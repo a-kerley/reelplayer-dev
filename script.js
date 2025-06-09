@@ -11,11 +11,18 @@ const wavesurfer = WaveSurfer.create({
 const loadingIndicator = document.getElementById('loading');
 loadingIndicator.style.display = 'block';
 
+wavesurfer.on('ready', () => {
+  if (loadingIndicator) loadingIndicator.remove();
+});
+
 wavesurfer.load(audioURL);
 
-wavesurfer.on('ready', () => {
-  loadingIndicator.remove();
-});
+// Fallback in case 'ready' doesn't fire
+setTimeout(() => {
+  if (wavesurfer.isReady && loadingIndicator) {
+    loadingIndicator.remove();
+  }
+}, 5000);
 
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
