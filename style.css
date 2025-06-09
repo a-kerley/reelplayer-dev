@@ -24,7 +24,7 @@
 
 /* Define your primary UI accent color */
 :root {
-  --ui-accent: #03002d; /* Change this to your preferred accent color */
+  --ui-accent: #00780c; /* Change this to your preferred accent color */
   --waveform-unplayed: #929292; /* unplayed waveform fill */
   --waveform-hover: rgba(0, 31, 103, 0.126); /* subtle hover highlight */
 }
@@ -58,7 +58,7 @@ button,
   position: absolute;
   bottom: -1.5rem;
   left: 0;
-  color: --ui-accent;
+  color: var(--ui-accent);
   font-size: 0.75rem;
   font-weight: 400;
   padding: 0 0.3rem;
@@ -74,7 +74,7 @@ button,
   position: absolute;
   bottom: -1.5rem;
   left: 0;
-  color: --ui-accent;
+  color: var(--ui-accent);
   font-size: 0.75rem;
   font-weight: 400;
   padding: 0 0.5rem;
@@ -90,7 +90,7 @@ button,
   position: absolute;
   bottom: 60%;
   right: 0.3rem;
-  color: var(--ui---waveform-unplayed);
+  color: var(--waveform-unplayed);
   font-size: 0.65rem;
   font-weight: 200;
   pointer-events: none;
@@ -320,4 +320,30 @@ button {
   height: 46px;
   padding-top: 0.2rem;
   color: var(--ui-accent);
+}
+
+/* Playlist styles */
+.playlist {
+  margin-top: 2.5rem;
+  max-width: 700px;
+  margin-left: auto;
+  margin-right: auto;
+  text-align: left;
+}
+
+.playlist-item {
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #ddd;
+  user-select: none;
+}
+
+.playlist-item:hover {
+  background-color: #f0f0f0;
+}
+
+.playlist-item.active {
+  background-color: var(--ui-accent);
+  color: white;
+  font-weight: 600;
 }

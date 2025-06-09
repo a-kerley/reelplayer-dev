@@ -1,5 +1,13 @@
-const audioURL =
-  "https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1";
+// Convert Dropbox share link to direct download link
+function convertDropboxLinkToDirect(url) {
+  if (!url.includes("dropbox.com")) return url;
+
+  return url
+    .replace("www.dropbox.com", "dl.dropboxusercontent.com")
+    .replace("dropbox.com", "dl.dropboxusercontent.com")
+    .replace("?dl=0", "?dl=1")
+    .replace("&dl=0", "&dl=1");
+}
 
 const rootStyles = getComputedStyle(document.documentElement);
 const accentColor = rootStyles.getPropertyValue("--ui-accent").trim();
@@ -24,7 +32,48 @@ document.addEventListener("DOMContentLoaded", () => {
 
   const loadingIndicator = document.getElementById("loading");
 
-  wavesurfer.load(audioURL);
+  // Load playlist and initialize first track
+  fetch('playlist.json')
+    .then(res => res.json())
+    .then(playlist => {
+      if (!playlist.length) return;
+      renderPlaylist(playlist);
+      const firstTrack = playlist[0];
+      const convertedURL = convertDropboxLinkToDirect(firstTrack.url);
+      initializePlayer(convertedURL, firstTrack.title, 0);
+    });
+
+  function renderPlaylist(playlist) {
+    const playlistEl = document.getElementById('playlist');
+    playlistEl.innerHTML = '';
+    playlist.forEach((track, index) => {
+      const trackEl = document.createElement('div');
+      trackEl.className = 'playlist-item';
+      trackEl.textContent = track.title || track.url.split('/').pop();
+      trackEl.dataset.index = index;
+
+      trackEl.addEventListener('click', () => {
+        const url = convertDropboxLinkToDirect(track.url);
+        initializePlayer(url, track.title, index);
+      });
+
+      playlistEl.appendChild(trackEl);
+    });
+  }
+
+  function initializePlayer(audioURL, title, index) {
+    const fileName = title || audioURL.split("/").pop().split("?")[0].replace(/_/g, " ").replace(/\.[^/.]+$/, "");
+    document.querySelector(".track-info").textContent = fileName;
+    wavesurfer.load(audioURL);
+
+    // Highlight active playlist item
+    const items = document.querySelectorAll(".playlist-item");
+    items.forEach(el => el.classList.remove("active"));
+    if (typeof index === "number") {
+      const activeItem = document.querySelector(`.playlist-item[data-index="${index}"]`);
+      if (activeItem) activeItem.classList.add("active");
+    }
+  }
 
   playheadTime.style.opacity = "0"; // start hidden
 
@@ -276,11 +325,7 @@ setTimeout(() => {
   }
 }, 5000);
 
-const fileNameRaw = audioURL.split("/").pop().split("?")[0];
-const fileName = fileNameRaw
-  .replace(/_/g, " ") // replace underscores with spaces
-  .replace(/\.[^/.]+$/, ""); // remove file extension
-document.querySelector(".track-info").textContent = fileName;
+// Track info is set in initializePlayer after loading playlist
 
 document.addEventListener("keydown", (e) => {
   if (e.code === "Space") {
