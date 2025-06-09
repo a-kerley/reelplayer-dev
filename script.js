@@ -8,6 +8,16 @@ const wavesurfer = WaveSurfer.create({
 
 wavesurfer.load('https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1');
 
-document.getElementById('playPause').onclick = () => {
+const playPauseBtn = document.getElementById('playPause');
+
+playPauseBtn.onclick = () => {
   wavesurfer.playPause();
 };
+
+wavesurfer.on('play', () => {
+  playPauseBtn.textContent = '⏸️';
+});
+
+wavesurfer.on('pause', () => {
+  playPauseBtn.textContent = '▶️';
+});

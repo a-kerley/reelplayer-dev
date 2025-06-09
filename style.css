@@ -17,3 +17,27 @@ button {
   color: #fff;
   cursor: pointer;
 }
+
+.player-container {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 1rem;
+  max-width: 700px;
+  margin: 1rem auto;
+}
+
+.icon-button {
+  background: none;
+  border: none;
+  font-size: 2rem;
+  cursor: pointer;
+  padding: 0;
+  color: #333;
+}
+
+.track-info {
+  font-size: 0.9rem;
+  color: #555;
+  margin-top: 0.5rem;
+}
