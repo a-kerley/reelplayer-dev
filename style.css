@@ -1,0 +1,19 @@
+body {
+  font-family: sans-serif;
+  padding: 2rem;
+  background: #f8f8f8;
+  text-align: center;
+}
+#waveform {
+  width: 100%;
+  max-width: 600px;
+  margin: 2rem auto;
+}
+button {
+  padding: 0.5rem 1rem;
+  font-size: 1rem;
+  border: none;
+  background: #333;
+  color: #fff;
+  cursor: pointer;
+}
