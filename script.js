@@ -6,7 +6,7 @@ const wavesurfer = WaveSurfer.create({
   responsive: true,
 });
 
-wavesurfer.load('https://dl.dropboxusercontent.com/s/abc123xyz/track1.mp3'); // Replace with your real Dropbox link
+wavesurfer.load('https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1');
 
 document.getElementById('playPause').onclick = () => {
   wavesurfer.playPause();
