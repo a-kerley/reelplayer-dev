@@ -11,11 +11,39 @@ const wavesurfer = WaveSurfer.create({
 const loadingIndicator = document.getElementById('loading');
 loadingIndicator.style.display = 'block';
 
-const playPauseBtn = document.getElementById('playPause');
+document.addEventListener('DOMContentLoaded', () => {
+  const playPauseBtn = document.getElementById('playPause');
+  wavesurfer.on('ready', () => {
+    if (loadingIndicator) loadingIndicator.remove();
+    playPauseBtn.style.display = 'inline-block';
+  });
 
-wavesurfer.on('ready', () => {
-  if (loadingIndicator) loadingIndicator.remove();
-  playPauseBtn.style.display = 'inline-block';
+  playPauseBtn.onclick = () => {
+    wavesurfer.playPause();
+  };
+
+  wavesurfer.on('play', () => {
+    playPauseBtn.textContent = '⏸️';
+  });
+
+  wavesurfer.on('pause', () => {
+    playPauseBtn.textContent = '▶️';
+  });
+
+  // Volume controls
+  const volumeToggle = document.getElementById('volumeToggle');
+  const volumeSlider = document.getElementById('volumeSlider');
+  if (volumeToggle && volumeSlider) {
+    volumeToggle.addEventListener('click', () => {
+      volumeSlider.style.display = 'block';
+    });
+    volumeSlider.addEventListener('mouseleave', () => {
+      volumeSlider.style.display = 'none';
+    });
+    volumeSlider.addEventListener('input', (e) => {
+      wavesurfer.setVolume(e.target.value);
+    });
+  }
 });
 
 wavesurfer.load(audioURL);
@@ -30,14 +58,3 @@ setTimeout(() => {
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
 
-playPauseBtn.onclick = () => {
-  wavesurfer.playPause();
-};
-
-wavesurfer.on('play', () => {
-  playPauseBtn.textContent = '⏸️';
-});
-
-wavesurfer.on('pause', () => {
-  playPauseBtn.textContent = '▶️';
-});

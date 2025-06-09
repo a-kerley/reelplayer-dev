@@ -1,3 +1,25 @@
+
+.waveform-and-volume {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+.volume-control {
+  position: relative;
+  display: flex;
+  flex-direction: column-reverse;
+  align-items: center;
+}
+
+#volumeSlider {
+  display: none;
+  writing-mode: bt-lr;
+  -webkit-appearance: slider-vertical;
+  width: 30px;
+  height: 100px;
+  margin-bottom: 0.5rem;
+}
 body {
   font-family: sans-serif;
   padding: 2rem;
