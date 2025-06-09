@@ -33,9 +33,19 @@ document.addEventListener("DOMContentLoaded", () => {
   const loadingIndicator = document.getElementById("loading");
 
   // Load playlist and initialize first track
-  fetch('playlist.json')
-    .then(res => res.json())
-    .then(playlist => {
+  fetch('playlist.txt')
+    .then(res => res.text())
+    .then(text => {
+      const links = text
+        .split('\n')
+        .map(line => line.trim())
+        .filter(line => line.length > 0);
+
+      const playlist = links.map(url => ({
+        title: null,
+        url: url
+      }));
+
       if (!playlist.length) return;
       renderPlaylist(playlist);
       const firstTrack = playlist[0];
@@ -49,8 +59,18 @@ document.addEventListener("DOMContentLoaded", () => {
     playlist.forEach((track, index) => {
       const trackEl = document.createElement('div');
       trackEl.className = 'playlist-item';
-      trackEl.textContent = track.title || track.url.split('/').pop();
       trackEl.dataset.index = index;
+
+      const titleEl = document.createElement('span');
+      titleEl.textContent = track.title || track.url.split("/").pop().split("?")[0].replace(/[_-]/g, " ").replace(/\.[^/.]+$/, "");
+      titleEl.style.flex = '1';
+
+      const durationEl = document.createElement('span');
+      durationEl.className = 'playlist-duration';
+      durationEl.textContent = '...';
+
+      trackEl.appendChild(titleEl);
+      trackEl.appendChild(durationEl);
 
       trackEl.addEventListener('click', () => {
         const url = convertDropboxLinkToDirect(track.url);
@@ -58,11 +78,25 @@ document.addEventListener("DOMContentLoaded", () => {
       });
 
       playlistEl.appendChild(trackEl);
+
+      // Load audio metadata to get duration
+      const audio = new Audio(convertDropboxLinkToDirect(track.url));
+      audio.addEventListener('loadedmetadata', () => {
+        const minutes = Math.floor(audio.duration / 60);
+        const seconds = Math.floor(audio.duration % 60)
+          .toString()
+          .padStart(2, '0');
+        durationEl.textContent = `${minutes}:${seconds}`;
+      });
     });
   }
 
   function initializePlayer(audioURL, title, index) {
-    const fileName = title || audioURL.split("/").pop().split("?")[0].replace(/_/g, " ").replace(/\.[^/.]+$/, "");
+    // Show loading indicator immediately when switching tracks
+    if (loadingIndicator) {
+      loadingIndicator.classList.remove("hidden");
+    }
+    const fileName = title || audioURL.split("/").pop().split("?")[0].replace(/[_-]/g, " ").replace(/\.[^/.]+$/, "");
     document.querySelector(".track-info").textContent = fileName;
     wavesurfer.load(audioURL);
 

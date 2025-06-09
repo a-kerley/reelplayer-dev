@@ -24,9 +24,10 @@
 
 /* Define your primary UI accent color */
 :root {
-  --ui-accent: #00780c; /* Change this to your preferred accent color */
+  --ui-accent: #2a0026; /* Change this to your preferred accent color */
   --waveform-unplayed: #929292; /* unplayed waveform fill */
   --waveform-hover: rgba(0, 31, 103, 0.126); /* subtle hover highlight */
+  --player-border-color: #ffffff;
 }
 
 /* Use the accent color for text elements */
@@ -140,7 +141,8 @@ button,
 .loading.hidden {
   opacity: 0;
   pointer-events: none;
-  transition: opacity 0.4s ease;
+  transform: translateY(-20px);
+  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 #volumeSlider {
@@ -324,14 +326,17 @@ button {
 
 /* Playlist styles */
 .playlist {
-  margin-top: 2.5rem;
-  max-width: 700px;
-  margin-left: auto;
+  margin-top: 2.7rem;
+  max-width: 4000px;
+  margin-left: 4rem;
   margin-right: auto;
   text-align: left;
 }
 
 .playlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
   padding: 0.5rem 1rem;
   cursor: pointer;
   border-bottom: 1px solid #ddd;
@@ -346,4 +351,25 @@ button {
   background-color: var(--ui-accent);
   color: white;
   font-weight: 600;
+}
+
+.playlist-duration {
+  margin-left: 1rem;
+  color: #666;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.playlist-item.active .playlist-duration {
+  color: white;
+  font-weight: 600;
+}
+
+.player-box {
+  border: 1px solid var(--player-border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
 }
