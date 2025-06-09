@@ -38,11 +38,10 @@ document.addEventListener("DOMContentLoaded", () => {
     setTimeout(() => {
       const canvas = document.querySelector("#waveform canvas");
       if (canvas) canvas.style.opacity = "1";
+      // Reset play button opacity to visible after display set
+      playPauseBtn.style.opacity = "1";
+      playPauseBtn.style.color = accentColor;
     }, 50);
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim();
-
-    playPauseBtn.style.opacity = "1";
-    playPauseBtn.style.color = accentColor;
 
     if (volumeControl) {
       volumeControl.style.opacity = "1";
@@ -58,8 +57,11 @@ document.addEventListener("DOMContentLoaded", () => {
     const totalTime = document.getElementById("total-time");
     const duration = wavesurfer.getDuration();
     const minutes = Math.floor(duration / 60);
-    const seconds = Math.floor(duration % 60).toString().padStart(2, "0");
+    const seconds = Math.floor(duration % 60)
+      .toString()
+      .padStart(2, "0");
     if (totalTime) totalTime.textContent = `${minutes}:${seconds}`;
+    if (totalTime) totalTime.classList.add("visible");
 
     // Enable hover time display only after waveform is ready
     waveformEl.addEventListener("mousemove", (e) => {
@@ -89,12 +91,13 @@ document.addEventListener("DOMContentLoaded", () => {
       )}px`;
 
       // Hide hover time if close to current playhead time to avoid overlap
+      const isPlaying = wavesurfer.isPlaying();
       const currentTime = wavesurfer.getCurrentTime();
       const hoverDiff = Math.abs(time - currentTime);
 
-      const threshold = 5; // muber of seconds to consider "close"
+      const threshold = 5;
 
-      if (hoverDiff < threshold) {
+      if (isPlaying && hoverDiff < threshold) {
         hoverTime.style.opacity = "0";
       } else {
         hoverTime.style.opacity = "1";

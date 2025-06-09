@@ -3,7 +3,17 @@
   transition: opacity 0.4s ease;
 }
 
-#playPause,
+#playPause {
+  opacity: 0;
+  color: #888888;
+  transition: opacity 0.4s ease, color 0.4s ease, transform 0.2s ease;
+  display: inline-flex;
+}
+
+#playPause:hover {
+  transform: scale(1.1);
+}
+
 .volume-control {
   opacity: 0.5;
   color: #888888;
@@ -14,7 +24,7 @@
 
 /* Define your primary UI accent color */
 :root {
-  --ui-accent: #001f67; /* Change this to your preferred accent color */
+  --ui-accent: #03002d; /* Change this to your preferred accent color */
   --waveform-unplayed: #929292; /* unplayed waveform fill */
   --waveform-hover: rgba(0, 31, 103, 0.126); /* subtle hover highlight */
 }
@@ -87,6 +97,11 @@ button,
   user-select: none;
   white-space: nowrap;
   z-index: 10;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+.total-time.visible {
+  opacity: 1;
 }
 
 .waveform-and-volume {
@@ -303,5 +318,6 @@ button {
 .heroicon {
   width: 46px;
   height: 46px;
+  padding-top: 0.2rem;
   color: var(--ui-accent);
 }
