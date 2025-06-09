@@ -48,8 +48,32 @@ button {
 }
 
 .loading {
-  font-size: 0.9rem;
+  font-size: 1rem;
   color: #999;
-  margin-left: 2.5rem;
-  margin-bottom: 0.5rem;
+  text-align: left;
+  padding-left: 0.5rem;
+  line-height: 100px;
+}
+
+.dot {
+  animation: blink 1.4s infinite;
+  opacity: 0;
+}
+
+.dot.one {
+  animation-delay: 0s;
+}
+
+.dot.two {
+  animation-delay: 0.2s;
+}
+
+.dot.three {
+  animation-delay: 0.4s;
+}
+
+@keyframes blink {
+  0%   { opacity: 0; }
+  50%  { opacity: 1; }
+  100% { opacity: 0; }
 }

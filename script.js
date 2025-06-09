@@ -14,7 +14,7 @@ loadingIndicator.style.display = 'block';
 wavesurfer.load(audioURL);
 
 wavesurfer.on('ready', () => {
-  loadingIndicator.style.display = 'none';
+  loadingIndicator.remove();
 });
 
 const fileName = audioURL.split('/').pop().split('?')[0];
