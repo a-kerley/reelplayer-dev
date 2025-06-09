@@ -8,7 +8,14 @@ const wavesurfer = WaveSurfer.create({
   responsive: true,
 });
 
+const loadingIndicator = document.getElementById('loading');
+loadingIndicator.style.display = 'block';
+
 wavesurfer.load(audioURL);
+
+wavesurfer.on('ready', () => {
+  loadingIndicator.style.display = 'none';
+});
 
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
