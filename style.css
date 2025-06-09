@@ -3,6 +3,7 @@
   align-items: stretch;
   gap: 0.5rem;
   flex-grow: 1;
+  height: 100px;
 }
 
 .volume-control {
@@ -30,7 +31,7 @@ body {
   flex: 1;
   width: 100%;
   max-width: 600px;
-  margin: 2rem auto;
+  /* margin: 2rem auto; */
 }
 button {
   padding: 0.5rem 1rem;
