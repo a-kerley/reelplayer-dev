@@ -11,8 +11,11 @@ const wavesurfer = WaveSurfer.create({
 const loadingIndicator = document.getElementById('loading');
 loadingIndicator.style.display = 'block';
 
+const playPauseBtn = document.getElementById('playPause');
+
 wavesurfer.on('ready', () => {
   if (loadingIndicator) loadingIndicator.remove();
+  playPauseBtn.style.display = 'inline-block';
 });
 
 wavesurfer.load(audioURL);
@@ -26,8 +29,6 @@ setTimeout(() => {
 
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
-
-const playPauseBtn = document.getElementById('playPause');
 
 playPauseBtn.onclick = () => {
   wavesurfer.playPause();
