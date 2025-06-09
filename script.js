@@ -1,24 +1,144 @@
 const audioURL =
   "https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1";
 
+const rootStyles = getComputedStyle(document.documentElement);
+const accentColor = rootStyles.getPropertyValue("--ui-accent").trim();
+const unplayedColor = rootStyles.getPropertyValue("--waveform-unplayed").trim();
+
 const wavesurfer = WaveSurfer.create({
   container: "#waveform",
-  waveColor: "#ddd",
-  progressColor: "#333",
+  waveColor: unplayedColor,
+  progressColor: accentColor,
   height: 100,
   responsive: true,
 });
 
-const loadingIndicator = document.getElementById("loading");
-loadingIndicator.style.display = "block";
+const waveformEl = document.getElementById("waveform");
+const hoverOverlay = document.querySelector(".hover-overlay");
+const hoverTime = document.querySelector(".hover-time");
 
 document.addEventListener("DOMContentLoaded", () => {
   const playPauseBtn = document.getElementById("playPause");
   const volumeControl = document.querySelector(".volume-control");
+  const playheadTime = document.querySelector(".playhead-time");
+
+  const loadingIndicator = document.getElementById("loading");
+
+  wavesurfer.load(audioURL);
+
+  playheadTime.style.opacity = "0"; // start hidden
+
   wavesurfer.on("ready", () => {
-    if (loadingIndicator) loadingIndicator.remove();
+    if (loadingIndicator) {
+      loadingIndicator.classList.add("hidden");
+    }
     playPauseBtn.style.display = "inline-block";
     if (volumeControl) volumeControl.classList.remove("hidden");
+    // Fade in waveform, play button, and volume control
+    setTimeout(() => {
+      const canvas = document.querySelector("#waveform canvas");
+      if (canvas) canvas.style.opacity = "1";
+    }, 50);
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim();
+
+    playPauseBtn.style.opacity = "1";
+    playPauseBtn.style.color = accentColor;
+
+    if (volumeControl) {
+      volumeControl.style.opacity = "1";
+      volumeControl.style.color = accentColor;
+    }
+    playheadTime.style.opacity = "0";
+    const trackInfo = document.querySelector(".track-info");
+    if (trackInfo) {
+      trackInfo.classList.add("visible");
+    }
+
+    // Add total time display update
+    const totalTime = document.getElementById("total-time");
+    const duration = wavesurfer.getDuration();
+    const minutes = Math.floor(duration / 60);
+    const seconds = Math.floor(duration % 60).toString().padStart(2, "0");
+    if (totalTime) totalTime.textContent = `${minutes}:${seconds}`;
+
+    // Enable hover time display only after waveform is ready
+    waveformEl.addEventListener("mousemove", (e) => {
+      const rect = waveformEl.getBoundingClientRect();
+      const percent = Math.min(
+        Math.max((e.clientX - rect.left) / rect.width, 0),
+        1
+      );
+      const duration = wavesurfer.getDuration();
+      const time = duration * percent;
+
+      // Update overlay width
+      hoverOverlay.style.width = `${percent * 100}%`;
+
+      // Update hover time text
+      const minutes = Math.floor(time / 60);
+      const seconds = Math.floor(time % 60)
+        .toString()
+        .padStart(2, "0");
+      const timeText = `${minutes}:${seconds}`;
+      hoverTime.textContent = timeText;
+
+      const pixelX = e.clientX - rect.left;
+      hoverTime.style.left = `${Math.max(
+        Math.min(pixelX, rect.width - 40),
+        30
+      )}px`;
+
+      // Hide hover time if close to current playhead time to avoid overlap
+      const currentTime = wavesurfer.getCurrentTime();
+      const hoverDiff = Math.abs(time - currentTime);
+
+      const threshold = 5; // muber of seconds to consider "close"
+
+      if (hoverDiff < threshold) {
+        hoverTime.style.opacity = "0";
+      } else {
+        hoverTime.style.opacity = "1";
+      }
+    });
+
+    waveformEl.addEventListener("mouseleave", () => {
+      hoverOverlay.style.width = `0%`;
+      hoverTime.style.opacity = "0";
+    });
+  });
+
+  wavesurfer.on("play", () => {
+    playheadTime.style.opacity = "1";
+  });
+
+  wavesurfer.on("pause", () => {
+    playheadTime.style.opacity = "0";
+  });
+
+  wavesurfer.on("finish", () => {
+    playheadTime.style.opacity = "0";
+  });
+
+  wavesurfer.on("audioprocess", () => {
+    const currentTime = wavesurfer.getCurrentTime();
+    const duration = wavesurfer.getDuration();
+    const minutes = Math.floor(currentTime / 60);
+    const seconds = Math.floor(currentTime % 60)
+      .toString()
+      .padStart(2, "0");
+
+    playheadTime.textContent = `${minutes}:${seconds}`;
+
+    // position the playhead time relative to playhead
+    const percent = currentTime / duration;
+    const pixelX = percent * waveformEl.clientWidth;
+
+    // Adjust left to center the label (assuming ~40px wide)
+    const clampedX = Math.min(
+      Math.max(pixelX, 20), // min left boundary
+      waveformEl.clientWidth - 40 // max right boundary
+    );
+    playheadTime.style.left = `${clampedX}px`;
   });
 
   playPauseBtn.onclick = () => {
@@ -145,16 +265,18 @@ document.addEventListener("DOMContentLoaded", () => {
   }
 });
 
-wavesurfer.load(audioURL);
-
 // Fallback in case 'ready' doesn't fire
 setTimeout(() => {
-  if (wavesurfer.isReady && loadingIndicator) {
-    loadingIndicator.remove();
+  const loadingFallback = document.getElementById("loading");
+  if (wavesurfer.isReady && loadingFallback) {
+    loadingFallback.classList.add("hidden");
   }
 }, 5000);
 
-const fileName = audioURL.split("/").pop().split("?")[0];
+const fileNameRaw = audioURL.split("/").pop().split("?")[0];
+const fileName = fileNameRaw
+  .replace(/_/g, " ") // replace underscores with spaces
+  .replace(/\.[^/.]+$/, ""); // remove file extension
 document.querySelector(".track-info").textContent = fileName;
 
 document.addEventListener("keydown", (e) => {

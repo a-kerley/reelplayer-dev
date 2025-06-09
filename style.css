@@ -1,3 +1,94 @@
+#waveform > canvas {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+#playPause,
+.volume-control {
+  opacity: 0.5;
+  color: #888888;
+  transition: opacity 0.4s ease, color 0.4s ease;
+  display: inline-flex;
+}
+@import url("https://fonts.googleapis.com/css2?family=Lato:ital,wght@0,100;0,300;0,400;0,700;0,900;1,100;1,300;1,400;1,700;1,900&family=Raleway:ital,wght@0,100..900;1,100..900&display=swap");
+
+/* Define your primary UI accent color */
+:root {
+  --ui-accent: #001f67; /* Change this to your preferred accent color */
+  --waveform-unplayed: #929292; /* unplayed waveform fill */
+  --waveform-hover: rgba(0, 31, 103, 0.126); /* subtle hover highlight */
+}
+
+/* Use the accent color for text elements */
+.hover-time,
+.playhead-time,
+.icon-button,
+button,
+.heroicon {
+  color: var(--ui-accent);
+}
+
+#waveform {
+  position: relative;
+  overflow: visible;
+}
+
+.hover-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  height: 100%;
+  background-color: var(--waveform-hover);
+  pointer-events: none;
+  width: 0;
+  z-index: 4;
+}
+
+.hover-time {
+  position: absolute;
+  bottom: -1.5rem;
+  left: 0;
+  color: --ui-accent;
+  font-size: 0.75rem;
+  font-weight: 400;
+  padding: 0 0.3rem;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.2s ease;
+  white-space: nowrap;
+  z-index: 10;
+  transform: translateX(-50%);
+}
+
+.playhead-time {
+  position: absolute;
+  bottom: -1.5rem;
+  left: 0;
+  color: --ui-accent;
+  font-size: 0.75rem;
+  font-weight: 400;
+  padding: 0 0.5rem;
+  pointer-events: none;
+  white-space: nowrap;
+  z-index: 10;
+  opacity: 0; /* initially hidden */
+  transition: opacity 0.2s ease;
+  transform: translateX(-50%);
+}
+
+.total-time {
+  position: absolute;
+  bottom: 60%;
+  right: 0.3rem;
+  color: var(--ui---waveform-unplayed);
+  font-size: 0.65rem;
+  font-weight: 200;
+  pointer-events: none;
+  user-select: none;
+  white-space: nowrap;
+  z-index: 10;
+}
+
 .waveform-and-volume {
   display: flex;
   align-items: center;
@@ -20,7 +111,21 @@
   height: 32px;
 }
 .hidden {
-  display: none;
+  opacity: 0;
+  pointer-events: none;
+  transform: translateY(10px);
+  transition: opacity 0.3s ease, transform 0.3s ease;
+  display: block !important;
+}
+
+.loading {
+  opacity: 1;
+  transition: opacity 0.4s ease;
+}
+.loading.hidden {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.4s ease;
 }
 
 #volumeSlider {
@@ -33,11 +138,11 @@
   -webkit-appearance: none;
   appearance: none;
   width: 6px;
-  height: 100px;
+  height: 80px;
   position: absolute;
-  bottom: 75%;
-  margin-bottom: 0.05rem;
-  background: #ccc;
+  bottom: 80%;
+  margin-bottom: 0.01rem;
+  background: var(--waveform-unplayed);
   border-radius: 6px;
   outline: none;
   cursor: pointer;
@@ -52,15 +157,13 @@
   pointer-events: auto;
 }
 
-
-
 #volumeSlider::-webkit-slider-thumb {
   -webkit-appearance: none;
   appearance: none;
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #383838;
+  background: var(--ui-accent);
   border: none;
   cursor: pointer;
 }
@@ -69,16 +172,19 @@
   width: 16px;
   height: 16px;
   border-radius: 50%;
-  background: #000;
+  background: var(--ui-accent);
   border: none;
   cursor: pointer;
 }
 body {
-  font-family: sans-serif;
+  font-family: "Raleway", sans-serif;
+  font-weight: 600;
+  font-style: normal;
   padding: 2rem;
   background: #f8f8f8;
   text-align: center;
 }
+
 #waveform {
   flex: 1;
   width: 100%;
@@ -88,7 +194,7 @@ button {
   padding: 0.5rem 1rem;
   font-size: 1rem;
   border: none;
-  background: #333;
+  background: var(--ui-accent);
   color: #fff;
   cursor: pointer;
 }
@@ -97,7 +203,7 @@ button {
   display: flex;
   justify-content: center;
   gap: 1.5rem;
-  max-width: 2000px;
+  max-width: 4000px;
   margin: 1rem auto;
   align-items: center;
 }
@@ -120,22 +226,49 @@ button {
 }
 
 .track-info {
-  margin-bottom: 0.5rem;
-  padding-left: 0;
+  display: block; /* always occupy space */
+  min-height: 1.2rem; /* reserve vertical space */
+  opacity: 0;
+  visibility: hidden;
+  transition: opacity 0.4s ease, visibility 0.4s ease;
+  margin-bottom: 0.75rem;
+  margin-left: 3.7rem;
+  padding-left: 0.5rem;
+  font-size: 0.9rem;
+  font-weight: 600;
+  color: var(--ui-accent);
+  font-style: normal;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.track-info.visible {
+  opacity: 1;
+  visibility: visible;
 }
 
 .player-wrapper {
-  max-width: 700px;
+  max-width: 100%;
   margin: 0 auto;
   text-align: left;
 }
 
 .loading {
-  font-size: 1rem;
-  color: #999;
-  text-align: left;
+  position: absolute;
+  top: 0;
+  left: 0;
+  z-index: 10;
+  background: rgba(255, 255, 255, 0.8);
+  width: 100%;
+  height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: left;
   padding-left: 0.5rem;
-  line-height: 100px;
+  font-weight: bold;
+  color: #999;
+  line-height: normal;
 }
 
 .dot {
@@ -170,5 +303,5 @@ button {
 .heroicon {
   width: 46px;
   height: 46px;
-  color: #333;
+  color: var(--ui-accent);
 }
