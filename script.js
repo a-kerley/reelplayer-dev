@@ -59,3 +59,10 @@ setTimeout(() => {
 
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
+
+document.addEventListener('keydown', (e) => {
+  if (e.code === 'Space') {
+    e.preventDefault();
+    wavesurfer.playPause();
+  }
+});
