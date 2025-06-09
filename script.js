@@ -13,9 +13,11 @@ loadingIndicator.style.display = 'block';
 
 document.addEventListener('DOMContentLoaded', () => {
   const playPauseBtn = document.getElementById('playPause');
+  const volumeControl = document.querySelector('.volume-control');
   wavesurfer.on('ready', () => {
     if (loadingIndicator) loadingIndicator.remove();
     playPauseBtn.style.display = 'inline-block';
+    if (volumeControl) volumeControl.style.display = 'flex';
   });
 
   playPauseBtn.onclick = () => {
@@ -57,4 +59,3 @@ setTimeout(() => {
 
 const fileName = audioURL.split('/').pop().split('?')[0];
 document.querySelector('.track-info').textContent = fileName;
-
