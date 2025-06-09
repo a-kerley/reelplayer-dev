@@ -1,3 +1,5 @@
+const audioURL = 'https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1';
+
 const wavesurfer = WaveSurfer.create({
   container: '#waveform',
   waveColor: '#ddd',
@@ -6,7 +8,10 @@ const wavesurfer = WaveSurfer.create({
   responsive: true,
 });
 
-wavesurfer.load('https://dl.dropboxusercontent.com/scl/fi/aac6ay1oyy2qp1cpfj93t/Sparkle_Sun_CharachterSuite_FullMix_-BoxedApe.wav?rlkey=dcz7tuj5i4z63kubay79yx89p&st=mbhllbd1');
+wavesurfer.load(audioURL);
+
+const fileName = audioURL.split('/').pop().split('?')[0];
+document.querySelector('.track-info').textContent = fileName;
 
 const playPauseBtn = document.getElementById('playPause');
 

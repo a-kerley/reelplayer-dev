@@ -37,18 +37,12 @@ button {
 }
 
 .track-info {
-  font-size: 0.9rem;
-  color: #555;
-  margin-top: 0.5rem;
+  margin-bottom: 0.5rem;
+  padding-left: 0;
 }
 
 .player-wrapper {
   max-width: 700px;
   margin: 0 auto;
   text-align: left;
-}
-
-.track-info {
-  margin-bottom: 0.5rem;
-  padding-left: 2.5rem;
 }
