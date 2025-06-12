@@ -129,20 +129,14 @@ button,
 .hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(10px);
-  transition: opacity 0.3s ease, transform 0.3s ease;
+  /* Removed transform: translateY(10px); */
+  transition: opacity 0.3s ease;
   display: block !important;
 }
 
-.loading {
-  opacity: 1;
-  transition: opacity 0.4s ease;
-}
 .loading.hidden {
   opacity: 0;
   pointer-events: none;
-  transform: translateY(-20px);
-  transition: opacity 0.4s ease, transform 0.4s ease;
 }
 
 #volumeSlider {
@@ -266,9 +260,11 @@ button {
 }
 
 .player-wrapper {
+  position: relative;
   max-width: 100%;
   margin: 0 auto;
   text-align: left;
+  min-height: 120px; /* adjust as needed */
 }
 
 .loading {
@@ -284,7 +280,7 @@ button {
   justify-content: left;
   padding-left: 0.5rem;
   font-weight: bold;
-  color: #999;
+  color: #666666;
   line-height: normal;
 }
 
