@@ -1,0 +1,39 @@
+.playlist {
+  margin-top: 2.7rem;
+  max-width: 4000px;
+  margin-left: 4rem;
+  margin-right: auto;
+  text-align: left;
+}
+
+.playlist-item {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 0.5rem 1rem;
+  cursor: pointer;
+  border-bottom: 1px solid #ddd;
+  user-select: none;
+}
+
+.playlist-item:hover {
+  background-color: #f0f0f0;
+}
+
+.playlist-item.active {
+  background-color: var(--ui-accent);
+  color: white;
+  font-weight: 600;
+}
+
+.playlist-duration {
+  margin-left: 1rem;
+  color: #666;
+  font-size: 0.85rem;
+  flex-shrink: 0;
+}
+
+.playlist-item.active .playlist-duration {
+  color: white;
+  font-weight: 600;
+}

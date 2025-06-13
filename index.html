@@ -4,70 +4,57 @@
     <meta charset="UTF-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Reel</title>
-    <link rel="stylesheet" href="style.css" />
+    <!-- Pickr Color Picker -->
+    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css"/>
+    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr"></script>
+    <link rel="stylesheet" href="css/style.css" />
   </head>
   <body>
-    <h1>My Reel</h1>
-    <div class="player-wrapper">
-      <div class="track-info"></div>
-      <div class="player-container">
-        <button id="playPause" class="icon-button">
-          <!-- Play icon -->
-          <svg
-            xmlns="http://www.w3.org/2000/svg"
-            viewBox="0 0 24 24"
-            fill="currentColor"
-            class="heroicon"
-          >
-            <path
-              fill-rule="evenodd"
-              d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z"
-              clip-rule="evenodd"
-            />
-          </svg>
-        </button>
-        <div class="waveform-and-volume">
-          <div id="waveform">
-            <div class="hover-overlay"></div>
-            <div class="hover-time">0:00</div>
-            <div class="playhead-time">0:00</div>
-            <div id="total-time" class="total-time">0:00</div>
-            <div id="loading" class="loading">
-              Loading<span class="dot one">.</span><span class="dot two">.</span
-              ><span class="dot three">.</span>
+    <!-- === Builder UI (start) === -->
+    <div class="builder-app">
+      <aside class="builder-sidebar">
+        <button id="newReelBtn">+ New Reel</button>
+        <ul id="reelList"></ul>
+      </aside>
+      <main class="builder-main">
+        <form id="reelForm" autocomplete="off">
+          <label>
+            Title:
+            <input type="text" id="reelTitle" class="filename-display" />
+          </label>
+          <fieldset style="margin-top: 2rem; border: 1px solid #eee; border-radius: 8px; padding: 1rem;">
+            <legend style="font-size:1.1rem;font-weight:600;color:var(--builder-accent)">Player Colors</legend>
+            <div class="color-row">
+              <span>UI Accent:</span>
+              <button id="pickr-ui-accent" class="pickr-button" type="button"></button>
             </div>
-          </div>
-          <div class="volume-control hidden">
-            <button id="volumeToggle" class="icon-button">
-              <svg
-                xmlns="http://www.w3.org/2000/svg"
-                viewBox="0 0 24 24"
-                fill="currentColor"
-                class="heroicon"
-              >
-                <path
-                  d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.06 8.25 8.25 0 0 0 0-11.668.75.75 0 0 1 0-1.06Z"
-                />
-                <path
-                  d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"
-                />
-              </svg>
-            </button>
-            <input
-              type="range"
-              id="volumeSlider"
-              min="0"
-              max="1"
-              step="0.01"
-              value="1"
-            />
-          </div>
-        </div>
-      </div>
+            <div class="color-row">
+              <span>Waveform Unplayed:</span>
+              <button id="pickr-waveform-unplayed" class="pickr-button" type="button"></button>
+            </div>
+            <div class="color-row">
+              <span>Waveform Hover:</span>
+              <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
+            </div>
+            <div class="color-row">
+              <span>Player Border:</span>
+              <button id="pickr-player-border" class="pickr-button" type="button"></button>
+            </div>
+          </fieldset>
+          <label style="margin-top: 1rem; display: block">
+            <input type="checkbox" id="reelShowTitle" />
+            Display Reel Title in Player
+          </label>
+          <!-- Tracks editor section now inserted dynamically by JS in builder.js -->
+          <button type="button" id="exportEmbedBtn">Export Embed Code</button>
+        </form>
+        <button type="button" id="refreshPreviewBtn" style="margin-top:1.2rem;margin-bottom:1.2rem;">Refresh Preview</button>
+        <div id="reelPlayerPreview"></div>
+      </main>
     </div>
-    <div id="playlist" class="playlist"></div>
+    <!-- === Builder UI (end) === -->
 
     <script src="https://unpkg.com/wavesurfer.js"></script>
-    <script type="module" src="main.js"></script>
+    <script type="module" src="js/main.js"></script>
   </body>
 </html>

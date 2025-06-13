@@ -1,0 +1,355 @@
+html,
+body {
+  height: 100%;
+}
+
+body {
+  min-height: 100vh;
+  margin: 0;
+}
+
+.builder-app {
+  display: flex;
+  flex-direction: row;
+  min-height: 100vh;
+  height: 100vh;
+  gap: 2.5rem;
+  align-items: stretch;
+}
+
+.builder-sidebar {
+  min-width: 220px;
+  background: var(--builder-bg);
+  border: 1px solid var(--builder-border);
+  box-shadow: 0 2px 10px 0 var(--builder-sidebar-shadow);
+  border-radius: 0 10px 10px 0;
+  padding: 1rem 0.5rem;
+  margin-right: 1rem;
+  height: 100vh;
+  display: flex;
+  flex-direction: column;
+  align-items: stretch;
+  box-sizing: border-box;
+}
+
+.track-drag-handle {
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  cursor: grab;
+  opacity: 0.6;
+  user-select: none;
+}
+.track-drag-handle svg {
+  display: block;
+  pointer-events: none;
+}
+.dragging {
+  opacity: 0.5;
+}
+.drag-over {
+  outline: 2px dashed #999;
+  background: #f3f3f3;
+}
+
+#tracksEditor input[type="text"] {
+  min-width: 14rem;
+  width: 18rem;
+  max-width: 100%;
+  font-size: 0.8rem;
+}
+
+#reelTitle {
+  margin-bottom: 1rem;
+}
+
+#reelShowTitle {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--builder-accent);
+  margin-bottom: 1.5rem;
+}
+
+/* === START: Sidebar Reel List Section === */
+#reelList {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+#reelList li.active {
+  background: var(--builder-accent);
+  color: white;
+}
+
+#reelList li:hover {
+  background: var(--builder-hover);
+  color: white;
+}
+
+#reelList li {
+  width: 100%;
+  box-sizing: border-box;
+  display: flex;
+  align-items: center;
+  justify-content: space-between; /* ensures right-align */
+  padding: 0.5rem 0.7rem;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 1.05rem;
+  font-weight: 500;
+  color: #222;
+  background: none;
+  transition: background 0.18s, color 0.18s;
+  position: relative;
+  overflow: hidden;
+}
+
+#reelList li span {
+  flex: 1 1 auto;
+  min-width: 0;
+  cursor: pointer;
+  margin: 0;
+  padding-right: 0.6rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#reelList li .delete-reel-btn {
+  background: none;
+  border: none;
+  cursor: pointer;
+  padding: 0.15rem 0;
+  flex-shrink: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  transition: transform 0.12s;
+  color: inherit;
+  margin-left: auto; /* ✅ this makes the icon always hug the right edge */
+}
+
+#reelList li .delete-reel-btn svg {
+  color: inherit;
+  transition: color 0.15s, transform 0.15s;
+}
+
+#reelList li .delete-reel-btn:hover svg {
+  color: var(--builder-delete-hover);
+  transform: scale(1.23);
+}
+/* === END: Sidebar Reel List Section === */
+
+.builder-main {
+  flex: 1 1 0;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  padding-top: 2.2rem;
+  padding-right: 2.5rem;
+}
+
+#reelPlayerPreview {
+  margin-top: 4rem;
+}
+
+.builder-sidebar > #newReelBtn {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  background: var(--builder-accent);
+  color: white;
+  border-radius: 5px;
+  font-size: 1rem;
+  padding: 0.45rem 0;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.01em;
+}
+
+.phantom-track-row {
+  pointer-events: none; /* only button is clickable */
+  min-height: 32px;
+  margin-bottom: 0.5rem;
+}
+.phantom-track-row .track-remove-btn {
+  pointer-events: auto;
+  opacity: 1;
+}
+
+#addTrackBtn,
+#exportEmbedBtn {
+  background: var(--builder-accent);
+  color: white;
+  border: none;
+  border-radius: 4px;
+  padding: 0.4rem 0.8rem;
+  font-weight: 600;
+  cursor: pointer;
+  margin-top: 1rem;
+  transition: background 0.2s ease;
+}
+
+#addTrackBtn:hover,
+#exportEmbedBtn:hover {
+  background: var(--builder-hover);
+}
+
+/* === Track Add/Remove Button Styles === */
+.track-remove-btn,
+.track-add-btn {
+  background: none;
+  /* border: 1px solid var(--builder-border); */ /* border removed */
+  border-radius: 4px;
+  cursor: pointer;
+  transition: transform 0.15s;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+}
+.track-btn-svg {
+  width: 22px;
+  height: 22px;
+  display: block;
+  color: var(--builder-accent);
+  transition: transform 0.15s;
+}
+.track-remove-btn:hover .track-btn-svg,
+.track-add-btn:hover .track-btn-svg {
+  transform: scale(1.18);
+  /* No color or background change on hover */
+}
+.track-remove-btn:hover,
+.track-add-btn:hover {
+  /* background: var(--builder-hover); */
+  /* color: white; */
+  transform: scale(1.1);
+}
+
+/* Ensure .phantom-track-row .track-remove-btn is still present for pointer events */
+
+.track-remove-btn:hover .track-btn-svg {
+  color: #c00; /* red for minus */
+  transform: scale(1.18);
+}
+.track-remove-btn.add-btn:hover .track-btn-svg {
+  color: #219e36; /* green for plus */
+  transform: scale(1.18);
+}
+
+/* More compact color picker area */
+.color-row {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  margin-bottom: 0.2rem;
+  user-select: none;
+}
+
+.pickr-button,
+.pcr-button {
+  width: 20px !important;
+  height: 20px !important;
+  min-width: 20px !important;
+  min-height: 20px !important;
+  max-width: 20px !important;
+  max-height: 20px !important;
+  background: var(--ui-accent, #2a0026);
+  border: 1px solid #bbb;
+  border-radius: 0;
+  cursor: pointer;
+  display: inline-block;
+  padding: 0;
+  transition: border-color 0.16s, background 0.2s;
+  box-sizing: border-box;
+}
+.color-row .pickr-button:not(:last-child) {
+  margin-right: 0.8rem;
+}
+
+/* Pickr (nano theme) swatch size hard override */
+.pcr-app .pcr-swatches {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  align-items: flex-start !important;
+  gap: 0 !important;
+  padding: 2px 3px !important;
+  box-sizing: border-box !important;
+}
+
+.pcr-app .pcr-swatches .pcr-swatch {
+  width: 12px !important;
+  height: 12px !important;
+  margin: 0 1px 1px 0 !important;
+  border-radius: 3px !important;
+  box-sizing: content-box !important;
+  min-width: 0 !important;
+  min-height: 0 !important;
+  max-width: none !important;
+  max-height: none !important;
+}
+
+.track-filename-label {
+  font-size: 0.3em;
+  color: #888;
+  margin-top: 0.2em;
+  margin-left: 0.4em;
+}
+
+/* === Filename display style for builder track rows === */
+.filename-display {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #222;
+  padding: 0.35em 0.7em;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  line-height: 1.5;
+  cursor: text;
+  user-select: text;
+  display: inline-block;
+  min-width: 14rem;
+  max-width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Placeholder style for filename display */
+.filename-display.placeholder {
+  color: #888888;
+  font-size: 0.7rem;
+  padding: 0.7em 0.7em;
+}
+
+/* Apply filename-display styles also to inputs with this class */
+input.filename-display {
+  font-family: inherit;
+  font-size: 0.8rem;
+  font-weight: 400;
+  color: #222;
+  padding: 0.35em 0.7em;
+  background: #fff;
+  border: 1px solid #ccc;
+  border-radius: 3px;
+  line-height: 1.5;
+  cursor: text;
+  user-select: text;
+  min-width: 14rem;
+  max-width: 100%;
+  box-sizing: border-box;
+}
+
+input.filename-display:focus {
+  outline-color: var(--builder-accent);
+  outline-offset: 2px;
+}

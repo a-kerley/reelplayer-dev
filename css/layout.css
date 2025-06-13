@@ -1,0 +1,26 @@
+body {
+  font-family: 'Inter', sans-serif;
+  font-weight: 600;
+  font-style: normal;
+  margin: 0;
+  background: #f8f8f8;
+  /* Removed padding and text-align for app layout */
+}
+
+.player-container {
+  display: flex;
+  justify-content: center;
+  gap: 1.5rem;
+  max-width: 4000px;
+  margin: 1rem auto;
+  align-items: center;
+}
+
+.player-box {
+  border: 1px solid var(--player-border-color);
+  border-radius: 8px;
+  padding: 1.5rem;
+  background: #ffffff;
+  box-shadow: 0 2px 8px rgba(0, 0, 0, 0.05);
+  margin-bottom: 2rem;
+}
