@@ -353,3 +353,148 @@ input.filename-display:focus {
   outline-color: var(--builder-accent);
   outline-offset: 2px;
 }
+
+
+#refreshPreviewBtn {
+  background: var(--ui-accent);
+  color: #fff;
+  border: none;
+  border-radius: 5px;
+  font-size: 1rem;
+  font-weight: 700;
+  padding: 0.45rem 1.2rem;
+  cursor: pointer;
+  margin-top: 1.2rem;
+  margin-bottom: 1.2rem;
+  transition: background 0.18s;
+}
+
+#refreshPreviewBtn:hover {
+  background: var(--builder-hover);
+}
+
+/* --- Colour Preset Modal Styles --- */
+#colourPresetModal {
+  display: none;
+  position: fixed;
+  top: 0; left: 0; width: 100vw; height: 100vh;
+  z-index: 1000;
+}
+#colourPresetModal[style*="display: block"] {
+  display: block;
+}
+#colourPresetModal .preset-modal-overlay {
+  /* See JS for overlay style */
+}
+#colourPresetModal .preset-modal-outer {
+  /* See JS for modal style */
+}
+.preset-modal-content {
+  /* padding etc handled inline */
+}
+.preset-row {
+  transition: background 0.13s;
+  border-radius: 5px;
+  padding: 0.16em 0.3em;
+}
+.preset-row:hover {
+  background: #f7f7fa;
+}
+.preset-swatch {
+  border: 1.5px solid #bbb !important;
+  margin-right: 0.2em;
+  box-shadow: 0 1px 3px rgba(40,0,38,0.05);
+}
+.preset-name {
+  cursor: pointer;
+  user-select: text;
+}
+.preset-star svg {
+  vertical-align: middle;
+}
+.preset-star {
+  transition: color 0.18s;
+}
+.preset-star:hover {
+  color: #f4cd2a !important;
+}
+.preset-edit svg,
+.preset-delete svg {
+  vertical-align: middle;
+}
+.preset-edit:hover svg {
+  stroke: #001f67;
+}
+.preset-delete:hover svg {
+  stroke: #b00000;
+}
+.preset-load-btn {
+  transition: background 0.13s, color 0.13s;
+}
+.preset-load-btn:hover {
+  background: var(--ui-accent,#2a0026);
+  color: #fff;
+}
+.preset-modal-header {
+  border-bottom: 1px solid #eee;
+  margin-bottom: 1em;
+  padding-bottom: 0.2em;
+}
+.close-preset-modal {
+  font-size: 1.5rem;
+  background: none;
+  border: none;
+  color: #888;
+  cursor: pointer;
+  transition: color 0.16s;
+}
+.close-preset-modal:hover {
+  color: #b00000;
+}
+/* === Colour Preset Modal Row Layout Styles === */
+.preset-row {
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 0.65em;
+}
+
+.preset-name-col {
+  flex: 1 1 0;
+  min-width: 80px;
+  max-width: 180px;
+  overflow: hidden;
+}
+
+.preset-name,
+.preset-name-col input {
+  font-weight: 600;
+  width: 100%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  border: none;
+  background: none;
+  padding: 0.2em 0.4em;
+  font-size: 1em;
+  font-family: inherit;
+}
+.preset-name-col input {
+  border: 1px solid #bbb;
+  border-radius: 3px;
+  background: #f9f9f9;
+}
+.preset-actions {
+  display: flex;
+  align-items: center;
+  gap: 0.2em;
+  margin-left: auto;
+}
+.drop-indicator {
+  height: 0;
+  border-top: 2.5px solid var(--ui-accent, #2a0026);
+  margin: -2px 0 0 0;
+  position: relative;
+  z-index: 20;
+  pointer-events: none;
+}

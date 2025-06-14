@@ -22,25 +22,6 @@
             Title:
             <input type="text" id="reelTitle" class="filename-display" />
           </label>
-          <fieldset style="margin-top: 2rem; border: 1px solid #eee; border-radius: 8px; padding: 1rem;">
-            <legend style="font-size:1.1rem;font-weight:600;color:var(--builder-accent)">Player Colors</legend>
-            <div class="color-row">
-              <span>UI Accent:</span>
-              <button id="pickr-ui-accent" class="pickr-button" type="button"></button>
-            </div>
-            <div class="color-row">
-              <span>Waveform Unplayed:</span>
-              <button id="pickr-waveform-unplayed" class="pickr-button" type="button"></button>
-            </div>
-            <div class="color-row">
-              <span>Waveform Hover:</span>
-              <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
-            </div>
-            <div class="color-row">
-              <span>Player Border:</span>
-              <button id="pickr-player-border" class="pickr-button" type="button"></button>
-            </div>
-          </fieldset>
           <label style="margin-top: 1rem; display: block">
             <input type="checkbox" id="reelShowTitle" />
             Display Reel Title in Player
@@ -48,7 +29,7 @@
           <!-- Tracks editor section now inserted dynamically by JS in builder.js -->
           <button type="button" id="exportEmbedBtn">Export Embed Code</button>
         </form>
-        <button type="button" id="refreshPreviewBtn" style="margin-top:1.2rem;margin-bottom:1.2rem;">Refresh Preview</button>
+        <button type="button" id="refreshPreviewBtn">Refresh Preview</button>
         <div id="reelPlayerPreview"></div>
       </main>
     </div>
