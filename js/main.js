@@ -115,11 +115,40 @@ function showPreview() {
   const unplayed = current.varWaveformUnplayed || "#929292";
   const hover = current.varWaveformHover || "rgba(0, 31, 103, 0.13)";
   const border = current.varPlayerBorder || "#ffffff";
-
   document.documentElement.style.setProperty("--ui-accent", accent);
   document.documentElement.style.setProperty("--waveform-unplayed", unplayed);
   document.documentElement.style.setProperty("--waveform-hover", hover);
   document.documentElement.style.setProperty("--player-border-color", border);
+
+  // --- Apply Reel Title Appearance CSS variables ---
+  const ta = current.titleAppearance || {};
+  // font size
+  document.documentElement.style.setProperty(
+    "--reel-title-size",
+    ta.fontSize || "1.3rem"
+  );
+  // font weight
+  document.documentElement.style.setProperty(
+    "--reel-title-weight",
+    ta.fontWeight || "700"
+  );
+  // text align
+  document.documentElement.style.setProperty(
+    "--reel-title-align",
+    ta.align || "center"
+  );
+  // padding below (margin-bottom)
+  let padVal = ta.paddingBottom;
+  if (!padVal || padVal === "") {
+    padVal = "0.8rem";
+  } else if (typeof padVal === "string" && !padVal.match(/[a-z%]+$/)) {
+    // If just a number, treat as px
+    padVal = padVal + "px";
+  }
+  document.documentElement.style.setProperty(
+    "--reel-title-padding-bottom",
+    padVal
+  );
 
   playerApp.renderPlayer({
     showTitle: current.showTitle,

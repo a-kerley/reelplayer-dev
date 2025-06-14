@@ -248,9 +248,9 @@ button {
 }
 
 .reel-title {
-  text-align: center;
-  font-size: 1.2rem;
-  font-weight: 800;
-  margin-bottom: 0.5rem;
+  text-align: var(--reel-title-align, center);
+  font-size: var(--reel-title-size, 1.3rem);
+  font-weight: var(--reel-title-weight, 700);
+  margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
   color: black;
 }

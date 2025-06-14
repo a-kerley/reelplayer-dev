@@ -383,15 +383,7 @@ input.filename-display:focus {
 #colourPresetModal[style*="display: block"] {
   display: block;
 }
-#colourPresetModal .preset-modal-overlay {
-  /* See JS for overlay style */
-}
-#colourPresetModal .preset-modal-outer {
-  /* See JS for modal style */
-}
-.preset-modal-content {
-  /* padding etc handled inline */
-}
+
 .preset-row {
   transition: background 0.13s;
   border-radius: 5px;
@@ -496,5 +488,52 @@ input.filename-display:focus {
   margin: -2px 0 0 0;
   position: relative;
   z-index: 20;
+  pointer-events: none;
+}
+
+.material-symbols-outlined {
+  font-size: 1.7em;
+  color: #444;
+  user-select: none;
+  vertical-align: middle;
+  transition: color 0.18s, opacity 0.18s;
+}
+#reelTitleAppearanceSection .material-symbols-outlined {
+  font-size: 1.2em;
+  line-height: 1;
+}
+.align-icon {
+  opacity: 0.5;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.18s, color 0.18s;
+  margin-right: 0.25em;
+}
+.align-icon.active, .align-icon:hover {
+  opacity: 1;
+  color: var(--builder-accent);
+}
+#reelTitleAppearanceSection .material-symbols-outlined {
+  font-size: 1.2em;
+  line-height: 1;
+}
+.align-icon {
+  opacity: 0.5;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.18s, color 0.18s;
+  margin-right: 0.25em;
+}
+.align-icon.active, .align-icon:hover {
+  opacity: 1;
+  color: var(--builder-accent);
+}
+
+/* Grey out reel title appearance options if the title isn't visible */
+#reelTitleAppearanceSection.disabled .appearance-option,
+#reelTitleAppearanceSection.disabled .align-icon {
+  opacity: 0.5;
   pointer-events: none;
 }

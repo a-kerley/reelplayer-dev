@@ -50,6 +50,169 @@ export function renderBuilder(reel, onChange) {
   const showTitleCheckbox = document.getElementById("reelShowTitle");
   const reelForm = document.getElementById("reelForm");
 
+  // Helper to enable/disable title appearance controls
+  function setTitleAppearanceEnabled(enabled) {
+    const fieldset = document.getElementById("reelTitleAppearanceSection");
+    if (!fieldset) return;
+    if (!enabled) {
+      fieldset.classList.add("disabled");
+    } else {
+      fieldset.classList.remove("disabled");
+    }
+  }
+  // --- Remove old reel title appearance fieldset if present ---
+  const oldTitleAppearance = document.getElementById("reelTitleAppearanceSection");
+  if (oldTitleAppearance) oldTitleAppearance.remove();
+
+  // --- Remove the original showTitleCheckbox label from the form (will be rendered inside fieldset) ---
+  // Find label for showTitleCheckbox as anchor
+  const showTitleLabel = showTitleCheckbox.closest("label");
+  if (showTitleLabel && showTitleLabel.parentNode) {
+    showTitleLabel.parentNode.removeChild(showTitleLabel);
+  }
+
+  // Build the fieldset, moving the "Display Reel Title in Player" checkbox inside as the first control
+  const titleAppearanceSection = document.createElement("fieldset");
+  titleAppearanceSection.id = "reelTitleAppearanceSection";
+  titleAppearanceSection.style.marginTop = "1.2rem";
+  titleAppearanceSection.style.border = "1px solid #eee";
+  titleAppearanceSection.style.borderRadius = "8px";
+  titleAppearanceSection.style.padding = "1rem";
+  titleAppearanceSection.innerHTML = `
+    <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Reel Title Appearance</legend>
+    <label style="margin-bottom: 1rem; display: block">
+      <input type="checkbox" id="reelShowTitle" />
+      Display Reel Title in Player
+    </label>
+    <div style="display:flex;flex-wrap:wrap;gap:1.1rem 2.2rem;">
+      <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
+        Font Size:
+        <input type="number" id="reelTitleFontSizePt" min="8" max="72" step="1" style="width:4em"> pt
+      </label>
+      <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
+        Font Weight:
+        <select id="reelTitleFontWeight">
+          <option value="400">400</option>
+          <option value="600">600</option>
+          <option value="700">700</option>
+          <option value="800">800</option>
+        </select>
+      </label>
+      <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
+        Align:
+        <span id="reelTitleAlignLeft" class="align-icon" title="Left">
+          <span class="material-symbols-outlined">format_align_left</span>
+        </span>
+        <span id="reelTitleAlignCenter" class="align-icon" title="Center">
+          <span class="material-symbols-outlined">format_align_center</span>
+        </span>
+      </label>
+      <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
+        Padding Below:
+        <input type="number" id="reelTitlePaddingBottom" min="0" max="100" step="1" style="width:4.5em" /> px
+      </label>
+    </div>
+  `;
+  // Insert after title input (so it's the second control in the form)
+  if (titleInput && titleInput.parentNode) {
+    if (titleInput.parentNode.nextSibling) {
+      titleInput.parentNode.parentNode.insertBefore(titleAppearanceSection, titleInput.parentNode.nextSibling);
+    } else {
+      titleInput.parentNode.parentNode.appendChild(titleAppearanceSection);
+    }
+  } else {
+    // Fallback: append to form start
+    reelForm.insertBefore(titleAppearanceSection, reelForm.firstChild);
+  }
+
+  // --- Set up value binding for reel.titleAppearance ---
+  // Ensure reel.titleAppearance exists
+  if (!reel.titleAppearance) {
+    reel.titleAppearance = {};
+  }
+  // Defaults
+  const defaultAppearance = {
+    fontSize: "1.3rem",
+    fontWeight: "700",
+    align: "center",
+    paddingBottom: "0.8rem"
+  };
+  // Use values from reel or fallback to defaults
+  const ta = reel.titleAppearance;
+  // Font size (pt) input
+  const fontSizeInput = titleAppearanceSection.querySelector("#reelTitleFontSizePt");
+  let ptVal = 11; // default
+  if (ta.fontSize && ta.fontSize.endsWith("px")) {
+    ptVal = Math.round(parseFloat(ta.fontSize) / 1.333);
+  } else if (ta.fontSize && ta.fontSize.endsWith("pt")) {
+    ptVal = parseInt(ta.fontSize, 10);
+  }
+  fontSizeInput.value = ptVal;
+  fontSizeInput.oninput = () => {
+    // Update local model, do not call onChange yet
+    const val = parseInt(fontSizeInput.value, 10) || 11;
+    reel.titleAppearance.fontSize = (val * 1.333).toFixed(1) + "px";
+  };
+  fontSizeInput.onblur = () => {
+    onChange();
+  };
+
+  // Font Weight
+  const fontWeightSelect = titleAppearanceSection.querySelector("#reelTitleFontWeight");
+  fontWeightSelect.value = ta.fontWeight || defaultAppearance.fontWeight;
+  fontWeightSelect.onchange = () => {
+    reel.titleAppearance.fontWeight = fontWeightSelect.value;
+    onChange();
+  };
+
+  // Align icons
+  const alignLeft = titleAppearanceSection.querySelector("#reelTitleAlignLeft");
+  const alignCenter = titleAppearanceSection.querySelector("#reelTitleAlignCenter");
+  function updateAlignUI() {
+    const align = ta.align || "center";
+    alignLeft.classList.toggle("active", align === "left");
+    alignCenter.classList.toggle("active", align === "center");
+  }
+  alignLeft.onclick = () => {
+    reel.titleAppearance.align = "left";
+    updateAlignUI();
+    onChange();
+  };
+  alignCenter.onclick = () => {
+    reel.titleAppearance.align = "center";
+    updateAlignUI();
+    onChange();
+  };
+  updateAlignUI();
+
+  // paddingBottom
+  const paddingInput = titleAppearanceSection.querySelector("#reelTitlePaddingBottom");
+  let padVal = ta.paddingBottom;
+  if (typeof padVal === "string" && padVal.endsWith("px")) {
+    padVal = padVal.slice(0, -2);
+  }
+  if (!padVal) {
+    padVal = defaultAppearance.paddingBottom.replace("rem", "") === defaultAppearance.paddingBottom
+      ? parseInt(defaultAppearance.paddingBottom)
+      : "";
+  }
+  if (!ta.paddingBottom && defaultAppearance.paddingBottom.endsWith("rem")) {
+    padVal = Math.round(parseFloat(defaultAppearance.paddingBottom) * 16);
+  }
+  paddingInput.value = padVal || "";
+  paddingInput.oninput = () => {
+    let val = paddingInput.value.trim();
+    if (val !== "" && !isNaN(val)) {
+      reel.titleAppearance.paddingBottom = val + "px";
+    } else {
+      delete reel.titleAppearance.paddingBottom;
+    }
+    // Do not call onChange here!
+  };
+  paddingInput.onblur = () => {
+    onChange();
+  };
+
   // Destroy old Pickr instances before rendering new ones
   if (pickrInstances.length) {
     pickrInstances.forEach((p) => p.destroy());
@@ -538,11 +701,16 @@ export function renderBuilder(reel, onChange) {
 
   // Set values, but do NOT clear or replace form HTML!
   titleInput.value = reel.title || "";
-  showTitleCheckbox.checked = !!reel.showTitle;
-  showTitleCheckbox.onchange = () => {
-    reel.showTitle = showTitleCheckbox.checked;
+  // After re-creating the checkbox inside the fieldset, rebind value and event
+  const showTitleCheckboxNew = titleAppearanceSection.querySelector("#reelShowTitle");
+  showTitleCheckboxNew.checked = !!reel.showTitle;
+  showTitleCheckboxNew.onchange = () => {
+    reel.showTitle = showTitleCheckboxNew.checked;
+    setTitleAppearanceEnabled(reel.showTitle);
     onChange();
   };
+  // Set the initial enabled/disabled state for title appearance controls
+  setTitleAppearanceEnabled(showTitleCheckboxNew.checked);
   // Update on input (but don't call onChange on every keystroke to avoid rerender)
   titleInput.oninput = () => {
     reel.title = titleInput.value;
