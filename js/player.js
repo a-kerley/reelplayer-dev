@@ -329,8 +329,11 @@ export const playerApp = {
   renderPlayer({ showTitle, title, playlist }) {
     const container = document.getElementById("reelPlayerPreview");
     if (!container) return;
+    
+    const shouldHideTitle = !(showTitle && title && title.trim());
+    
     container.innerHTML = `
-    <div class="player-wrapper">
+    <div class="player-wrapper${shouldHideTitle ? ' no-title' : ''}">
       <div class="player-content">
         ${
           showTitle && title && title.trim()
@@ -371,7 +374,7 @@ export const playerApp = {
           </div>
         </div>
       </div>
-      <div id="playlist" class="playlist"></div>
+      <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
     </div>
   `;
     this.elements = {};

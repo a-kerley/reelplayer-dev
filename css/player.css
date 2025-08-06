@@ -302,3 +302,8 @@ button {
   margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
   color: var(--ui-accent);
 }
+
+/* Add extra padding at the top when reel title is hidden */
+.player-wrapper.no-title .player-content {
+  padding-top: 3rem;
+}
