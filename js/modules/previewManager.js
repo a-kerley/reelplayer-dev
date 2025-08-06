@@ -125,7 +125,7 @@ export class PreviewManager {
     // Process padding value
     let paddingBottom = ta.paddingBottom;
     if (!paddingBottom || paddingBottom === "") {
-      paddingBottom = "0.8rem";
+      paddingBottom = "1.5rem";
     } else if (typeof paddingBottom === "string" && !paddingBottom.match(/[a-z%]+$/)) {
       paddingBottom = paddingBottom + "px";
     }

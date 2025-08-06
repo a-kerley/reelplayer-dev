@@ -6,18 +6,17 @@
 
 /* Add extra padding when reel title is hidden */
 .playlist.no-title::before {
-  content: '';
+  content: "";
   display: block;
   height: 0;
   width: 100%;
 }
 
-
 .playlist-item {
   display: flex;
   justify-content: space-between;
   align-items: center;
-  padding: 1rem 1rem;
+  padding: 0.75rem 1rem;
   cursor: pointer;
   border-bottom: 0px solid rgba(221, 221, 221, 0.6);
   user-select: none;

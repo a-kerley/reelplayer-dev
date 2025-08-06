@@ -8,6 +8,7 @@ import { renderSidebar, loadReels, saveReels } from "./sidebar.js";
 import { renderBuilder, createEmptyReel } from "./builder.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
+import { embedExporter } from "./modules/embedExporter.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -85,6 +86,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       const current = reels.find((r) => r.id === currentId);
       renderBuilder(current, updateCurrentReel);
       setupRefreshPreviewButton();
+      setupExportEmbedButton();
       // showPreview(); // preview is only refreshed via button now
       showPreview();
     }
@@ -93,6 +95,83 @@ document.addEventListener("DOMContentLoaded", async () => {
       const btn = document.getElementById('refreshPreviewBtn');
       if (btn) {
         btn.onclick = () => showPreview();
+      }
+    }
+
+    function setupExportEmbedButton() {
+      const btn = document.getElementById('exportEmbedBtn');
+      if (btn) {
+        btn.onclick = () => exportEmbedCode();
+      }
+    }
+
+    function exportEmbedCode() {
+      const current = reels.find((r) => r.id === currentId);
+      if (!current) {
+        dialog.alert("No reel selected for export.");
+        return;
+      }
+
+      try {
+        const embedHTML = embedExporter.generateEmbedCode(current);
+        
+        dialog.createDialog({
+          type: 'custom',
+          message: "Copy the code below and paste it into your Squarespace code block or website:",
+          content: `<textarea readonly style="width: 100%; height: 300px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;">${embedHTML.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>`,
+          buttons: [
+            {
+              text: "Copy to Clipboard",
+              type: "primary",
+              onClick: () => {
+                navigator.clipboard.writeText(embedHTML).then(() => {
+                  dialog.closeDialog();
+                  setTimeout(() => {
+                    dialog.alert("Embed code copied to clipboard!");
+                  }, 200);
+                }).catch(() => {
+                  dialog.closeDialog();
+                  setTimeout(() => {
+                    dialog.alert("Failed to copy to clipboard. Please manually select and copy the code.");
+                  }, 200);
+                });
+              }
+            },
+            {
+              text: "Download as HTML",
+              type: "secondary",
+              onClick: () => {
+                try {
+                  const blob = new Blob([embedHTML], { type: 'text/html' });
+                  const url = URL.createObjectURL(blob);
+                  const a = document.createElement('a');
+                  a.href = url;
+                  a.download = `${(current.title || 'reel').replace(/[^a-zA-Z0-9]/g, '_')}_embed.html`;
+                  document.body.appendChild(a);
+                  a.click();
+                  document.body.removeChild(a);
+                  URL.revokeObjectURL(url);
+                  dialog.closeDialog();
+                } catch (error) {
+                  console.error('Download failed:', error);
+                  dialog.closeDialog();
+                  setTimeout(() => {
+                    dialog.alert("Download failed. Please try copying to clipboard instead.");
+                  }, 200);
+                }
+              }
+            },
+            {
+              text: "Close",
+              type: "secondary",
+              onClick: () => {
+                dialog.closeDialog();
+              }
+            }
+          ]
+        });
+      } catch (error) {
+        dialog.alert(`Export Error: ${error.message}`);
       }
     }
 

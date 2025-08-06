@@ -118,15 +118,28 @@ export class DialogSystem {
     }
 
     // Add message
-    const messageEl = document.createElement('p');
-    messageEl.textContent = config.message;
-    messageEl.style.cssText = `
-      margin: ${icon ? '16px 0 24px 0' : '0 0 24px 0'};
-      font-size: 16px;
-      line-height: 1.5;
-      color: #333;
-    `;
-    content.appendChild(messageEl);
+    if (config.message) {
+      const messageEl = document.createElement('p');
+      messageEl.textContent = config.message;
+      messageEl.style.cssText = `
+        margin: ${icon ? '16px 0 24px 0' : '0 0 24px 0'};
+        font-size: 16px;
+        line-height: 1.5;
+        color: #333;
+      `;
+      content.appendChild(messageEl);
+    }
+
+    // Add custom content if provided
+    if (config.content) {
+      const customContent = document.createElement('div');
+      customContent.innerHTML = config.content;
+      customContent.style.cssText = `
+        margin: 16px 0 24px 0;
+        text-align: left;
+      `;
+      content.appendChild(customContent);
+    }
 
     // Add buttons
     const buttonContainer = document.createElement('div');
