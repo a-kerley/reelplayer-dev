@@ -8,7 +8,13 @@
   --builder-bg: #faf8fa;
   --builder-border: #eee;
   --builder-sidebar-shadow: rgba(40, 0, 38, 0.04);
-  --builder-accent: #333;
-  --builder-hover: #686868;
+  --builder-accent: #000;
+  --builder-hover: #333;
   --builder-delete-hover: #b00000;
+  
+  /* Background effects variables */
+  --background-image: none;
+  --background-opacity: 1;
+  --background-blur: 2px;
+  --overlay-color: rgba(255, 255, 255, 0);
 }

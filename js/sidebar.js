@@ -1,10 +1,21 @@
+import { dialog } from './modules/dialogSystem.js';
+
 export function loadReels() {
-  const json = localStorage.getItem('reelList');
-  return json ? JSON.parse(json) : [];
+  try {
+    const json = localStorage.getItem('reelList');
+    return json ? JSON.parse(json) : [];
+  } catch (e) {
+    console.error('Failed to load reels from localStorage:', e);
+    return [];
+  }
 }
 
 export function saveReels(reels) {
-  localStorage.setItem('reelList', JSON.stringify(reels));
+  try {
+    localStorage.setItem('reelList', JSON.stringify(reels));
+  } catch (e) {
+    console.error('Failed to save reels to localStorage:', e);
+  }
 }
 
 export function renderSidebar(reels, currentId, onSelect, onNew, onDelete) {
@@ -40,7 +51,9 @@ export function renderSidebar(reels, currentId, onSelect, onNew, onDelete) {
     delBtn.onclick = (e) => {
       e.stopPropagation();
       if (e.target.closest('.delete-reel-btn')) {
-        if (confirm('Delete this reel?')) onDelete(reel.id);
+        dialog.confirm('Delete this reel?', 'Delete', 'Cancel').then(confirmed => {
+          if (confirmed) onDelete(reel.id);
+        });
       }
     };
 

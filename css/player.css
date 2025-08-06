@@ -211,35 +211,83 @@ button {
   margin: 0 auto;
   text-align: left;
   min-height: 120px;
+  background-image: var(--background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-blend-mode: var(--background-blend-mode);
+  background-color: var(--background-color, rgba(255, 255, 255, var(--background-opacity)));
+  border-radius: 8px;
+  overflow: hidden;
+  padding: 1rem;
 }
+
+/* Create a background layer that can be blurred */
+.player-wrapper::after {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-image: var(--background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-color: rgba(255, 255, 255, var(--background-opacity));
+  z-index: 0;
+  border-radius: 8px;
+}
+
+/* Backdrop filter overlay for blur effect */
+.player-wrapper::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: var(--overlay-color);
+  backdrop-filter: blur(var(--background-blur));
+  -webkit-backdrop-filter: blur(var(--background-blur));
+  pointer-events: none;
+  z-index: 1;
+  border-radius: 8px;
+}
+
+.player-wrapper > * {
+  position: relative;
+  z-index: 2;
+}
+
 .loading {
   position: absolute;
   top: 0;
   left: 0;
   z-index: 10;
-  background: rgba(255, 255, 255, 0.8);
+  background: rgba(255, 255, 255, 0.9);
   width: 100%;
   height: 100%;
   display: flex;
   align-items: center;
-  justify-content: left;
-  padding-left: 0.5rem;
-  font-weight: bold;
-  color: #666666;
-  line-height: normal;
+  justify-content: center;
+  border-radius: 8px;
 }
-.dot {
-  animation: blink 1.4s infinite;
-  opacity: 0;
+
+.loading dotlottie-player {
+  /* Apply color overlay to match UI accent color */
+  filter: 
+    brightness(0) /* Make it black first */
+    saturate(100%) 
+    brightness(var(--lottie-brightness, 1)) 
+    sepia(1) 
+    hue-rotate(var(--lottie-hue-rotation, 0deg)) 
+    saturate(var(--lottie-saturation, 1));
+  transition: filter 0.3s ease;
 }
-.dot.one { animation-delay: 0s; }
-.dot.two { animation-delay: 0.2s; }
-.dot.three { animation-delay: 0.4s; }
-@keyframes blink {
-  0% { opacity: 0; }
-  50% { opacity: 1; }
-  100% { opacity: 0; }
-}
+
+/* Remove old dot animation styles */
+
 .heroicon {
   width: 46px;
   height: 46px;
@@ -252,5 +300,5 @@ button {
   font-size: var(--reel-title-size, 1.3rem);
   font-weight: var(--reel-title-weight, 700);
   margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
-  color: black;
+  color: var(--ui-accent);
 }

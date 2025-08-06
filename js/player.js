@@ -331,41 +331,48 @@ export const playerApp = {
     if (!container) return;
     container.innerHTML = `
     <div class="player-wrapper">
-      ${
-        showTitle && title && title.trim()
-          ? `<div class="reel-title">${title}</div>`
-          : ""
-      }
-      <div class="track-info"></div>
-      <div class="player-container">
-        <button id="playPause" class="icon-button">
-          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
-            <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z" clip-rule="evenodd"/>
-          </svg>
-        </button>
-        <div class="waveform-and-volume">
-          <div id="waveform">
-            <div class="hover-overlay"></div>
-            <div class="hover-time">0:00</div>
-            <div class="playhead-time">0:00</div>
-            <div id="total-time" class="total-time">0:00</div>
-            <div id="loading" class="loading">
-              Loading<span class="dot one">.</span><span class="dot two">.</span><span class="dot three">.</span>
+      <div class="player-content">
+        ${
+          showTitle && title && title.trim()
+            ? `<div class="reel-title">${title}</div>`
+            : ""
+        }
+        <div class="track-info"></div>
+        <div class="player-container">
+          <button id="playPause" class="icon-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+              <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z" clip-rule="evenodd"/>
+            </svg>
+          </button>
+          <div class="waveform-and-volume">
+            <div id="waveform">
+              <div class="hover-overlay"></div>
+              <div class="hover-time">0:00</div>
+              <div class="playhead-time">0:00</div>
+              <div id="total-time" class="total-time">0:00</div>
+              <div id="loading" class="loading">
+                <dotlottie-player 
+                  src="assets/Insider-loading.lottie" 
+                  autoplay 
+                  loop
+                  style="width: 120px; height: 120px;">
+                </dotlottie-player>
+              </div>
             </div>
-          </div>
-          <div class="volume-control hidden">
-            <button id="volumeToggle" class="icon-button">
-              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
-                <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.06 8.25 8.25 0 0 0 0-11.668.75.75 0 0 1 0-1.06Z"/>
-                <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
-              </svg>
-            </button>
-            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
+            <div class="volume-control hidden">
+              <button id="volumeToggle" class="icon-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                  <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.06 8.25 8.25 0 0 0 0-11.668.75.75 0 0 1 0-1.06Z"/>
+                  <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                </svg>
+              </button>
+              <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
+            </div>
           </div>
         </div>
       </div>
+      <div id="playlist" class="playlist"></div>
     </div>
-    <div id="playlist" class="playlist"></div>
   `;
     this.elements = {};
     this.cacheElements();

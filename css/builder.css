@@ -155,6 +155,7 @@ body {
 
 #reelPlayerPreview {
   margin-top: 4rem;
+  margin-bottom: 4rem;
 }
 
 .builder-sidebar > #newReelBtn {
@@ -199,9 +200,10 @@ body {
   background: var(--builder-hover);
 }
 
-/* === Track Add/Remove Button Styles === */
+/* === Track Add/Remove/Copy Button Styles === */
 .track-remove-btn,
-.track-add-btn {
+.track-add-btn,
+.track-copy-btn {
   background: none;
   /* border: 1px solid var(--builder-border); */ /* border removed */
   border-radius: 4px;
@@ -222,12 +224,14 @@ body {
   transition: transform 0.15s;
 }
 .track-remove-btn:hover .track-btn-svg,
-.track-add-btn:hover .track-btn-svg {
+.track-add-btn:hover .track-btn-svg,
+.track-copy-btn:hover .track-btn-svg {
   transform: scale(1.18);
   /* No color or background change on hover */
 }
 .track-remove-btn:hover,
-.track-add-btn:hover {
+.track-add-btn:hover,
+.track-copy-btn:hover {
   /* background: var(--builder-hover); */
   /* color: white; */
   transform: scale(1.1);
@@ -241,6 +245,10 @@ body {
 }
 .track-remove-btn.add-btn:hover .track-btn-svg {
   color: #219e36; /* green for plus */
+  transform: scale(1.18);
+}
+.track-copy-btn:hover .track-btn-svg {
+  color: #8b5cf6; /* purple for copy arrow */
   transform: scale(1.18);
 }
 
@@ -261,7 +269,7 @@ body {
   min-height: 20px !important;
   max-width: 20px !important;
   max-height: 20px !important;
-  background: var(--ui-accent, #2a0026);
+  background: var(--builder-accent, #333);
   border: 1px solid #bbb;
   border-radius: 0;
   cursor: pointer;
@@ -272,6 +280,77 @@ body {
 }
 .color-row .pickr-button:not(:last-child) {
   margin-right: 0.8rem;
+}
+
+/* Toggle Switch Styles */
+.toggle-switch {
+  position: relative;
+  display: inline-block;
+  width: 34px;
+  height: 20px;
+  cursor: pointer;
+}
+
+.toggle-switch input {
+  opacity: 0;
+  width: 0;
+  height: 0;
+  position: absolute;
+}
+
+.toggle-slider {
+  position: absolute;
+  cursor: pointer;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: #ccc;
+  transition: 0.3s ease;
+  border-radius: 20px;
+  user-select: none;
+}
+
+.toggle-slider:before {
+  position: absolute;
+  content: "";
+  height: 14px;
+  width: 14px;
+  left: 3px;
+  bottom: 3px;
+  background-color: white;
+  transition: 0.3s ease;
+  border-radius: 50%;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.3);
+}
+
+.toggle-switch input:checked + .toggle-slider {
+  background-color: var(--builder-accent, #2a0026);
+}
+
+.toggle-switch input:checked + .toggle-slider:before {
+  transform: translateX(14px);
+  background-color: white;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* Hover effect */
+.toggle-switch:hover .toggle-slider {
+  box-shadow: 0 0 0 2px rgba(42, 0, 38, 0.1);
+}
+
+/* Disabled state styling */
+.toggle-switch input:disabled + .toggle-slider {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+/* Disabled input and button styling */
+input:disabled,
+button:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Pickr (nano theme) swatch size hard override */
@@ -356,7 +435,7 @@ input.filename-display:focus {
 
 
 #refreshPreviewBtn {
-  background: var(--ui-accent);
+  background: var(--builder-accent);
   color: #fff;
   border: none;
   border-radius: 5px;
@@ -424,7 +503,7 @@ input.filename-display:focus {
   transition: background 0.13s, color 0.13s;
 }
 .preset-load-btn:hover {
-  background: var(--ui-accent,#2a0026);
+  background: var(--builder-accent,#333);
   color: #fff;
 }
 .preset-modal-header {
@@ -484,7 +563,7 @@ input.filename-display:focus {
 }
 .drop-indicator {
   height: 0;
-  border-top: 2.5px solid var(--ui-accent, #2a0026);
+  border-top: 2.5px solid var(--builder-accent, #333);
   margin: -2px 0 0 0;
   position: relative;
   z-index: 20;
@@ -536,4 +615,98 @@ input.filename-display:focus {
 #reelTitleAppearanceSection.disabled .align-icon {
   opacity: 0.5;
   pointer-events: none;
+}
+
+/* Validation styles */
+.validation-error {
+  border-color: #dc3545 !important;
+  box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
+}
+
+.validation-feedback {
+  color: #dc3545;
+  font-size: 0.875em;
+  margin-top: 0.25rem;
+  display: block;
+}
+
+/* Custom Range Slider Styles for Builder */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 6px;
+  outline: none;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+input[type="range"]:hover {
+  background: #d0d0d0;
+}
+
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  appearance: none;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--builder-accent);
+  border: 2px solid #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-webkit-slider-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+input[type="range"]::-moz-range-thumb {
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: var(--builder-accent);
+  border: 2px solid #fff;
+  cursor: pointer;
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
+  transition: transform 0.1s ease, box-shadow 0.1s ease;
+  border: none; /* Remove default border for Firefox */
+}
+
+input[type="range"]::-moz-range-thumb:hover {
+  transform: scale(1.1);
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
+}
+
+input[type="range"]::-moz-range-thumb:active {
+  transform: scale(1.05);
+  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
+}
+
+input[type="range"]::-moz-range-track {
+  height: 6px;
+  background: #e0e0e0;
+  border-radius: 6px;
+  border: none;
+}
+
+/* Focus styles for accessibility */
+input[type="range"]:focus {
+  outline: none;
+}
+
+input[type="range"]:focus::-webkit-slider-thumb {
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+input[type="range"]:focus::-moz-range-thumb {
+  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
 }

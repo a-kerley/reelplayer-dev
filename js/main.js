@@ -6,22 +6,27 @@ import {
 } from "./playlist.js";
 import { renderSidebar, loadReels, saveReels } from "./sidebar.js";
 import { renderBuilder, createEmptyReel } from "./builder.js";
+import { PreviewManager } from "./modules/previewManager.js";
+import { dialog } from "./modules/dialogSystem.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
-  // === Old player: legacy mode for playlist.txt ===
-  // playerApp.cacheElements();
-  // playerApp.showLoading(true);
-  // playerApp.setupWaveSurfer();
-  // playerApp.setupWaveformEvents();
-  // playerApp.setupPlayPauseUI();
-  // playerApp.setupVolumeControls();
-
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
   const builderRoot = document.querySelector(".builder-app");
   if (builderRoot) {
     // --- Reel Builder SPA mode ---
     let reels = loadReels();
     let savedId = localStorage.getItem('currentReelId');
+
+    // Make reels and saveReels globally accessible for blend mode controls
+    window.reels = reels;
+    window.saveReels = saveReels;
+
+    // Initialize preview manager
+    const previewManager = new PreviewManager();
+    if (!previewManager.initialize("reelPlayerPreview")) {
+      console.error("Failed to initialize preview manager");
+      return;
+    }
 
     let currentId = null;
     if (savedId && reels.some(r => r.id === savedId)) {
@@ -53,7 +58,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function handleDelete(id) {
       if (reels.length === 1) {
-        alert("At least one reel must remain.");
+        dialog.alert("At least one reel must remain.", "OK");
         return;
       }
       const idx = reels.findIndex((r) => r.id === id);
@@ -70,6 +75,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function updateCurrentReel() {
       saveReels(reels);
+      window.reels = reels; // Keep global reference updated
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
       renderBuilder(reels.find(r => r.id === currentId), updateCurrentReel);
     }
@@ -86,76 +92,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     function setupRefreshPreviewButton() {
       const btn = document.getElementById('refreshPreviewBtn');
       if (btn) {
-        btn.onclick = showPreview;
+        btn.onclick = () => showPreview();
       }
     }
 
-function showPreview() {
-  const current = reels.find((r) => r.id === currentId);
-  const container = document.getElementById("reelPlayerPreview");
-  if (!container || !current) return;
-
-  // Build the playlist for the player
-  const playlist = (current.playlist || []).filter(
-    (t) => t.url && t.url.trim() !== ""
-  );
-
-  // If no tracks available, show instructional text instead of player
-  if (playlist.length === 0) {
-    container.innerHTML = `
-      <div style="padding: 1rem; font-style: italic; color: #666; text-align: center;">
-        No tracks available. Please add some tracks in the builder.
-      </div>
-    `;
-    return;
-  }
-
-  // Apply colors (use current or fallbacks)
-  const accent = current.varUiAccent || "#2a0026";
-  const unplayed = current.varWaveformUnplayed || "#929292";
-  const hover = current.varWaveformHover || "rgba(0, 31, 103, 0.13)";
-  const border = current.varPlayerBorder || "#ffffff";
-  document.documentElement.style.setProperty("--ui-accent", accent);
-  document.documentElement.style.setProperty("--waveform-unplayed", unplayed);
-  document.documentElement.style.setProperty("--waveform-hover", hover);
-  document.documentElement.style.setProperty("--player-border-color", border);
-
-  // --- Apply Reel Title Appearance CSS variables ---
-  const ta = current.titleAppearance || {};
-  // font size
-  document.documentElement.style.setProperty(
-    "--reel-title-size",
-    ta.fontSize || "1.3rem"
-  );
-  // font weight
-  document.documentElement.style.setProperty(
-    "--reel-title-weight",
-    ta.fontWeight || "700"
-  );
-  // text align
-  document.documentElement.style.setProperty(
-    "--reel-title-align",
-    ta.align || "center"
-  );
-  // padding below (margin-bottom)
-  let padVal = ta.paddingBottom;
-  if (!padVal || padVal === "") {
-    padVal = "0.8rem";
-  } else if (typeof padVal === "string" && !padVal.match(/[a-z%]+$/)) {
-    // If just a number, treat as px
-    padVal = padVal + "px";
-  }
-  document.documentElement.style.setProperty(
-    "--reel-title-padding-bottom",
-    padVal
-  );
-
-  playerApp.renderPlayer({
-    showTitle: current.showTitle,
-    title: current.title,
-    playlist,
-  });
-}
+    function showPreview() {
+      const current = reels.find((r) => r.id === currentId);
+      previewManager.showPreview(current, playerApp);
+    }
 
     render();
   } else {
