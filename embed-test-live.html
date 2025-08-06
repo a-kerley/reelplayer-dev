@@ -1,0 +1,324 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Live Embed Test - GitHub Pages</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      margin: 0;
+      padding: 40px 20px;
+      background: #f5f5f5;
+      line-height: 1.6;
+    }
+    
+    .container {
+      max-width: 1200px;
+      margin: 0 auto;
+      background: white;
+      border-radius: 12px;
+      box-shadow: 0 4px 20px rgba(0, 0, 0, 0.1);
+      overflow: hidden;
+    }
+    
+    .header {
+      background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+      color: white;
+      padding: 30px;
+      text-align: center;
+    }
+    
+    .header h1 {
+      margin: 0 0 10px 0;
+      font-size: 2rem;
+      font-weight: 700;
+    }
+    
+    .header p {
+      margin: 0;
+      font-size: 1rem;
+      opacity: 0.9;
+    }
+    
+    .content {
+      padding: 30px;
+    }
+    
+    .instructions {
+      background: #e3f2fd;
+      border-left: 4px solid #2196f3;
+      padding: 20px;
+      margin: 20px 0;
+      border-radius: 0 8px 8px 0;
+    }
+    
+    .embed-area {
+      background: #f8f9fa;
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+      min-height: 600px;
+    }
+    
+    .note {
+      background: #fff3cd;
+      border: 1px solid #ffeaa7;
+      color: #856404;
+      padding: 15px;
+      border-radius: 8px;
+      margin: 20px 0;
+    }
+    
+    .embed-textarea {
+      width: 100%;
+      height: 200px;
+      font-family: monospace;
+      font-size: 12px;
+      padding: 15px;
+      border: 2px solid #dee2e6;
+      border-radius: 8px;
+      resize: vertical;
+      margin-bottom: 15px;
+      background: #f8f9fa;
+    }
+    
+    .test-button {
+      background: #007bff;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+      margin-right: 10px;
+    }
+    
+    .test-button:hover {
+      background: #0056b3;
+    }
+    
+    .clear-button {
+      background: #6c757d;
+      color: white;
+      border: none;
+      padding: 12px 24px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      font-weight: 600;
+      transition: background-color 0.2s ease;
+    }
+    
+    .clear-button:hover {
+      background: #545b62;
+    }
+    
+    .embed-preview {
+      border: 2px solid #e9ecef;
+      border-radius: 8px;
+      margin: 20px 0;
+      min-height: 100px;
+      position: relative;
+      background: white;
+    }
+    
+    .placeholder {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 200px;
+      color: #6c757d;
+      font-style: italic;
+      text-align: center;
+      padding: 20px;
+    }
+    
+    .success-message {
+      background: #d4edda;
+      border: 1px solid #c3e6cb;
+      color: #155724;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 10px 0;
+      display: none;
+    }
+    
+    .error-message {
+      background: #f8d7da;
+      border: 1px solid #f5c6cb;
+      color: #721c24;
+      padding: 12px;
+      border-radius: 6px;
+      margin: 10px 0;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+  <div class="container">
+    <div class="header">
+      <h1>🌐 Live Embed Test</h1>
+      <p>Testing environment using GitHub Pages - Real domain, no CORS issues!</p>
+    </div>
+    
+    <div class="content">
+      <div class="instructions">
+        <h3>🎉 Real Environment Testing</h3>
+        <ol>
+          <li><strong>Export your reel</strong> using "Export Embed Code" button in the app</li>
+          <li><strong>Copy the HTML code</strong> from the dialog</li>
+          <li><strong>Paste it below</strong> and click "Test Embed"</li>
+          <li><strong>See it work perfectly</strong> with real audio loading!</li>
+        </ol>
+      </div>
+      
+      <div class="embed-area">
+        <h3>📋 Paste Your Embed Code</h3>
+        <textarea 
+          id="embedCode" 
+          class="embed-textarea" 
+          placeholder="Paste your exported embed code here..."
+        ></textarea>
+        <div>
+          <button id="testButton" class="test-button">🎵 Test Embed</button>
+          <button id="clearButton" class="clear-button">🗑️ Clear</button>
+        </div>
+        <div id="successMessage" class="success-message"></div>
+        <div id="errorMessage" class="error-message"></div>
+      </div>
+      
+      <div class="embed-preview" id="embedPreview">
+        <div class="placeholder">
+          🎵 Your embedded reel player will appear here with full audio functionality!
+        </div>
+      </div>
+      
+      <div class="note">
+        <strong>✅ GitHub Pages Benefits:</strong>
+        <ul>
+          <li><strong>🌐 Real Domain:</strong> No localhost CORS restrictions</li>
+          <li><strong>🎵 Audio Loading:</strong> Dropbox and other sources will work</li>
+          <li><strong>🔄 HTTPS:</strong> Secure context for all features</li>
+          <li><strong>🚀 Production-Ready:</strong> Same environment as real deployment</li>
+        </ul>
+      </div>
+      
+      <div class="instructions">
+        <h3>🔗 GitHub Pages URL</h3>
+        <p><strong>Access this page at:</strong></p>
+        <code>https://a-kerley.github.io/reelplayer-dev/embed-test-live.html</code>
+        <p style="margin-top: 10px;"><small>Once you commit and push this file to the main branch.</small></p>
+      </div>
+    </div>
+  </div>
+
+  <script>
+    // Dynamic embed testing functionality - GitHub Pages version
+    document.addEventListener('DOMContentLoaded', function() {
+      const embedCode = document.getElementById('embedCode');
+      const testButton = document.getElementById('testButton');
+      const clearButton = document.getElementById('clearButton');
+      const embedPreview = document.getElementById('embedPreview');
+      const successMessage = document.getElementById('successMessage');
+      const errorMessage = document.getElementById('errorMessage');
+      
+      // Clear messages
+      function clearMessages() {
+        successMessage.style.display = 'none';
+        errorMessage.style.display = 'none';
+        successMessage.textContent = '';
+        errorMessage.textContent = '';
+      }
+      
+      // Show success message
+      function showSuccess(message) {
+        clearMessages();
+        successMessage.textContent = message;
+        successMessage.style.display = 'block';
+        setTimeout(() => {
+          successMessage.style.display = 'none';
+        }, 5000);
+      }
+      
+      // Show error message
+      function showError(message) {
+        clearMessages();
+        errorMessage.textContent = message;
+        errorMessage.style.display = 'block';
+      }
+      
+      // Test embed code
+      function testEmbedCode() {
+        const code = embedCode.value.trim();
+        
+        if (!code) {
+          showError('❌ Please paste some embed code first');
+          return;
+        }
+        
+        // Basic validation
+        if (!code.includes('<') || !code.includes('>')) {
+          showError('❌ This doesn\'t look like HTML code');
+          return;
+        }
+        
+        try {
+          // Clear preview and add code
+          embedPreview.innerHTML = '';
+          
+          // Create iframe for safer rendering
+          const iframe = document.createElement('iframe');
+          iframe.style.width = '100%';
+          iframe.style.height = '600px';
+          iframe.style.border = 'none';
+          iframe.style.borderRadius = '8px';
+          
+          embedPreview.appendChild(iframe);
+          
+          // Write content to iframe
+          const doc = iframe.contentDocument || iframe.contentWindow.document;
+          doc.open();
+          doc.write(code);
+          doc.close();
+          
+          showSuccess('✅ Embed code loaded successfully! Audio should work perfectly on GitHub Pages.');
+          
+        } catch (error) {
+          console.error('Error rendering embed:', error);
+          showError('❌ Error rendering embed: ' + error.message);
+        }
+      }
+      
+      // Clear everything
+      function clearEverything() {
+        embedCode.value = '';
+        embedPreview.innerHTML = '<div class="placeholder">🎵 Your embedded reel player will appear here with full audio functionality!</div>';
+        clearMessages();
+        showSuccess('✅ Cleared successfully');
+      }
+      
+      // Event listeners
+      testButton.addEventListener('click', testEmbedCode);
+      clearButton.addEventListener('click', clearEverything);
+      
+      // Allow Ctrl+Enter to test
+      embedCode.addEventListener('keydown', function(e) {
+        if ((e.ctrlKey || e.metaKey) && e.key === 'Enter') {
+          e.preventDefault();
+          testEmbedCode();
+        }
+      });
+      
+      // Auto-resize textarea
+      embedCode.addEventListener('input', function() {
+        this.style.height = 'auto';
+        this.style.height = Math.min(this.scrollHeight, 400) + 'px';
+      });
+    });
+  </script>
+</body>
+</html>
