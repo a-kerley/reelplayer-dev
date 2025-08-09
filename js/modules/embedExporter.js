@@ -5,8 +5,8 @@ export class EmbedExporter {
     this.baseURL = window.location.origin + window.location.pathname;
   }
 
-  // Generate a complete standalone HTML player for embedding
-  generateEmbedCode(reel) {
+  // Generate embed options - both iframe and standalone
+  generateEmbedOptions(reel) {
     // Filter valid tracks
     const playlist = (reel.playlist || []).filter(
       track => track.url && track.url.trim() !== ""
@@ -16,10 +16,89 @@ export class EmbedExporter {
       throw new Error("No valid tracks found in the reel. Please add some tracks before exporting.");
     }
 
-    // Generate the complete HTML with inline styles and JavaScript
-    const embedHTML = this.generateStandaloneHTML(reel, playlist);
+    return {
+      // Option 1: Simple iframe (recommended for concise embeds)
+      iframe: this.generateIframeEmbed(reel),
+      
+      // Option 2: Full standalone (current method)
+      standalone: this.generateStandaloneHTML(reel, playlist)
+    };
+  }
+
+  // Generate a complete standalone HTML player for embedding (legacy method)
+  generateEmbedCode(reel) {
+    const options = this.generateEmbedOptions(reel);
+    return options.standalone; // Keep backward compatibility
+  }
+
+  generateIframeEmbed(reel) {
+    const reelId = this.generateReelId(reel);
+    this.storeReelData(reelId, reel);
     
-    return embedHTML;
+    return `<iframe src="${this.baseURL.replace('index.html', '')}player.html?id=${reelId}" 
+           width="100%" height="400" frameborder="0" 
+           style="border-radius: 8px; border: none;">
+          </iframe>`;
+  }
+
+  generateReelId(reel) {
+    // Generate a short unique ID based on reel content
+    const content = JSON.stringify({
+      title: reel.title,
+      playlist: reel.playlist?.map(t => ({ title: t.title, url: t.url })),
+      settings: {
+        accent: reel.varUiAccent,
+        waveform: reel.varWaveformUnplayed,
+        background: reel.backgroundImage
+      }
+    });
+    
+    // Simple hash function to create short ID
+    let hash = 0;
+    for (let i = 0; i < content.length; i++) {
+      const char = content.charCodeAt(i);
+      hash = ((hash << 5) - hash) + char;
+      hash = hash & hash; // Convert to 32-bit integer
+    }
+    return Math.abs(hash).toString(36).substring(0, 8);
+  }
+
+  storeReelData(reelId, reel) {
+    // Store complete reel configuration for iframe player
+    const reelData = {
+      id: reelId,
+      title: reel.title,
+      showTitle: reel.showTitle,
+      playlist: reel.playlist?.filter(track => track.url && track.url.trim() !== "") || [],
+      settings: {
+        // Color settings
+        varUiAccent: reel.varUiAccent || "#2a0026",
+        varWaveformUnplayed: reel.varWaveformUnplayed || "#929292",
+        varWaveformHover: reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
+        
+        // Background settings
+        backgroundImage: reel.backgroundImage,
+        backgroundImageEnabled: reel.backgroundImageEnabled,
+        overlayColor: reel.overlayColor,
+        overlayColorEnabled: reel.overlayColorEnabled,
+        backgroundOpacity: reel.backgroundOpacity,
+        backgroundBlur: reel.backgroundBlur,
+        
+        // Title appearance
+        titleAppearance: reel.titleAppearance || {},
+        
+        // Blend modes and effects
+        backgroundBlendMode: reel.backgroundBlendMode,
+        elementBlendMode: reel.elementBlendMode
+      },
+      created: new Date().toISOString()
+    };
+    
+    // Store the reel data in localStorage (in production, this would be a server endpoint)
+    localStorage.setItem(`reel_${reelId}`, JSON.stringify(reelData));
+    console.log(`🎵 Reel stored with ID: ${reelId}`);
+    
+    return reelData;
   }
 
   generateStandaloneHTML(reel, playlist) {
@@ -251,6 +330,67 @@ export class EmbedExporter {
       pointer-events: auto;
     }
     
+    .volume-control {
+      display: flex;
+      position: relative;
+      align-items: center;
+      justify-content: center;
+      transition: transform 0.3s ease;
+      height: 100%;
+    }
+    
+    .volume-control.show-slider #volumeSlider {
+      opacity: 1;
+      transform: scaleY(1);
+      pointer-events: auto;
+    }
+    
+    #volumeToggle .heroicon {
+      width: 32px;
+      height: 32px;
+    }
+    
+    #volumeSlider {
+      opacity: 0;
+      transform: scaleY(0);
+      transform-origin: bottom center;
+      transition: opacity 0.2s ease, transform 0.2s ease;
+      writing-mode: vertical-rl;
+      direction: rtl;
+      -webkit-appearance: none;
+      appearance: none;
+      width: 6px;
+      height: 80px;
+      position: absolute;
+      bottom: 80%;
+      margin-bottom: 0.01rem;
+      background: var(--waveform-unplayed);
+      border-radius: 6px;
+      outline: none;
+      cursor: pointer;
+      pointer-events: none;
+    }
+    
+    #volumeSlider::-webkit-slider-thumb {
+      -webkit-appearance: none;
+      appearance: none;
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--ui-accent);
+      border: none;
+      cursor: pointer;
+    }
+    
+    #volumeSlider::-moz-range-thumb {
+      width: 16px;
+      height: 16px;
+      border-radius: 50%;
+      background: var(--ui-accent);
+      border: none;
+      cursor: pointer;
+    }
+    
     .hidden { display: none !important; }
   </style>
 </head>
@@ -276,6 +416,15 @@ export class EmbedExporter {
               }
             </style>
           </div>
+        </div>
+        <div class="volume-control" id="volumeControl">
+          <button id="volumeToggle" class="icon-button">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+              <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+              <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+            </svg>
+          </button>
+          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
         </div>
       </div>
     </div>
@@ -354,7 +503,31 @@ export class EmbedExporter {
                     
                     console.log('📋 Playlist data:', playlist.length, 'tracks');
                   
-                  // Convert Dropbox links to direct download links
+                  // Preload durations for playlist items
+                  function preloadDurations() {
+                    playlist.forEach((track, index) => {
+                      const durationEl = document.querySelector(\`.playlist-item[data-index="\${index}"] .playlist-duration\`);
+                      if (!durationEl || durationEl.textContent !== '--:--') return;
+                      
+                      const audio = new Audio(convertDropboxLink(track.url));
+                      audio.addEventListener('loadedmetadata', () => {
+                        const minutes = Math.floor(audio.duration / 60);
+                        const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+                        durationEl.textContent = \`\${minutes}:\${seconds}\`;
+                      });
+                      
+                      audio.addEventListener('error', () => {
+                        durationEl.textContent = '0:00';
+                      });
+                    });
+                  }
+                  
+                  // Initialize durations
+                  if ('requestIdleCallback' in window) {
+                    requestIdleCallback(() => preloadDurations());
+                  } else {
+                    setTimeout(() => preloadDurations(), 200);
+                  }
                   function convertDropboxLink(url) {
                     if (url.includes('dropbox.com') && !url.includes('&dl=1')) {
                       return url.replace(/[?&]dl=0/, '').replace(/[?&]dl=1/, '') + (url.includes('?') ? '&' : '?') + 'dl=1';
@@ -369,12 +542,18 @@ export class EmbedExporter {
                     const playPauseBtn = document.getElementById('playPause');
                     const trackInfo = document.getElementById('trackInfo');
                     const loading = document.getElementById('loading');
+                    const volumeControl = document.getElementById('volumeControl');
+                    const volumeToggle = document.getElementById('volumeToggle');
+                    const volumeSlider = document.getElementById('volumeSlider');
                     
                     console.log('🔍 DOM elements found:', {
                       waveform: !!waveformContainer,
                       playPause: !!playPauseBtn,
                       trackInfo: !!trackInfo,
-                      loading: !!loading
+                      loading: !!loading,
+                      volumeControl: !!volumeControl,
+                      volumeToggle: !!volumeToggle,
+                      volumeSlider: !!volumeSlider
                     });
                     
                     if (!waveformContainer || !playPauseBtn || !trackInfo) {
@@ -391,8 +570,8 @@ export class EmbedExporter {
                     try {
                       wavesurfer = WaveSurfer.create({
                         container: waveformContainer,
-                        waveColor: 'var(--waveform-unplayed)',
-                        progressColor: 'var(--ui-accent)',
+                        waveColor: '${waveformUnplayed}',
+                        progressColor: '${uiAccentColor}',
                         height: 85,
                         barWidth: 2,
                         barGap: 1,
@@ -402,6 +581,94 @@ export class EmbedExporter {
                       });
                       
                       console.log('✅ WaveSurfer created successfully');
+                      
+                      // Setup volume controls
+                      if (volumeControl && volumeToggle && volumeSlider) {
+                        let previousVolume = 1;
+                        let isDraggingSlider = false;
+                        let isHoveringSlider = false;
+                        let isHoveringIcon = false;
+                        let hideSliderTimeout;
+                        
+                        const volumeIconLoud = \`
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                            <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                          </svg>
+                        \`;
+                        
+                        const volumeIconMuted = \`
+                          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM17.78 9.22a.75.75 0 1 0-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L19.22 12l-1.44-1.22Z"/>
+                          </svg>
+                        \`;
+                        
+                        volumeToggle.addEventListener('click', () => {
+                          const currentVolume = parseFloat(volumeSlider.value);
+                          if (currentVolume === 0) {
+                            volumeSlider.value = previousVolume;
+                          } else {
+                            previousVolume = currentVolume;
+                            volumeSlider.value = 0;
+                          }
+                          volumeSlider.dispatchEvent(new Event('input'));
+                        });
+                        
+                        volumeSlider.addEventListener('input', (e) => {
+                          const volume = parseFloat(e.target.value);
+                          wavesurfer.setVolume(volume);
+                          volumeToggle.innerHTML = volume === 0 ? volumeIconMuted : volumeIconLoud;
+                        });
+                        
+                        volumeSlider.addEventListener('mousedown', () => {
+                          isDraggingSlider = true;
+                        });
+                        
+                        document.addEventListener('mouseup', () => {
+                          isDraggingSlider = false;
+                        });
+                        
+                        volumeControl.addEventListener('mouseenter', () => {
+                          clearTimeout(hideSliderTimeout);
+                          volumeControl.classList.add('show-slider');
+                        });
+                        
+                        volumeControl.addEventListener('mouseleave', () => {
+                          hideSliderTimeout = setTimeout(() => {
+                            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+                              volumeControl.classList.remove('show-slider');
+                            }
+                          }, 300);
+                        });
+                        
+                        volumeSlider.addEventListener('mouseenter', () => {
+                          isHoveringSlider = true;
+                          clearTimeout(hideSliderTimeout);
+                        });
+                        
+                        volumeSlider.addEventListener('mouseleave', () => {
+                          isHoveringSlider = false;
+                          hideSliderTimeout = setTimeout(() => {
+                            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+                              volumeControl.classList.remove('show-slider');
+                            }
+                          }, 300);
+                        });
+                        
+                        volumeToggle.addEventListener('mouseenter', () => {
+                          isHoveringIcon = true;
+                          clearTimeout(hideSliderTimeout);
+                        });
+                        
+                        volumeToggle.addEventListener('mouseleave', () => {
+                          isHoveringIcon = false;
+                          hideSliderTimeout = setTimeout(() => {
+                            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+                              volumeControl.classList.remove('show-slider');
+                            }
+                          }, 300);
+                        });
+                      }
                       
                       // Load first track
                       loadTrack(0);
@@ -514,7 +781,7 @@ export class EmbedExporter {
     return playlist.map((track, index) => `
       <div class="playlist-item${index === 0 ? ' active' : ''}" data-index="${index}">
         <span>${track.title || 'Untitled Track'}</span>
-        <span class="playlist-duration">${track.duration || '--:--'}</span>
+        <span class="playlist-duration">--:--</span>
       </div>
     `).join('');
   }

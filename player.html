@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Reel Player</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+      background: transparent;
+      overflow: hidden;
+    }
+    
+    .reel-player {
+      width: 100%;
+      height: 100vh;
+      position: relative;
+      box-sizing: border-box;
+    }
+    
+    .error-message {
+      color: #dc3545;
+      text-align: center;
+      padding: 2rem;
+      background: #f8f9fa;
+      border-radius: 8px;
+      margin: 1rem;
+    }
+    
+    .loading-message {
+      color: #6c757d;
+      text-align: center;
+      padding: 2rem;
+    }
+  </style>
+</head>
+<body>
+  <div id="playerContainer">
+    <div class="loading-message">🎵 Loading player...</div>
+  </div>
+
+  <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7"></script>
+  <script>
+    // Get reel ID from URL parameters
+    const urlParams = new URLSearchParams(window.location.search);
+    const reelId = urlParams.get('id');
+    
+    if (!reelId) {
+      document.getElementById('playerContainer').innerHTML = 
+        '<div class="error-message">❌ No reel ID provided</div>';
+    } else {
+      loadReel(reelId);
+    }
+    
+    function loadReel(reelId) {
+      try {
+        // Try to get reel data from localStorage
+        let reelData = null;
+        
+        const storedData = localStorage.getItem(`reel_${reelId}`);
+        if (storedData) {
+          reelData = JSON.parse(storedData);
+        } else {
+          // Try to get from parent window if in iframe
+          try {
+            if (window.parent && window.parent !== window) {
+              const parentData = window.parent.localStorage.getItem(`reel_${reelId}`);
+              if (parentData) {
+                reelData = JSON.parse(parentData);
+              }
+            }
+          } catch (e) {
+            console.log('Cannot access parent localStorage (cross-origin)');
+          }
+        }
+        
+        if (!reelData) {
+          document.getElementById('playerContainer').innerHTML = 
+            '<div class="error-message">❌ Reel not found: ' + reelId + '</div>';
+          return;
+        }
+        
+        // Render the player with exact same styling as builder
+        renderPlayer(reelData);
+        
+      } catch (error) {
+        console.error('Failed to load reel:', error);
+        document.getElementById('playerContainer').innerHTML = 
+          '<div class="error-message">❌ Failed to load reel</div>';
+      }
+    }
+    
+    function renderPlayer(reelData) {
+      const container = document.getElementById('playerContainer');
+      const settings = reelData.settings || {};
+      const ta = settings.titleAppearance || {};
+      
+      // Process values exactly like the main embedExporter
+      let paddingBottom = ta.paddingBottom || "1.5rem";
+      if (typeof paddingBottom === "string" && !paddingBottom.match(/[a-z%]+$/)) {
+        paddingBottom = paddingBottom + "px";
+      }
+
+      const uiAccentColor = settings.varUiAccent || "#2a0026";
+      const waveformUnplayed = settings.varWaveformUnplayed || "#929292";
+      const waveformHover = settings.varWaveformHover || "rgba(0, 31, 103, 0.13)";
+      
+      // Process background settings
+      const backgroundImage = (settings.backgroundImageEnabled && settings.backgroundImage && settings.backgroundImage.trim()) 
+        ? settings.backgroundImage 
+        : null;
+
+      let backgroundColor = `rgba(255, 255, 255, ${settings.backgroundOpacity || "1"})`;
+      let overlayColor = "rgba(255, 255, 255, 0)";
+      
+      if (settings.overlayColorEnabled && settings.overlayColor) {
+        if (backgroundImage) {
+          overlayColor = settings.overlayColor;
+        } else {
+          backgroundColor = settings.overlayColor;
+        }
+      }
+
+      const backgroundBlur = settings.backgroundBlur || "2";
+      
+      // Generate player HTML with identical styling
+      container.innerHTML = `
+        <style>
+          .reel-player-${reelData.id} {
+            --ui-accent: ${uiAccentColor};
+            --waveform-unplayed: ${waveformUnplayed};
+            --waveform-hover: ${waveformHover};
+            --reel-title-size: ${ta.fontSize || "1.3rem"};
+            --reel-title-weight: ${ta.fontWeight || "700"};
+            --reel-title-align: ${ta.align || "center"};
+            --reel-title-padding-bottom: ${paddingBottom};
+            --background-color: ${backgroundColor};
+            --background-blur: ${backgroundBlur}px;
+            --overlay-color: ${overlayColor};
+            
+            position: relative;
+            background-color: var(--background-color);
+            ${backgroundImage ? `background-image: url("${backgroundImage}");` : ''}
+            background-size: cover;
+            background-position: center;
+            background-repeat: no-repeat;
+            border-radius: 8px;
+            overflow: hidden;
+            padding: 1rem;
+            height: 100%;
+            box-sizing: border-box;
+            ${settings.backgroundBlendMode ? `mix-blend-mode: ${settings.backgroundBlendMode};` : ''}
+          }
+          
+          .reel-player-${reelData.id}::before {
+            content: '';
+            position: absolute;
+            top: 0; left: 0; right: 0; bottom: 0;
+            background-color: var(--overlay-color);
+            backdrop-filter: blur(var(--background-blur));
+            -webkit-backdrop-filter: blur(var(--background-blur));
+            pointer-events: none;
+            z-index: 1;
+            border-radius: 8px;
+          }
+          
+          .reel-player-${reelData.id} > * {
+            position: relative;
+            z-index: 2;
+            ${settings.elementBlendMode ? `mix-blend-mode: ${settings.elementBlendMode};` : ''}
+          }
+          
+          .reel-title {
+            text-align: var(--reel-title-align);
+            font-size: var(--reel-title-size);
+            font-weight: var(--reel-title-weight);
+            margin-bottom: var(--reel-title-padding-bottom);
+            color: var(--ui-accent);
+          }
+          
+          .player-content${!reelData.showTitle ? '.no-title' : ''} {
+            ${!reelData.showTitle ? 'padding-top: 3rem;' : ''}
+          }
+          
+          .track-info {
+            min-height: 1.2rem;
+            margin-bottom: 0.75rem;
+            margin-left: 3.7rem;
+            padding-left: 0.5rem;
+            font-size: 0.9rem;
+            font-weight: 600;
+            color: var(--ui-accent);
+            white-space: nowrap;
+            overflow: hidden;
+            text-overflow: ellipsis;
+          }
+          
+          .player-container {
+            display: flex;
+            align-items: center;
+            gap: 1rem;
+            margin-bottom: 1rem;
+          }
+          
+          .icon-button {
+            background: none;
+            border: none;
+            cursor: pointer;
+            padding: 0;
+            color: var(--ui-accent);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.2s ease;
+          }
+          
+          .icon-button:hover {
+            transform: scale(1.1);
+          }
+          
+          .heroicon {
+            width: 46px;
+            height: 46px;
+            padding-top: 0.2rem;
+            color: var(--ui-accent);
+          }
+          
+          .waveform-container {
+            flex: 1;
+            position: relative;
+            height: 85px;
+          }
+          
+          #waveform {
+            position: relative;
+            overflow: visible;
+            width: 100%;
+            height: 100%;
+          }
+          
+          .playlist {
+            margin-top: 2.5rem;
+            ${!reelData.showTitle ? 'padding-bottom: 2.5rem;' : ''}
+            max-height: 200px;
+            overflow-y: auto;
+          }
+          
+          .playlist-item {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            padding: 0.75rem 1rem;
+            cursor: pointer;
+            color: var(--ui-accent);
+            transition: all 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+            transform: scale(0.95);
+            opacity: 0.7;
+            border-radius: 4px;
+            margin-bottom: 0px;
+            transform-origin: center;
+          }
+          
+          .playlist-item:first-child {
+            margin-top: 4px;
+          }
+          
+          .playlist-item:hover {
+            transform: scale(0.98);
+            opacity: 0.85;
+            background-color: rgba(255, 255, 255, 0.1);
+          }
+          
+          .playlist-item.active {
+            transform: scale(1);
+            opacity: 1;
+            font-weight: 600;
+            background-color: rgba(255, 255, 255, 0.05);
+            box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+          }
+          
+          .playlist-duration {
+            margin-left: 1rem;
+            color: var(--ui-accent);
+            font-size: 0.85rem;
+            opacity: 0.8;
+          }
+          
+          .playlist-item.active .playlist-duration {
+            font-weight: 600;
+            opacity: 1;
+          }
+          
+          .volume-control {
+            display: flex;
+            position: relative;
+            align-items: center;
+            justify-content: center;
+            transition: transform 0.3s ease;
+            height: 100%;
+          }
+          
+          .volume-control.show-slider #volumeSlider {
+            opacity: 1;
+            transform: scaleY(1);
+            pointer-events: auto;
+          }
+          
+          #volumeToggle .heroicon {
+            width: 32px;
+            height: 32px;
+          }
+          
+          #volumeSlider {
+            opacity: 0;
+            transform: scaleY(0);
+            transform-origin: bottom center;
+            transition: opacity 0.2s ease, transform 0.2s ease;
+            writing-mode: vertical-rl;
+            direction: rtl;
+            -webkit-appearance: none;
+            appearance: none;
+            width: 6px;
+            height: 80px;
+            position: absolute;
+            bottom: 80%;
+            margin-bottom: 0.01rem;
+            background: var(--waveform-unplayed);
+            border-radius: 6px;
+            outline: none;
+            cursor: pointer;
+            pointer-events: none;
+          }
+          
+          #volumeSlider::-webkit-slider-thumb {
+            -webkit-appearance: none;
+            appearance: none;
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--ui-accent);
+            border: none;
+            cursor: pointer;
+          }
+          
+          #volumeSlider::-moz-range-thumb {
+            width: 16px;
+            height: 16px;
+            border-radius: 50%;
+            background: var(--ui-accent);
+            border: none;
+            cursor: pointer;
+          }
+          
+          .loading {
+            position: absolute;
+            top: 0; left: 0;
+            z-index: 10;
+            background: rgba(255, 255, 255, 0.9);
+            width: 100%;
+            height: 100%;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            border-radius: 8px;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease;
+          }
+          
+          .loading.show {
+            opacity: 1;
+            pointer-events: auto;
+          }
+        </style>
+        
+        <div class="reel-player-${reelData.id}">
+          <div class="player-content${!reelData.showTitle ? ' no-title' : ''}">
+            ${reelData.showTitle && reelData.title && reelData.title.trim() ? `<div class="reel-title">${reelData.title}</div>` : ''}
+            <div class="track-info" id="trackInfo"></div>
+            <div class="player-container">
+              <button id="playPause" class="icon-button">
+                <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                  <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z" clip-rule="evenodd"/>
+                </svg>
+              </button>
+              <div class="waveform-container">
+                <div id="waveform"></div>
+                <div id="loading" class="loading">
+                  <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid var(--ui-accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+                  <style>
+                    @keyframes spin {
+                      0% { transform: rotate(0deg); }
+                      100% { transform: rotate(360deg); }
+                    }
+                  </style>
+                </div>
+              </div>
+              <div class="volume-control" id="volumeControl">
+                <button id="volumeToggle" class="icon-button">
+                  <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                    <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                    <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                  </svg>
+                </button>
+                <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
+              </div>
+            </div>
+          </div>
+          <div class="playlist" id="playlist">
+            ${reelData.playlist.map((track, index) => `
+              <div class="playlist-item${index === 0 ? ' active' : ''}" data-index="${index}">
+                <span>${track.title || 'Untitled Track'}</span>
+                <span class="playlist-duration">--:--</span>
+              </div>
+            `).join('')}
+          </div>
+        </div>
+      `;
+      
+      // Initialize the player with full functionality
+      initializePlayer(reelData);
+    }
+    
+    function initializePlayer(reelData) {
+      const playlist = reelData.playlist;
+      const settings = reelData.settings;
+      let currentTrackIndex = 0;
+      let wavesurfer = null;
+      
+      if (typeof WaveSurfer === 'undefined') {
+        console.error('WaveSurfer not loaded');
+        return;
+      }
+      
+      try {
+        // Create WaveSurfer with exact same settings as main player
+        wavesurfer = WaveSurfer.create({
+          container: document.getElementById('waveform'),
+          waveColor: settings.varWaveformUnplayed || '#929292',
+          progressColor: settings.varUiAccent || '#2a0026',
+          height: 85,
+          barWidth: 2,
+          barGap: 1,
+          barRadius: 1,
+          responsive: true,
+          normalize: true
+        });
+        
+        console.log('✅ WaveSurfer created successfully');
+        
+        // Setup volume controls exactly like main player
+        setupVolumeControls();
+        
+        // Load first track
+        if (playlist.length > 0) {
+          loadTrack(0);
+        }
+        
+        // Preload durations
+        preloadDurations();
+        
+        // Event handlers
+        document.getElementById('playPause').addEventListener('click', () => {
+          wavesurfer.playPause();
+        });
+        
+        wavesurfer.on('play', () => {
+          document.getElementById('playPause').innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+              <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12ZM9 8.25a.75.75 0 0 0-.75.75v6c0 .414.336.75.75.75h1.5a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75H9Zm5.25 0a.75.75 0 0 0-.75.75v6c0 .414.336.75.75.75H15a.75.75 0 0 0 .75-.75V9a.75.75 0 0 0-.75-.75h-1.5Z" clip-rule="evenodd"/>
+            </svg>
+          `;
+        });
+        
+        wavesurfer.on('pause', () => {
+          document.getElementById('playPause').innerHTML = `
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+              <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z" clip-rule="evenodd"/>
+            </svg>
+          `;
+        });
+        
+        wavesurfer.on('finish', () => {
+          if (currentTrackIndex < playlist.length - 1) {
+            loadTrack(currentTrackIndex + 1);
+            setTimeout(() => wavesurfer.play(), 100);
+          }
+        });
+        
+        wavesurfer.on('loading', (percent) => {
+          const loading = document.getElementById('loading');
+          if (loading) {
+            if (percent < 100) {
+              loading.classList.add('show');
+            } else {
+              loading.classList.remove('show');
+            }
+          }
+        });
+        
+        // Playlist click handlers
+        document.querySelectorAll('.playlist-item').forEach((item, index) => {
+          item.addEventListener('click', () => {
+            loadTrack(index);
+          });
+        });
+        
+      } catch (error) {
+        console.error('Error initializing player:', error);
+      }
+      
+      function convertDropboxLink(url) {
+        if (url.includes('dropbox.com') && !url.includes('&dl=1')) {
+          return url.replace(/[?&]dl=0/, '').replace(/[?&]dl=1/, '') + (url.includes('?') ? '&' : '?') + 'dl=1';
+        }
+        return url;
+      }
+      
+      function preloadDurations() {
+        playlist.forEach((track, index) => {
+          const durationEl = document.querySelector(`.playlist-item[data-index="${index}"] .playlist-duration`);
+          if (!durationEl || durationEl.textContent !== '--:--') return;
+          
+          const audio = new Audio(convertDropboxLink(track.url));
+          audio.addEventListener('loadedmetadata', () => {
+            const minutes = Math.floor(audio.duration / 60);
+            const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+            durationEl.textContent = `${minutes}:${seconds}`;
+          });
+          
+          audio.addEventListener('error', () => {
+            durationEl.textContent = '0:00';
+          });
+        });
+      }
+      
+      function setupVolumeControls() {
+        const volumeControl = document.getElementById('volumeControl');
+        const volumeToggle = document.getElementById('volumeToggle');
+        const volumeSlider = document.getElementById('volumeSlider');
+        
+        if (!volumeControl || !volumeToggle || !volumeSlider) return;
+        
+        let previousVolume = 1;
+        let isDraggingSlider = false;
+        let isHoveringSlider = false;
+        let isHoveringIcon = false;
+        let hideSliderTimeout;
+        
+        const volumeIconLoud = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+            <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+          </svg>
+        `;
+        
+        const volumeIconMuted = `
+          <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+            <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM17.78 9.22a.75.75 0 1 0-1.06 1.06L18.44 12l-1.72 1.72a.75.75 0 1 0 1.06 1.06L19.22 12l-1.44-1.22Z"/>
+          </svg>
+        `;
+        
+        volumeToggle.addEventListener('click', () => {
+          const currentVolume = parseFloat(volumeSlider.value);
+          if (currentVolume === 0) {
+            volumeSlider.value = previousVolume;
+          } else {
+            previousVolume = currentVolume;
+            volumeSlider.value = 0;
+          }
+          volumeSlider.dispatchEvent(new Event('input'));
+        });
+        
+        volumeSlider.addEventListener('input', (e) => {
+          const volume = parseFloat(e.target.value);
+          wavesurfer.setVolume(volume);
+          volumeToggle.innerHTML = volume === 0 ? volumeIconMuted : volumeIconLoud;
+        });
+        
+        volumeSlider.addEventListener('mousedown', () => {
+          isDraggingSlider = true;
+        });
+        
+        document.addEventListener('mouseup', () => {
+          isDraggingSlider = false;
+        });
+        
+        volumeControl.addEventListener('mouseenter', () => {
+          clearTimeout(hideSliderTimeout);
+          volumeControl.classList.add('show-slider');
+        });
+        
+        volumeControl.addEventListener('mouseleave', () => {
+          hideSliderTimeout = setTimeout(() => {
+            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+              volumeControl.classList.remove('show-slider');
+            }
+          }, 300);
+        });
+        
+        volumeSlider.addEventListener('mouseenter', () => {
+          isHoveringSlider = true;
+          clearTimeout(hideSliderTimeout);
+        });
+        
+        volumeSlider.addEventListener('mouseleave', () => {
+          isHoveringSlider = false;
+          hideSliderTimeout = setTimeout(() => {
+            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+              volumeControl.classList.remove('show-slider');
+            }
+          }, 300);
+        });
+        
+        volumeToggle.addEventListener('mouseenter', () => {
+          isHoveringIcon = true;
+          clearTimeout(hideSliderTimeout);
+        });
+        
+        volumeToggle.addEventListener('mouseleave', () => {
+          isHoveringIcon = false;
+          hideSliderTimeout = setTimeout(() => {
+            if (!isDraggingSlider && !isHoveringSlider && !isHoveringIcon) {
+              volumeControl.classList.remove('show-slider');
+            }
+          }, 300);
+        });
+      }
+      
+      function loadTrack(index) {
+        if (index < 0 || index >= playlist.length) return;
+        
+        currentTrackIndex = index;
+        const track = playlist[index];
+        const convertedURL = convertDropboxLink(track.url);
+        
+        // Update UI
+        document.querySelectorAll('.playlist-item').forEach((item, i) => {
+          item.classList.toggle('active', i === index);
+        });
+        
+        document.getElementById('trackInfo').textContent = track.title || 'Untitled Track';
+        
+        // Load audio
+        if (wavesurfer) {
+          try {
+            wavesurfer.load(convertedURL);
+          } catch (error) {
+            console.error('Error loading track:', error);
+          }
+        }
+      }
+    }
+  </script>
+</body>
+</html>
