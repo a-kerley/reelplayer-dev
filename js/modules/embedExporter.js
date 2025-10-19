@@ -204,7 +204,11 @@ export class EmbedExporter {
     }
     
     .track-info {
+      display: block;
       min-height: 1.2rem;
+      opacity: 0;
+      visibility: hidden;
+      transition: opacity 0.4s ease, visibility 0.4s ease;
       margin-bottom: 0.75rem;
       margin-left: 3.7rem;
       padding-left: 0.5rem;
@@ -216,7 +220,12 @@ export class EmbedExporter {
       text-overflow: ellipsis;
     }
     
-    .player-container {
+    .track-info.visible {
+      opacity: 1;
+      visibility: visible;
+    }
+    
+    .player-controls {
       display: flex;
       align-items: center;
       gap: 1rem;
@@ -246,10 +255,25 @@ export class EmbedExporter {
       color: var(--ui-accent);
     }
     
-    .waveform-container {
-      flex: 1;
-      position: relative;
+    .waveform-and-volume {
+      display: flex;
+      align-items: center;
+      gap: 0.5rem;
+      flex-grow: 1;
       height: 85px;
+      min-height: 85px;
+      max-height: 85px;
+    }
+    
+    #waveform > canvas {
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    
+    #playPause {
+      opacity: 0;
+      color: #888888;
+      transition: opacity 0.4s ease, color 0.4s ease, transform 0.2s ease;
     }
     
     #waveform {
@@ -257,6 +281,54 @@ export class EmbedExporter {
       overflow: visible;
       width: 100%;
       height: 100%;
+      flex: 1;
+    }
+    
+    .hover-overlay {
+      position: absolute;
+      top: 0;
+      left: 0;
+      height: 100%;
+      background-color: var(--waveform-hover);
+      pointer-events: none;
+      width: 0;
+      z-index: 4;
+    }
+    
+    .hover-time,
+    .playhead-time {
+      position: absolute;
+      bottom: -1.5rem;
+      left: 0;
+      color: var(--ui-accent);
+      font-size: 0.75rem;
+      font-weight: 400;
+      padding: 0 0.3rem;
+      pointer-events: none;
+      opacity: 0;
+      transition: opacity 0.2s ease;
+      white-space: nowrap;
+      z-index: 10;
+      transform: translateX(-50%);
+    }
+    
+    .total-time {
+      position: absolute;
+      bottom: 60%;
+      right: 0.3rem;
+      color: var(--waveform-unplayed);
+      font-size: 0.65rem;
+      font-weight: 200;
+      pointer-events: none;
+      user-select: none;
+      white-space: nowrap;
+      z-index: 10;
+      opacity: 0;
+      transition: opacity 0.4s ease;
+    }
+    
+    .total-time.visible {
+      opacity: 1;
     }
     
     .playlist {
@@ -336,7 +408,11 @@ export class EmbedExporter {
       align-items: center;
       justify-content: center;
       transition: transform 0.3s ease;
-      height: 100%;
+      height: 85px;
+      min-width: 40px;
+      opacity: 0.5;
+      color: #888888;
+      transition: opacity 0.4s ease, color 0.4s ease;
     }
     
     .volume-control.show-slider #volumeSlider {
@@ -345,9 +421,18 @@ export class EmbedExporter {
       pointer-events: auto;
     }
     
+    #volumeToggle {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      width: 40px;
+      height: 40px;
+    }
+    
     #volumeToggle .heroicon {
-      width: 32px;
-      height: 32px;
+      width: 28px;
+      height: 28px;
+      flex-shrink: 0;
     }
     
     #volumeSlider {
@@ -369,6 +454,8 @@ export class EmbedExporter {
       outline: none;
       cursor: pointer;
       pointer-events: none;
+      will-change: transform, opacity;
+      backface-visibility: hidden;
     }
     
     #volumeSlider::-webkit-slider-thumb {
@@ -399,32 +486,37 @@ export class EmbedExporter {
     <div class="player-content${!reel.showTitle ? ' no-title' : ''}">
       ${reel.showTitle && reel.title && reel.title.trim() ? `<div class="reel-title">${reel.title}</div>` : ''}
       <div class="track-info" id="trackInfo"></div>
-      <div class="player-container">
+      <div class="player-controls">
         <button id="playPause" class="icon-button">
           <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
             <path fill-rule="evenodd" d="M2.25 12c0-5.385 4.365-9.75 9.75-9.75s9.75 4.365 9.75 9.75-4.365 9.75-9.75 9.75S2.25 17.385 2.25 12Zm14.024-.983a1.125 1.125 0 0 1 0 1.966l-5.603 3.113A1.125 1.125 0 0 1 9 15.113V8.887c0-.857.921-1.4 1.671-.983l5.603 3.113Z" clip-rule="evenodd"/>
           </svg>
         </button>
-        <div class="waveform-container">
-          <div id="waveform"></div>
-          <div id="loading" class="loading">
-            <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid var(--ui-accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
-            <style>
-              @keyframes spin {
-                0% { transform: rotate(0deg); }
-                100% { transform: rotate(360deg); }
-              }
-            </style>
+        <div class="waveform-and-volume">
+          <div id="waveform">
+            <div class="hover-overlay"></div>
+            <div class="hover-time">0:00</div>
+            <div class="playhead-time">0:00</div>
+            <div id="total-time" class="total-time">0:00</div>
+            <div id="loading" class="loading">
+              <div style="width: 60px; height: 60px; border: 4px solid #f3f3f3; border-top: 4px solid var(--ui-accent); border-radius: 50%; animation: spin 1s linear infinite;"></div>
+              <style>
+                @keyframes spin {
+                  0% { transform: rotate(0deg); }
+                  100% { transform: rotate(360deg); }
+                }
+              </style>
+            </div>
           </div>
-        </div>
-        <div class="volume-control" id="volumeControl">
-          <button id="volumeToggle" class="icon-button">
-            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
-              <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
-              <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
-            </svg>
-          </button>
-          <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
+          <div class="volume-control" id="volumeControl">
+            <button id="volumeToggle" class="icon-button">
+              <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
+                <path d="M13.5 4.06c0-1.336-1.616-2.005-2.56-1.06l-4.5 4.5H4.508c-1.141 0-2.318.664-2.66 1.905A9.76 9.76 0 0 0 1.5 12c0 .898.121 1.768.35 2.595.341 1.24 1.518 1.905 2.659 1.905h1.93l4.5 4.5c.945.945 2.561.276 2.561-1.06V4.06ZM18.584 5.106a.75.75 0 0 1 1.06 0c3.808 3.807 3.808 9.98 0 13.788a.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+                <path d="M15.932 7.757a.75.75 0 0 1 1.061 0 6 6 0 0 1 0 8.486.75.75 0 0 1-1.06-1.061 4.5 4.5 0 0 0 0-6.364.75.75 0 0 1 0-1.06Z"/>
+              </svg>
+            </button>
+            <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
+          </div>
         </div>
       </div>
     </div>
@@ -510,15 +602,50 @@ export class EmbedExporter {
                       if (!durationEl || durationEl.textContent !== '--:--') return;
                       
                       const audio = new Audio(convertDropboxLink(track.url));
+                      let loaded = false;
+                      
+                      // Set timeout fallback (10 seconds)
+                      const timeout = setTimeout(() => {
+                        if (!loaded) {
+                          durationEl.textContent = '?:??';
+                          console.warn(\`Duration timeout for track \${index}: \${track.title}\`);
+                        }
+                      }, 10000);
+                      
+                      // Try loadedmetadata first (fastest)
                       audio.addEventListener('loadedmetadata', () => {
-                        const minutes = Math.floor(audio.duration / 60);
-                        const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
-                        durationEl.textContent = \`\${minutes}:\${seconds}\`;
+                        if (!loaded && !isNaN(audio.duration) && audio.duration > 0 && isFinite(audio.duration)) {
+                          loaded = true;
+                          clearTimeout(timeout);
+                          const minutes = Math.floor(audio.duration / 60);
+                          const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+                          durationEl.textContent = \`\${minutes}:\${seconds}\`;
+                        }
                       });
                       
-                      audio.addEventListener('error', () => {
-                        durationEl.textContent = '0:00';
+                      // Fallback to canplaythrough (slower but more reliable)
+                      audio.addEventListener('canplaythrough', () => {
+                        if (!loaded && !isNaN(audio.duration) && audio.duration > 0 && isFinite(audio.duration)) {
+                          loaded = true;
+                          clearTimeout(timeout);
+                          const minutes = Math.floor(audio.duration / 60);
+                          const seconds = Math.floor(audio.duration % 60).toString().padStart(2, '0');
+                          durationEl.textContent = \`\${minutes}:\${seconds}\`;
+                        }
                       });
+                      
+                      // Handle errors gracefully
+                      audio.addEventListener('error', (e) => {
+                        if (!loaded) {
+                          loaded = true;
+                          clearTimeout(timeout);
+                          durationEl.textContent = '--:--';
+                          console.warn(\`Duration load error for track \${index}:\`, e.type);
+                        }
+                      });
+                      
+                      // Trigger load
+                      audio.load();
                     });
                   }
                   
@@ -529,10 +656,52 @@ export class EmbedExporter {
                     setTimeout(() => preloadDurations(), 200);
                   }
                   function convertDropboxLink(url) {
-                    if (url.includes('dropbox.com') && !url.includes('&dl=1')) {
-                      return url.replace(/[?&]dl=0/, '').replace(/[?&]dl=1/, '') + (url.includes('?') ? '&' : '?') + 'dl=1';
+                    if (!url) return url;
+                    
+                    // Handle new Dropbox shared links (scl/fi/ format) - CORS fix
+                    if (url.includes('dropbox.com/scl/')) {
+                      return url
+                        .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                        .replace('&dl=0', '')
+                        .replace('&dl=1', '')
+                        .replace('?dl=0', '')
+                        .replace('?dl=1', '');
                     }
+                    
+                    // Handle old Dropbox shared links (s/ format)
+                    if (url.includes('www.dropbox.com/s/')) {
+                      return url
+                        .replace('www.dropbox.com', 'dl.dropboxusercontent.com')
+                        .replace('?dl=0', '')
+                        .replace('&dl=0', '');
+                    }
+                    
+                    // Handle old dl parameter
+                    if (url.includes('dropbox.com') && url.includes('dl=0')) {
+                      return url.replace('dl=0', 'dl=1');
+                    }
+                    
                     return url;
+                  }
+                  
+                  function detectAudioFormat(url) {
+                    // Extract file extension from URL (handle query parameters)
+                    const ext = url.split('.').pop().toLowerCase().split('?')[0].split('#')[0];
+                    
+                    // Format compatibility database
+                    const formats = {
+                      'mp3': { ext: 'MP3', mime: 'audio/mpeg', universal: true },
+                      'aac': { ext: 'AAC', mime: 'audio/aac', universal: true },
+                      'm4a': { ext: 'M4A/AAC', mime: 'audio/mp4', universal: true },
+                      'wav': { ext: 'WAV', mime: 'audio/wav', universal: true },
+                      'ogg': { ext: 'OGG', mime: 'audio/ogg', compatibility: 'Not supported in Safari' },
+                      'opus': { ext: 'Opus', mime: 'audio/opus', compatibility: 'Requires Safari 15+ on iOS/macOS' },
+                      'webm': { ext: 'WebM', mime: 'audio/webm', compatibility: 'Not supported in Safari' },
+                      'flac': { ext: 'FLAC', mime: 'audio/flac', compatibility: 'Requires Safari 11+, modern browsers' },
+                      'alac': { ext: 'ALAC', mime: 'audio/mp4', compatibility: 'Only supported in Safari' }
+                    };
+                    
+                    return formats[ext] || { ext: ext.toUpperCase(), mime: 'audio/*', compatibility: 'Unknown format' };
                   }
                   
                   // Initialize player
@@ -581,6 +750,104 @@ export class EmbedExporter {
                       });
                       
                       console.log('✅ WaveSurfer created successfully');
+                      
+                      // Setup waveform interactions
+                      const hoverOverlay = waveformContainer.querySelector('.hover-overlay');
+                      const hoverTime = waveformContainer.querySelector('.hover-time');
+                      const playheadTime = waveformContainer.querySelector('.playhead-time');
+                      const totalTimeEl = document.getElementById('total-time');
+                      
+                      // Handle ready event - fade in controls and show duration
+                      wavesurfer.on('ready', () => {
+                        console.log('🎵 WaveSurfer ready event fired');
+                        console.log('Duration:', wavesurfer.getDuration());
+                        
+                        // Show total duration
+                        const duration = wavesurfer.getDuration();
+                        const minutes = Math.floor(duration / 60);
+                        const seconds = Math.floor(duration % 60).toString().padStart(2, '0');
+                        if (totalTimeEl) {
+                          totalTimeEl.textContent = \`\${minutes}:\${seconds}\`;
+                          totalTimeEl.classList.add('visible');
+                        }
+                        
+                        // Track info visible
+                        if (trackInfo) {
+                          trackInfo.classList.add('visible');
+                        }
+                        
+                        // Fade in controls
+                        setTimeout(() => {
+                          const canvas = waveformContainer.querySelector('canvas');
+                          if (canvas) {
+                            console.log('✅ Canvas found, setting opacity to 1');
+                            canvas.style.opacity = '1';
+                          } else {
+                            console.error('❌ Canvas element not found!');
+                          }
+                          
+                          if (playPauseBtn) {
+                            playPauseBtn.style.opacity = '1';
+                            playPauseBtn.style.color = '${uiAccentColor}';
+                            console.log('✅ Play button opacity set to 1');
+                          }
+                          
+                          if (volumeControl) {
+                            volumeControl.style.opacity = '1';
+                            volumeControl.style.color = '${uiAccentColor}';
+                            console.log('✅ Volume control opacity set to 1');
+                          }
+                        }, 50);
+                      });
+                      
+                      // Hover effects on waveform
+                      waveformContainer.addEventListener('mousemove', (e) => {
+                        const rect = waveformContainer.getBoundingClientRect();
+                        const percent = Math.min(Math.max((e.clientX - rect.left) / rect.width, 0), 1);
+                        const duration = wavesurfer.getDuration();
+                        const time = duration * percent;
+                        
+                        if (hoverOverlay) {
+                          hoverOverlay.style.width = \`\${percent * 100}%\`;
+                        }
+                        
+                        if (hoverTime) {
+                          const minutes = Math.floor(time / 60);
+                          const seconds = Math.floor(time % 60).toString().padStart(2, '0');
+                          hoverTime.textContent = \`\${minutes}:\${seconds}\`;
+                          hoverTime.style.opacity = '1';
+                          
+                          const pixelX = e.clientX - rect.left;
+                          hoverTime.style.left = \`\${Math.max(Math.min(pixelX, rect.width - 40), 30)}px\`;
+                        }
+                      });
+                      
+                      waveformContainer.addEventListener('mouseleave', () => {
+                        if (hoverOverlay) {
+                          hoverOverlay.style.width = '0%';
+                        }
+                        if (hoverTime) {
+                          hoverTime.style.opacity = '0';
+                        }
+                      });
+                      
+                      // Update playhead time during playback
+                      wavesurfer.on('audioprocess', () => {
+                        const currentTime = wavesurfer.getCurrentTime();
+                        const duration = wavesurfer.getDuration();
+                        const minutes = Math.floor(currentTime / 60);
+                        const seconds = Math.floor(currentTime % 60).toString().padStart(2, '0');
+                        
+                        if (playheadTime) {
+                          playheadTime.textContent = \`\${minutes}:\${seconds}\`;
+                          
+                          const percent = currentTime / duration;
+                          const pixelX = percent * waveformContainer.clientWidth;
+                          const clampedX = Math.min(Math.max(pixelX, 20), waveformContainer.clientWidth - 40);
+                          playheadTime.style.left = \`\${clampedX}px\`;
+                          playheadTime.style.opacity = wavesurfer.isPlaying() ? '1' : '0';
+                        }
+                      });
                       
                       // Setup volume controls
                       if (volumeControl && volumeToggle && volumeSlider) {
@@ -713,6 +980,28 @@ export class EmbedExporter {
                             loading.classList.add('show');
                           } else {
                             loading.classList.remove('show');
+                          }
+                        }
+                      });
+                      
+                      // Enhanced error handling for unsupported audio formats
+                      wavesurfer.on('error', (error) => {
+                        console.error('WaveSurfer playback error:', error);
+                        
+                        const currentTrack = playlist[currentTrackIndex];
+                        if (currentTrack) {
+                          const format = detectAudioFormat(currentTrack.url);
+                          const formatName = format ? format.ext : 'Unknown';
+                          
+                          // Show user-friendly error message
+                          const trackInfo = document.getElementById('trackInfo');
+                          if (trackInfo) {
+                            if (format && format.compatibility) {
+                              trackInfo.textContent = \`⚠️ \${formatName} format may not be supported in this browser\`;
+                            } else {
+                              trackInfo.textContent = \`⚠️ Unable to load audio file\`;
+                            }
+                            trackInfo.style.color = '#dc3545'; // Red error color
                           }
                         }
                       });

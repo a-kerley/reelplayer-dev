@@ -312,8 +312,12 @@ export const playerApp = {
       container: "#waveform",
       waveColor: unplayedColor,
       progressColor: accentColor,
-      height: 100,
+      height: 85,
+      barWidth: 2,
+      barGap: 1,
+      barRadius: 1,
       responsive: true,
+      normalize: true,
     });
   },
 
