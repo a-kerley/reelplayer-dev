@@ -94,7 +94,7 @@ function createTitleField(track, onChange) {
   titleField.type = "text";
   titleField.setAttribute("inputmode", "text");
   titleField.setAttribute("autocomplete", "off");
-  titleField.placeholder = "Track title (optional, overrides file name)";
+  titleField.placeholder = "Track Title (optional, overrides file name)";
   titleField.value = track.title;
   titleField.size = 32;
   
@@ -113,16 +113,16 @@ function createUrlField(track, onChange, extractFileName) {
   const fileNameSpan = document.createElement("span");
   fileNameSpan.classList.add("filename-display");
   
-  const filenameText = extractFileName(track.url) || "Paste Link or Select File";
+  const filenameText = extractFileName(track.url) || "Paste Cloudinary Link or Select File";
   fileNameSpan.textContent = filenameText;
   
-  if (filenameText === "Paste Link or Select File") {
+  if (filenameText === "Paste Cloudinary Link or Select File") {
     fileNameSpan.classList.add("placeholder");
   } else {
     fileNameSpan.classList.remove("placeholder");
   }
   
-  // Styling
+  // Styling - match title field styling
   Object.assign(fileNameSpan.style, {
     flex: "2",
     minWidth: "14rem",
@@ -131,7 +131,10 @@ function createUrlField(track, onChange, extractFileName) {
     padding: "0.35em 0.7em",
     fontFamily: "inherit",
     fontSize: "0.8rem",
-    fontWeight: "400"
+    fontWeight: "400",
+    border: "1px solid #ccc",
+    borderRadius: "4px",
+    backgroundColor: "#fff"
   });
   fileNameSpan.tabIndex = 0;
 
@@ -139,6 +142,7 @@ function createUrlField(track, onChange, extractFileName) {
   const urlField = document.createElement("input");
   urlField.type = "text";
   urlField.value = track.url;
+  urlField.placeholder = "Paste Cloudinary Link or Select File";
   
   Object.assign(urlField.style, {
     flex: "2",
@@ -161,10 +165,10 @@ function createUrlField(track, onChange, extractFileName) {
 
   // URL field events
   urlField.onblur = () => {
-    const newFilenameText = extractFileName(urlField.value) || "Paste Link or Select File";
+    const newFilenameText = extractFileName(urlField.value) || "Paste Cloudinary Link or Select File";
     fileNameSpan.textContent = newFilenameText;
     
-    if (newFilenameText === "Paste Link or Select File") {
+    if (newFilenameText === "Paste Cloudinary Link or Select File") {
       fileNameSpan.classList.add("placeholder");
     } else {
       fileNameSpan.classList.remove("placeholder");
@@ -316,15 +320,15 @@ function createFilePickerButton(track, onChange, extractFileName) {
   
   // Folder icon SVG
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px;">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
     </svg>
   `;
   
   // Styling
   Object.assign(btn.style, {
-    background: "var(--ui-accent, #2f2f2f)",
-    color: "#fff",
+    background: "transparent",
+    color: "#000",
     border: "none",
     borderRadius: "4px",
     padding: "0.35em 0.5em",
@@ -332,16 +336,18 @@ function createFilePickerButton(track, onChange, extractFileName) {
     display: "flex",
     alignItems: "center",
     justifyContent: "center",
-    transition: "background-color 0.2s ease"
+    transition: "all 0.2s ease"
   });
   
-  // Hover effect
+  // Hover effect - changes icon color to blue
   btn.addEventListener("mouseenter", () => {
-    btn.style.backgroundColor = "#4a90e2";
+    const svg = btn.querySelector('svg');
+    if (svg) svg.style.color = "#4a90e2";
   });
   
   btn.addEventListener("mouseleave", () => {
-    btn.style.backgroundColor = "var(--ui-accent, #2f2f2f)";
+    const svg = btn.querySelector('svg');
+    if (svg) svg.style.color = "#000";
   });
   
   // Click handler - opens file browser modal
@@ -369,6 +375,8 @@ function createFilePickerButton(track, onChange, extractFileName) {
 }
 
 function openFileBrowserModal(onSelectCallback) {
+  console.log('[File Picker] Opening file browser modal...');
+  
   // Create modal overlay
   const modal = document.createElement("div");
   modal.className = "file-browser-modal";
@@ -418,85 +426,292 @@ function openFileBrowserModal(onSelectCallback) {
     gap: "0.5rem"
   });
   
+  // Loading message
+  const loadingMsg = document.createElement("p");
+  loadingMsg.textContent = "Loading files...";
+  loadingMsg.style.color = "#999";
+  loadingMsg.style.textAlign = "center";
+  fileList.appendChild(loadingMsg);
+  
+  modalContent.appendChild(fileList);
+  modal.appendChild(modalContent);
+  
+  // Add modal to DOM immediately
+  document.body.appendChild(modal);
+  
   // Supported audio formats
   const audioFormats = ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.aac', '.m4a', '.webm', '.alac'];
   
-  // Fetch files from assets/audio directory
-  fetch('/assets/audio/')
-    .then(response => response.text())
-    .then(html => {
-      const parser = new DOMParser();
-      const doc = parser.parseFromString(html, 'text/html');
-      const links = Array.from(doc.querySelectorAll('a'));
+  // Simplified approach: directly scan known subdirectories
+  async function scanKnownDirectories() {
+    const allFiles = [];
+    
+    try {
+      // First, try to get the main directory listing to find all subdirectories
+      const mainResponse = await fetch('/assets/audio/');
+      if (mainResponse.ok) {
+        const mainHtml = await mainResponse.text();
+        const parser = new DOMParser();
+        const doc = parser.parseFromString(mainHtml, 'text/html');
+        const links = Array.from(doc.querySelectorAll('a'));
+        
+        // Find all directory names - handle both relative and absolute paths
+        const foundFolders = links
+          .map(link => link.getAttribute('href'))
+          .filter(href => {
+            // Must be a valid href and should point to a subfolder of /assets/audio/
+            return href && href.startsWith('/assets/audio/') && href !== '/assets/audio' && href !== '/assets/audio/';
+          })
+          .map(href => {
+            // Extract just the folder name (e.g., "/assets/audio/ExampleReel01" -> "ExampleReel01")
+            return href.replace('/assets/audio/', '').replace(/\/$/, '');
+          });
+        
+        console.log('[File Picker] Found folders:', foundFolders);
+        
+        // Scan each folder
+        for (const folder of foundFolders) {
+          try {
+            const folderResponse = await fetch(`/assets/audio/${folder}/`);
+            
+            if (!folderResponse.ok) continue;
+            
+            const folderHtml = await folderResponse.text();
+            const folderDoc = parser.parseFromString(folderHtml, 'text/html');
+            const folderLinks = Array.from(folderDoc.querySelectorAll('a'));
+            
+            folderLinks.forEach(link => {
+              const href = link.getAttribute('href');
+              
+              // Skip navigation links
+              if (!href || href === '../' || href === './' || href === '/') return;
+              
+              // For absolute paths, check if it's a file in this folder
+              if (href.startsWith('/assets/audio/')) {
+                const expectedPrefix = `/assets/audio/${folder}/`;
+                if (!href.startsWith(expectedPrefix)) return;
+                
+                // Extract just the filename
+                const fileName = href.replace(expectedPrefix, '');
+                
+                // Check if it's an audio file (not a subdirectory)
+                if (fileName && !fileName.includes('/') && audioFormats.some(ext => fileName.toLowerCase().endsWith(ext))) {
+                  allFiles.push({
+                    name: decodeURIComponent(fileName),
+                    path: `assets/audio/${folder}/${decodeURIComponent(fileName)}`,
+                    displayPath: `${folder}/${decodeURIComponent(fileName)}`,
+                    folder: folder
+                  });
+                }
+              } else if (!href.startsWith('/')) {
+                // Handle relative paths
+                if (audioFormats.some(ext => href.toLowerCase().endsWith(ext))) {
+                  allFiles.push({
+                    name: href,
+                    path: `assets/audio/${folder}/${href}`,
+                    displayPath: `${folder}/${href}`,
+                    folder: folder
+                  });
+                }
+              }
+            });
+          } catch (err) {
+            console.warn(`[File Picker] Could not scan folder ${folder}:`, err);
+          }
+        }
+      }
+    } catch (error) {
+      console.error('[File Picker] Error scanning directories:', error);
+    }
+    
+    return allFiles;
+  }
+  
+  // Scan for audio files
+  console.log('[File Picker] Starting simplified scan...');
+  scanKnownDirectories()
+    .then(audioFiles => {
+      // Clear loading message
+      fileList.innerHTML = '';
       
-      const audioFiles = links
-        .map(link => link.getAttribute('href'))
-        .filter(href => href && audioFormats.some(ext => href.toLowerCase().endsWith(ext)));
-      
-      if (audioFiles.length === 0) {
-        const noFiles = document.createElement("p");
-        noFiles.textContent = "No audio files found in assets/audio/";
-        noFiles.style.color = "#999";
-        fileList.appendChild(noFiles);
-      } else {
-        audioFiles.forEach(audioFile => {
-          const fileItem = document.createElement("div");
-          fileItem.className = "file-item";
-          
-          Object.assign(fileItem.style, {
-            padding: "0.75rem",
-            backgroundColor: "#1f1f1f",
-            borderRadius: "4px",
-            cursor: "pointer",
-            color: "#fff",
-            transition: "background-color 0.2s ease",
-            display: "flex",
-            alignItems: "center",
-            gap: "0.5rem"
-          });
-          
-          // File icon
-          const icon = document.createElement("span");
-          icon.innerHTML = `
-            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px;">
-              <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
-            </svg>
-          `;
-          fileItem.appendChild(icon);
-          
-          const fileNameSpan = document.createElement("span");
-          fileNameSpan.textContent = decodeURIComponent(audioFile);
-          fileItem.appendChild(fileNameSpan);
-          
-          // Hover effect
-          fileItem.addEventListener("mouseenter", () => {
-            fileItem.style.backgroundColor = "#4a90e2";
-          });
-          
-          fileItem.addEventListener("mouseleave", () => {
-            fileItem.style.backgroundColor = "#1f1f1f";
-          });
-          
-          // Click to select
-          fileItem.onclick = () => {
-            const filePath = `assets/audio/${audioFile}`;
+      if (!audioFiles || audioFiles.length === 0) {
+        console.log('[File Picker] No files found - showing manual file input');
+        // Show manual file input option
+        const manualInput = document.createElement("div");
+        Object.assign(manualInput.style, {
+          padding: "1rem",
+          backgroundColor: "#1f1f1f",
+          borderRadius: "4px",
+          textAlign: "center"
+        });
+        
+        const info = document.createElement("p");
+        info.textContent = "No audio files found or directory listing unavailable.";
+        info.style.color = "#999";
+        info.style.marginBottom = "1rem";
+        manualInput.appendChild(info);
+        
+        const fileInput = document.createElement("input");
+        fileInput.type = "file";
+        fileInput.accept = audioFormats.join(',');
+        fileInput.style.display = "block";
+        fileInput.style.margin = "0 auto";
+        
+        fileInput.onchange = (e) => {
+          if (e.target.files && e.target.files[0]) {
+            const file = e.target.files[0];
+            // For local files, we'll use a relative path
+            const filePath = `assets/audio/${file.name}`;
             onSelectCallback(filePath);
             document.body.removeChild(modal);
+          }
+        };
+        
+        manualInput.appendChild(fileInput);
+        fileList.appendChild(manualInput);
+      } else {
+        console.log(`[File Picker] Found ${audioFiles.length} audio files`);
+        
+        // Group files by folder
+        const filesByFolder = {};
+        audioFiles.forEach(file => {
+          if (!filesByFolder[file.folder]) {
+            filesByFolder[file.folder] = [];
+          }
+          filesByFolder[file.folder].push(file);
+        });
+        
+        // Create collapsible folder sections
+        Object.keys(filesByFolder).forEach(folderName => {
+          const folderSection = document.createElement("div");
+          folderSection.className = "folder-section";
+          folderSection.style.marginBottom = "0.5rem";
+          
+          // Folder header
+          const folderHeader = document.createElement("div");
+          folderHeader.className = "folder-header";
+          Object.assign(folderHeader.style, {
+            padding: "0.5rem 0.75rem",
+            backgroundColor: "#1a1a1a",
+            borderRadius: "4px",
+            cursor: "pointer",
+            color: "#4a90e2",
+            fontWeight: "600",
+            display: "flex",
+            alignItems: "center",
+            gap: "0.5rem",
+            transition: "background-color 0.2s ease"
+          });
+          
+          // Folder icon and name
+          const folderIcon = document.createElement("span");
+          folderIcon.innerHTML = `▶`;
+          folderIcon.style.fontSize = "0.7rem";
+          folderIcon.style.transition = "transform 0.2s ease";
+          
+          const folderNameSpan = document.createElement("span");
+          folderNameSpan.textContent = `${folderName} (${filesByFolder[folderName].length} files)`;
+          
+          folderHeader.appendChild(folderIcon);
+          folderHeader.appendChild(folderNameSpan);
+          
+          // Files container (initially hidden)
+          const filesContainer = document.createElement("div");
+          filesContainer.className = "files-container";
+          filesContainer.style.display = "none";
+          filesContainer.style.marginTop = "0.25rem";
+          filesContainer.style.paddingLeft = "1rem";
+          
+          // Toggle folder
+          let isExpanded = false;
+          folderHeader.onclick = () => {
+            isExpanded = !isExpanded;
+            filesContainer.style.display = isExpanded ? "block" : "none";
+            folderIcon.style.transform = isExpanded ? "rotate(90deg)" : "rotate(0deg)";
           };
           
-          fileList.appendChild(fileItem);
+          // Hover effect on folder header
+          folderHeader.addEventListener("mouseenter", () => {
+            folderHeader.style.backgroundColor = "#252525";
+          });
+          folderHeader.addEventListener("mouseleave", () => {
+            folderHeader.style.backgroundColor = "#1a1a1a";
+          });
+          
+          // Add files to container
+          filesByFolder[folderName].forEach(audioFile => {
+            const fileItem = document.createElement("div");
+            fileItem.className = "file-item";
+            
+            Object.assign(fileItem.style, {
+              padding: "0.5rem 0.75rem",
+              backgroundColor: "#1f1f1f",
+              borderRadius: "4px",
+              cursor: "pointer",
+              color: "#fff",
+              transition: "background-color 0.2s ease",
+              display: "flex",
+              alignItems: "center",
+              gap: "0.5rem",
+              marginBottom: "0.25rem"
+            });
+            
+            // File icon with hover effect
+            const icon = document.createElement("span");
+            icon.className = "file-icon";
+            icon.innerHTML = `
+              <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 18px; height: 18px; color: #666;">
+                <path stroke-linecap="round" stroke-linejoin="round" d="M9 9l10.5-3m0 6.553v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 1 1-.99-3.467l2.31-.66a2.25 2.25 0 0 0 1.632-2.163Zm0 0V2.25L9 5.25v10.303m0 0v3.75a2.25 2.25 0 0 1-1.632 2.163l-1.32.377a1.803 1.803 0 0 1-.99-3.467l2.31-.66A2.25 2.25 0 0 0 9 15.553Z" />
+              </svg>
+            `;
+            fileItem.appendChild(icon);
+            
+            const fileNameSpan = document.createElement("span");
+            fileNameSpan.textContent = audioFile.name;
+            fileNameSpan.style.fontSize = "0.9rem";
+            fileItem.appendChild(fileNameSpan);
+            
+            // Hover effect for entire row and icon
+            fileItem.addEventListener("mouseenter", () => {
+              fileItem.style.backgroundColor = "#4a90e2";
+              const svg = icon.querySelector('svg');
+              if (svg) svg.style.color = "#fff";
+            });
+            
+            fileItem.addEventListener("mouseleave", () => {
+              fileItem.style.backgroundColor = "#1f1f1f";
+              const svg = icon.querySelector('svg');
+              if (svg) svg.style.color = "#666";
+            });
+            
+            // Click to select
+            fileItem.onclick = () => {
+              onSelectCallback(audioFile.path);
+              document.body.removeChild(modal);
+            };
+            
+            filesContainer.appendChild(fileItem);
+          });
+          
+          folderSection.appendChild(folderHeader);
+          folderSection.appendChild(filesContainer);
+          fileList.appendChild(folderSection);
+          
+          // Auto-expand if only one folder
+          if (Object.keys(filesByFolder).length === 1) {
+            folderHeader.click();
+          }
         });
       }
     })
     .catch(error => {
-      console.error('Error loading audio files:', error);
+      console.error('[File Picker] Error loading audio files:', error);
+      fileList.innerHTML = '';
       const errorMsg = document.createElement("p");
-      errorMsg.textContent = "Error loading files. Make sure directory listing is enabled.";
+      errorMsg.textContent = "Error loading files. Please try again.";
       errorMsg.style.color = "#ff6b6b";
       fileList.appendChild(errorMsg);
     });
-  
-  modalContent.appendChild(fileList);
   
   // Cancel button
   const cancelBtn = document.createElement("button");
@@ -519,7 +734,6 @@ function openFileBrowserModal(onSelectCallback) {
   };
   
   modalContent.appendChild(cancelBtn);
-  modal.appendChild(modalContent);
   
   // Close on overlay click
   modal.onclick = (e) => {
@@ -527,8 +741,6 @@ function openFileBrowserModal(onSelectCallback) {
       document.body.removeChild(modal);
     }
   };
-  
-  document.body.appendChild(modal);
 }
 
 function createAddTrackRow(reel, onChange) {

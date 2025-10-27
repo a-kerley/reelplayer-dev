@@ -85,6 +85,12 @@ export class PreviewManager {
   showPreview(reel, playerApp) {
     if (!this.container || !reel) return;
 
+    // Stop and reset playback when refreshing preview
+    if (playerApp.wavesurfer) {
+      playerApp.wavesurfer.pause();
+      playerApp.wavesurfer.seekTo(0);
+    }
+
     // Filter valid tracks
     const playlist = (reel.playlist || []).filter(
       (track) => track.url && track.url.trim() !== ""
@@ -104,6 +110,7 @@ export class PreviewManager {
       showTitle: reel.showTitle,
       title: reel.title,
       playlist,
+      reel: reel  // Pass the full reel object for settings access
     });
   }
 
@@ -174,6 +181,9 @@ export class PreviewManager {
       "--background-opacity": reel.backgroundOpacity || "1",
       "--background-blur": `${reel.backgroundBlur || "2"}px`,
       "--overlay-color": overlayColor,
+      
+      // Player height
+      "--player-height": `${reel.playerHeight || 500}px`,
       
       // Lottie animation color variables
       "--lottie-brightness": colorFilters.brightness,

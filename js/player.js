@@ -7,6 +7,7 @@ export const playerApp = {
   isDraggingSlider: false,
   isHoveringSlider: false,
   isHoveringIcon: false,
+  currentTrackIndex: 0,
 
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
@@ -62,6 +63,188 @@ export const playerApp = {
     } else {
       setTimeout(() => this.preloadDurations(playlist), 200);
     }
+    
+    // Initialize custom scrollbar with delay to ensure DOM is ready
+    setTimeout(() => {
+      this.initCustomScrollbar(playlistEl);
+    }, 300);
+  },
+
+  initCustomScrollbar(playlistEl) {
+    // Remove any existing custom scrollbar
+    const existingScrollbar = playlistEl.querySelector('.custom-scrollbar');
+    if (existingScrollbar) {
+      existingScrollbar.remove();
+    }
+
+    // Get UI accent color from CSS variable
+    let accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || '#2a0026';
+    
+    console.log('Raw accent color from CSS:', accentColor);
+    
+    // Convert color to rgba with opacity
+    const colorToRgba = (color, opacity) => {
+      // If already rgba/rgb, extract the rgb values
+      if (color.startsWith('rgb')) {
+        const match = color.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
+        if (match) {
+          const r = Math.round(parseFloat(match[1]));
+          const g = Math.round(parseFloat(match[2]));
+          const b = Math.round(parseFloat(match[3]));
+          const result = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+          console.log('Converted rgba color:', result);
+          return result;
+        }
+      }
+      // If hex, convert to rgba
+      color = color.replace('#', '');
+      const r = parseInt(color.substring(0, 2), 16);
+      const g = parseInt(color.substring(2, 4), 16);
+      const b = parseInt(color.substring(4, 6), 16);
+      const result = `rgba(${r}, ${g}, ${b}, ${opacity})`;
+      console.log('Converted hex color:', result);
+      return result;
+    };
+    
+    const thumbColor = colorToRgba(accentColor, 0.3);
+    console.log('Final thumb color:', thumbColor);
+
+    // Create custom scrollbar elements - position relative to playlist's parent
+    const playlistParent = playlistEl.parentElement;
+    const scrollbarContainer = document.createElement('div');
+    scrollbarContainer.className = 'custom-scrollbar';
+    scrollbarContainer.style.cssText = 'position: absolute; right: 15px; width: 6px; background: transparent; z-index: 1000; pointer-events: none;';
+    
+    const scrollbarThumb = document.createElement('div');
+    scrollbarThumb.className = 'custom-scrollbar-thumb';
+    scrollbarThumb.style.cssText = `position: absolute; right: 0; width: 6px; background: ${thumbColor}; border-radius: 3px; pointer-events: auto; cursor: pointer; transition: background 0.2s ease;`;
+    
+    scrollbarContainer.appendChild(scrollbarThumb);
+    playlistParent.appendChild(scrollbarContainer);
+    
+    // Position scrollbar to match playlist position
+    const updateScrollbarPosition = () => {
+      const playlistRect = playlistEl.getBoundingClientRect();
+      const parentRect = playlistParent.getBoundingClientRect();
+      const topOffset = playlistRect.top - parentRect.top;
+      scrollbarContainer.style.top = topOffset + 'px';
+      scrollbarContainer.style.height = playlistRect.height + 'px';
+    };
+
+    // Update scrollbar position and size
+    const updateScrollbar = () => {
+      updateScrollbarPosition();
+      
+      const scrollHeight = playlistEl.scrollHeight;
+      const clientHeight = playlistEl.clientHeight;
+      
+      if (scrollHeight <= clientHeight) {
+        scrollbarContainer.style.display = 'none';
+        playlistEl.classList.remove('scrollable');
+        return;
+      }
+      
+      scrollbarContainer.style.display = 'block';
+      playlistEl.classList.add('scrollable');
+      
+      const thumbHeight = Math.max(30, (clientHeight / scrollHeight) * clientHeight);
+      const scrollPercentage = playlistEl.scrollTop / (scrollHeight - clientHeight);
+      const thumbTop = scrollPercentage * (clientHeight - thumbHeight);
+      
+      scrollbarThumb.style.height = thumbHeight + 'px';
+      scrollbarThumb.style.top = thumbTop + 'px';
+    };
+    
+    // Initial position
+    updateScrollbarPosition();
+
+    // Handle scroll events
+    playlistEl.addEventListener('scroll', () => {
+      if (!isDragging) {
+        updateScrollbar();
+      }
+    });
+    
+    // Prevent page scroll when playlist reaches top/bottom
+    playlistEl.addEventListener('wheel', (e) => {
+      const scrollHeight = playlistEl.scrollHeight;
+      const scrollTop = playlistEl.scrollTop;
+      const clientHeight = playlistEl.clientHeight;
+      
+      const atTop = scrollTop === 0;
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1; // -1 for rounding
+      
+      // If scrolling up at top, or scrolling down at bottom, prevent propagation
+      if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
+        e.preventDefault();
+        e.stopPropagation();
+      }
+    }, { passive: false });
+    
+    // Handle thumb dragging
+    let isDragging = false;
+    let startY = 0;
+    let startThumbTop = 0;
+
+    scrollbarThumb.addEventListener('mousedown', (e) => {
+      isDragging = true;
+      startY = e.clientY;
+      startThumbTop = parseInt(scrollbarThumb.style.top) || 0;
+      scrollbarThumb.style.background = colorToRgba(accentColor, 0.5);
+      e.preventDefault();
+      e.stopPropagation();
+    });
+
+    scrollbarThumb.addEventListener('mouseenter', () => {
+      if (!isDragging) {
+        scrollbarThumb.style.background = colorToRgba(accentColor, 0.4);
+      }
+    });
+
+    scrollbarThumb.addEventListener('mouseleave', () => {
+      if (!isDragging) {
+        scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      
+      const deltaY = e.clientY - startY;
+      const scrollHeight = playlistEl.scrollHeight;
+      const clientHeight = playlistEl.clientHeight;
+      const thumbHeight = parseInt(scrollbarThumb.style.height);
+      const maxThumbTop = clientHeight - thumbHeight;
+      const scrollRange = scrollHeight - clientHeight;
+      
+      // Calculate new thumb position based on drag
+      let newThumbTop = startThumbTop + deltaY;
+      newThumbTop = Math.max(0, Math.min(maxThumbTop, newThumbTop));
+      
+      // Update thumb position visually
+      scrollbarThumb.style.top = `${newThumbTop}px`;
+      
+      // Update scroll position based on thumb position
+      const scrollPercentage = newThumbTop / maxThumbTop;
+      playlistEl.scrollTop = scrollPercentage * scrollRange;
+      
+      e.preventDefault();
+    });
+
+    document.addEventListener('mouseup', () => {
+      if (isDragging) {
+        isDragging = false;
+        scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
+      }
+    });
+
+    // Initial update with delay to ensure playlist is rendered
+    setTimeout(updateScrollbar, 100);
+    setTimeout(updateScrollbar, 500);
+    
+    // Update on window resize
+    const resizeObserver = new ResizeObserver(updateScrollbar);
+    resizeObserver.observe(playlistEl);
   },
 
   preloadDurations(playlist) {
@@ -70,14 +253,31 @@ export const playerApp = {
         `.playlist-item[data-index="${index}"] .playlist-duration`
       );
       if (!durationEl) return;
-      const audio = new Audio(this.convertDropboxLinkToDirect(track.url));
-      audio.addEventListener("loadedmetadata", () => {
-        const minutes = Math.floor(audio.duration / 60);
-        const seconds = Math.floor(audio.duration % 60)
-          .toString()
-          .padStart(2, "0");
-        durationEl.textContent = `${minutes}:${seconds}`;
+      
+      // Use WaveSurfer to decode duration for accurate results (especially for OGG files)
+      const tempWavesurfer = WaveSurfer.create({
+        container: document.createElement("div"),
+        height: 0,
+        backend: "WebAudio",
       });
+
+      tempWavesurfer.once("ready", () => {
+        const duration = tempWavesurfer.getDuration();
+        if (duration && isFinite(duration)) {
+          durationEl.textContent = this.formatTime(duration);
+        } else {
+          durationEl.textContent = "—";
+        }
+        tempWavesurfer.destroy(); // Clean up
+      });
+
+      tempWavesurfer.on("error", () => {
+        durationEl.textContent = "—";
+        tempWavesurfer.destroy();
+      });
+
+      const audioURL = this.convertDropboxLinkToDirect(track.url);
+      tempWavesurfer.load(audioURL);
     });
   },
 
@@ -92,11 +292,50 @@ export const playerApp = {
 
   initializePlayer(audioURL, title, index) {
     this.showLoading(true);
+    
+    // Update current track index
+    this.currentTrackIndex = index;
+    
+    // Update active playlist item
+    this.updateActivePlaylistItem(index);
+    
+    // Update track info display
+    this.updateTrackInfo(audioURL, title);
+    
+    // Reset playhead to beginning when changing tracks
+    if (playerApp.wavesurfer) {
+      playerApp.wavesurfer.seekTo(0);
+    }
+    
     playerApp.wavesurfer.load(audioURL);
     const event = new CustomEvent("track:change", {
       detail: { audioURL, title, index },
     });
     document.dispatchEvent(event);
+  },
+
+  updateTrackInfo(audioURL, title) {
+    const trackInfo = this.elements.trackInfo;
+    if (trackInfo) {
+      const fileName = title || 
+        audioURL.split('/').pop().split('?')[0]
+          .replace(/[_-]/g, ' ')
+          .replace(/\.[^/.]+$/, '');
+      trackInfo.textContent = fileName;
+      trackInfo.classList.add('visible');
+    }
+  },
+
+  updateActivePlaylistItem(index) {
+    // Remove active class from all items
+    const allItems = document.querySelectorAll('.playlist-item');
+    allItems.forEach(item => item.classList.remove('active'));
+    
+    // Add active class to current item
+    const activeItem = document.querySelector(`.playlist-item[data-index="${index}"]`);
+    if (activeItem) {
+      activeItem.classList.add('active');
+    }
   },
 
   setupVolumeControls() {
@@ -203,8 +442,9 @@ export const playerApp = {
       playPauseBtn.style.display = "inline-block";
       if (volumeControl) volumeControl.classList.remove("hidden");
       setTimeout(() => {
-        const canvas = document.querySelector("#waveform canvas");
-        if (canvas) canvas.style.opacity = "1";
+        // Set opacity for all canvases inside waveform (WaveSurfer v7 uses nested structure)
+        const canvases = document.querySelectorAll("#waveform canvas");
+        canvases.forEach(canvas => canvas.style.opacity = "1");
         playPauseBtn.style.opacity = "1";
         playPauseBtn.style.color = getComputedStyle(document.documentElement)
           .getPropertyValue("--ui-accent")
@@ -220,16 +460,25 @@ export const playerApp = {
       if (trackInfo) {
         trackInfo.classList.add("visible");
       }
-      const totalTime = this.elements.totalTime;
-      const duration = this.wavesurfer.getDuration();
-      const minutes = Math.floor(duration / 60);
-      const seconds = Math.floor(duration % 60)
-        .toString()
-        .padStart(2, "0");
-      if (totalTime) {
-        totalTime.textContent = `${minutes}:${seconds}`;
-        totalTime.classList.add("visible");
-      }
+      
+      // Update total time - wait for accurate duration
+      const updateTotalTime = () => {
+        const totalTime = this.elements.totalTime;
+        const duration = this.wavesurfer.getDuration();
+        console.log('[Player] getDuration returned:', duration);
+        if (duration && isFinite(duration)) {
+          if (totalTime) {
+            totalTime.textContent = this.formatTime(duration);
+            totalTime.classList.add("visible");
+            console.log('[Player] Total time set to:', this.formatTime(duration));
+          }
+        }
+      };
+      
+      updateTotalTime();
+      // Update again after a delay for OGG files
+      setTimeout(updateTotalTime, 100);
+      setTimeout(updateTotalTime, 500);
       waveformEl.addEventListener("mousemove", (e) => {
         const rect = waveformEl.getBoundingClientRect();
         const percent = Math.min(
@@ -239,11 +488,7 @@ export const playerApp = {
         const duration = this.wavesurfer.getDuration();
         const time = duration * percent;
         hoverOverlay.style.width = `${percent * 100}%`;
-        const minutes = Math.floor(time / 60);
-        const seconds = Math.floor(time % 60)
-          .toString()
-          .padStart(2, "0");
-        hoverTime.textContent = `${minutes}:${seconds}`;
+        hoverTime.textContent = this.formatTime(time);
         hoverTime.style.opacity = "1";
         const pixelX = e.clientX - rect.left;
         hoverTime.style.left = `${Math.max(
@@ -261,22 +506,60 @@ export const playerApp = {
       });
     });
     this.wavesurfer.on("play", () => {
+      // Show cursor when playing using UI accent color
+      const accentColor = getComputedStyle(document.documentElement)
+        .getPropertyValue("--ui-accent")
+        .trim();
+      this.wavesurfer.setOptions({ cursorColor: accentColor });
+      this.elements.waveform.classList.add('playing');
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
+      // Hide cursor when paused by making it transparent
+      this.wavesurfer.setOptions({ cursorColor: 'transparent' });
+      this.elements.waveform.classList.remove('playing');
       document.dispatchEvent(new CustomEvent("playback:pause"));
     });
     this.wavesurfer.on("finish", () => {
+      // Hide cursor when finished
+      this.wavesurfer.setOptions({ cursorColor: 'transparent' });
+      this.elements.waveform.classList.remove('playing');
       document.dispatchEvent(new CustomEvent("playback:finish"));
+    });
+    this.wavesurfer.on("seek", () => {
+      // Update playhead time immediately when seeking
+      const currentTime = this.wavesurfer.getCurrentTime();
+      this.elements.playheadTime.textContent = this.formatTime(currentTime);
+      
+      // Position playhead at seek location
+      const duration = this.wavesurfer.getDuration();
+      const percent = currentTime / duration;
+      const pixelX = percent * this.elements.waveform.clientWidth;
+      const clampedX = Math.min(
+        Math.max(pixelX, 20),
+        this.elements.waveform.clientWidth - 40
+      );
+      this.elements.playheadTime.style.left = `${clampedX}px`;
+      // Show playhead briefly when seeking
+      if (!this.wavesurfer.isPlaying()) {
+        this.elements.playheadTime.style.opacity = "1";
+        // Hide after a moment if not playing
+        setTimeout(() => {
+          if (!this.wavesurfer.isPlaying()) {
+            this.elements.playheadTime.style.opacity = "0";
+          }
+        }, 1000);
+      }
     });
     this.wavesurfer.on("audioprocess", () => {
       const currentTime = this.wavesurfer.getCurrentTime();
       const duration = this.wavesurfer.getDuration();
-      const minutes = Math.floor(currentTime / 60);
-      const seconds = Math.floor(currentTime % 60)
-        .toString()
-        .padStart(2, "0");
-      this.elements.playheadTime.textContent = `${minutes}:${seconds}`;
+      
+      this.elements.playheadTime.textContent = this.formatTime(currentTime);
+      
+      // Show playhead only when playing
+      this.elements.playheadTime.style.opacity = this.wavesurfer.isPlaying() ? "1" : "0";
+      
       const percent = currentTime / duration;
       const pixelX = percent * this.elements.waveform.clientWidth;
       const clampedX = Math.min(
@@ -288,6 +571,10 @@ export const playerApp = {
   },
 
   formatTime(seconds) {
+    // Safety check for invalid durations
+    if (isNaN(seconds) || seconds === Infinity || !isFinite(seconds)) {
+      return "0:00";
+    }
     const min = Math.floor(seconds / 60);
     const sec = Math.floor(seconds % 60)
       .toString()
@@ -303,21 +590,56 @@ export const playerApp = {
   },
 
   setupWaveSurfer() {
+    // Destroy existing WaveSurfer instance if it exists
+    if (this.wavesurfer) {
+      this.wavesurfer.destroy();
+      this.wavesurfer = null;
+    }
+    
     const rootStyles = getComputedStyle(document.documentElement);
     const accentColor = rootStyles.getPropertyValue("--ui-accent").trim();
     const unplayedColor = rootStyles
       .getPropertyValue("--waveform-unplayed")
       .trim();
+    
+    // Smooth waveform configuration
+    const waveformContainer = document.querySelector("#waveform");
+    
     this.wavesurfer = WaveSurfer.create({
       container: "#waveform",
       waveColor: unplayedColor,
       progressColor: accentColor,
-      height: 85,
-      barWidth: 2,
-      barGap: 1,
-      barRadius: 1,
+      cursorWidth: 1,
+      cursorColor: 'transparent', // Start with transparent, show on play
+      barWidth: 0,
+      barGap: 0,
+      barHeight: 1,
+      barRadius: 0,
+      height: 86, // Even number helps Safari render without gaps
       responsive: true,
+      hideScrollbar: true,
+      interact: true,
+      fillParent: true,
       normalize: true,
+      backend: "WebAudio", // Use WebAudio for accurate duration/playback
+      minPxPerSec: 1,
+      pixelRatio: Math.ceil(window.devicePixelRatio || 1), // Ensure whole number for Safari
+    });
+    
+    // Fix Safari-specific sub-pixel rendering gap at origin line
+    this.wavesurfer.on("ready", () => {
+      const canvases = document.querySelectorAll("#waveform canvas");
+      canvases.forEach(canvas => {
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.imageSmoothingEnabled = false;
+          // Safari-specific: ensure canvas dimensions are whole pixels
+          const rect = canvas.getBoundingClientRect();
+          if (rect.height % 2 !== 0) {
+            canvas.style.transform = 'translateY(0.5px)';
+          }
+        }
+      });
     });
   },
 
@@ -330,7 +652,10 @@ export const playerApp = {
       loadingIndicator.classList.add("hidden");
     }
   },
-  renderPlayer({ showTitle, title, playlist }) {
+  renderPlayer({ showTitle, title, playlist, reel }) {
+    // Store reel reference for accessing settings
+    this.reel = reel || {};
+    
     const container = document.getElementById("reelPlayerPreview");
     if (!container) return;
     

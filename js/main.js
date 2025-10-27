@@ -79,6 +79,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.reels = reels; // Keep global reference updated
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
       renderBuilder(reels.find(r => r.id === currentId), updateCurrentReel);
+      showPreview(); // Update preview when settings change
     }
 
     function render() {
@@ -117,25 +118,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         
         dialog.createDialog({
           type: 'custom',
-          message: "Choose your embed type:",
+          message: "Your embed code is ready!",
           content: `
             <div style="margin-bottom: 1.5rem;">
-              <h3 style="color: var(--builder-accent); margin: 0 0 1rem 0; font-size: 1.1rem;">📦 Embed Options</h3>
+              <h3 style="color: var(--builder-accent); margin: 0 0 1rem 0; font-size: 1.1rem;">🎯 iframe Embed Code</h3>
               
-              <div style="display: flex; gap: 1rem; margin-bottom: 1.5rem;">
-                <button id="selectIframe" style="flex: 1; padding: 0.75rem; border: 2px solid var(--builder-accent); background: var(--builder-accent); color: white; border-radius: 6px; cursor: pointer; font-weight: 600;">
-                  🎯 iframe (Recommended)
-                </button>
-                <button id="selectStandalone" style="flex: 1; padding: 0.75rem; border: 2px solid var(--builder-accent); background: white; color: var(--builder-accent); border-radius: 6px; cursor: pointer; font-weight: 600;">
-                  📄 Standalone HTML
-                </button>
+              <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong>Perfect for:</strong> Squarespace, WordPress, Wix, and most website platforms. Ultra-concise 3-line embed code that inherits all your styling automatically.
               </div>
               
-              <div id="embedDescription" style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
-                <strong>🎯 iframe:</strong> Ultra-concise 3-line embed code. Perfect for Squarespace, WordPress, and most platforms. Inherits all your styling automatically.
-              </div>
-              
-              <textarea id="embedCodeArea" readonly style="width: 100%; height: 200px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+              <textarea id="embedCodeArea" readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             </div>
           `,
           buttons: [
@@ -169,8 +161,7 @@ document.addEventListener("DOMContentLoaded", async () => {
                   const url = URL.createObjectURL(blob);
                   const a = document.createElement('a');
                   a.href = url;
-                  const isIframe = currentCode.includes('<iframe');
-                  a.download = `${(current.title || 'reel').replace(/[^a-zA-Z0-9]/g, '_')}_${isIframe ? 'iframe' : 'standalone'}.html`;
+                  a.download = `${(current.title || 'reel').replace(/[^a-zA-Z0-9]/g, '_')}_iframe.html`;
                   document.body.appendChild(a);
                   a.click();
                   document.body.removeChild(a);
@@ -194,35 +185,6 @@ document.addEventListener("DOMContentLoaded", async () => {
             }
           ]
         });
-
-        // Set up embed type switching
-        setTimeout(() => {
-          const iframeBtn = document.getElementById('selectIframe');
-          const standaloneBtn = document.getElementById('selectStandalone');
-          const textarea = document.getElementById('embedCodeArea');
-          const description = document.getElementById('embedDescription');
-
-          function selectIframe() {
-            iframeBtn.style.background = 'var(--builder-accent)';
-            iframeBtn.style.color = 'white';
-            standaloneBtn.style.background = 'white';
-            standaloneBtn.style.color = 'var(--builder-accent)';
-            textarea.value = embedOptions.iframe;
-            description.innerHTML = '<strong>🎯 iframe:</strong> Ultra-concise 3-line embed code. Perfect for Squarespace, WordPress, and most platforms. Inherits all your styling automatically.';
-          }
-
-          function selectStandalone() {
-            standaloneBtn.style.background = 'var(--builder-accent)';
-            standaloneBtn.style.color = 'white';
-            iframeBtn.style.background = 'white';
-            iframeBtn.style.color = 'var(--builder-accent)';
-            textarea.value = embedOptions.standalone;
-            description.innerHTML = '<strong>📄 Standalone:</strong> Complete self-contained HTML file (~500+ lines). Use when iframe restrictions exist or for direct file hosting.';
-          }
-
-          iframeBtn.onclick = selectIframe;
-          standaloneBtn.onclick = selectStandalone;
-        }, 100);
 
       } catch (error) {
         dialog.alert(`Export Error: ${error.message}`);

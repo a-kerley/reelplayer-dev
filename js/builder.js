@@ -25,7 +25,9 @@ export function createEmptyReel() {
     backgroundOpacity: "1",
     backgroundBlur: "2",
     overlayColor: "rgba(255, 255, 255, 0.5)",
-    overlayColorEnabled: false
+    overlayColorEnabled: false,
+    // Player dimensions
+    playerHeight: 500 // Default height in pixels
   };
   if (defaultPreset) {
     // Only set if present in preset
@@ -176,6 +178,11 @@ function createColorPickersSection() {
         <span>Blur Amount:</span>
         <input id="backgroundBlur" type="range" min="0" max="20" step="1" style="flex:1;" />
         <span id="backgroundBlurValue" style="min-width:2.5rem;text-align:right;font-size:0.9rem;"></span>
+      </div>
+      <div class="color-row">
+        <span>Player Height:</span>
+        <input id="playerHeight" type="number" step="1" style="flex:1;padding:0.25rem;" />
+        <span style="min-width:2.5rem;text-align:right;font-size:0.9rem;">px</span>
       </div>
       <div class="color-row">
         <span>Overlay Colour:</span>
@@ -343,6 +350,32 @@ function setupBlendModeControls(reel, onChange) {
       // Save when user finishes dragging (but don't re-render builder)
       backgroundBlur.addEventListener('change', () => {
         // Just trigger a save without re-rendering the builder
+        if (window.saveReels && window.reels) {
+          window.saveReels(window.reels);
+        }
+      });
+    }
+
+    // Player Height Control
+    const playerHeight = document.getElementById("playerHeight");
+    if (playerHeight) {
+      playerHeight.value = reel.playerHeight || 500;
+      
+      // Listen to input for immediate visual feedback
+      playerHeight.addEventListener('input', () => {
+        const value = parseInt(playerHeight.value);
+        if (!isNaN(value) && value > 0) {
+          reel.playerHeight = value;
+          
+          // Update preview if available
+          if (window.previewManager) {
+            window.previewManager.updatePreview(reel);
+          }
+        }
+      });
+      
+      // Save when user finishes editing
+      playerHeight.addEventListener('change', () => {
         if (window.saveReels && window.reels) {
           window.saveReels(window.reels);
         }

@@ -1,7 +1,92 @@
 .playlist {
-  margin-top: 2.5rem;
-  max-width: 100%;
+  margin-top: 1rem; /* Space between waveform player and playlist - adjust this value to change gap */
+  max-width: calc(100% + 30px); /* Extend beyond container to hide scrollbar */
+  width: calc(100% + 30px);
   text-align: left;
+  overflow-y: scroll;
+  overflow-x: hidden;
+  flex: 1;
+  min-height: 0;
+  position: relative;
+  padding-right: 30px; /* Push content back and push scrollbar out of view */
+  margin-right: -30px; /* Pull back to align content */
+}
+
+/* Fade mask only when scrollable */
+.playlist.scrollable {
+  mask-image: linear-gradient(to bottom, 
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, 
+    transparent 0%,
+    black 10%,
+    black 90%,
+    transparent 100%
+  );
+}
+
+/* Aggressively hide native scrollbar */
+.playlist::-webkit-scrollbar {
+  width: 0 !important;
+  height: 0 !important;
+  display: none !important;
+  background: transparent !important;
+}
+
+.playlist::-webkit-scrollbar-track {
+  display: none !important;
+}
+
+.playlist::-webkit-scrollbar-thumb {
+  display: none !important;
+}
+
+.playlist {
+  -ms-overflow-style: none !important;
+  scrollbar-width: none !important;
+}
+
+/* Custom scrollbar container */
+.custom-scrollbar {
+  position: absolute;
+  right: 8px; /* Position away from the edge */
+  top: 0;
+  bottom: 0;
+  width: 6px;
+  background: transparent;
+  pointer-events: none;
+  z-index: 100;
+  border-radius: 3px;
+}
+
+/* Custom scrollbar thumb */
+.custom-scrollbar-thumb {
+  position: absolute;
+  right: 0;
+  width: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 3px;
+  transition: background 0.2s ease;
+  pointer-events: auto;
+  cursor: pointer;
+  min-height: 30px;
+}
+
+.custom-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.5);
+}
+
+.custom-scrollbar-thumb:active {
+  background: rgba(0, 0, 0, 0.6);
+}
+
+/* Firefox scrollbar - minimal overlay style */
+.playlist {
+  scrollbar-width: thin !important;
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent !important;
 }
 
 /* Add extra padding when reel title is hidden */
@@ -17,6 +102,7 @@
   justify-content: space-between;
   align-items: center;
   padding: 0.75rem 1rem;
+  margin-right: 2rem; /* Add right margin to create space from edge */
   cursor: pointer;
   border-bottom: 0px solid rgba(221, 221, 221, 0.6);
   user-select: none;
