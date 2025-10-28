@@ -151,6 +151,8 @@ body {
   overflow-y: auto;
   padding-top: 2.2rem;
   padding-right: 2.5rem;
+  /* Add bottom padding to accommodate expanding player */
+  padding-bottom: 500px;
 }
 
 #reelPlayerPreview {

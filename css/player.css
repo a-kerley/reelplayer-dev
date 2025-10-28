@@ -1,20 +1,30 @@
 /* ========================================
    WAVEFORM CANVAS
    ======================================== */
+/* Base state - let JS or expandable mode CSS control visibility */
 #waveform > canvas {
-  opacity: 0;
   transition: opacity 0.4s ease;
+}
+
+/* Only set initial hidden state for non-expandable mode */
+.player-wrapper:not(.expandable-mode) #waveform > canvas {
+  opacity: 0;
 }
 
 /* ========================================
    PLAY/PAUSE BUTTON
    ======================================== */
 #playPause {
-  opacity: 0;
   color: #888888;
   transition: opacity 0.4s ease, color 0.4s ease, transform 0.2s ease;
   display: inline-flex;
 }
+
+/* Only set initial hidden state for non-expandable mode */
+.player-wrapper:not(.expandable-mode) #playPause {
+  opacity: 0;
+}
+
 #playPause:hover {
   transform: scale(1.1);
 }

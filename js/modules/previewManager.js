@@ -182,8 +182,12 @@ export class PreviewManager {
       "--background-blur": `${reel.backgroundBlur || "2"}px`,
       "--overlay-color": overlayColor,
       
-      // Player height
+      // Player height (used for static mode)
       "--player-height": `${reel.playerHeight || 500}px`,
+      
+      // Expandable mode variables
+      "--expandable-collapsed-height": `${reel.expandableCollapsedHeight || 120}px`,
+      "--expandable-expanded-height": `${reel.expandableExpandedHeight || 500}px`,
       
       // Lottie animation color variables
       "--lottie-brightness": colorFilters.brightness,

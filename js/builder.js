@@ -8,6 +8,12 @@ import { updateTracksEditor } from "./modules/tracksEditor.js";
 import { createTitleAppearanceSection, setupTitleAppearanceControls } from "./modules/titleAppearance.js";
 import { initTooltips } from "./modules/tooltips.js";
 import { ValidationUtils } from "./modules/validation.js";
+import { 
+  createPlayerModeSection, 
+  setupPlayerModeControls,
+  createExpandableModeSettings,
+  setupExpandableModeSettings
+} from "./modules/expandableMode.js";
 
 export function createEmptyReel() {
   // If there's a default preset, apply its values
@@ -27,7 +33,14 @@ export function createEmptyReel() {
     overlayColor: "rgba(255, 255, 255, 0.5)",
     overlayColorEnabled: false,
     // Player dimensions
-    playerHeight: 500 // Default height in pixels
+    playerHeight: 500, // Default height in pixels
+    // Player mode
+    mode: "static", // "static" or "expandable"
+    // Expandable mode settings
+    expandableCollapsedHeight: 120,
+    expandableExpandedHeight: 500,
+    projectTitleImage: "",
+    showWaveformOnCollapse: true
   };
   if (defaultPreset) {
     // Only set if present in preset
@@ -52,9 +65,17 @@ export function renderBuilder(reel, onChange) {
   // Remove old sections
   removeOldSections();
 
+  // Create and insert player mode section
+  const playerModeSection = createPlayerModeSection(reel, onChange);
+  insertPlayerModeSection(playerModeSection, titleInput, reelForm);
+
+  // Create and insert expandable mode settings section
+  const expandableModeSettings = createExpandableModeSettings(reel, onChange);
+  insertExpandableModeSettings(expandableModeSettings, playerModeSection, reelForm);
+
   // Create and insert title appearance section
   const titleAppearanceSection = createTitleAppearanceSection(reel, onChange);
-  insertTitleAppearanceSection(titleAppearanceSection, titleInput, reelForm);
+  insertTitleAppearanceSection(titleAppearanceSection, expandableModeSettings, reelForm);
 
   // Create tracks section
   const tracksSection = createTracksSection();
@@ -71,6 +92,12 @@ export function renderBuilder(reel, onChange) {
   // Set up title input
   setupTitleInput(titleInput, reel, onChange);
 
+  // Set up player mode controls
+  setupPlayerModeControls(playerModeSection, reel, onChange);
+
+  // Set up expandable mode settings
+  setupExpandableModeSettings(expandableModeSettings, reel, onChange);
+
   // Set up title appearance controls
   setupTitleAppearanceControls(titleAppearanceSection, reel, onChange);
 
@@ -85,6 +112,12 @@ export function renderBuilder(reel, onChange) {
 }
 
 function removeOldSections() {
+  const oldPlayerModeSection = document.getElementById("playerModeSection");
+  if (oldPlayerModeSection) oldPlayerModeSection.remove();
+
+  const oldExpandableModeSettings = document.getElementById("expandableModeSettings");
+  if (oldExpandableModeSettings) oldExpandableModeSettings.remove();
+
   const oldTracksSection = document.getElementById("tracksSection");
   if (oldTracksSection) oldTracksSection.remove();
   
@@ -92,15 +125,39 @@ function removeOldSections() {
   if (oldColorFieldset) oldColorFieldset.remove();
 }
 
-function insertTitleAppearanceSection(titleAppearanceSection, titleInput, reelForm) {
-  if (titleInput && titleInput.parentNode) {
-    if (titleInput.parentNode.nextSibling) {
-      titleInput.parentNode.parentNode.insertBefore(titleAppearanceSection, titleInput.parentNode.nextSibling);
+function insertPlayerModeSection(playerModeSection, titleInput, reelForm) {
+  // Insert after the show title checkbox
+  const showTitleCheckbox = document.getElementById("reelShowTitle");
+  if (showTitleCheckbox && showTitleCheckbox.parentNode) {
+    if (showTitleCheckbox.parentNode.nextSibling) {
+      reelForm.insertBefore(playerModeSection, showTitleCheckbox.parentNode.nextSibling);
     } else {
-      titleInput.parentNode.parentNode.appendChild(titleAppearanceSection);
+      reelForm.appendChild(playerModeSection);
+    }
+  } else if (titleInput && titleInput.parentNode) {
+    if (titleInput.parentNode.nextSibling) {
+      reelForm.insertBefore(playerModeSection, titleInput.parentNode.nextSibling);
+    } else {
+      reelForm.appendChild(playerModeSection);
     }
   } else {
-    reelForm.insertBefore(titleAppearanceSection, reelForm.firstChild);
+    reelForm.insertBefore(playerModeSection, reelForm.firstChild);
+  }
+}
+
+function insertExpandableModeSettings(expandableModeSettings, playerModeSection, reelForm) {
+  if (playerModeSection && playerModeSection.nextSibling) {
+    reelForm.insertBefore(expandableModeSettings, playerModeSection.nextSibling);
+  } else {
+    reelForm.appendChild(expandableModeSettings);
+  }
+}
+
+function insertTitleAppearanceSection(titleAppearanceSection, expandableModeSettings, reelForm) {
+  if (expandableModeSettings && expandableModeSettings.nextSibling) {
+    reelForm.insertBefore(titleAppearanceSection, expandableModeSettings.nextSibling);
+  } else {
+    reelForm.appendChild(titleAppearanceSection);
   }
 }
 

@@ -9,6 +9,7 @@
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/playlist.css">
+  <link rel="stylesheet" href="css/expandable.css">
   
   <style>
     /* Minimal embed-specific overrides only */
@@ -39,6 +40,16 @@
       max-height: 100%;
       box-sizing: border-box;
       margin: 0;
+    }
+    
+    /* Expandable mode specific overrides for embed */
+    #embedPlayer .player-wrapper.expandable-mode {
+      height: var(--expandable-collapsed-height, 120px);
+      max-height: none;
+    }
+    
+    #embedPlayer .player-wrapper.expandable-mode.expanded {
+      height: var(--expandable-expanded-height, 500px);
     }
     
     /* Player container styles (from layout.css but needed for embed) */
@@ -196,10 +207,19 @@
       const playerHeight = reelData.playerHeight || 500;
       root.style.setProperty('--player-height', `${playerHeight}px`);
       
+      // Expandable mode settings
+      root.style.setProperty('--expandable-collapsed-height', `${settings.expandableCollapsedHeight || 120}px`);
+      root.style.setProperty('--expandable-expanded-height', `${settings.expandableExpandedHeight || 500}px`);
+      
       // Apply background image and blend modes
       const container = document.getElementById('embedPlayer');
-      // Set minimum height for the container
-      container.style.minHeight = `${playerHeight}px`;
+      // Set minimum height for the container based on mode
+      const mode = reelData.mode || 'static';
+      if (mode === 'expandable') {
+        container.style.minHeight = `${settings.expandableCollapsedHeight || 120}px`;
+      } else {
+        container.style.minHeight = `${playerHeight}px`;
+      }
       
       if (backgroundImage) {
         container.style.backgroundImage = `url("${backgroundImage}")`;
@@ -282,15 +302,30 @@
       const container = document.getElementById('embedPlayer');
       const shouldHideTitle = !(reelData.showTitle && reelData.title && reelData.title.trim());
       const settings = reelData.settings || {};
+      const mode = reelData.mode || 'static';
       
       // Apply element blend mode to wrapper if specified
       const elementBlendStyle = settings.elementBlendMode 
         ? `mix-blend-mode: ${settings.elementBlendMode};` 
         : '';
       
+      // Determine player wrapper classes
+      let wrapperClasses = 'player-wrapper';
+      if (shouldHideTitle) wrapperClasses += ' no-title';
+      if (mode === 'expandable') wrapperClasses += ' expandable-mode';
+      
+      // Build project title overlay HTML for expandable mode
+      let projectTitleOverlayHTML = '';
+      if (mode === 'expandable' && settings.projectTitleImage) {
+        projectTitleOverlayHTML = `
+          <div class="project-title-overlay" style="background-image: url('${settings.projectTitleImage}');"></div>
+        `;
+      }
+      
       // Use exact same HTML structure as playerApp.renderPlayer()
       const playerHTML = `
-        <div class="player-wrapper${shouldHideTitle ? ' no-title' : ''}" style="position: relative; z-index: 2; ${elementBlendStyle}">
+        <div class="${wrapperClasses}" style="position: relative; z-index: 2; ${elementBlendStyle}">
+          ${projectTitleOverlayHTML}
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
               `<div class="reel-title">${reelData.title}</div>` : ''}
@@ -336,12 +371,23 @@
     }
     
     function initializeEmbedPlayer(reelData) {
-      // Store reel reference
+      // Store reel reference with full reelData for expandable mode
       playerApp.reel = reelData.settings || {};
+      playerApp.currentReelSettings = reelData;
+      
+      // Set expandable mode state
+      playerApp.isExpandableMode = reelData.mode === 'expandable';
+      playerApp.isExpanded = false;
+      playerApp.isPlaying = false;
       
       // Cache DOM elements using playerApp's method
       playerApp.elements = {};
       playerApp.cacheElements();
+      
+      // Setup expandable mode interactions if enabled
+      if (playerApp.isExpandableMode) {
+        playerApp.setupExpandableModeInteractions();
+      }
       
       // Setup player using actual playerApp methods
       playerApp.setupWaveSurfer();

@@ -1,0 +1,247 @@
+/* ========================================
+   EXPANDABLE MODE STYLES
+   ======================================== */
+
+/* Expandable mode player wrapper */
+.player-wrapper.expandable-mode {
+  position: relative;
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  height: var(--expandable-collapsed-height, 120px);
+}
+
+/* Expanded state */
+.player-wrapper.expandable-mode.expanded {
+  height: var(--expandable-expanded-height, 500px);
+}
+
+/* Project title overlay */
+.player-wrapper.expandable-mode .project-title-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  z-index: 10;
+  pointer-events: none;
+  opacity: 1;
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Keep background image at collapsed size to prevent visual scaling */
+.player-wrapper.expandable-mode:not(.expanded) .project-title-overlay {
+  height: var(--expandable-collapsed-height, 120px);
+  top: 0;
+  /* Ensure background fills the collapsed height */
+  background-size: auto 100%;
+}
+
+/* When expanding, fade out before container grows */
+.player-wrapper.expandable-mode.expanded .project-title-overlay {
+  /* Fade happens during transition, size stays same until invisible */
+  height: var(--expandable-collapsed-height, 120px);
+  top: 0;
+}
+
+/* Hide overlay when expanded or when playing in collapsed state */
+.player-wrapper.expandable-mode.expanded .project-title-overlay,
+.player-wrapper.expandable-mode.playing-collapsed .project-title-overlay {
+  opacity: 0;
+  pointer-events: none;
+}
+
+/* Player content container in expandable mode */
+.player-wrapper.expandable-mode .player-content {
+  position: relative;
+  z-index: 5;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  flex: 1; /* Ensure it fills the wrapper properly */
+}
+
+/* Ensure player-container has proper layout in expandable mode */
+.player-wrapper.expandable-mode .player-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+}
+
+/* Only add gap when expanded (when controls are visible) */
+.player-wrapper.expandable-mode.expanded .player-container {
+  gap: 1.5rem;
+}
+
+/* Ensure waveform-and-volume fills available space */
+.player-wrapper.expandable-mode .waveform-and-volume {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* Hide play/pause button and volume when collapsed (unless expanded) */
+.player-wrapper.expandable-mode:not(.expanded) #playPause,
+.player-wrapper.expandable-mode:not(.expanded) .volume-control {
+  opacity: 0 !important;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+/* Hide playlist when collapsed - use display:none to remove from layout */
+.player-wrapper.expandable-mode:not(.expanded) .playlist {
+  display: none !important;
+}
+
+/* Show controls and playlist when expanded */
+.player-wrapper.expandable-mode.expanded #playPause,
+.player-wrapper.expandable-mode.expanded .volume-control {
+  opacity: 1 !important;
+  pointer-events: auto;
+}
+
+.player-wrapper.expandable-mode.expanded .playlist {
+  display: block !important;
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* Ensure canvases fill the waveform container width in expandable mode */
+.player-wrapper.expandable-mode #waveform > canvas {
+  width: 100% !important;
+  height: 100% !important;
+  display: block !important;
+}
+
+/* Hide entire waveform container when collapsed (not just canvas) */
+.player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) #waveform {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Show waveform container when expanded or playing-collapsed */
+.player-wrapper.expandable-mode.expanded #waveform,
+.player-wrapper.expandable-mode.playing-collapsed #waveform {
+  opacity: 1 !important;
+  visibility: visible !important;
+  pointer-events: auto !important;
+  transition: opacity 0.3s ease !important;
+}
+
+/* Center waveform vertically when playing in collapsed state */
+.player-wrapper.expandable-mode.playing-collapsed:not(.expanded) .player-container {
+  position: absolute;
+  top: 50%;
+  left: 0;
+  right: 0;
+  transform: translateY(-50%);
+  padding: 0 1rem;
+  width: 100%;
+  box-sizing: border-box;
+}
+
+/* Reset positioning when expanded */
+.player-wrapper.expandable-mode.expanded .player-container {
+  position: static !important;
+  top: auto !important;
+  transform: none !important;
+  padding: 0;
+}
+
+/* Also ensure normal positioning when collapsed and not playing */
+.player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) .player-container {
+  position: static;
+  top: auto;
+  transform: none;
+  padding: 0;
+}
+
+/* Keep waveform container at consistent height and width to prevent WaveSurfer re-renders */
+.player-wrapper.expandable-mode #waveform {
+  /* Lock the height so WaveSurfer doesn't detect size changes */
+  height: 86px !important;
+  min-height: 86px !important;
+  flex-shrink: 0 !important;
+  /* Ensure it takes up space even when canvas is hidden */
+  display: block !important;
+  position: relative !important;
+  /* Allow it to fill available space */
+  flex: 1 !important;
+  width: auto !important;
+  max-width: none !important;
+}
+
+/* Prevent the waveform-and-volume container from changing size */
+.player-wrapper.expandable-mode .waveform-and-volume {
+  min-height: 86px;
+  display: flex;
+  align-items: center;
+}
+
+/* Waveform container visibility */
+.player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) #waveform {
+  pointer-events: none;
+}
+
+/* Allow waveform to be interactive when expanded or playing-collapsed */
+.player-wrapper.expandable-mode.expanded #waveform,
+.player-wrapper.expandable-mode.playing-collapsed #waveform {
+  pointer-events: auto;
+}
+
+/* Title visibility in expandable mode */
+.player-wrapper.expandable-mode:not(.expanded) .reel-title {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-in-out;
+}
+
+.player-wrapper.expandable-mode.expanded .reel-title {
+  opacity: 1;
+}
+
+/* Smooth transitions for all interactive elements */
+.player-wrapper.expandable-mode .player-controls,
+.player-wrapper.expandable-mode #waveform,
+.player-wrapper.expandable-mode .reel-title {
+  transition: opacity 0.3s ease-in-out;
+}
+
+/* Ensure proper layering */
+.player-wrapper.expandable-mode {
+  position: relative;
+  z-index: 1;
+}
+
+/* Track info adjustments for collapsed state */
+.player-wrapper.expandable-mode:not(.expanded) .track-info {
+  opacity: 0;
+  pointer-events: none;
+}
+
+.player-wrapper.expandable-mode.expanded .track-info {
+  opacity: 1;
+}
+
+/* Loading indicator in expandable mode */
+.player-wrapper.expandable-mode #loading {
+  z-index: 15;
+}
+
+/* Hide playhead time and total time when collapsed - keep in layout to maintain waveform width */
+.player-wrapper.expandable-mode:not(.expanded) .playhead-time,
+.player-wrapper.expandable-mode:not(.expanded) #total-time {
+  opacity: 0 !important;
+  /* Don't use visibility: hidden - keep them in layout */
+  pointer-events: none !important;
+}
+
+/* Show times when expanded */
+.player-wrapper.expandable-mode.expanded .playhead-time,
+.player-wrapper.expandable-mode.expanded #total-time {
+  opacity: 1 !important;
+  pointer-events: auto !important;
+}

@@ -8,6 +8,13 @@ export const playerApp = {
   isHoveringSlider: false,
   isHoveringIcon: false,
   currentTrackIndex: 0,
+  // Expandable mode state
+  isExpandableMode: false,
+  isExpanded: false,
+  isPlaying: false,
+  currentReelSettings: null,
+  // Event listener cleanup references
+  expandableModeListeners: null,
 
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
@@ -22,6 +29,8 @@ export const playerApp = {
     this.elements.trackInfo = document.querySelector(".track-info");
     this.elements.totalTime = document.getElementById("total-time");
     this.elements.playlist = document.getElementById("playlist");
+    this.elements.playerWrapper = document.querySelector(".player-wrapper");
+    this.elements.projectTitleOverlay = document.querySelector(".project-title-overlay");
   },
 
   renderPlaylist(playlist) {
@@ -444,14 +453,22 @@ export const playerApp = {
       setTimeout(() => {
         // Set opacity for all canvases inside waveform (WaveSurfer v7 uses nested structure)
         const canvases = document.querySelectorAll("#waveform canvas");
-        canvases.forEach(canvas => canvas.style.opacity = "1");
-        playPauseBtn.style.opacity = "1";
+        // In expandable mode, don't set inline opacity - let CSS handle it completely
+        // In static mode, set opacity as normal
+        if (!this.isExpandableMode) {
+          canvases.forEach(canvas => canvas.style.opacity = "1");
+          playPauseBtn.style.opacity = "1";
+          if (volumeControl) {
+            volumeControl.style.opacity = "1";
+          }
+        }
+        // Set color for all modes
         playPauseBtn.style.color = getComputedStyle(document.documentElement)
           .getPropertyValue("--ui-accent")
           .trim();
       }, 50);
       if (volumeControl) {
-        volumeControl.style.opacity = "1";
+        // Set color for all modes
         volumeControl.style.color = getComputedStyle(document.documentElement)
           .getPropertyValue("--ui-accent")
           .trim();
@@ -512,18 +529,21 @@ export const playerApp = {
         .trim();
       this.wavesurfer.setOptions({ cursorColor: accentColor });
       this.elements.waveform.classList.add('playing');
+      this.updatePlayingState(true);
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
       // Hide cursor when paused by making it transparent
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
+      this.updatePlayingState(false);
       document.dispatchEvent(new CustomEvent("playback:pause"));
     });
     this.wavesurfer.on("finish", () => {
       // Hide cursor when finished
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
+      this.updatePlayingState(false);
       document.dispatchEvent(new CustomEvent("playback:finish"));
     });
     this.wavesurfer.on("seek", () => {
@@ -616,10 +636,10 @@ export const playerApp = {
       barHeight: 1,
       barRadius: 0,
       height: 86, // Even number helps Safari render without gaps
-      responsive: true,
+      responsive: !this.isExpandableMode, // Disable responsive in expandable mode to prevent redraws
       hideScrollbar: true,
       interact: true,
-      fillParent: true,
+      fillParent: true, // Re-enable fillParent for proper width
       normalize: true,
       backend: "WebAudio", // Use WebAudio for accurate duration/playback
       minPxPerSec: 1,
@@ -640,6 +660,15 @@ export const playerApp = {
           }
         }
       });
+      
+      // In expandable mode, ensure canvases fill width but prevent resize loops
+      if (this.isExpandableMode && waveformContainer) {
+        canvases.forEach(canvas => {
+          canvas.style.width = '100%'; // Fill the container width
+          canvas.style.height = '100%'; // Fill the container height
+          canvas.style.willChange = 'auto'; // Prevent unnecessary GPU acceleration
+        });
+      }
     });
   },
 
@@ -652,17 +681,158 @@ export const playerApp = {
       loadingIndicator.classList.add("hidden");
     }
   },
+
+  setupExpandableModeInteractions() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    // Clean up old listeners if they exist
+    this.cleanupExpandableModeListeners();
+
+    // Create new listener functions and store references for cleanup
+    const handleMouseEnter = () => {
+      if (!this.isExpanded) {
+        this.expandPlayer();
+      }
+    };
+
+    const handleMouseLeave = () => {
+      if (this.isExpanded) {
+        this.collapsePlayer();
+      }
+    };
+
+    // Store listener references for cleanup
+    this.expandableModeListeners = {
+      wrapper,
+      mouseEnter: handleMouseEnter,
+      mouseLeave: handleMouseLeave
+    };
+
+    // Attach event listeners
+    wrapper.addEventListener('mouseenter', handleMouseEnter);
+    wrapper.addEventListener('mouseleave', handleMouseLeave);
+  },
+
+  cleanupExpandableModeListeners() {
+    if (this.expandableModeListeners) {
+      const { wrapper, mouseEnter, mouseLeave } = this.expandableModeListeners;
+      if (wrapper) {
+        wrapper.removeEventListener('mouseenter', mouseEnter);
+        wrapper.removeEventListener('mouseleave', mouseLeave);
+      }
+      this.expandableModeListeners = null;
+    }
+  },
+
+  validateProjectTitleImage() {
+    const overlay = this.elements.projectTitleOverlay;
+    if (!overlay) return;
+    
+    const imageUrl = overlay.dataset.imageUrl;
+    if (!imageUrl) return;
+    
+    // Add loading class
+    overlay.classList.add('loading');
+    
+    // Create a test image to validate the URL
+    const testImage = new Image();
+    
+    testImage.onload = () => {
+      // Image loaded successfully
+      overlay.classList.remove('loading');
+      overlay.classList.add('loaded');
+    };
+    
+    testImage.onerror = () => {
+      // Image failed to load - hide overlay and show fallback
+      console.warn('[Player] Failed to load project title image:', imageUrl);
+      overlay.classList.remove('loading');
+      overlay.classList.add('error');
+      overlay.style.opacity = '0';
+      overlay.style.pointerEvents = 'none';
+    };
+    
+    // Start loading the image
+    testImage.src = imageUrl;
+  },
+
+  expandPlayer() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    this.isExpanded = true;
+    wrapper.classList.add('expanded');
+  },
+
+  collapsePlayer() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    this.isExpanded = false;
+    wrapper.classList.remove('expanded');
+
+    // Handle playing state during collapse - check current playback state
+    const isCurrentlyPlaying = this.wavesurfer && this.wavesurfer.isPlaying();
+    if (isCurrentlyPlaying && this.currentReelSettings && this.currentReelSettings.showWaveformOnCollapse) {
+      wrapper.classList.add('playing-collapsed');
+    } else {
+      wrapper.classList.remove('playing-collapsed');
+    }
+  },
+
+  updatePlayingState(playing) {
+    this.isPlaying = playing;
+    const wrapper = this.elements.playerWrapper;
+    
+    if (wrapper && this.isExpandableMode) {
+      // Update collapsed state based on playing status (only when not expanded)
+      if (!this.isExpanded) {
+        if (playing && this.currentReelSettings && this.currentReelSettings.showWaveformOnCollapse) {
+          wrapper.classList.add('playing-collapsed');
+        } else {
+          wrapper.classList.remove('playing-collapsed');
+        }
+      } else {
+        // Remove playing-collapsed class when expanded
+        wrapper.classList.remove('playing-collapsed');
+      }
+    }
+  },
+
   renderPlayer({ showTitle, title, playlist, reel }) {
+    // Clean up old event listeners before re-rendering
+    this.cleanupExpandableModeListeners();
+    
     // Store reel reference for accessing settings
-    this.reel = reel || {};
+    this.currentReelSettings = reel;
+    
+    // Set expandable mode state
+    this.isExpandableMode = reel && reel.mode === 'expandable';
+    this.isExpanded = false;
+    this.isPlaying = false;
     
     const container = document.getElementById("reelPlayerPreview");
     if (!container) return;
     
     const shouldHideTitle = !(showTitle && title && title.trim());
     
+    // Determine player wrapper classes
+    let wrapperClasses = 'player-wrapper';
+    if (shouldHideTitle) wrapperClasses += ' no-title';
+    if (this.isExpandableMode) wrapperClasses += ' expandable-mode';
+    
+    // Build project title overlay HTML for expandable mode
+    let projectTitleOverlayHTML = '';
+    if (this.isExpandableMode && reel.projectTitleImage) {
+      projectTitleOverlayHTML = `
+        <div class="project-title-overlay" style="background-image: url('${reel.projectTitleImage}');" data-image-url="${reel.projectTitleImage}"></div>
+      `;
+    }
+    
     container.innerHTML = `
-    <div class="player-wrapper${shouldHideTitle ? ' no-title' : ''}">
+    <div class="${wrapperClasses}">
+      ${projectTitleOverlayHTML}
       <div class="player-content">
         ${
           showTitle && title && title.trim()
@@ -708,6 +878,13 @@ export const playerApp = {
   `;
     this.elements = {};
     this.cacheElements();
+    
+    // Set up expandable mode interactions if enabled
+    if (this.isExpandableMode) {
+      this.setupExpandableModeInteractions();
+      this.validateProjectTitleImage();
+    }
+    
     this.setupWaveSurfer();
     this.setupWaveformEvents();
     this.setupPlayPauseUI();

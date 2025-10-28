@@ -31,8 +31,15 @@ export class EmbedExporter {
     const reelId = this.generateReelId(reel);
     this.storeReelData(reelId, reel);
     
-    // Use player height from reel settings, or calculate responsive height
-    let height = reel.playerHeight || 500;
+    // Determine height based on mode
+    let height;
+    if (reel.mode === 'expandable') {
+      // Use collapsed height for expandable mode embeds
+      height = reel.expandableCollapsedHeight || 120;
+    } else {
+      // Use player height from reel settings for static mode
+      height = reel.playerHeight || 500;
+    }
     
     // If height is a string (from calculateEmbedHeight), parse it
     if (typeof height === 'string') {
@@ -41,7 +48,7 @@ export class EmbedExporter {
     
     return `<iframe src="${this.baseURL.replace('index.html', '')}player.html?id=${reelId}" 
            width="100%" height="${height}px" frameborder="0" 
-           style="border-radius: 8px; border: none; min-height: 300px;">
+           style="border-radius: 8px; border: none; min-height: ${height}px;">
           </iframe>`;
   }
 
@@ -95,6 +102,7 @@ export class EmbedExporter {
       showTitle: reel.showTitle,
       playlist: reel.playlist?.filter(track => track.url && track.url.trim() !== "") || [],
       playerHeight: reel.playerHeight || 500, // Player height setting
+      mode: reel.mode || "static", // Player mode: "static" or "expandable"
       settings: {
         // Color settings
         varUiAccent: reel.varUiAccent || "#2a0026",
@@ -116,6 +124,12 @@ export class EmbedExporter {
         // Blend modes and effects
         backgroundBlendMode: reel.backgroundBlendMode,
         elementBlendMode: reel.elementBlendMode,
+        
+        // Expandable mode settings
+        expandableCollapsedHeight: reel.expandableCollapsedHeight || 120,
+        expandableExpandedHeight: reel.expandableExpandedHeight || 500,
+        projectTitleImage: reel.projectTitleImage || "",
+        showWaveformOnCollapse: reel.showWaveformOnCollapse !== false, // Default to true
         
         // Waveform settings
         waveform: reel.settings?.waveform || {
