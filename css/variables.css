@@ -1,20 +1,77 @@
+/* ========================================
+   GLOBAL CSS VARIABLES
+   Central configuration for all player styles
+   ======================================== */
+
 @import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
 
 :root {
-  --ui-accent: #2a0026;
-  --waveform-unplayed: #929292;
-  --waveform-hover: rgba(0, 31, 103, 0.126);
-  --player-border-color: #ffffff;
-  --builder-bg: #faf8fa;
-  --builder-border: #eee;
-  --builder-sidebar-shadow: rgba(40, 0, 38, 0.04);
-  --builder-accent: #000;
-  --builder-hover: #333;
-  --builder-delete-hover: #b00000;
+  /* ========================================
+     COLOR PALETTE
+     ======================================== */
+  --ui-accent: #2a0026;                           /* Primary accent color for text, icons, and UI elements */
+  --waveform-unplayed: #929292;                   /* Color of unplayed waveform sections */
+  --waveform-hover: rgba(0, 31, 103, 0.126);      /* Hover overlay color on waveform */
+  --player-border-color: #ffffff;                 /* Border color for player wrapper */
   
-  /* Background effects variables */
-  --background-image: none;
-  --background-opacity: 1;
-  --background-blur: 2px;
-  --overlay-color: rgba(255, 255, 255, 0);
+  /* Builder UI Colors */
+  --builder-bg: #faf8fa;                          /* Background color for builder interface */
+  --builder-border: #eee;                         /* Border color for builder elements */
+  --builder-sidebar-shadow: rgba(40, 0, 38, 0.04); /* Shadow for builder sidebar */
+  --builder-accent: #000;                         /* Accent color for builder UI */
+  --builder-hover: #333;                          /* Hover state color for builder buttons */
+  --builder-delete-hover: #b00000;                /* Hover color for delete buttons */
+  
+  /* ========================================
+     SHARED SPACING & LAYOUT
+     Used across static and expandable modes
+     ======================================== */
+  --player-padding: 2rem;                         /* Horizontal and top padding for player */
+  --player-padding-bottom: 1.5rem;                /* Bottom padding for player */
+  --reel-title-padding-bottom: 0.8rem;            /* Space below reel title */
+  
+  /* ========================================
+     BACKGROUND EFFECTS
+     ======================================== */
+  --background-image: none;                       /* Background image URL */
+  --background-opacity: 1;                        /* Opacity of background */
+  --background-blur: 2px;                         /* Blur amount for backdrop filter */
+  --overlay-color: rgba(255, 255, 255, 0);        /* Overlay color on background */
+  
+  /* ========================================
+     EXPANDABLE MODE - HEIGHT SETTINGS
+     ======================================== */
+  --expandable-waveform-height: 86px;             /* Fixed height of waveform in expandable mode */
+  
+  /* ========================================
+     EXPANDABLE MODE - SPACING & LAYOUT
+     ======================================== */
+  --expandable-overlay-padding: 0.75rem;          /* Vertical padding for project title overlay */
+  --expandable-player-gap: 1.5rem;                /* Gap between play button, waveform, volume when expanded */
+  --expandable-content-gap: 0rem;                 /* Gap between waveform and playlist when expanded */
+  --expandable-waveform-margin-top: 0.5rem;       /* Margin above waveform container when expanded */
+  --expandable-waveform-margin-bottom: 1rem;      /* Margin below waveform container when expanded */
+  --expandable-collapsed-waveform-offset: -1.5rem; /* Vertical offset for waveform when collapsed during playback */
+  --expandable-playlist-inset: 2rem;              /* How much narrower playlist is from edges */
+  --expandable-playlist-bottom-margin: 1rem;      /* Space between bottom of playlist and player edge */
+  --expandable-playlist-internal-padding: 1rem;   /* Internal padding at bottom of playlist content */
+  
+  /* ========================================
+     EXPANDABLE MODE - TRACK INFO POSITIONING
+     ======================================== */
+  --expandable-track-info-left: 3.7rem;           /* Left offset for track info (matches play button width) */
+  --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text */
+  --expandable-track-info-top: 2rem;            /* Top margin above track info */
+  --expandable-track-info-bottom: 0rem;           /* Bottom margin below track info */
+  
+  /* ========================================
+     EXPANDABLE MODE - TRANSITIONS
+     ======================================== */
+  --expandable-transition-duration: 0.3s;         /* Duration of expand/collapse animations */
+  --expandable-transition-easing: cubic-bezier(0.4, 0, 0.2, 1); /* Easing function for smooth animations */
+  
+  /* ========================================
+     EXPANDABLE MODE - SCROLLBAR
+     ======================================== */
+  --expandable-scrollbar-width: 30px;             /* Width reserved for hiding native scrollbar */
 }

@@ -10,22 +10,57 @@
   position: relative;
   padding-right: 30px; /* Push content back and push scrollbar out of view */
   margin-right: -30px; /* Pull back to align content */
+  scroll-behavior: smooth; /* Smooth scrolling with inertia */
 }
 
-/* Fade mask only when scrollable */
+/* Fade mask only when scrollable - default state with both fades */
 .playlist.scrollable {
   mask-image: linear-gradient(to bottom, 
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 15%,
+    black 85%,
     transparent 100%
   );
   -webkit-mask-image: linear-gradient(to bottom, 
     transparent 0%,
-    black 10%,
-    black 90%,
+    black 15%,
+    black 85%,
     transparent 100%
   );
+}
+
+/* At top - no top fade, only bottom fade */
+.playlist.scrollable.scroll-at-top {
+  mask-image: linear-gradient(to bottom, 
+    black 0%,
+    black 85%,
+    transparent 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, 
+    black 0%,
+    black 85%,
+    transparent 100%
+  );
+}
+
+/* At bottom - no bottom fade, only top fade */
+.playlist.scrollable.scroll-at-bottom {
+  mask-image: linear-gradient(to bottom, 
+    transparent 0%,
+    black 15%,
+    black 100%
+  );
+  -webkit-mask-image: linear-gradient(to bottom, 
+    transparent 0%,
+    black 15%,
+    black 100%
+  );
+}
+
+/* At both top and bottom (content fits exactly or very small scroll) - no fades */
+.playlist.scrollable.scroll-at-top.scroll-at-bottom {
+  mask-image: none;
+  -webkit-mask-image: none;
 }
 
 /* Aggressively hide native scrollbar */

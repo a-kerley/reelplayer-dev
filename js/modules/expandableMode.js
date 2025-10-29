@@ -99,6 +99,12 @@ export function setupPlayerModeControls(section, reel, onChange) {
       ? 'Expandable mode: Player appears as a banner and expands on hover to show full controls.'
       : 'Static mode: Player displays at full height with all controls visible.';
 
+    // Toggle static settings visibility
+    const staticSettings = document.getElementById('staticModeSettings');
+    if (staticSettings) {
+      staticSettings.style.display = newMode === 'static' ? 'block' : 'none';
+    }
+
     // Toggle expandable settings visibility
     const expandableSettings = document.getElementById('expandableModeSettings');
     if (expandableSettings) {
@@ -110,6 +116,72 @@ export function setupPlayerModeControls(section, reel, onChange) {
 
   staticRadio.addEventListener('change', handleModeChange);
   expandableRadio.addEventListener('change', handleModeChange);
+}
+
+/**
+ * Creates the Static Mode Settings section
+ */
+export function createStaticModeSettings(reel, onChange) {
+  const section = document.createElement('fieldset');
+  section.id = 'staticModeSettings';
+  section.style.marginBottom = '1.5rem';
+  section.style.padding = '1rem';
+  section.style.border = '1px solid var(--builder-border)';
+  section.style.borderRadius = '6px';
+  section.style.display = (reel.mode || 'static') === 'static' ? 'block' : 'none';
+
+  const legend = document.createElement('legend');
+  legend.textContent = 'Static Mode Settings';
+  legend.style.fontWeight = '600';
+  legend.style.fontSize = '0.95rem';
+  legend.style.padding = '0 0.5rem';
+  section.appendChild(legend);
+
+  const settingsContainer = document.createElement('div');
+  settingsContainer.style.display = 'flex';
+  settingsContainer.style.flexDirection = 'column';
+  settingsContainer.style.gap = '1rem';
+  settingsContainer.style.marginTop = '0.75rem';
+
+  // Player Height
+  const playerHeightRow = createNumberInput(
+    'Player Height (px):',
+    'playerHeight',
+    reel.playerHeight || 500,
+    200,
+    1000,
+    'Height of the player in static mode'
+  );
+  settingsContainer.appendChild(playerHeightRow);
+
+  section.appendChild(settingsContainer);
+
+  return section;
+}
+
+/**
+ * Sets up event handlers for static mode settings
+ */
+export function setupStaticModeSettings(section, reel, onChange) {
+  // Player Height
+  const playerHeight = section.querySelector('#playerHeight');
+  if (playerHeight) {
+    playerHeight.addEventListener('input', () => {
+      const value = parseInt(playerHeight.value);
+      if (!isNaN(value) && value >= 200 && value <= 1000) {
+        reel.playerHeight = value;
+        
+        if (window.previewManager) {
+          window.previewManager.updatePreview(reel);
+        }
+      }
+    });
+    playerHeight.addEventListener('change', () => {
+      if (window.saveReels && window.reels) {
+        window.saveReels(window.reels);
+      }
+    });
+  }
 }
 
 /**
@@ -164,7 +236,13 @@ export function createExpandableModeSettings(reel, onChange) {
     'Project Title Image URL:',
     'projectTitleImage',
     reel.projectTitleImage || '',
-    'URL of the image to display when collapsed'
+    'URL of the image to display when collapsed',
+    true, // Enable file picker
+    {
+      directory: 'assets/images/project-titles',
+      extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'],
+      title: 'Select Project Title Image'
+    }
   );
   settingsContainer.appendChild(titleImageRow);
 
@@ -341,7 +419,7 @@ function createNumberInput(label, id, value, min, max, tooltip) {
 /**
  * Helper: Create a text input row
  */
-function createTextInput(label, id, value, tooltip) {
+function createTextInput(label, id, value, tooltip, withFilePicker = false, pickerOptions = null) {
   const row = document.createElement('div');
   row.style.display = 'flex';
   row.style.flexDirection = 'column';
@@ -356,6 +434,12 @@ function createTextInput(label, id, value, tooltip) {
     labelEl.title = tooltip;
   }
 
+  // Input wrapper for input + button
+  const inputWrapper = document.createElement('div');
+  inputWrapper.style.display = 'flex';
+  inputWrapper.style.gap = '0.5rem';
+  inputWrapper.style.alignItems = 'center';
+
   const input = document.createElement('input');
   input.type = 'text';
   input.id = id;
@@ -363,10 +447,22 @@ function createTextInput(label, id, value, tooltip) {
   input.style.padding = '0.4rem';
   input.style.borderRadius = '4px';
   input.style.border = '1px solid var(--builder-border)';
+  input.style.flex = '1';
   input.placeholder = 'https://example.com/title-image.jpg';
 
+  inputWrapper.appendChild(input);
+  
+  // Add file picker button if requested
+  if (withFilePicker && pickerOptions) {
+    // Import and create file picker button dynamically
+    import('./filePicker.js').then(({ createFilePickerButton }) => {
+      const pickerBtn = createFilePickerButton(input, pickerOptions);
+      inputWrapper.appendChild(pickerBtn);
+    });
+  }
+
   row.appendChild(labelEl);
-  row.appendChild(input);
+  row.appendChild(inputWrapper);
 
   return row;
 }

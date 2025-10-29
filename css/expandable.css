@@ -1,48 +1,51 @@
 /* ========================================
    EXPANDABLE MODE STYLES
+   All CSS variables defined in variables.css
+   ======================================== */
+
+/* ========================================
+   1. WRAPPER & STATES
    ======================================== */
 
 /* Expandable mode player wrapper */
 .player-wrapper.expandable-mode {
   position: relative;
   overflow: hidden;
-  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: height var(--expandable-transition-duration) var(--expandable-transition-easing),
+              max-height var(--expandable-transition-duration) var(--expandable-transition-easing);
   height: var(--expandable-collapsed-height, 120px);
+  max-height: var(--expandable-collapsed-height, 120px);
+  padding: 0;
+  z-index: 1;
 }
 
 /* Expanded state */
 .player-wrapper.expandable-mode.expanded {
   height: var(--expandable-expanded-height, 500px);
+  max-height: var(--expandable-expanded-height, 500px);
 }
 
-/* Project title overlay */
+/* ========================================
+   2. PROJECT TITLE OVERLAY
+   ======================================== */
+
 .player-wrapper.expandable-mode .project-title-overlay {
   position: absolute;
   top: 0;
   left: 0;
   width: 100%;
+  height: var(--expandable-collapsed-height, 120px);
   background-size: contain;
-  background-position: center;
+  background-position: center center;
   background-repeat: no-repeat;
+  background-origin: content-box;
+  background-clip: content-box;
   z-index: 10;
   pointer-events: none;
   opacity: 1;
-  transition: opacity 0.3s ease-in-out;
-}
-
-/* Keep background image at collapsed size to prevent visual scaling */
-.player-wrapper.expandable-mode:not(.expanded) .project-title-overlay {
-  height: var(--expandable-collapsed-height, 120px);
-  top: 0;
-  /* Ensure background fills the collapsed height */
-  background-size: auto 100%;
-}
-
-/* When expanding, fade out before container grows */
-.player-wrapper.expandable-mode.expanded .project-title-overlay {
-  /* Fade happens during transition, size stays same until invisible */
-  height: var(--expandable-collapsed-height, 120px);
-  top: 0;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+  padding: var(--expandable-overlay-padding) 0;
+  box-sizing: border-box;
 }
 
 /* Hide overlay when expanded or when playing in collapsed state */
@@ -52,196 +55,255 @@
   pointer-events: none;
 }
 
-/* Player content container in expandable mode */
+/* ========================================
+   3. CONTENT CONTAINER
+   ======================================== */
+
 .player-wrapper.expandable-mode .player-content {
   position: relative;
   z-index: 5;
   height: 100%;
   display: flex;
   flex-direction: column;
-  flex: 1; /* Ensure it fills the wrapper properly */
+  flex: 1;
+  /* Always use flex-start - we'll use padding to create centering effect */
+  justify-content: flex-start;
+  transition: padding var(--expandable-transition-duration) var(--expandable-transition-easing),
+              gap var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
-/* Ensure player-container has proper layout in expandable mode */
+/* Collapsed state - center vertically using padding */
+.player-wrapper.expandable-mode:not(.expanded) .player-content {
+  padding-top: calc((var(--expandable-collapsed-height, 120px) - var(--expandable-waveform-height)) / 2 + var(--expandable-collapsed-waveform-offset));
+  padding-bottom: calc((var(--expandable-collapsed-height, 120px) - var(--expandable-waveform-height)) / 2 - var(--expandable-collapsed-waveform-offset));
+}
+
+/* Expanded state - normal padding */
+.player-wrapper.expandable-mode.expanded .player-content {
+  padding-top: var(--player-padding);
+  padding-left: var(--player-padding);
+  padding-right: var(--player-padding);
+  padding-bottom: var(--player-padding-bottom);
+  gap: var(--expandable-content-gap);
+}
+
+/* ========================================
+   4. PLAYER CONTROLS & CONTAINER
+   ======================================== */
+
+/* Base container - stays in normal flow in both states */
 .player-wrapper.expandable-mode .player-container {
   display: flex;
   align-items: center;
   width: 100%;
+  box-sizing: border-box;
+  margin: 0 !important; /* Override inline styles from player.html */
+  flex-shrink: 0; /* Prevent shrinking in flex layout */
+  transition: padding var(--expandable-transition-duration) var(--expandable-transition-easing),
+              gap var(--expandable-transition-duration) var(--expandable-transition-easing),
+              margin var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
-/* Only add gap when expanded (when controls are visible) */
+/* Collapsed state - horizontal padding only */
+.player-wrapper.expandable-mode:not(.expanded) .player-container {
+  padding: 0 var(--player-padding);
+}
+
+/* Expanded state - add gap, margins, and remove padding (parent has it) */
 .player-wrapper.expandable-mode.expanded .player-container {
-  gap: 1.5rem;
+  gap: var(--expandable-player-gap);
+  padding: 0; /* Remove padding since player-content now has it */
+  margin-top: var(--expandable-waveform-margin-top);
+  margin-bottom: var(--expandable-waveform-margin-bottom);
 }
 
-/* Ensure waveform-and-volume fills available space */
+/* Hide play/pause button and volume when collapsed */
+.player-wrapper.expandable-mode:not(.expanded) #playPause,
+.player-wrapper.expandable-mode:not(.expanded) .volume-control {
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* Show controls when expanded */
+.player-wrapper.expandable-mode.expanded #playPause,
+.player-wrapper.expandable-mode.expanded .volume-control {
+  opacity: 1;
+  pointer-events: auto;
+}
+
+/* ========================================
+   5. WAVEFORM & AUDIO CONTROLS
+   ======================================== */
+
 .player-wrapper.expandable-mode .waveform-and-volume {
   flex: 1;
   display: flex;
   align-items: center;
   gap: 0.5rem;
+  min-height: var(--expandable-waveform-height);
 }
 
-/* Hide play/pause button and volume when collapsed (unless expanded) */
-.player-wrapper.expandable-mode:not(.expanded) #playPause,
-.player-wrapper.expandable-mode:not(.expanded) .volume-control {
-  opacity: 0 !important;
-  pointer-events: none;
-  transition: opacity 0.2s ease-in-out;
-}
-
-/* Hide playlist when collapsed - use display:none to remove from layout */
-.player-wrapper.expandable-mode:not(.expanded) .playlist {
-  display: none !important;
-}
-
-/* Show controls and playlist when expanded */
-.player-wrapper.expandable-mode.expanded #playPause,
-.player-wrapper.expandable-mode.expanded .volume-control {
-  opacity: 1 !important;
-  pointer-events: auto;
-}
-
-.player-wrapper.expandable-mode.expanded .playlist {
-  display: block !important;
-  opacity: 1;
-  pointer-events: auto;
-}
-
-/* Ensure canvases fill the waveform container width in expandable mode */
-.player-wrapper.expandable-mode #waveform > canvas {
-  width: 100% !important;
-  height: 100% !important;
-  display: block !important;
-}
-
-/* Hide entire waveform container when collapsed (not just canvas) */
-.player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) #waveform {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  pointer-events: none !important;
-}
-
-/* Show waveform container when expanded or playing-collapsed */
-.player-wrapper.expandable-mode.expanded #waveform,
-.player-wrapper.expandable-mode.playing-collapsed #waveform {
-  opacity: 1 !important;
-  visibility: visible !important;
-  pointer-events: auto !important;
-  transition: opacity 0.3s ease !important;
-}
-
-/* Center waveform vertically when playing in collapsed state */
-.player-wrapper.expandable-mode.playing-collapsed:not(.expanded) .player-container {
-  position: absolute;
-  top: 50%;
-  left: 0;
-  right: 0;
-  transform: translateY(-50%);
-  padding: 0 1rem;
-  width: 100%;
-  box-sizing: border-box;
-}
-
-/* Reset positioning when expanded */
-.player-wrapper.expandable-mode.expanded .player-container {
-  position: static !important;
-  top: auto !important;
-  transform: none !important;
-  padding: 0;
-}
-
-/* Also ensure normal positioning when collapsed and not playing */
-.player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) .player-container {
-  position: static;
-  top: auto;
-  transform: none;
-  padding: 0;
-}
-
-/* Keep waveform container at consistent height and width to prevent WaveSurfer re-renders */
 .player-wrapper.expandable-mode #waveform {
-  /* Lock the height so WaveSurfer doesn't detect size changes */
-  height: 86px !important;
-  min-height: 86px !important;
-  flex-shrink: 0 !important;
-  /* Ensure it takes up space even when canvas is hidden */
-  display: block !important;
-  position: relative !important;
-  /* Allow it to fill available space */
-  flex: 1 !important;
-  width: auto !important;
-  max-width: none !important;
+  height: var(--expandable-waveform-height);
+  min-height: var(--expandable-waveform-height);
+  flex: 1;
+  flex-shrink: 0;
+  display: block;
+  position: relative;
+  width: auto;
+  max-width: none;
 }
 
-/* Prevent the waveform-and-volume container from changing size */
-.player-wrapper.expandable-mode .waveform-and-volume {
-  min-height: 86px;
-  display: flex;
-  align-items: center;
+.player-wrapper.expandable-mode #waveform > canvas {
+  width: 100%;
+  height: 100%;
+  display: block;
 }
 
-/* Waveform container visibility */
+/* Hide waveform when collapsed (unless playing with waveform enabled) */
 .player-wrapper.expandable-mode:not(.expanded):not(.playing-collapsed) #waveform {
+  opacity: 0;
+  visibility: hidden;
   pointer-events: none;
 }
 
-/* Allow waveform to be interactive when expanded or playing-collapsed */
+/* Show waveform when expanded or playing-collapsed */
 .player-wrapper.expandable-mode.expanded #waveform,
 .player-wrapper.expandable-mode.playing-collapsed #waveform {
+  opacity: 1;
+  visibility: visible;
   pointer-events: auto;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
-/* Title visibility in expandable mode */
-.player-wrapper.expandable-mode:not(.expanded) .reel-title {
-  opacity: 0;
-  pointer-events: none;
-  transition: opacity 0.2s ease-in-out;
-}
-
-.player-wrapper.expandable-mode.expanded .reel-title {
-  opacity: 1;
-}
-
-/* Smooth transitions for all interactive elements */
-.player-wrapper.expandable-mode .player-controls,
-.player-wrapper.expandable-mode #waveform,
-.player-wrapper.expandable-mode .reel-title {
-  transition: opacity 0.3s ease-in-out;
-}
-
-/* Ensure proper layering */
-.player-wrapper.expandable-mode {
-  position: relative;
-  z-index: 1;
-}
-
-/* Track info adjustments for collapsed state */
-.player-wrapper.expandable-mode:not(.expanded) .track-info {
-  opacity: 0;
-  pointer-events: none;
-}
-
-.player-wrapper.expandable-mode.expanded .track-info {
-  opacity: 1;
-}
-
-/* Loading indicator in expandable mode */
-.player-wrapper.expandable-mode #loading {
-  z-index: 15;
-}
-
-/* Hide playhead time and total time when collapsed - keep in layout to maintain waveform width */
+/* Hide time displays when collapsed - keep in layout to maintain waveform width */
 .player-wrapper.expandable-mode:not(.expanded) .playhead-time,
 .player-wrapper.expandable-mode:not(.expanded) #total-time {
-  opacity: 0 !important;
-  /* Don't use visibility: hidden - keep them in layout */
-  pointer-events: none !important;
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
 /* Show times when expanded */
 .player-wrapper.expandable-mode.expanded .playhead-time,
 .player-wrapper.expandable-mode.expanded #total-time {
-  opacity: 1 !important;
-  pointer-events: auto !important;
+  opacity: 1;
+  pointer-events: auto;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* ========================================
+   6. PLAYLIST
+   ======================================== */
+
+/* Playlist - always in DOM but hidden when collapsed */
+.player-wrapper.expandable-mode .playlist {
+  /* Override base playlist.css styles that conflict */
+  margin-top: 0 !important; /* Gap handled by player-content gap property */
+  margin-bottom: var(--expandable-playlist-bottom-margin) !important;
+  margin-left: var(--expandable-playlist-inset) !important;
+  margin-right: var(--expandable-playlist-inset) !important;
+  
+  /* Add internal bottom padding for spacing inside the playlist */
+  padding-bottom: var(--expandable-playlist-internal-padding) !important;
+  
+  /* Flexbox behavior for expandable mode */
+  flex: 1 1 auto !important; /* Allow it to grow and shrink */
+  min-height: 0 !important; /* Allow flexbox to shrink below content size */
+  
+  /* Width adjusted for insets while keeping scrollbar-hiding */
+  width: calc(100% - (var(--expandable-playlist-inset) * 2) + var(--expandable-scrollbar-width)) !important;
+  max-width: calc(100% - (var(--expandable-playlist-inset) * 2) + var(--expandable-scrollbar-width)) !important;
+  
+  /* Keep scrollbar hiding from base - only override the padding-right position */
+  padding-right: calc(var(--expandable-scrollbar-width) + var(--expandable-playlist-inset)) !important;
+  
+  /* Transition for smooth show/hide */
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* Hide playlist when collapsed */
+.player-wrapper.expandable-mode:not(.expanded) .playlist {
+  opacity: 0;
+  pointer-events: none;
+  max-height: 0;
+  overflow: hidden;
+}
+
+/* Show playlist when expanded */
+.player-wrapper.expandable-mode.expanded .playlist {
+  opacity: 1;
+  pointer-events: auto;
+  max-height: none;
+}
+
+/* ========================================
+   7. MISC ELEMENTS
+   ======================================== */
+
+/* Title visibility */
+.player-wrapper.expandable-mode .reel-title {
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+  /* Ensure consistent styling with static mode */
+  margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
+  /* Remove any top margin for consistent positioning */
+  margin-top: 0;
+}
+
+.player-wrapper.expandable-mode:not(.expanded) .reel-title {
+  opacity: 0;
+  pointer-events: none;
+  max-height: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing),
+              max-height var(--expandable-transition-duration) var(--expandable-transition-easing),
+              margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+.player-wrapper.expandable-mode.expanded .reel-title {
+  opacity: 1;
+  pointer-events: auto;
+  max-height: 100px; /* Large enough for any title */
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing),
+              max-height var(--expandable-transition-duration) var(--expandable-transition-easing),
+              margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* Track info visibility */
+.player-wrapper.expandable-mode .track-info {
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+  /* Match static mode positioning - align with waveform left edge */
+  margin-bottom: var(--expandable-track-info-bottom) !important;
+  margin-left: var(--expandable-track-info-left) !important;
+  padding-left: var(--expandable-track-info-padding) !important;
+  margin-top: var(--expandable-track-info-top) !important;
+}
+
+.player-wrapper.expandable-mode:not(.expanded) .track-info {
+  opacity: 0;
+  pointer-events: none;
+  max-height: 0;
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+  overflow: hidden;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing),
+              max-height var(--expandable-transition-duration) var(--expandable-transition-easing),
+              margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+.player-wrapper.expandable-mode.expanded .track-info {
+  opacity: 1;
+  pointer-events: auto;
+  max-height: 50px; /* Large enough for track info */
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing),
+              max-height var(--expandable-transition-duration) var(--expandable-transition-easing),
+              margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* Loading indicator */
+.player-wrapper.expandable-mode #loading {
+  z-index: 15;
 }

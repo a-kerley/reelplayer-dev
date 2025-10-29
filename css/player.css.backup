@@ -247,8 +247,12 @@ button {
   min-height: 120px;
   display: flex;
   flex-direction: column;
-  /* Background color - set by JS based on overlay color when no image, or default when image present */
-  background-color: var(--background-color, rgba(255, 255, 255, 1));
+  background-image: var(--background-image);
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-blend-mode: var(--background-blend-mode);
+  background-color: var(--background-color, rgba(255, 255, 255, var(--background-opacity)));
   border-radius: 8px;
   overflow: hidden;
   padding: var(--player-padding);
@@ -260,7 +264,7 @@ button {
   max-height: var(--player-height, none);
 }
 
-/* Background image layer (when image is used) */
+/* Create a background layer that can be blurred */
 .player-wrapper::after {
   content: '';
   position: absolute;
@@ -272,13 +276,12 @@ button {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
-  background-blend-mode: var(--background-blend-mode);
-  opacity: var(--background-opacity);
+  background-color: rgba(255, 255, 255, var(--background-opacity));
   z-index: 0;
   border-radius: 8px;
 }
 
-/* Overlay color layer - sits above background image, provides color tint or solid color when no image */
+/* Backdrop filter overlay for blur effect */
 .player-wrapper::before {
   content: '';
   position: absolute;

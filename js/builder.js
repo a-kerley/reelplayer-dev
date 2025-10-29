@@ -11,6 +11,8 @@ import { ValidationUtils } from "./modules/validation.js";
 import { 
   createPlayerModeSection, 
   setupPlayerModeControls,
+  createStaticModeSettings,
+  setupStaticModeSettings,
   createExpandableModeSettings,
   setupExpandableModeSettings
 } from "./modules/expandableMode.js";
@@ -69,9 +71,13 @@ export function renderBuilder(reel, onChange) {
   const playerModeSection = createPlayerModeSection(reel, onChange);
   insertPlayerModeSection(playerModeSection, titleInput, reelForm);
 
+  // Create and insert static mode settings section
+  const staticModeSettings = createStaticModeSettings(reel, onChange);
+  insertStaticModeSettings(staticModeSettings, playerModeSection, reelForm);
+
   // Create and insert expandable mode settings section
   const expandableModeSettings = createExpandableModeSettings(reel, onChange);
-  insertExpandableModeSettings(expandableModeSettings, playerModeSection, reelForm);
+  insertExpandableModeSettings(expandableModeSettings, staticModeSettings, reelForm);
 
   // Create and insert title appearance section
   const titleAppearanceSection = createTitleAppearanceSection(reel, onChange);
@@ -95,14 +101,22 @@ export function renderBuilder(reel, onChange) {
   // Set up player mode controls
   setupPlayerModeControls(playerModeSection, reel, onChange);
 
+  // Set up static mode settings
+  setupStaticModeSettings(staticModeSettings, reel, onChange);
+
   // Set up expandable mode settings
   setupExpandableModeSettings(expandableModeSettings, reel, onChange);
 
   // Set up title appearance controls
   setupTitleAppearanceControls(titleAppearanceSection, reel, onChange);
 
-  // Set up tracks editor
-  updateTracksEditor(reel, onChange);
+  // Set up tracks editor with callback to update per-track backgrounds
+  const onChangeWithBackgrounds = () => {
+    onChange();
+    // Also update per-track backgrounds list when playlist changes
+    setTimeout(() => renderPerTrackBackgrounds(reel, onChange), 50);
+  };
+  updateTracksEditor(reel, onChangeWithBackgrounds);
 
   // Set up color pickers
   createColorPickers(reel, onChange);
@@ -114,6 +128,9 @@ export function renderBuilder(reel, onChange) {
 function removeOldSections() {
   const oldPlayerModeSection = document.getElementById("playerModeSection");
   if (oldPlayerModeSection) oldPlayerModeSection.remove();
+
+  const oldStaticModeSettings = document.getElementById("staticModeSettings");
+  if (oldStaticModeSettings) oldStaticModeSettings.remove();
 
   const oldExpandableModeSettings = document.getElementById("expandableModeSettings");
   if (oldExpandableModeSettings) oldExpandableModeSettings.remove();
@@ -145,9 +162,17 @@ function insertPlayerModeSection(playerModeSection, titleInput, reelForm) {
   }
 }
 
-function insertExpandableModeSettings(expandableModeSettings, playerModeSection, reelForm) {
+function insertStaticModeSettings(staticModeSettings, playerModeSection, reelForm) {
   if (playerModeSection && playerModeSection.nextSibling) {
-    reelForm.insertBefore(expandableModeSettings, playerModeSection.nextSibling);
+    reelForm.insertBefore(staticModeSettings, playerModeSection.nextSibling);
+  } else {
+    reelForm.appendChild(staticModeSettings);
+  }
+}
+
+function insertExpandableModeSettings(expandableModeSettings, staticModeSettings, reelForm) {
+  if (staticModeSettings && staticModeSettings.nextSibling) {
+    reelForm.insertBefore(expandableModeSettings, staticModeSettings.nextSibling);
   } else {
     reelForm.appendChild(expandableModeSettings);
   }
@@ -202,17 +227,6 @@ function createColorPickersSection() {
       </button>
     </legend>
     <div class="color-row">
-      <span>Background Image:</span>
-      <label class="toggle-switch" style="margin-right:0.5rem;">
-        <input type="checkbox" id="backgroundImageEnabled" />
-        <span class="toggle-slider"></span>
-      </label>
-    </div>
-    <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
-      <span>Background Image URL:</span>
-      <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
-    </div>
-    <div class="color-row">
       <span>UI Accent Colour:</span>
       <button id="pickr-ui-accent" class="pickr-button" type="button"></button>
     </div>
@@ -225,7 +239,29 @@ function createColorPickersSection() {
       <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
     </div>
     <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;">
-      <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Effects</h4>
+      <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Image & Effects</h4>
+      <div class="color-row">
+        <span>Background Image:</span>
+        <label class="toggle-switch" style="margin-right:0.5rem;">
+          <input type="checkbox" id="backgroundImageEnabled" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
+        <span>Background Image URL:</span>
+        <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
+        <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
+      </div>
+      <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
+          <div style="display:flex;align-items:center;gap:0.2rem;">
+            <span class="expand-arrow" style="font-size:0.8rem;transition:transform 0.2s;display:inline-block;">▶</span>
+            <span>Per-Track Backgrounds:</span>
+          </div>
+          <span style="font-size:0.75rem;color:#999;">Click to expand</span>
+        </div>
+        <div id="perTrackBackgroundsList" style="display:none;margin-top:0.5rem;"></div>
+      </div>
       <div class="color-row">
         <span>Background Opacity:</span>
         <input id="backgroundOpacity" type="range" min="0" max="1" step="0.1" style="flex:1;" />
@@ -235,11 +271,6 @@ function createColorPickersSection() {
         <span>Blur Amount:</span>
         <input id="backgroundBlur" type="range" min="0" max="20" step="1" style="flex:1;" />
         <span id="backgroundBlurValue" style="min-width:2.5rem;text-align:right;font-size:0.9rem;"></span>
-      </div>
-      <div class="color-row">
-        <span>Player Height:</span>
-        <input id="playerHeight" type="number" step="1" style="flex:1;padding:0.25rem;" />
-        <span style="min-width:2.5rem;text-align:right;font-size:0.9rem;">px</span>
       </div>
       <div class="color-row">
         <span>Overlay Colour:</span>
@@ -262,6 +293,119 @@ function insertColorPickersSection(colorFieldset, reelForm) {
   } else {
     reelForm.appendChild(colorFieldset);
   }
+}
+
+function renderPerTrackBackgrounds(reel, onChange) {
+  const container = document.getElementById('perTrackBackgroundsList');
+  if (!container) return;
+  
+  container.innerHTML = '';
+  
+  // Ensure each track has a backgroundImage property
+  reel.playlist.forEach((track, index) => {
+    if (track.backgroundImage === undefined) {
+      track.backgroundImage = '';
+    }
+    
+    const trackRow = document.createElement('div');
+    trackRow.className = 'per-track-bg-row';
+    trackRow.style.cssText = 'display:flex;gap:0.4rem;align-items:center;margin-bottom:0.4rem;padding:0.35rem 0.5rem;background:#fafafa;border-radius:3px;border:1px solid #eee;';
+    
+    // Track number/name
+    const trackLabel = document.createElement('span');
+    trackLabel.style.cssText = 'width:180px;font-size:0.75rem;font-weight:500;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;';
+    const trackTitle = track.title || `Track ${index + 1}`;
+    trackLabel.textContent = trackTitle;
+    trackLabel.title = trackTitle;
+    
+    // URL input
+    const urlInput = document.createElement('input');
+    urlInput.type = 'url';
+    urlInput.placeholder = 'Image URL';
+    urlInput.value = track.backgroundImage || '';
+    urlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;';
+    
+    let urlTimeout;
+    urlInput.addEventListener('input', () => {
+      clearTimeout(urlTimeout);
+      urlTimeout = setTimeout(() => {
+        track.backgroundImage = ValidationUtils.isValidImageUrl(urlInput.value) ? urlInput.value : urlInput.value;
+        onChange();
+      }, 300);
+    });
+    
+    // File picker button
+    const filePickerBtn = document.createElement('button');
+    filePickerBtn.type = 'button';
+    filePickerBtn.className = 'file-picker-btn';
+    filePickerBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; color: #333;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+      </svg>
+    `;
+    filePickerBtn.setAttribute('aria-label', 'Browse backgrounds');
+    filePickerBtn.title = 'Browse files';
+    
+    Object.assign(filePickerBtn.style, {
+      background: 'transparent',
+      color: '#333',
+      border: 'none',
+      borderRadius: '3px',
+      padding: '0.2em 0.3em',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      flexShrink: '0'
+    });
+    
+    // Hover effects
+    filePickerBtn.addEventListener('mouseenter', () => {
+      const svg = filePickerBtn.querySelector('svg');
+      if (svg) svg.style.color = '#4a90e2';
+    });
+    filePickerBtn.addEventListener('mouseleave', () => {
+      const svg = filePickerBtn.querySelector('svg');
+      if (svg) svg.style.color = '#333';
+    });
+    
+    // Click handler
+    filePickerBtn.addEventListener('click', async () => {
+      const { openFilePicker } = await import('./modules/filePicker.js');
+      openFilePicker({
+        directory: 'assets/images/backgrounds',
+        extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'],
+        title: 'Select Background Image',
+        onSelect: (filePath) => {
+          urlInput.value = filePath;
+          track.backgroundImage = filePath;
+          onChange();
+        }
+      });
+    });
+    
+    // Clear button
+    const clearBtn = document.createElement('button');
+    clearBtn.type = 'button';
+    clearBtn.innerHTML = '✕';
+    clearBtn.title = 'Clear';
+    clearBtn.style.cssText = 'background:transparent;border:none;color:#666;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;';
+    clearBtn.addEventListener('mouseenter', () => clearBtn.style.color = '#dc3545');
+    clearBtn.addEventListener('mouseleave', () => clearBtn.style.color = '#666');
+    clearBtn.addEventListener('click', () => {
+      urlInput.value = '';
+      track.backgroundImage = '';
+      onChange();
+    });
+    
+    trackRow.appendChild(trackLabel);
+    trackRow.appendChild(urlInput);
+    trackRow.appendChild(filePickerBtn);
+    trackRow.appendChild(clearBtn);
+    
+    container.appendChild(trackRow);
+  });
 }
 
 function setupPresetModalEvents(colourPresetModal, reel, onChange) {
@@ -315,8 +459,16 @@ function setupBlendModeControls(reel, onChange) {
       
       const updateBackgroundImageState = () => {
         const isEnabled = backgroundImageEnabled.checked;
+        const filePickerBtn = document.getElementById('backgroundImageFilePicker');
+        
         backgroundImageUrl.disabled = !isEnabled;
         backgroundImageRow.style.opacity = isEnabled ? "1" : "0.5";
+        
+        if (filePickerBtn) {
+          filePickerBtn.style.display = isEnabled ? 'inline-block' : 'none';
+          filePickerBtn.disabled = !isEnabled;
+        }
+        
         reel.backgroundImageEnabled = isEnabled;
         // Don't reset the URL - preserve it for when user re-enables
       };
@@ -342,6 +494,62 @@ function setupBlendModeControls(reel, onChange) {
           onChange();
         }, 300);
       });
+      
+      // Wire up file picker button
+      const filePickerBtn = document.getElementById('backgroundImageFilePicker');
+      if (filePickerBtn) {
+        // Set up the file picker button with folder SVG icon
+        filePickerBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+          </svg>
+        `;
+        filePickerBtn.setAttribute("aria-label", "Browse backgrounds");
+        filePickerBtn.title = "Browse files from assets/images/backgrounds";
+        
+        Object.assign(filePickerBtn.style, {
+          background: "transparent",
+          color: "#000",
+          border: "none",
+          borderRadius: "4px",
+          padding: "0.35em 0.5em",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease"
+        });
+        
+        // Hover effect - changes icon color to blue
+        filePickerBtn.addEventListener("mouseenter", () => {
+          if (!filePickerBtn.disabled) {
+            const svg = filePickerBtn.querySelector('svg');
+            if (svg) svg.style.color = "#4a90e2";
+          }
+        });
+        filePickerBtn.addEventListener("mouseleave", () => {
+          const svg = filePickerBtn.querySelector('svg');
+          if (svg) svg.style.color = "#000";
+        });
+        
+        // Click handler
+        filePickerBtn.addEventListener("click", async () => {
+          const { openFilePicker } = await import('./modules/filePicker.js');
+          openFilePicker({
+            directory: 'assets/images/backgrounds',
+            extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'],
+            title: 'Select Background Image',
+            onSelect: (filePath) => {
+              backgroundImageUrl.value = filePath;
+              backgroundImageUrl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+        });
+        
+        // Initial state
+        filePickerBtn.style.display = backgroundImageEnabled.checked ? 'inline-block' : 'none';
+        filePickerBtn.disabled = !backgroundImageEnabled.checked;
+      }
     }
 
     if (overlayColorEnabled) {
@@ -412,32 +620,9 @@ function setupBlendModeControls(reel, onChange) {
         }
       });
     }
-
-    // Player Height Control
-    const playerHeight = document.getElementById("playerHeight");
-    if (playerHeight) {
-      playerHeight.value = reel.playerHeight || 500;
-      
-      // Listen to input for immediate visual feedback
-      playerHeight.addEventListener('input', () => {
-        const value = parseInt(playerHeight.value);
-        if (!isNaN(value) && value > 0) {
-          reel.playerHeight = value;
-          
-          // Update preview if available
-          if (window.previewManager) {
-            window.previewManager.updatePreview(reel);
-          }
-        }
-      });
-      
-      // Save when user finishes editing
-      playerHeight.addEventListener('change', () => {
-        if (window.saveReels && window.reels) {
-          window.saveReels(window.reels);
-        }
-      });
-    }
+    
+    // Render per-track backgrounds UI
+    renderPerTrackBackgrounds(reel, onChange);
   }, 100);
 }
 

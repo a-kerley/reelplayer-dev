@@ -8,13 +8,16 @@ export const playerApp = {
   isHoveringSlider: false,
   isHoveringIcon: false,
   currentTrackIndex: 0,
-  // Expandable mode state
-  isExpandableMode: false,
-  isExpanded: false,
-  isPlaying: false,
-  currentReelSettings: null,
-  // Event listener cleanup references
-  expandableModeListeners: null,
+  
+  // Expandable mode state - consolidated
+  expandable: {
+    enabled: false,
+    isExpanded: false,
+    isPlaying: false,
+    showWaveformOnCollapse: true,
+    settings: null,
+    listeners: null
+  },
 
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
@@ -87,11 +90,14 @@ export const playerApp = {
     }
 
     // Get UI accent color from CSS variable
-    let accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || '#2a0026';
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || '#2a0026';
     
-    console.log('Raw accent color from CSS:', accentColor);
-    
-    // Convert color to rgba with opacity
+    /**
+     * Convert any color format to rgba with specified opacity
+     * @param {string} color - Color in hex, rgb, or rgba format
+     * @param {number} opacity - Opacity value between 0 and 1
+     * @returns {string} Color in rgba format
+     */
     const colorToRgba = (color, opacity) => {
       // If already rgba/rgb, extract the rgb values
       if (color.startsWith('rgb')) {
@@ -100,9 +106,7 @@ export const playerApp = {
           const r = Math.round(parseFloat(match[1]));
           const g = Math.round(parseFloat(match[2]));
           const b = Math.round(parseFloat(match[3]));
-          const result = `rgba(${r}, ${g}, ${b}, ${opacity})`;
-          console.log('Converted rgba color:', result);
-          return result;
+          return `rgba(${r}, ${g}, ${b}, ${opacity})`;
         }
       }
       // If hex, convert to rgba
@@ -110,13 +114,10 @@ export const playerApp = {
       const r = parseInt(color.substring(0, 2), 16);
       const g = parseInt(color.substring(2, 4), 16);
       const b = parseInt(color.substring(4, 6), 16);
-      const result = `rgba(${r}, ${g}, ${b}, ${opacity})`;
-      console.log('Converted hex color:', result);
-      return result;
+      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
     };
     
     const thumbColor = colorToRgba(accentColor, 0.3);
-    console.log('Final thumb color:', thumbColor);
 
     // Create custom scrollbar elements - position relative to playlist's parent
     const playlistParent = playlistEl.parentElement;
@@ -150,6 +151,8 @@ export const playerApp = {
       if (scrollHeight <= clientHeight) {
         scrollbarContainer.style.display = 'none';
         playlistEl.classList.remove('scrollable');
+        playlistEl.classList.remove('scroll-at-top');
+        playlistEl.classList.remove('scroll-at-bottom');
         return;
       }
       
@@ -162,10 +165,45 @@ export const playerApp = {
       
       scrollbarThumb.style.height = thumbHeight + 'px';
       scrollbarThumb.style.top = thumbTop + 'px';
+      
+      // Update scroll position classes for dynamic masking
+      const scrollTop = playlistEl.scrollTop;
+      const atTop = scrollTop <= 1; // Small threshold for rounding
+      const atBottom = scrollTop + clientHeight >= scrollHeight - 1;
+      
+      if (atTop) {
+        playlistEl.classList.add('scroll-at-top');
+      } else {
+        playlistEl.classList.remove('scroll-at-top');
+      }
+      
+      if (atBottom) {
+        playlistEl.classList.add('scroll-at-bottom');
+      } else {
+        playlistEl.classList.remove('scroll-at-bottom');
+      }
     };
     
     // Initial position
     updateScrollbarPosition();
+
+    // Smooth scrolling with momentum for mouse wheel
+    let scrollVelocity = 0;
+    let isScrolling = false;
+    let scrollAnimationFrame = null;
+
+    const smoothScroll = () => {
+      if (Math.abs(scrollVelocity) > 0.1) {
+        playlistEl.scrollTop += scrollVelocity;
+        scrollVelocity *= 0.92; // Friction/deceleration factor
+        scrollAnimationFrame = requestAnimationFrame(smoothScroll);
+        isScrolling = true;
+      } else {
+        scrollVelocity = 0;
+        isScrolling = false;
+        cancelAnimationFrame(scrollAnimationFrame);
+      }
+    };
 
     // Handle scroll events
     playlistEl.addEventListener('scroll', () => {
@@ -174,7 +212,7 @@ export const playerApp = {
       }
     });
     
-    // Prevent page scroll when playlist reaches top/bottom
+    // Prevent page scroll when playlist reaches top/bottom + add smooth momentum
     playlistEl.addEventListener('wheel', (e) => {
       const scrollHeight = playlistEl.scrollHeight;
       const scrollTop = playlistEl.scrollTop;
@@ -187,6 +225,19 @@ export const playerApp = {
       if ((atTop && e.deltaY < 0) || (atBottom && e.deltaY > 0)) {
         e.preventDefault();
         e.stopPropagation();
+        return;
+      }
+
+      // Apply smooth momentum scrolling
+      e.preventDefault();
+      e.stopPropagation();
+      
+      // Add to velocity (scaled down for smooth control)
+      scrollVelocity += e.deltaY * 0.5;
+      
+      // Start smooth scroll animation if not already running
+      if (!isScrolling) {
+        smoothScroll();
       }
     }, { passive: false });
     
@@ -311,6 +362,9 @@ export const playerApp = {
     // Update track info display
     this.updateTrackInfo(audioURL, title);
     
+    // Update track background with cross-dissolve
+    this.updateTrackBackground(index);
+    
     // Reset playhead to beginning when changing tracks
     if (playerApp.wavesurfer) {
       playerApp.wavesurfer.seekTo(0);
@@ -321,6 +375,55 @@ export const playerApp = {
       detail: { audioURL, title, index },
     });
     document.dispatchEvent(event);
+  },
+
+  updateTrackBackground(trackIndex) {
+    // Get the main player element
+    const mainElement = document.querySelector('main');
+    if (!mainElement) return;
+    
+    // Get current reel settings (from global or stored settings)
+    const reelSettings = this.currentReelSettings || window.currentReelSettings;
+    if (!reelSettings) return;
+    
+    // Get the track's background image
+    const playlist = reelSettings.playlist || [];
+    const track = playlist[trackIndex];
+    const trackBackgroundImage = track?.backgroundImage;
+    
+    // Determine which background to use
+    let targetBackgroundImage = '';
+    if (trackBackgroundImage && trackBackgroundImage.trim()) {
+      // Use track-specific background
+      targetBackgroundImage = `url("${trackBackgroundImage}")`;
+    } else if (reelSettings.backgroundImageEnabled && reelSettings.backgroundImage) {
+      // Fall back to main background
+      targetBackgroundImage = `url("${reelSettings.backgroundImage}")`;
+    } else {
+      // No background
+      targetBackgroundImage = 'none';
+    }
+    
+    // Get current background
+    const currentBackground = getComputedStyle(mainElement).getPropertyValue('--background-image').trim();
+    
+    // Only transition if background is different
+    if (currentBackground !== targetBackgroundImage) {
+      // Create cross-dissolve effect by animating opacity
+      mainElement.style.transition = 'none';
+      
+      // Set up the transition
+      requestAnimationFrame(() => {
+        mainElement.style.transition = 'opacity 0.6s ease-in-out';
+        mainElement.style.opacity = '0';
+        
+        // After fade out, change background and fade in
+        setTimeout(() => {
+          mainElement.style.setProperty('--background-image', targetBackgroundImage);
+          mainElement.style.opacity = '1';
+        }, 600);
+      });
+    }
   },
 
   updateTrackInfo(audioURL, title) {
@@ -455,7 +558,7 @@ export const playerApp = {
         const canvases = document.querySelectorAll("#waveform canvas");
         // In expandable mode, don't set inline opacity - let CSS handle it completely
         // In static mode, set opacity as normal
-        if (!this.isExpandableMode) {
+        if (!this.expandable.enabled) {
           canvases.forEach(canvas => canvas.style.opacity = "1");
           playPauseBtn.style.opacity = "1";
           if (volumeControl) {
@@ -478,16 +581,17 @@ export const playerApp = {
         trackInfo.classList.add("visible");
       }
       
-      // Update total time - wait for accurate duration
+      /**
+       * Update total time display with accurate duration
+       * Called multiple times to handle OGG file duration quirks
+       */
       const updateTotalTime = () => {
         const totalTime = this.elements.totalTime;
         const duration = this.wavesurfer.getDuration();
-        console.log('[Player] getDuration returned:', duration);
         if (duration && isFinite(duration)) {
           if (totalTime) {
             totalTime.textContent = this.formatTime(duration);
             totalTime.classList.add("visible");
-            console.log('[Player] Total time set to:', this.formatTime(duration));
           }
         }
       };
@@ -636,7 +740,7 @@ export const playerApp = {
       barHeight: 1,
       barRadius: 0,
       height: 86, // Even number helps Safari render without gaps
-      responsive: !this.isExpandableMode, // Disable responsive in expandable mode to prevent redraws
+      responsive: !this.expandable.enabled, // Disable responsive in expandable mode to prevent redraws
       hideScrollbar: true,
       interact: true,
       fillParent: true, // Re-enable fillParent for proper width
@@ -662,7 +766,7 @@ export const playerApp = {
       });
       
       // In expandable mode, ensure canvases fill width but prevent resize loops
-      if (this.isExpandableMode && waveformContainer) {
+      if (this.expandable.enabled && waveformContainer) {
         canvases.forEach(canvas => {
           canvas.style.width = '100%'; // Fill the container width
           canvas.style.height = '100%'; // Fill the container height
@@ -691,19 +795,19 @@ export const playerApp = {
 
     // Create new listener functions and store references for cleanup
     const handleMouseEnter = () => {
-      if (!this.isExpanded) {
+      if (!this.expandable.isExpanded) {
         this.expandPlayer();
       }
     };
 
     const handleMouseLeave = () => {
-      if (this.isExpanded) {
+      if (this.expandable.isExpanded) {
         this.collapsePlayer();
       }
     };
 
     // Store listener references for cleanup
-    this.expandableModeListeners = {
+    this.expandable.listeners = {
       wrapper,
       mouseEnter: handleMouseEnter,
       mouseLeave: handleMouseLeave
@@ -715,13 +819,13 @@ export const playerApp = {
   },
 
   cleanupExpandableModeListeners() {
-    if (this.expandableModeListeners) {
-      const { wrapper, mouseEnter, mouseLeave } = this.expandableModeListeners;
+    if (this.expandable.listeners) {
+      const { wrapper, mouseEnter, mouseLeave } = this.expandable.listeners;
       if (wrapper) {
         wrapper.removeEventListener('mouseenter', mouseEnter);
         wrapper.removeEventListener('mouseleave', mouseLeave);
       }
-      this.expandableModeListeners = null;
+      this.expandable.listeners = null;
     }
   },
 
@@ -761,7 +865,7 @@ export const playerApp = {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
-    this.isExpanded = true;
+    this.expandable.isExpanded = true;
     wrapper.classList.add('expanded');
   },
 
@@ -769,12 +873,14 @@ export const playerApp = {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
-    this.isExpanded = false;
+    this.expandable.isExpanded = false;
     wrapper.classList.remove('expanded');
 
     // Handle playing state during collapse - check current playback state
-    const isCurrentlyPlaying = this.wavesurfer && this.wavesurfer.isPlaying();
-    if (isCurrentlyPlaying && this.currentReelSettings && this.currentReelSettings.showWaveformOnCollapse) {
+    const isCurrentlyPlaying = this.wavesurfer?.isPlaying();
+    const shouldShowWaveform = isCurrentlyPlaying && this.expandable.settings?.showWaveformOnCollapse !== false;
+    
+    if (shouldShowWaveform) {
       wrapper.classList.add('playing-collapsed');
     } else {
       wrapper.classList.remove('playing-collapsed');
@@ -782,19 +888,16 @@ export const playerApp = {
   },
 
   updatePlayingState(playing) {
-    this.isPlaying = playing;
+    this.expandable.isPlaying = playing;
     const wrapper = this.elements.playerWrapper;
     
-    if (wrapper && this.isExpandableMode) {
+    if (wrapper && this.expandable.enabled) {
       // Update collapsed state based on playing status (only when not expanded)
-      if (!this.isExpanded) {
-        if (playing && this.currentReelSettings && this.currentReelSettings.showWaveformOnCollapse) {
-          wrapper.classList.add('playing-collapsed');
-        } else {
-          wrapper.classList.remove('playing-collapsed');
-        }
+      const shouldShowWaveform = playing && this.expandable.settings?.showWaveformOnCollapse !== false;
+      
+      if (!this.expandable.isExpanded && shouldShowWaveform) {
+        wrapper.classList.add('playing-collapsed');
       } else {
-        // Remove playing-collapsed class when expanded
         wrapper.classList.remove('playing-collapsed');
       }
     }
@@ -804,13 +907,12 @@ export const playerApp = {
     // Clean up old event listeners before re-rendering
     this.cleanupExpandableModeListeners();
     
-    // Store reel reference for accessing settings
-    this.currentReelSettings = reel;
-    
-    // Set expandable mode state
-    this.isExpandableMode = reel && reel.mode === 'expandable';
-    this.isExpanded = false;
-    this.isPlaying = false;
+    // Set expandable mode state - consolidated
+    this.expandable.enabled = reel?.mode === 'expandable';
+    this.expandable.isExpanded = false;
+    this.expandable.isPlaying = false;
+    this.expandable.settings = reel;
+    this.expandable.showWaveformOnCollapse = reel?.showWaveformOnCollapse !== false;
     
     const container = document.getElementById("reelPlayerPreview");
     if (!container) return;
@@ -820,11 +922,11 @@ export const playerApp = {
     // Determine player wrapper classes
     let wrapperClasses = 'player-wrapper';
     if (shouldHideTitle) wrapperClasses += ' no-title';
-    if (this.isExpandableMode) wrapperClasses += ' expandable-mode';
+    if (this.expandable.enabled) wrapperClasses += ' expandable-mode';
     
     // Build project title overlay HTML for expandable mode
     let projectTitleOverlayHTML = '';
-    if (this.isExpandableMode && reel.projectTitleImage) {
+    if (this.expandable.enabled && reel.projectTitleImage) {
       projectTitleOverlayHTML = `
         <div class="project-title-overlay" style="background-image: url('${reel.projectTitleImage}');" data-image-url="${reel.projectTitleImage}"></div>
       `;
@@ -879,8 +981,11 @@ export const playerApp = {
     this.elements = {};
     this.cacheElements();
     
+    // Store current reel settings for background transitions
+    this.currentReelSettings = reel;
+    
     // Set up expandable mode interactions if enabled
-    if (this.isExpandableMode) {
+    if (this.expandable.enabled) {
       this.setupExpandableModeInteractions();
       this.validateProjectTitleImage();
     }
