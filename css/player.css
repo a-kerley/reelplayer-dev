@@ -140,7 +140,7 @@
   background-color: var(--waveform-hover);
   pointer-events: none;
   width: 0;
-  z-index: 4;
+  z-index: 8;
 }
 .hover-time {
   position: absolute;
@@ -350,16 +350,30 @@ button {
   opacity: 1;
 }
 
-/* Track video sits on top of main video for proper precedence */
-.track-video {
+/* Force video to be hidden immediately (used when interrupting fades) */
+.background-video.force-hidden {
+  opacity: 0 !important;
+  transition: none !important;
+}
+
+/* Video layering - track videos on top, with B layers above A for crossfade */
+.main-video-a {
   z-index: 2;
 }
 
-.main-video {
-  z-index: 2;
+.main-video-b {
+  z-index: 3;
 }
 
-/* Overlay color layer - sits above background images and videos, provides color tint or blur */
+.track-video-a {
+  z-index: 4;
+}
+
+.track-video-b {
+  z-index: 5;
+}
+
+/* Overlay color layer - MUST be above ALL videos to apply blur/color effects */
 .player-wrapper::before {
   content: '';
   position: absolute;
@@ -371,20 +385,20 @@ button {
   backdrop-filter: blur(var(--background-blur));
   -webkit-backdrop-filter: blur(var(--background-blur));
   pointer-events: none;
-  z-index: 4;
+  z-index: 6;
   border-radius: 8px;
 }
 
 /* Exclude background layers and videos from automatic z-index */
-.player-wrapper > *:not(.track-background-layer):not(.background-video) {
+.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay) {
   position: relative;
-  z-index: 5;
+  z-index: 7;
 }
 
-/* Ensure player content sits above videos */
+/* Ensure player content sits above overlay effects */
 .player-content {
   position: relative;
-  z-index: 5;
+  z-index: 7;
 }
 
 .loading {
