@@ -178,6 +178,7 @@ export function openFilePicker(options) {
         // Check cache first
         const cacheKey = `filePicker_${manifestPath}`;
         const cachedData = localStorage.getItem(cacheKey);
+        let usedCache = false;
         
         if (cachedData) {
           try {
@@ -192,7 +193,7 @@ export function openFilePicker(options) {
                 return extensions.some(ext => lowerPath.endsWith(ext));
               });
               console.log(`[File Picker] Loaded ${files.length} files from cache`);
-              return; // Early return with cached data
+              usedCache = true;
             } else {
               console.log(`[File Picker] Cache expired (${Math.round(cacheAge / 1000)}s old), fetching fresh data`);
             }
@@ -201,33 +202,36 @@ export function openFilePicker(options) {
           }
         }
         
-        try {
-          const response = await fetch(manifestPath);
-          if (response.ok) {
-            const manifest = await response.json();
-            files = manifest.files.filter(file => {
-              const lowerPath = file.path.toLowerCase();
-              return extensions.some(ext => lowerPath.endsWith(ext));
-            });
-            console.log(`[File Picker] Loaded ${files.length} files from manifest`);
-            
-            // Cache the manifest with timestamp
-            try {
-              localStorage.setItem(cacheKey, JSON.stringify({
-                timestamp: Date.now(),
-                files: manifest.files
-              }));
-              console.log(`[File Picker] Cached manifest for ${directory}`);
-            } catch (e) {
-              console.warn(`[File Picker] Failed to cache manifest:`, e);
+        // Only fetch if we didn't use cache
+        if (!usedCache) {
+          try {
+            const response = await fetch(manifestPath);
+            if (response.ok) {
+              const manifest = await response.json();
+              files = manifest.files.filter(file => {
+                const lowerPath = file.path.toLowerCase();
+                return extensions.some(ext => lowerPath.endsWith(ext));
+              });
+              console.log(`[File Picker] Loaded ${files.length} files from manifest`);
+              
+              // Cache the manifest with timestamp
+              try {
+                localStorage.setItem(cacheKey, JSON.stringify({
+                  timestamp: Date.now(),
+                  files: manifest.files
+                }));
+                console.log(`[File Picker] Cached manifest for ${directory}`);
+              } catch (e) {
+                console.warn(`[File Picker] Failed to cache manifest:`, e);
+              }
+            } else {
+              console.log(`[File Picker] Manifest not found (${response.status}), falling back to directory scan`);
+              await fallbackDirectoryScan();
             }
-          } else {
-            console.log(`[File Picker] Manifest not found (${response.status}), falling back to directory scan`);
+          } catch (error) {
+            console.log(`[File Picker] Error loading manifest, falling back to directory scan`, error);
             await fallbackDirectoryScan();
           }
-        } catch (error) {
-          console.log(`[File Picker] Error loading manifest, falling back to directory scan`, error);
-          await fallbackDirectoryScan();
         }
       } else {
         // For directories without manifests, use directory scanning
