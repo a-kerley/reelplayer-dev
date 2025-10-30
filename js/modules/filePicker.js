@@ -165,7 +165,8 @@ export function openFilePicker(options) {
       const manifestMap = {
         'assets/audio': 'assets/audio-manifest.json',
         'assets/images/backgrounds': 'assets/images/backgrounds-manifest.json',
-        'assets/images/project-titles': 'assets/images/project-titles-manifest.json'
+        'assets/images/project-titles': 'assets/images/project-titles-manifest.json',
+        'assets/video': 'assets/video-manifest.json'
       };
       
       // Check if we have a manifest for this directory

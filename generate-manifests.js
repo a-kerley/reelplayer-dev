@@ -22,6 +22,11 @@ const ASSET_TYPES = [
     dir: './assets/images/project-titles',
     manifest: './assets/images/project-titles-manifest.json',
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
+  },
+  {
+    dir: './assets/video',
+    manifest: './assets/video-manifest.json',
+    extensions: ['.mp4', '.mov', '.avi', '.mkv', '.webm']
   }
 ];
 
