@@ -260,7 +260,19 @@ button {
   max-height: var(--player-height, none);
 }
 
-/* Background image layer (when image is used) */
+/* ========================================
+   PLAYBACK-IDLE ZOOM ANIMATION
+   ======================================== */
+/* ========================================
+   BACKGROUND ZOOM ANIMATION SYSTEM
+   Main background layer with zoom controlled by Web Animations API
+   ======================================== */
+
+.player-wrapper {
+  /* Default zoom value, animated by JavaScript via Web Animations API */
+  --animated-zoom: var(--background-zoom, 1);
+}
+
 .player-wrapper::after {
   content: '';
   position: absolute;
@@ -276,9 +288,43 @@ button {
   opacity: var(--background-opacity);
   z-index: 0;
   border-radius: 8px;
+  /* Apply zoom from animated custom property */
+  transform: scale(var(--animated-zoom));
 }
 
-/* Overlay color layer - sits above background image, provides color tint or solid color when no image */
+/* Per-track background layers (double-buffered A/B for smooth crossfades) */
+/* Zoom animation controlled by Web Animations API via transform: scale() */
+.track-background-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+  background-blend-mode: var(--background-blend-mode);
+  opacity: 0;
+  z-index: 1;
+  border-radius: 8px;
+  transition: opacity 0.8s ease-in-out;
+  pointer-events: none;
+}
+
+.track-background-layer.active {
+  opacity: var(--background-opacity);
+}
+
+/* Layer B sits on top of Layer A for proper crossfading */
+.track-bg-layer-b {
+  z-index: 1;
+}
+
+.track-bg-layer-a {
+  z-index: 1;
+}
+
+/* Overlay color layer - sits above background images, provides color tint or solid color when no image */
 .player-wrapper::before {
   content: '';
   position: absolute;
@@ -290,13 +336,13 @@ button {
   backdrop-filter: blur(var(--background-blur));
   -webkit-backdrop-filter: blur(var(--background-blur));
   pointer-events: none;
-  z-index: 1;
+  z-index: 2;
   border-radius: 8px;
 }
 
-.player-wrapper > * {
+.player-wrapper > *:not(.track-background-layer) {
   position: relative;
-  z-index: 2;
+  z-index: 3;
 }
 
 .loading {

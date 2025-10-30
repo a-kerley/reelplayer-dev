@@ -79,8 +79,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       window.reels = reels; // Keep global reference updated
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
       // Don't re-render builder here - it destroys form elements and causes issues
-      // Only update the preview
-      showPreview(); // Update preview when settings change
+      // Preview updates are now manual via the refresh button only
     }
 
     function render() {

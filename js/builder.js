@@ -30,6 +30,7 @@ export function createEmptyReel() {
     // Background effects properties
     backgroundImage: "",
     backgroundImageEnabled: false,
+    backgroundZoom: 1,
     backgroundOpacity: "1",
     backgroundBlur: "2",
     overlayColor: "rgba(255, 255, 255, 0.5)",
@@ -247,10 +248,18 @@ function createColorPickersSection() {
           <span class="toggle-slider"></span>
         </label>
       </div>
-      <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
-        <span>Background Image URL:</span>
-        <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
-        <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
+      <div id="backgroundImageRowWrapper">
+        <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
+          <span>Background Image URL:</span>
+          <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
+          <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
+          <button id="backgroundImageCropBtn" type="button" class="crop-preview-btn" style="display:none;background:transparent;color:#333;border:none;border-radius:4px;padding:0.35em 0.5em;cursor:pointer;transition:all 0.2s ease;flex-shrink:0;align-items:center;justify-content:center;" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+          </button>
+        </div>
+        <div id="backgroundImagePreviewPane" class="bg-preview-pane" style="display:none;margin-top:0.5rem;padding:0.75rem;background:#fff;border:1px solid #ddd;border-radius:4px;"></div>
       </div>
       <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
@@ -260,7 +269,7 @@ function createColorPickersSection() {
           </div>
           <span style="font-size:0.75rem;color:#999;">Click to expand</span>
         </div>
-        <div id="perTrackBackgroundsList" style="display:none;margin-top:0.5rem;"></div>
+        <div id="perTrackBackgroundsList" style="display:none;margin-top:0.2rem;"></div>
       </div>
       <div class="color-row">
         <span>Background Opacity:</span>
@@ -385,6 +394,158 @@ function renderPerTrackBackgrounds(reel, onChange) {
       });
     });
     
+    // Crop/Preview button
+    const cropBtn = document.createElement('button');
+    cropBtn.type = 'button';
+    cropBtn.className = 'crop-preview-btn';
+    cropBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; color: #333;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+      </svg>
+    `;
+    cropBtn.setAttribute('aria-label', 'Preview & Crop');
+    cropBtn.title = 'Preview & Crop';
+    
+    Object.assign(cropBtn.style, {
+      background: 'transparent',
+      color: '#333',
+      border: 'none',
+      borderRadius: '3px',
+      padding: '0.2em 0.3em',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      flexShrink: '0'
+    });
+    
+    // Preview pane container (hidden by default)
+    const previewPane = document.createElement('div');
+    previewPane.className = 'bg-preview-pane';
+    previewPane.style.cssText = 'display:none;margin-top:0.5rem;padding:0.75rem;background:#fff;border:1px solid #ddd;border-radius:4px;';
+    
+    // Initialize zoom value from track data
+    if (track.backgroundZoom === undefined) {
+      track.backgroundZoom = 1;
+    }
+    
+    // Function to create expandable mode preview
+    const createExpandablePreview = (imageUrl, reel, zoom = 1) => {
+      if (!reel || reel.mode !== 'expandable') {
+        // Fallback to simple preview for non-expandable mode
+        return `<img src="${imageUrl}" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:3px;transform:scale(${zoom});" />`;
+      }
+      
+      // Get player dimensions from preview iframe or use defaults
+      const previewIframe = document.querySelector('#player-preview');
+      let playerWidth = 800; // Default width
+      if (previewIframe) {
+        const iframeRect = previewIframe.getBoundingClientRect();
+        playerWidth = Math.min(iframeRect.width, 800); // Cap at 800px
+      }
+      
+      // Get expandable mode settings or use defaults
+      const collapsedHeight = parseInt(reel.expandableSettings?.collapsedHeight) || 120;
+      const expandedHeight = parseInt(reel.expandableSettings?.expandedHeight) || 500;
+      
+      // Scale down if needed (max 90% of panel width for each preview)
+      const maxPreviewWidth = Math.min(playerWidth, 400);
+      const scaleFactor = maxPreviewWidth / playerWidth;
+      const previewWidth = playerWidth * scaleFactor;
+      const collapsedPreviewHeight = collapsedHeight * scaleFactor;
+      const expandedPreviewHeight = expandedHeight * scaleFactor;
+      
+      return `
+        <div style="display:flex;flex-direction:column;gap:1rem;">
+          <div style="text-align:center;font-size:0.85rem;color:#666;font-weight:500;">Expandable Mode Preview</div>
+          
+          <!-- Zoom Control -->
+          <div style="display:flex;align-items:center;gap:0.75rem;padding:0 1rem;">
+            <label style="font-size:0.75rem;color:#666;white-space:nowrap;">Zoom:</label>
+            <input type="range" class="zoom-slider" min="1" max="3" step="0.1" value="${zoom}" style="flex:1;" />
+            <span class="zoom-value" style="font-size:0.75rem;color:#666;min-width:3rem;text-align:right;">${(zoom * 100).toFixed(0)}%</span>
+          </div>
+          
+          <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="font-size:0.75rem;color:#666;text-align:center;">Collapsed (${collapsedHeight}px)</div>
+              <div style="width:${previewWidth}px;height:${collapsedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+                <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
+              </div>
+            </div>
+            <div style="display:flex;flex-direction:column;gap:0.5rem;">
+              <div style="font-size:0.75rem;color:#666;text-align:center;">Expanded (${expandedHeight}px)</div>
+              <div style="width:${previewWidth}px;height:${expandedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+                <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
+              </div>
+            </div>
+          </div>
+        </div>
+      `;
+    };
+    
+    // Toggle preview pane
+    let previewOpen = false;
+    const updatePreview = () => {
+      if (track.backgroundImage) {
+        previewPane.innerHTML = createExpandablePreview(track.backgroundImage, reel, track.backgroundZoom);
+        // Re-attach zoom slider listener after innerHTML update
+        attachZoomListener();
+      } else {
+        previewPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No image selected</p>';
+      }
+    };
+    
+    const attachZoomListener = () => {
+      const zoomSlider = previewPane.querySelector('.zoom-slider');
+      const zoomValue = previewPane.querySelector('.zoom-value');
+      const previewImages = previewPane.querySelectorAll('.preview-img');
+      
+      if (zoomSlider && zoomValue && previewImages.length) {
+        zoomSlider.addEventListener('input', (e) => {
+          const zoom = parseFloat(e.target.value);
+          track.backgroundZoom = zoom;
+          zoomValue.textContent = `${(zoom * 100).toFixed(0)}%`;
+          previewImages.forEach(img => {
+            img.style.transform = `scale(${zoom})`;
+          });
+          // Save without triggering onChange to prevent CPU spike
+        });
+        // Save on change (when user finishes dragging)
+        zoomSlider.addEventListener('change', () => {
+          onChange();
+        });
+      }
+    };
+    
+    cropBtn.addEventListener('click', () => {
+      previewOpen = !previewOpen;
+      if (previewOpen) {
+        previewPane.style.display = 'block';
+        cropBtn.style.color = '#4a90e2';
+        updatePreview();
+      } else {
+        previewPane.style.display = 'none';
+        cropBtn.style.color = '#333';
+      }
+    });
+    
+    // Update preview when URL changes
+    urlInput.addEventListener('input', () => {
+      if (previewOpen) {
+        updatePreview();
+      }
+    });
+    
+    // Hover effects
+    cropBtn.addEventListener('mouseenter', () => {
+      if (!previewOpen) cropBtn.style.color = '#4a90e2';
+    });
+    cropBtn.addEventListener('mouseleave', () => {
+      if (!previewOpen) cropBtn.style.color = '#333';
+    });
+    
     // Clear button
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
@@ -397,14 +558,25 @@ function renderPerTrackBackgrounds(reel, onChange) {
       urlInput.value = '';
       track.backgroundImage = '';
       onChange();
+      if (previewOpen) {
+        previewPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No image selected</p>';
+      }
     });
+    
+    // Create wrapper for row and preview
+    const trackWrapper = document.createElement('div');
+    trackWrapper.style.cssText = 'margin-bottom:0.4rem;';
     
     trackRow.appendChild(trackLabel);
     trackRow.appendChild(urlInput);
     trackRow.appendChild(filePickerBtn);
+    trackRow.appendChild(cropBtn);
     trackRow.appendChild(clearBtn);
     
-    container.appendChild(trackRow);
+    trackWrapper.appendChild(trackRow);
+    trackWrapper.appendChild(previewPane);
+    
+    container.appendChild(trackWrapper);
   });
 }
 
@@ -460,6 +632,7 @@ function setupBlendModeControls(reel, onChange) {
       const updateBackgroundImageState = () => {
         const isEnabled = backgroundImageEnabled.checked;
         const filePickerBtn = document.getElementById('backgroundImageFilePicker');
+        const cropBtn = document.getElementById('backgroundImageCropBtn');
         
         backgroundImageUrl.disabled = !isEnabled;
         backgroundImageRow.style.opacity = isEnabled ? "1" : "0.5";
@@ -467,6 +640,11 @@ function setupBlendModeControls(reel, onChange) {
         if (filePickerBtn) {
           filePickerBtn.style.display = isEnabled ? 'inline-block' : 'none';
           filePickerBtn.disabled = !isEnabled;
+        }
+        
+        if (cropBtn) {
+          cropBtn.style.display = isEnabled ? 'inline-flex' : 'none';
+          cropBtn.disabled = !isEnabled;
         }
         
         reel.backgroundImageEnabled = isEnabled;
@@ -549,6 +727,144 @@ function setupBlendModeControls(reel, onChange) {
         // Initial state
         filePickerBtn.style.display = backgroundImageEnabled.checked ? 'inline-block' : 'none';
         filePickerBtn.disabled = !backgroundImageEnabled.checked;
+      }
+      
+      // Wire up crop/preview button
+      const cropBtn = document.getElementById('backgroundImageCropBtn');
+      const previewPane = document.getElementById('backgroundImagePreviewPane');
+      if (cropBtn && previewPane) {
+        // Initialize zoom if not set
+        if (reel.backgroundZoom === undefined) {
+          reel.backgroundZoom = 1;
+        }
+        
+        // Function to create expandable mode preview
+        const createExpandablePreview = (imageUrl, zoom = 1) => {
+          if (!reel || reel.mode !== 'expandable') {
+            // Fallback to simple preview for non-expandable mode
+            return `<img src="${imageUrl}" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:3px;transform:scale(${zoom});" />`;
+          }
+          
+          // Get player dimensions from preview iframe or use defaults
+          const previewIframe = document.querySelector('#player-preview');
+          let playerWidth = 800; // Default width
+          if (previewIframe) {
+            const iframeRect = previewIframe.getBoundingClientRect();
+            playerWidth = Math.min(iframeRect.width, 800); // Cap at 800px
+          }
+          
+          // Get expandable mode settings or use defaults
+          const collapsedHeight = parseInt(reel.expandableSettings?.collapsedHeight) || 120;
+          const expandedHeight = parseInt(reel.expandableSettings?.expandedHeight) || 500;
+          
+          // Scale down if needed (max 90% of panel width for each preview)
+          const maxPreviewWidth = Math.min(playerWidth, 400);
+          const scaleFactor = maxPreviewWidth / playerWidth;
+          const previewWidth = playerWidth * scaleFactor;
+          const collapsedPreviewHeight = collapsedHeight * scaleFactor;
+          const expandedPreviewHeight = expandedHeight * scaleFactor;
+          
+          return `
+            <div style="display:flex;flex-direction:column;gap:1rem;">
+              <div style="text-align:center;font-size:0.85rem;color:#666;font-weight:500;">Expandable Mode Preview</div>
+              <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                  <div style="font-size:0.75rem;color:#666;text-align:center;">Collapsed (${collapsedHeight}px)</div>
+                  <div style="width:${previewWidth}px;height:${collapsedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+                    <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
+                  </div>
+                </div>
+                <div style="display:flex;flex-direction:column;gap:0.5rem;">
+                  <div style="font-size:0.75rem;color:#666;text-align:center;">Expanded (${expandedHeight}px)</div>
+                  <div style="width:${previewWidth}px;height:${expandedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+                    <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
+                  </div>
+                </div>
+              </div>
+              <div style="display:flex;flex-direction:column;gap:0.5rem;padding:0 1rem;">
+                <div style="display:flex;justify-content:space-between;align-items:center;">
+                  <label style="font-size:0.85rem;color:#666;">Zoom</label>
+                  <span class="zoom-value" style="font-size:0.85rem;color:#999;">${zoom.toFixed(1)}x</span>
+                </div>
+                <input type="range" class="zoom-slider" min="1" max="3" step="0.1" value="${zoom}" 
+                       style="width:100%;cursor:pointer;" />
+              </div>
+            </div>
+          `;
+        };
+        
+        let previewOpen = false;
+        
+        // Hover effects
+        cropBtn.addEventListener('mouseenter', () => {
+          if (!cropBtn.disabled && !previewOpen) {
+            const svg = cropBtn.querySelector('svg');
+            if (svg) svg.style.color = '#4a90e2';
+          }
+        });
+        cropBtn.addEventListener('mouseleave', () => {
+          if (!previewOpen) {
+            const svg = cropBtn.querySelector('svg');
+            if (svg) svg.style.color = '#000';
+          }
+        });
+        
+        // Function to update preview content
+        const updatePreview = () => {
+          if (backgroundImageUrl.value) {
+            previewPane.innerHTML = createExpandablePreview(backgroundImageUrl.value, reel.backgroundZoom);
+            attachZoomListener();
+          } else {
+            previewPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No image selected</p>';
+          }
+        };
+        
+        // Function to attach zoom slider listener
+        const attachZoomListener = () => {
+          const slider = previewPane.querySelector('.zoom-slider');
+          const zoomValue = previewPane.querySelector('.zoom-value');
+          if (slider && zoomValue) {
+            slider.addEventListener('input', (e) => {
+              const zoom = parseFloat(e.target.value);
+              reel.backgroundZoom = zoom;
+              zoomValue.textContent = `${zoom.toFixed(1)}x`;
+              // Update all preview images
+              previewPane.querySelectorAll('.preview-img').forEach(img => {
+                img.style.transform = `scale(${zoom})`;
+              });
+              // No need to call updatePreview here - visual update is already done
+            });
+            // Save on change (when user finishes dragging)
+            slider.addEventListener('change', () => {
+              onChange();
+            });
+          }
+        };
+        
+        // Toggle preview
+        cropBtn.addEventListener('click', () => {
+          previewOpen = !previewOpen;
+          const svg = cropBtn.querySelector('svg');
+          if (previewOpen) {
+            previewPane.style.display = 'block';
+            if (svg) svg.style.color = '#4a90e2';
+            updatePreview();
+          } else {
+            previewPane.style.display = 'none';
+            if (svg) svg.style.color = '#000';
+          }
+        });
+        
+        // Update preview when URL changes
+        backgroundImageUrl.addEventListener('input', () => {
+          if (previewOpen) {
+            updatePreview();
+          }
+        });
+        
+        // Initial state
+        cropBtn.style.display = backgroundImageEnabled.checked ? 'inline-flex' : 'none';
+        cropBtn.disabled = !backgroundImageEnabled.checked;
       }
     }
 

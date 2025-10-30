@@ -27,7 +27,7 @@
      Used across static and expandable modes
      ======================================== */
   --player-padding: 2rem;                         /* Horizontal and top padding for player */
-  --player-padding-bottom: 1.5rem;                /* Bottom padding for player */
+  --player-padding-bottom: 1rem;                /* Bottom padding for player */
   --reel-title-padding-bottom: 0.8rem;            /* Space below reel title */
   
   /* ========================================
@@ -35,6 +35,7 @@
      ======================================== */
   --background-image: none;                       /* Background image URL */
   --background-opacity: 1;                        /* Opacity of background */
+  --background-zoom: 1;                           /* Base zoom level for background (1 = 100%, 1.1 = 110%) */
   --background-blur: 2px;                         /* Blur amount for backdrop filter */
   --overlay-color: rgba(255, 255, 255, 0);        /* Overlay color on background */
   
@@ -47,10 +48,10 @@
      EXPANDABLE MODE - SPACING & LAYOUT
      ======================================== */
   --expandable-overlay-padding: 0.75rem;          /* Vertical padding for project title overlay */
-  --expandable-player-gap: 1.5rem;                /* Gap between play button, waveform, volume when expanded */
+  --expandable-player-gap: 0.5rem;                /* Gap between play button, waveform, volume when expanded */
   --expandable-content-gap: 0rem;                 /* Gap between waveform and playlist when expanded */
-  --expandable-waveform-margin-top: 0.5rem;       /* Margin above waveform container when expanded */
-  --expandable-waveform-margin-bottom: 1rem;      /* Margin below waveform container when expanded */
+  --expandable-waveform-margin-top: 0rem;       /* Margin above waveform container when expanded */
+  --expandable-waveform-margin-bottom: 1.2rem;      /* Margin below waveform container when expanded */
   --expandable-collapsed-waveform-offset: -1.5rem; /* Vertical offset for waveform when collapsed during playback */
   --expandable-playlist-inset: 2rem;              /* How much narrower playlist is from edges */
   --expandable-playlist-bottom-margin: 1rem;      /* Space between bottom of playlist and player edge */
@@ -61,14 +62,42 @@
      ======================================== */
   --expandable-track-info-left: 3.7rem;           /* Left offset for track info (matches play button width) */
   --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text */
-  --expandable-track-info-top: 2rem;            /* Top margin above track info */
-  --expandable-track-info-bottom: 0rem;           /* Bottom margin below track info */
+  --expandable-track-info-top: 1rem;            /* Top margin above track info */
+  --expandable-track-info-bottom: 0.5rem;           /* Bottom margin below track info */
   
   /* ========================================
      EXPANDABLE MODE - TRANSITIONS
      ======================================== */
   --expandable-transition-duration: 0.3s;         /* Duration of expand/collapse animations */
   --expandable-transition-easing: cubic-bezier(0.4, 0, 0.2, 1); /* Easing function for smooth animations */
+  --expandable-pre-collapse-opacity: 0.6;         /* Reduced opacity when mouse leaves (before full fade) */
+  --expandable-pre-collapse-duration: 0.2s;       /* Duration of initial opacity reduction */
+  --expandable-collapse-delay: 1000ms;            /* Delay before starting collapse fade-out (in ms for JS) */
+  --expandable-collapse-fade-duration: 0.2s; 
+  /* playback-idle transition settings */     /* Duration of final fade-out before height collapse */
+  --playback-idle-delay: 1000ms;                  /* Time of no mouse movement before entering idle state (in ms for JS) */
+  --playback-idle-opacity: 0.18;                  /* Opacity of UI in playback-idle state */
+  --playback-idle-transition-in: 0.8s;            /* Duration of opacity fade into idle state */
+  --playback-idle-transition-out: 0.3s;           /* Duration of opacity fade out of idle state */
+  --playback-idle-blur-delay-in: 0s;              /* Delay before blur transition starts when entering idle state */
+  --playback-idle-blur-delay-out: 1s;             /* Delay before blur transition starts when exiting idle state */
+  --playback-idle-blur-transition-in: 2s;       /* Duration of blur transition into idle state */
+  --playback-idle-blur-transition-out: 0.8s;      /* Duration of blur transition out of idle state */
+  --playback-idle-overlay-opacity-multiplier: 0.5; /* Opacity multiplier for entire ::before layer in idle state (affects both overlay color AND blur backdrop) */
+  --playback-idle-overlay-delay-in: 0s;           /* Delay before overlay transition starts when entering idle state */
+  --playback-idle-overlay-delay-out: 0.2s;          /* Delay before overlay transition starts when exiting idle state */
+  --playback-idle-overlay-transition-in: 1.8s;    /* Duration of overlay opacity transition into idle state */
+  --playback-idle-overlay-transition-out: 0.8s;   /* Duration of overlay opacity transition out of idle state */
+  
+  /* ========================================
+     PLAYBACK-IDLE BACKGROUND ANIMATION
+     Controlled by Web Animations API in JavaScript
+     ======================================== */
+  --playback-idle-zoom-speed: 60s;                 /* Duration for one full zoom cycle (min → max → min) */
+  --playback-idle-zoom-multiplier: 1.4;            /* Maximum zoom multiplier (1.4 = 140% of base zoom) */
+  --playback-idle-zoom-ease: ease-in-out;          /* Easing function applied at keyframe transitions */
+  --playback-idle-zoom-speed-up-duration: 900ms;   /* Time to smoothly ramp animation speed when entering idle */
+  --playback-idle-zoom-slow-down-duration: 900ms;  /* Time to smoothly ramp animation speed when exiting idle */
   
   /* ========================================
      EXPANDABLE MODE - SCROLLBAR

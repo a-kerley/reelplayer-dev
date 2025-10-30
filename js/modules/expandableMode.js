@@ -170,10 +170,6 @@ export function setupStaticModeSettings(section, reel, onChange) {
       const value = parseInt(playerHeight.value);
       if (!isNaN(value) && value >= 200 && value <= 1000) {
         reel.playerHeight = value;
-        
-        if (window.previewManager) {
-          window.previewManager.updatePreview(reel);
-        }
       }
     });
     playerHeight.addEventListener('change', () => {
@@ -274,10 +270,6 @@ export function setupExpandableModeSettings(section, reel, onChange) {
         
         // Validate against expanded height
         validateHeightSettings(reel, collapsedHeight, section);
-        
-        if (window.previewManager) {
-          window.previewManager.updatePreview(reel);
-        }
       }
     });
     collapsedHeight.addEventListener('change', () => {
@@ -297,10 +289,6 @@ export function setupExpandableModeSettings(section, reel, onChange) {
         
         // Validate against collapsed height
         validateHeightSettings(reel, expandedHeight, section);
-        
-        if (window.previewManager) {
-          window.previewManager.updatePreview(reel);
-        }
       }
     });
     expandedHeight.addEventListener('change', () => {

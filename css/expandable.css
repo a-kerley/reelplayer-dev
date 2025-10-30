@@ -99,8 +99,8 @@
   box-sizing: border-box;
   margin: 0 !important; /* Override inline styles from player.html */
   flex-shrink: 0; /* Prevent shrinking in flex layout */
+  gap: var(--expandable-player-gap); /* Keep gap constant in both states */
   transition: padding var(--expandable-transition-duration) var(--expandable-transition-easing),
-              gap var(--expandable-transition-duration) var(--expandable-transition-easing),
               margin var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
@@ -109,12 +109,9 @@
   padding: 0 var(--player-padding);
 }
 
-/* Expanded state - add gap, margins, and remove padding (parent has it) */
+/* Expanded state - remove padding (parent has it) */
 .player-wrapper.expandable-mode.expanded .player-container {
-  gap: var(--expandable-player-gap);
   padding: 0; /* Remove padding since player-content now has it */
-  margin-top: var(--expandable-waveform-margin-top);
-  margin-bottom: var(--expandable-waveform-margin-bottom);
 }
 
 /* Hide play/pause button and volume when collapsed */
@@ -132,6 +129,95 @@
   pointer-events: auto;
 }
 
+/* Initial opacity reduction on mouse leave */
+.player-wrapper.expandable-mode.pre-collapsing #playPause,
+.player-wrapper.expandable-mode.pre-collapsing .volume-control,
+.player-wrapper.expandable-mode.pre-collapsing .playlist,
+.player-wrapper.expandable-mode.pre-collapsing .reel-title,
+.player-wrapper.expandable-mode.pre-collapsing .track-info,
+.player-wrapper.expandable-mode.pre-collapsing .playhead-time,
+.player-wrapper.expandable-mode.pre-collapsing #total-time {
+  opacity: var(--expandable-pre-collapse-opacity) !important;
+  transition: opacity var(--expandable-pre-collapse-duration) ease-out;
+}
+
+/* Reduce waveform opacity only when not playing */
+.player-wrapper.expandable-mode.pre-collapsing:not(.playing-collapsed) #waveform {
+  opacity: var(--expandable-pre-collapse-opacity) !important;
+  transition: opacity var(--expandable-pre-collapse-duration) ease-out;
+}
+
+/* Fade out controls during collapse */
+.player-wrapper.expandable-mode.collapsing #playPause,
+.player-wrapper.expandable-mode.collapsing .volume-control,
+.player-wrapper.expandable-mode.collapsing .playlist,
+.player-wrapper.expandable-mode.collapsing .reel-title,
+.player-wrapper.expandable-mode.collapsing .track-info,
+.player-wrapper.expandable-mode.collapsing .playhead-time,
+.player-wrapper.expandable-mode.collapsing #total-time {
+  opacity: 0 !important;
+  transition: opacity var(--expandable-collapse-fade-duration) ease-out;
+}
+
+/* Fade out waveform only when not playing */
+.player-wrapper.expandable-mode.collapsing:not(.playing-collapsed) #waveform {
+  opacity: 0 !important;
+  transition: opacity var(--expandable-collapse-fade-duration) ease-out;
+}
+
+/* ========================================
+   PLAYBACK IDLE STATE
+   ======================================== */
+
+/* Base transition for idle state elements (fast transition out) */
+.player-wrapper.expandable-mode.expanded .volume-control,
+.player-wrapper.expandable-mode.expanded .playlist,
+.player-wrapper.expandable-mode.expanded .reel-title,
+.player-wrapper.expandable-mode.expanded .track-info,
+.player-wrapper.expandable-mode.expanded .playhead-time,
+.player-wrapper.expandable-mode.expanded #total-time {
+  transition: opacity var(--playback-idle-transition-out) ease-out;
+}
+
+/* Reduce UI opacity during playback when mouse is idle (slow transition in) */
+.player-wrapper.expandable-mode.playback-idle #playPause,
+.player-wrapper.expandable-mode.playback-idle .volume-control,
+.player-wrapper.expandable-mode.playback-idle .playlist,
+.player-wrapper.expandable-mode.playback-idle .reel-title,
+.player-wrapper.expandable-mode.playback-idle .track-info,
+.player-wrapper.expandable-mode.playback-idle .playhead-time,
+.player-wrapper.expandable-mode.playback-idle #total-time {
+  opacity: var(--playback-idle-opacity) !important;
+  transition: opacity var(--playback-idle-transition-in) ease-out;
+}
+
+/* Remove background blur and reduce overlay opacity during playback idle */
+.player-wrapper.expandable-mode::before {
+  transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
+              -webkit-backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
+              opacity var(--playback-idle-overlay-transition-out) ease-out var(--playback-idle-overlay-delay-out);
+}
+
+.player-wrapper.expandable-mode.playback-idle::before {
+  backdrop-filter: blur(0) !important;
+  -webkit-backdrop-filter: blur(0) !important;
+  /* Note: opacity affects entire ::before layer (both background-color and backdrop-filter) */
+  opacity: var(--playback-idle-overlay-opacity-multiplier);
+  transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
+}
+
+/* Ensure play button stays aligned with waveform center despite margins */
+.player-wrapper.expandable-mode #playPause {
+  transition: margin var(--expandable-transition-duration) var(--expandable-transition-easing),
+              opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+.player-wrapper.expandable-mode.expanded #playPause {
+  align-self: center;
+}
+
 /* ========================================
    5. WAVEFORM & AUDIO CONTROLS
    ======================================== */
@@ -142,6 +228,14 @@
   align-items: center;
   gap: 0.5rem;
   min-height: var(--expandable-waveform-height);
+  transition: margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* Apply waveform margins when expanded */
+.player-wrapper.expandable-mode.expanded .waveform-and-volume,
+.player-wrapper.expandable-mode.expanded #playPause {
+  margin-top: var(--expandable-waveform-margin-top);
+  margin-bottom: var(--expandable-waveform-margin-bottom);
 }
 
 .player-wrapper.expandable-mode #waveform {

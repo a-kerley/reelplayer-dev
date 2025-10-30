@@ -1,0 +1,57 @@
+{
+  "generated": "2025-10-29T17:00:18.511Z",
+  "directory": "assets/audio",
+  "extensions": [
+    ".mp3",
+    ".wav",
+    ".ogg",
+    ".opus",
+    ".flac",
+    ".aac",
+    ".m4a",
+    ".webm",
+    ".alac"
+  ],
+  "files": [
+    {
+      "name": "01. Event Horizon.ogg",
+      "path": "assets/audio/ExampleReel01/01. Event Horizon.ogg"
+    },
+    {
+      "name": "02. Iron and Fire.ogg",
+      "path": "assets/audio/ExampleReel01/02. Iron and Fire.ogg"
+    },
+    {
+      "name": "03. Shadowy Figures.ogg",
+      "path": "assets/audio/ExampleReel01/03. Shadowy Figures.ogg"
+    },
+    {
+      "name": "04. Monster in the House.ogg",
+      "path": "assets/audio/ExampleReel01/04. Monster in the House.ogg"
+    },
+    {
+      "name": "05. Desolation.ogg",
+      "path": "assets/audio/ExampleReel01/05. Desolation.ogg"
+    },
+    {
+      "name": "06. The Forgotten Realm.ogg",
+      "path": "assets/audio/ExampleReel01/06. The Forgotten Realm.ogg"
+    },
+    {
+      "name": "07. Screen Violence.ogg",
+      "path": "assets/audio/ExampleReel01/07. Screen Violence.ogg"
+    },
+    {
+      "name": "08. Mayhem.ogg",
+      "path": "assets/audio/ExampleReel01/08. Mayhem.ogg"
+    },
+    {
+      "name": "09. Machines in the Ruins.ogg",
+      "path": "assets/audio/ExampleReel01/09. Machines in the Ruins.ogg"
+    },
+    {
+      "name": "10. Legacy of the Brave.ogg",
+      "path": "assets/audio/ExampleReel01/10. Legacy of the Brave.ogg"
+    }
+  ]
+}

@@ -180,6 +180,7 @@ export class PreviewManager {
       "--background-color": backgroundColor,
       "--background-opacity": reel.backgroundOpacity || "1",
       "--background-blur": `${reel.backgroundBlur || "2"}px`,
+      "--background-zoom": reel.backgroundZoom || "1",
       "--overlay-color": overlayColor,
       
       // Player height (used for static mode)

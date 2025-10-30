@@ -19,6 +19,13 @@ export const playerApp = {
     listeners: null
   },
 
+  // Background zoom animations (Web Animations API)
+  backgroundAnimations: {
+    main: null,        // Animation for main background (::after)
+    layerA: null,      // Animation for track background layer A
+    layerB: null       // Animation for track background layer B
+  },
+
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
     this.elements.playPauseBtn = document.getElementById("playPause");
@@ -353,6 +360,11 @@ export const playerApp = {
   initializePlayer(audioURL, title, index) {
     this.showLoading(true);
     
+    // Initialize main background animation on first load
+    if (!this.backgroundAnimations.main) {
+      this.initMainBackgroundAnimation();
+    }
+    
     // Update current track index
     this.currentTrackIndex = index;
     
@@ -378,51 +390,110 @@ export const playerApp = {
   },
 
   updateTrackBackground(trackIndex) {
-    // Get the main player element
-    const mainElement = document.querySelector('main');
-    if (!mainElement) return;
+    // Get both track background layer elements
+    const layerA = document.querySelector('.track-bg-layer-a');
+    const layerB = document.querySelector('.track-bg-layer-b');
+    if (!layerA || !layerB) return;
+    
+    // Initialize current layer tracker if not exists
+    if (!this.currentTrackBgLayer) {
+      this.currentTrackBgLayer = 'a';
+    }
     
     // Get current reel settings (from global or stored settings)
     const reelSettings = this.currentReelSettings || window.currentReelSettings;
     if (!reelSettings) return;
     
-    // Get the track's background image
+    // Get the track's background image and zoom
     const playlist = reelSettings.playlist || [];
     const track = playlist[trackIndex];
     const trackBackgroundImage = track?.backgroundImage;
+    const trackBackgroundZoom = track?.backgroundZoom || 1;
     
-    // Determine which background to use
-    let targetBackgroundImage = '';
+
+    
+    // Determine which layers are current and next
+    const currentLayer = this.currentTrackBgLayer === 'a' ? layerA : layerB;
+    const nextLayer = this.currentTrackBgLayer === 'a' ? layerB : layerA;
+    
+    // Get current background image
+    const currentBgImage = currentLayer.style.backgroundImage;
+    const targetBgImage = trackBackgroundImage && trackBackgroundImage.trim() 
+      ? `url("${trackBackgroundImage}")`
+      : 'none';
+    
+    // Check if the background image is actually changing
+    const isChanging = currentBgImage !== targetBgImage;
+    
+    // Check if track has its own background
     if (trackBackgroundImage && trackBackgroundImage.trim()) {
-      // Use track-specific background
-      targetBackgroundImage = `url("${trackBackgroundImage}")`;
-    } else if (reelSettings.backgroundImageEnabled && reelSettings.backgroundImage) {
-      // Fall back to main background
-      targetBackgroundImage = `url("${reelSettings.backgroundImage}")`;
-    } else {
-      // No background
-      targetBackgroundImage = 'none';
-    }
-    
-    // Get current background
-    const currentBackground = getComputedStyle(mainElement).getPropertyValue('--background-image').trim();
-    
-    // Only transition if background is different
-    if (currentBackground !== targetBackgroundImage) {
-      // Create cross-dissolve effect by animating opacity
-      mainElement.style.transition = 'none';
-      
-      // Set up the transition
-      requestAnimationFrame(() => {
-        mainElement.style.transition = 'opacity 0.6s ease-in-out';
-        mainElement.style.opacity = '0';
+      // If background is changing, crossfade to next layer
+      if (isChanging) {
+        // Set the new image on the next layer (hidden)
+        nextLayer.style.backgroundImage = targetBgImage;
         
-        // After fade out, change background and fade in
+        // Set up animation for the next layer
+        const zoomMultiplier = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--playback-idle-zoom-multiplier') || 1.2);
+        const maxZoom = trackBackgroundZoom * zoomMultiplier;
+        
+        // Initialize Web Animations API animation for this layer
+        this.initTrackLayerAnimation(nextLayer, trackBackgroundZoom, maxZoom);
+        
+        // Crossfade: fade in next layer while keeping old layer animation active
+        requestAnimationFrame(() => {
+          nextLayer.classList.add('active');
+          // Don't remove 'active' yet - change to 'fading-out' to keep animation
+          currentLayer.classList.remove('active');
+          currentLayer.classList.add('fading-out');
+        });
+        
+        // Switch the current layer reference
+        this.currentTrackBgLayer = this.currentTrackBgLayer === 'a' ? 'b' : 'a';
+        
+        // Add class and pause main background animation when per-track bg is visible
+        if (this.elements.playerWrapper) {
+          this.elements.playerWrapper.classList.add('has-track-bg');
+          this.backgroundAnimations.main?.pause();
+        }
+        
+        // Clean up the old layer after transition completes
         setTimeout(() => {
-          mainElement.style.setProperty('--background-image', targetBackgroundImage);
-          mainElement.style.opacity = '1';
-        }, 600);
-      });
+          currentLayer.classList.remove('fading-out');
+          currentLayer.style.backgroundImage = 'none';
+          // Cancel old layer animation
+          const oldLayerId = currentLayer.classList.contains('track-bg-layer-a') ? 'layerA' : 'layerB';
+          this.backgroundAnimations[oldLayerId]?.cancel();
+        }, 800);
+      } else {
+        // Same image, just ensure current layer is active and update animation
+        if (!currentLayer.classList.contains('active')) {
+          currentLayer.classList.add('active');
+        }
+        
+        // Update animation for current layer
+        const zoomMultiplier = parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--playback-idle-zoom-multiplier') || 1.2);
+        const maxZoom = trackBackgroundZoom * zoomMultiplier;
+        this.initTrackLayerAnimation(currentLayer, trackBackgroundZoom, maxZoom);
+      }
+    } else {
+      // Track doesn't have a custom background - fade out both layers to show main background
+      layerA.classList.remove('active');
+      layerB.classList.remove('active');
+      
+      // Remove class to resume main background animation
+      if (this.elements.playerWrapper) {
+        this.elements.playerWrapper.classList.remove('has-track-bg');
+      }
+      
+      // Clear both layers after fade completes
+      setTimeout(() => {
+        if (!layerA.classList.contains('active')) {
+          layerA.style.backgroundImage = 'none';
+        }
+        if (!layerB.classList.contains('active')) {
+          layerB.style.backgroundImage = 'none';
+        }
+      }, 800);
     }
   },
 
@@ -798,36 +869,297 @@ export const playerApp = {
       if (!this.expandable.isExpanded) {
         this.expandPlayer();
       }
+      // Exit playback-idle state on mouse enter
+      this.exitPlaybackIdle();
     };
 
     const handleMouseLeave = () => {
       if (this.expandable.isExpanded) {
         this.collapsePlayer();
       }
+      // Clear idle timeout when mouse leaves
+      this.clearPlaybackIdleTimeout();
+    };
+
+    const handleMouseMove = () => {
+      // Reset idle timer on mouse movement
+      this.resetPlaybackIdleTimer();
     };
 
     // Store listener references for cleanup
     this.expandable.listeners = {
       wrapper,
       mouseEnter: handleMouseEnter,
-      mouseLeave: handleMouseLeave
+      mouseLeave: handleMouseLeave,
+      mouseMove: handleMouseMove
     };
 
     // Attach event listeners
     wrapper.addEventListener('mouseenter', handleMouseEnter);
     wrapper.addEventListener('mouseleave', handleMouseLeave);
+    wrapper.addEventListener('mousemove', handleMouseMove);
   },
 
   cleanupExpandableModeListeners() {
     if (this.expandable.listeners) {
-      const { wrapper, mouseEnter, mouseLeave } = this.expandable.listeners;
+      const { wrapper, mouseEnter, mouseLeave, mouseMove } = this.expandable.listeners;
       if (wrapper) {
         wrapper.removeEventListener('mouseenter', mouseEnter);
         wrapper.removeEventListener('mouseleave', mouseLeave);
+        wrapper.removeEventListener('mousemove', mouseMove);
       }
       this.expandable.listeners = null;
     }
+    // Clear any pending idle timeout
+    this.clearPlaybackIdleTimeout();
   },
+
+  resetPlaybackIdleTimer() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    // Only set idle timer during playback
+    const isPlaying = this.wavesurfer?.isPlaying();
+    if (!isPlaying) return;
+
+    // Clear existing timeout
+    this.clearPlaybackIdleTimeout();
+
+    // Exit idle state immediately on movement
+    this.exitPlaybackIdle();
+
+    // Get idle delay from CSS variable
+    const styles = getComputedStyle(document.documentElement);
+    const idleDelay = parseInt(styles.getPropertyValue('--playback-idle-delay')) || 1000;
+
+    // Set new timeout
+    this.expandable.playbackIdleTimeout = setTimeout(() => {
+      this.enterPlaybackIdle();
+    }, idleDelay);
+  },
+
+  clearPlaybackIdleTimeout() {
+    if (this.expandable.playbackIdleTimeout) {
+      clearTimeout(this.expandable.playbackIdleTimeout);
+      this.expandable.playbackIdleTimeout = null;
+    }
+  },
+
+  // ========================================
+  // PLAYBACK-IDLE STATE MANAGEMENT
+  // ========================================
+
+  enterPlaybackIdle() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    // Only enter idle during playback
+    const isPlaying = this.wavesurfer?.isPlaying();
+    if (!isPlaying) return;
+
+    wrapper.classList.add('playback-idle');
+    
+    // Get speed-up duration from CSS and resume animations with smooth transition
+    const duration = this.parseCssDuration('--playback-idle-zoom-speed-up-duration', 800);
+    this.playBackgroundAnimations(true, duration);
+  },
+
+  exitPlaybackIdle() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    wrapper.classList.remove('playback-idle');
+    
+    // Get slow-down duration from CSS and pause animations with smooth transition
+    const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
+    this.pauseBackgroundAnimations(true, duration);
+  },
+
+  // ========================================
+  // BACKGROUND ZOOM ANIMATION SYSTEM
+  // ========================================
+
+  // Parse CSS duration value (handles 's' and 'ms' units)
+  parseCssDuration(cssVariable, defaultValue = 800) {
+    const styles = getComputedStyle(document.documentElement);
+    const value = styles.getPropertyValue(cssVariable).trim();
+    
+    if (!value) return defaultValue;
+    
+    if (value.endsWith('ms')) {
+      return parseFloat(value);
+    } else if (value.endsWith('s')) {
+      return parseFloat(value) * 1000;
+    }
+    
+    return parseFloat(value) || defaultValue;
+  },
+
+  // Create a Web Animations API zoom animation for a background element
+  initBackgroundAnimation(element, minZoom, maxZoom) {
+    if (!element) return null;
+
+    const styles = getComputedStyle(document.documentElement);
+    const duration = this.parseCssDuration('--playback-idle-zoom-speed', 60000);
+    const easing = styles.getPropertyValue('--playback-idle-zoom-ease')?.trim() || 'ease-in-out';
+
+    // Create animation with per-keyframe easing for smooth transitions at peak zoom
+    const animation = element.animate([
+      { transform: `scale(${minZoom})`, easing },
+      { transform: `scale(${maxZoom})`, easing },
+      { transform: `scale(${minZoom})` }
+    ], {
+      duration,
+      iterations: Infinity
+    });
+
+    animation.pause();
+    return animation;
+  },
+
+  // Initialize main background zoom animation (uses CSS custom property for pseudo-element)
+  initMainBackgroundAnimation() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    const styles = getComputedStyle(document.documentElement);
+    const baseZoom = parseFloat(styles.getPropertyValue('--background-zoom')) || 1;
+    const multiplier = parseFloat(styles.getPropertyValue('--playback-idle-zoom-multiplier')) || 1.2;
+    const duration = this.parseCssDuration('--playback-idle-zoom-speed', 60000);
+    const easing = styles.getPropertyValue('--playback-idle-zoom-ease')?.trim() || 'ease-in-out';
+
+    const minZoom = baseZoom;
+    const maxZoom = baseZoom * multiplier;
+
+    // Animate CSS custom property (::after pseudo-element uses this via var())
+    const keyframes = [
+      { '--animated-zoom': minZoom, easing },
+      { '--animated-zoom': maxZoom, easing },
+      { '--animated-zoom': minZoom }
+    ];
+
+    this.backgroundAnimations.main = wrapper.animate(keyframes, {
+      duration,
+      iterations: Infinity
+    });
+    
+    this.backgroundAnimations.main.pause();
+  },
+
+  // Initialize or update track layer zoom animation
+  initTrackLayerAnimation(layer, minZoom, maxZoom) {
+    if (!layer) return;
+
+    const layerId = layer.classList.contains('track-bg-layer-a') ? 'layerA' : 'layerB';
+    
+    // Cancel and replace existing animation
+    if (this.backgroundAnimations[layerId]) {
+      this.backgroundAnimations[layerId].cancel();
+    }
+
+    this.backgroundAnimations[layerId] = this.initBackgroundAnimation(layer, minZoom, maxZoom);
+
+    // Auto-play if currently in idle state
+    if (this.elements.playerWrapper?.classList.contains('playback-idle')) {
+      this.backgroundAnimations[layerId].play();
+    }
+  },
+
+  // Smoothly transition animation playback rate (for speed up/slow down effects)
+  smoothTransitionPlaybackRate(animation, targetRate, duration = 800) {
+    if (!animation) return Promise.resolve();
+
+    const startRate = animation.playbackRate;
+    const startTime = performance.now();
+
+    return new Promise((resolve) => {
+      const tick = (currentTime) => {
+        const elapsed = currentTime - startTime;
+        const progress = Math.min(elapsed / duration, 1);
+        
+        // Ease-out cubic for smooth deceleration
+        const eased = 1 - Math.pow(1 - progress, 3);
+        
+        animation.playbackRate = startRate + (targetRate - startRate) * eased;
+
+        if (progress < 1) {
+          requestAnimationFrame(tick);
+        } else {
+          resolve();
+        }
+      };
+
+      requestAnimationFrame(tick);
+    });
+  },
+
+  // Start an animation with optional smooth speed transition
+  startAnimation(animation, smooth, duration) {
+    if (!animation) return null;
+
+    if (smooth) {
+      animation.playbackRate = 0;
+      if (animation.playState === 'paused') {
+        animation.play();
+      }
+      return this.smoothTransitionPlaybackRate(animation, 1, duration);
+    } else {
+      animation.playbackRate = 1;
+      if (animation.playState === 'paused') {
+        animation.play();
+      }
+      return null;
+    }
+  },
+
+  // Stop an animation with optional smooth speed transition
+  stopAnimation(animation, smooth, duration) {
+    if (!animation) return;
+
+    if (smooth) {
+      this.smoothTransitionPlaybackRate(animation, 0, duration).then(() => {
+        animation.pause();
+        animation.playbackRate = 1; // Reset for next play
+      });
+    } else {
+      animation.pause();
+    }
+  },
+
+  // Play all active background zoom animations
+  playBackgroundAnimations(smooth = false, duration = 800) {
+    const promises = [];
+
+    // Play main background if no track background is active
+    if (!this.elements.playerWrapper?.classList.contains('has-track-bg')) {
+      const promise = this.startAnimation(this.backgroundAnimations.main, smooth, duration);
+      if (promise) promises.push(promise);
+    }
+
+    // Play active track layer animations
+    const layerA = document.querySelector('.track-bg-layer-a');
+    const layerB = document.querySelector('.track-bg-layer-b');
+    
+    if (layerA?.classList.contains('active') || layerA?.classList.contains('fading-out')) {
+      const promise = this.startAnimation(this.backgroundAnimations.layerA, smooth, duration);
+      if (promise) promises.push(promise);
+    }
+    
+    if (layerB?.classList.contains('active') || layerB?.classList.contains('fading-out')) {
+      const promise = this.startAnimation(this.backgroundAnimations.layerB, smooth, duration);
+      if (promise) promises.push(promise);
+    }
+
+    return Promise.all(promises);
+  },
+
+  // Pause all background zoom animations
+  pauseBackgroundAnimations(smooth = false, duration = 800) {
+    this.stopAnimation(this.backgroundAnimations.main, smooth, duration);
+    this.stopAnimation(this.backgroundAnimations.layerA, smooth, duration);
+    this.stopAnimation(this.backgroundAnimations.layerB, smooth, duration);
+  },
+
 
   validateProjectTitleImage() {
     const overlay = this.elements.projectTitleOverlay;
@@ -865,6 +1197,19 @@ export const playerApp = {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
+    // Clear any pending collapse timeouts
+    if (this.expandable.collapseDelayTimeout) {
+      clearTimeout(this.expandable.collapseDelayTimeout);
+      this.expandable.collapseDelayTimeout = null;
+    }
+    if (this.expandable.collapseFadeTimeout) {
+      clearTimeout(this.expandable.collapseFadeTimeout);
+      this.expandable.collapseFadeTimeout = null;
+    }
+
+    // Remove collapsing classes and ensure expanded state
+    wrapper.classList.remove('pre-collapsing');
+    wrapper.classList.remove('collapsing');
     this.expandable.isExpanded = true;
     wrapper.classList.add('expanded');
   },
@@ -874,9 +1219,8 @@ export const playerApp = {
     if (!wrapper) return;
 
     this.expandable.isExpanded = false;
-    wrapper.classList.remove('expanded');
-
-    // Handle playing state during collapse - check current playback state
+    
+    // Check playing state immediately to set playing-collapsed class
     const isCurrentlyPlaying = this.wavesurfer?.isPlaying();
     const shouldShowWaveform = isCurrentlyPlaying && this.expandable.settings?.showWaveformOnCollapse !== false;
     
@@ -885,6 +1229,30 @@ export const playerApp = {
     } else {
       wrapper.classList.remove('playing-collapsed');
     }
+    
+    // Add pre-collapsing class for initial opacity reduction
+    wrapper.classList.add('pre-collapsing');
+    
+    // Get timing values from CSS variables
+    const styles = getComputedStyle(document.documentElement);
+    const collapseDelay = parseInt(styles.getPropertyValue('--expandable-collapse-delay')) || 1000;
+    const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
+    
+    // Wait for delay, then trigger fade-out
+    this.expandable.collapseDelayTimeout = setTimeout(() => {
+      wrapper.classList.remove('pre-collapsing');
+      wrapper.classList.add('collapsing');
+      
+      // Wait for fade-out to complete, then collapse height
+      this.expandable.collapseFadeTimeout = setTimeout(() => {
+        wrapper.classList.remove('expanded');
+        wrapper.classList.remove('collapsing');
+        
+        // Clear timeout references
+        this.expandable.collapseDelayTimeout = null;
+        this.expandable.collapseFadeTimeout = null;
+      }, fadeDuration);
+    }, collapseDelay);
   },
 
   updatePlayingState(playing) {
@@ -899,6 +1267,16 @@ export const playerApp = {
         wrapper.classList.add('playing-collapsed');
       } else {
         wrapper.classList.remove('playing-collapsed');
+      }
+
+      // Handle playback-idle state
+      if (playing) {
+        // Start idle timer when playback starts
+        this.resetPlaybackIdleTimer();
+      } else {
+        // Clear idle state and timer when playback stops
+        this.clearPlaybackIdleTimeout();
+        this.exitPlaybackIdle();
       }
     }
   },
@@ -934,6 +1312,8 @@ export const playerApp = {
     
     container.innerHTML = `
     <div class="${wrapperClasses}">
+      <div class="track-background-layer track-bg-layer-a"></div>
+      <div class="track-background-layer track-bg-layer-b"></div>
       ${projectTitleOverlayHTML}
       <div class="player-content">
         ${
