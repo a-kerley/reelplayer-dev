@@ -10,22 +10,22 @@ const path = require('path');
 const ASSET_TYPES = [
   {
     dir: './assets/audio',
-    manifest: './assets/audio-manifest.json',
+    manifest: './assets/manifests/audio.json',
     extensions: ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.aac', '.m4a', '.webm', '.alac']
   },
   {
     dir: './assets/images/backgrounds',
-    manifest: './assets/images/backgrounds-manifest.json',
+    manifest: './assets/manifests/images-backgrounds.json',
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
   },
   {
     dir: './assets/images/project-titles',
-    manifest: './assets/images/project-titles-manifest.json',
+    manifest: './assets/manifests/images-titles.json',
     extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp']
   },
   {
     dir: './assets/video',
-    manifest: './assets/video-manifest.json',
+    manifest: './assets/manifests/video.json',
     extensions: ['.mp4', '.mov', '.avi', '.mkv', '.webm']
   }
 ];
@@ -64,6 +64,13 @@ function scanDirectory(dir, baseDir = dir, extensions) {
   }
   
   return files;
+}
+
+// Ensure manifests directory exists
+const manifestsDir = './assets/manifests';
+if (!fs.existsSync(manifestsDir)) {
+  fs.mkdirSync(manifestsDir, { recursive: true });
+  console.log(`Created manifests directory: ${manifestsDir}`);
 }
 
 // Generate manifests for all asset types

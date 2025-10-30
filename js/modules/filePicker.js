@@ -163,10 +163,10 @@ export function openFilePicker(options) {
     try {
       // Map directories to their manifest files
       const manifestMap = {
-        'assets/audio': 'assets/audio-manifest.json',
-        'assets/images/backgrounds': 'assets/images/backgrounds-manifest.json',
-        'assets/images/project-titles': 'assets/images/project-titles-manifest.json',
-        'assets/video': 'assets/video-manifest.json'
+        'assets/audio': 'assets/manifests/audio.json',
+        'assets/images/backgrounds': 'assets/manifests/images-backgrounds.json',
+        'assets/images/project-titles': 'assets/manifests/images-titles.json',
+        'assets/video': 'assets/manifests/video.json'
       };
       
       // Check if we have a manifest for this directory
@@ -174,6 +174,32 @@ export function openFilePicker(options) {
       
       if (manifestPath) {
         console.log(`[File Picker] Trying manifest for ${directory}: ${manifestPath}`);
+        
+        // Check cache first
+        const cacheKey = `filePicker_${manifestPath}`;
+        const cachedData = localStorage.getItem(cacheKey);
+        
+        if (cachedData) {
+          try {
+            const cached = JSON.parse(cachedData);
+            const cacheAge = Date.now() - cached.timestamp;
+            const maxAge = 5 * 60 * 1000; // 5 minutes
+            
+            if (cacheAge < maxAge) {
+              console.log(`[File Picker] Using cached manifest (${Math.round(cacheAge / 1000)}s old)`);
+              files = cached.files.filter(file => {
+                const lowerPath = file.path.toLowerCase();
+                return extensions.some(ext => lowerPath.endsWith(ext));
+              });
+              console.log(`[File Picker] Loaded ${files.length} files from cache`);
+              return; // Early return with cached data
+            } else {
+              console.log(`[File Picker] Cache expired (${Math.round(cacheAge / 1000)}s old), fetching fresh data`);
+            }
+          } catch (e) {
+            console.log(`[File Picker] Cache parse error, fetching fresh data`);
+          }
+        }
         
         try {
           const response = await fetch(manifestPath);
@@ -184,6 +210,17 @@ export function openFilePicker(options) {
               return extensions.some(ext => lowerPath.endsWith(ext));
             });
             console.log(`[File Picker] Loaded ${files.length} files from manifest`);
+            
+            // Cache the manifest with timestamp
+            try {
+              localStorage.setItem(cacheKey, JSON.stringify({
+                timestamp: Date.now(),
+                files: manifest.files
+              }));
+              console.log(`[File Picker] Cached manifest for ${directory}`);
+            } catch (e) {
+              console.warn(`[File Picker] Failed to cache manifest:`, e);
+            }
           } else {
             console.log(`[File Picker] Manifest not found (${response.status}), falling back to directory scan`);
             await fallbackDirectoryScan();
@@ -266,7 +303,7 @@ export function openFilePicker(options) {
     displayFolderStructure(folderStructure, directory);
   }
   
-  // Build a hierarchical folder structure from flat file list
+  // Build a hierarchical folder structure from flat file list (supports unlimited nesting)
   function buildFolderStructure(files, baseDir) {
     const structure = {
       folders: {},
@@ -282,23 +319,26 @@ export function openFilePicker(options) {
         // File is in root directory
         structure.files.push(file);
       } else {
-        // File is in a subfolder
-        const folderName = pathParts[0];
-        if (!structure.folders[folderName]) {
-          structure.folders[folderName] = {
-            folders: {},
-            files: []
-          };
+        // File is in nested folders - build recursive structure
+        let currentLevel = structure;
+        
+        // Navigate/create folder hierarchy
+        for (let i = 0; i < pathParts.length - 1; i++) {
+          const folderName = pathParts[i];
+          
+          if (!currentLevel.folders[folderName]) {
+            currentLevel.folders[folderName] = {
+              folders: {},
+              files: [],
+              fullPath: baseDir + '/' + pathParts.slice(0, i + 1).join('/')
+            };
+          }
+          
+          currentLevel = currentLevel.folders[folderName];
         }
         
-        // For simplicity, we'll just track which folder the file is in
-        // and store the full file info
-        if (pathParts.length === 2) {
-          structure.folders[folderName].files.push(file);
-        } else {
-          // Nested deeper - for now just add to parent folder
-          structure.folders[folderName].files.push(file);
-        }
+        // Add file to deepest folder level
+        currentLevel.files.push(file);
       }
     });
     

@@ -647,7 +647,7 @@ function renderPerTrackBackgrounds(reel, onChange) {
     videoFilePickerBtn.addEventListener('click', async () => {
       const { openFilePicker } = await import('./modules/filePicker.js');
       openFilePicker({
-        directory: 'assets/videos/backgrounds',
+        directory: 'assets/video',
         extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
         title: 'Select Background Video',
         onSelect: (filePath) => {
@@ -1062,7 +1062,7 @@ function setupBlendModeControls(reel, onChange) {
         videoFilePickerBtn.addEventListener("click", async () => {
           const { openFilePicker } = await import('./modules/filePicker.js');
           openFilePicker({
-            directory: 'assets/videos/backgrounds',
+            directory: 'assets/video',
             extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
             title: 'Select Background Video',
             onSelect: (filePath) => {

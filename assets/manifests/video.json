@@ -1,0 +1,17 @@
+{
+  "generated": "2025-10-30T18:53:51.426Z",
+  "directory": "assets/video",
+  "extensions": [
+    ".mp4",
+    ".mov",
+    ".avi",
+    ".mkv",
+    ".webm"
+  ],
+  "files": [
+    {
+      "name": "CosmicBeauty.mp4",
+      "path": "assets/video/backgrounds/Test-Videos/CosmicBeauty.mp4"
+    }
+  ]
+}
