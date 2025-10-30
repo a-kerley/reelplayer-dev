@@ -320,11 +320,14 @@ function insertColorPickersSection(colorFieldset, reelForm) {
   }
 }
 
-function renderPerTrackBackgrounds(reel, onChange) {
+async function renderPerTrackBackgrounds(reel, onChange) {
   const container = document.getElementById('perTrackBackgroundsList');
   if (!container) return;
   
   container.innerHTML = '';
+  
+  // Import utilities once
+  const { extractFileName } = await import('./modules/urlUtils.js');
   
   // Ensure each track has a backgroundImage property
   reel.playlist.forEach((track, index) => {
@@ -343,20 +346,55 @@ function renderPerTrackBackgrounds(reel, onChange) {
     trackLabel.textContent = trackTitle;
     trackLabel.title = trackTitle;
     
-    // URL input
+    // Filename display for image URL (click to edit)
+    const imageFilenameDisplay = document.createElement('span');
+    imageFilenameDisplay.classList.add('filename-display');
+    const imageFilename = extractFileName(track.backgroundImage) || "Image URL";
+    imageFilenameDisplay.textContent = imageFilename;
+    if (imageFilename === "Image URL") {
+      imageFilenameDisplay.classList.add('placeholder');
+    }
+    imageFilenameDisplay.tabIndex = 0;
+    imageFilenameDisplay.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;background:#fff;cursor:text;';
+    
+    // Hidden URL input
     const urlInput = document.createElement('input');
     urlInput.type = 'url';
     urlInput.placeholder = 'Image URL';
     urlInput.value = track.backgroundImage || '';
-    urlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;';
+    urlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;display:none;';
+    
+    // Click filename to edit
+    imageFilenameDisplay.onclick = () => {
+      imageFilenameDisplay.style.display = 'none';
+      urlInput.style.display = '';
+      urlInput.focus();
+    };
     
     let urlTimeout;
     urlInput.addEventListener('input', () => {
       clearTimeout(urlTimeout);
       urlTimeout = setTimeout(() => {
-        track.backgroundImage = ValidationUtils.isValidImageUrl(urlInput.value) ? urlInput.value : urlInput.value;
+        track.backgroundImage = urlInput.value;
         onChange();
       }, 300);
+    });
+    
+    // Update filename display on blur
+    urlInput.onblur = () => {
+      const newFilename = extractFileName(urlInput.value) || "Image URL";
+      imageFilenameDisplay.textContent = newFilename;
+      if (newFilename === "Image URL") {
+        imageFilenameDisplay.classList.add('placeholder');
+      } else {
+        imageFilenameDisplay.classList.remove('placeholder');
+      }
+      imageFilenameDisplay.style.display = '';
+      urlInput.style.display = 'none';
+    };
+    
+    urlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') urlInput.blur();
     });
     
     // File picker button
@@ -405,6 +443,14 @@ function renderPerTrackBackgrounds(reel, onChange) {
         onSelect: (filePath) => {
           urlInput.value = filePath;
           track.backgroundImage = filePath;
+          // Update filename display
+          const newFilename = extractFileName(filePath) || "Image URL";
+          imageFilenameDisplay.textContent = newFilename;
+          if (newFilename === "Image URL") {
+            imageFilenameDisplay.classList.add('placeholder');
+          } else {
+            imageFilenameDisplay.classList.remove('placeholder');
+          }
           onChange();
         }
       });
@@ -576,6 +622,9 @@ function renderPerTrackBackgrounds(reel, onChange) {
     clearBtn.addEventListener('click', () => {
       urlInput.value = '';
       track.backgroundImage = '';
+      // Update filename display
+      imageFilenameDisplay.textContent = "Image URL";
+      imageFilenameDisplay.classList.add('placeholder');
       onChange();
       if (previewOpen) {
         previewPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No image selected</p>';
@@ -593,12 +642,30 @@ function renderPerTrackBackgrounds(reel, onChange) {
       track.backgroundVideo = '';
     }
     
-    // Video URL input
+    // Filename display for video URL (click to edit)
+    const videoFilenameDisplay = document.createElement('span');
+    videoFilenameDisplay.classList.add('filename-display');
+    const videoFilename = extractFileName(track.backgroundVideo) || "Video URL";
+    videoFilenameDisplay.textContent = videoFilename;
+    if (videoFilename === "Video URL") {
+      videoFilenameDisplay.classList.add('placeholder');
+    }
+    videoFilenameDisplay.tabIndex = 0;
+    videoFilenameDisplay.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;background:#fff;cursor:text;';
+    
+    // Hidden video URL input
     const videoUrlInput = document.createElement('input');
     videoUrlInput.type = 'url';
     videoUrlInput.placeholder = 'Video URL';
     videoUrlInput.value = track.backgroundVideo || '';
-    videoUrlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;';
+    videoUrlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;display:none;';
+    
+    // Click filename to edit
+    videoFilenameDisplay.onclick = () => {
+      videoFilenameDisplay.style.display = 'none';
+      videoUrlInput.style.display = '';
+      videoUrlInput.focus();
+    };
     
     let videoUrlTimeout;
     videoUrlInput.addEventListener('input', () => {
@@ -607,6 +674,23 @@ function renderPerTrackBackgrounds(reel, onChange) {
         track.backgroundVideo = videoUrlInput.value;
         onChange();
       }, 300);
+    });
+    
+    // Update filename display on blur
+    videoUrlInput.onblur = () => {
+      const newVideoFilename = extractFileName(videoUrlInput.value) || "Video URL";
+      videoFilenameDisplay.textContent = newVideoFilename;
+      if (newVideoFilename === "Video URL") {
+        videoFilenameDisplay.classList.add('placeholder');
+      } else {
+        videoFilenameDisplay.classList.remove('placeholder');
+      }
+      videoFilenameDisplay.style.display = '';
+      videoUrlInput.style.display = 'none';
+    };
+    
+    videoUrlInput.addEventListener('keydown', (e) => {
+      if (e.key === 'Enter') videoUrlInput.blur();
     });
     
     // Video file picker button
@@ -653,6 +737,14 @@ function renderPerTrackBackgrounds(reel, onChange) {
         onSelect: (filePath) => {
           videoUrlInput.value = filePath;
           track.backgroundVideo = filePath;
+          // Update filename display
+          const newVideoFilename = extractFileName(filePath) || "Video URL";
+          videoFilenameDisplay.textContent = newVideoFilename;
+          if (newVideoFilename === "Video URL") {
+            videoFilenameDisplay.classList.add('placeholder');
+          } else {
+            videoFilenameDisplay.classList.remove('placeholder');
+          }
           onChange();
         }
       });
@@ -669,6 +761,9 @@ function renderPerTrackBackgrounds(reel, onChange) {
     videoClearBtn.addEventListener('click', () => {
       videoUrlInput.value = '';
       track.backgroundVideo = '';
+      // Update filename display
+      videoFilenameDisplay.textContent = "Video URL";
+      videoFilenameDisplay.classList.add('placeholder');
       onChange();
     });
     
@@ -678,11 +773,13 @@ function renderPerTrackBackgrounds(reel, onChange) {
     
     // Append all elements to track row
     trackRow.appendChild(trackLabel);
+    trackRow.appendChild(imageFilenameDisplay);
     trackRow.appendChild(urlInput);
     trackRow.appendChild(filePickerBtn);
     trackRow.appendChild(cropBtn);
     trackRow.appendChild(clearBtn);
     trackRow.appendChild(separator);
+    trackRow.appendChild(videoFilenameDisplay);
     trackRow.appendChild(videoUrlInput);
     trackRow.appendChild(videoFilePickerBtn);
     trackRow.appendChild(videoClearBtn);

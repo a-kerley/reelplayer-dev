@@ -99,7 +99,7 @@
      PLAYBACK-IDLE BACKGROUND ANIMATION
      Controlled by Web Animations API in JavaScript
      ======================================== */
-  --playback-idle-zoom-speed: 180s;                 /* Duration for one full zoom cycle (min → max → min) */
+  --playback-idle-zoom-speed: 120s;                 /* Duration for one full zoom cycle (min → max → min) */
   --playback-idle-zoom-multiplier: 1.4;            /* Maximum zoom multiplier (1.4 = 140% of base zoom) */
   --playback-idle-zoom-ease: ease-in-out;          /* Easing function applied at keyframe transitions */
   --playback-idle-zoom-speed-up-duration: 900ms;   /* Time to smoothly ramp animation speed when entering idle */
@@ -108,7 +108,8 @@
   /* ========================================
      VIDEO BACKGROUND TRANSITIONS
      ======================================== */
-  --video-fade-duration: 2000ms;                   /* Duration of video fade in/out transitions */
+  --video-fade-in-duration: 2000ms;                /* Duration of video fade-in transition */
+  --video-fade-out-duration: 2000ms;               /* Duration of video fade-out transition */
   
   /* ========================================
      EXPANDABLE MODE - SCROLLBAR

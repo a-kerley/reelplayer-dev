@@ -2,17 +2,9 @@
 
 import { ValidationUtils } from './validation.js';
 import { openFilePicker } from './filePicker.js';
+import { extractFileName } from './urlUtils.js';
 
 export function updateTracksEditor(reel, onChange) {
-  function extractFileName(url) {
-    if (!url) return "";
-    return url
-      .split("/")
-      .pop()
-      .split("?")[0]
-      .replace(/[_-]/g, " ")
-      .replace(/\.[^/.]+$/, "");
-  }
 
   const tracksEditor = document.getElementById("tracksEditor");
   if (!tracksEditor) return;
@@ -20,7 +12,7 @@ export function updateTracksEditor(reel, onChange) {
   tracksEditor.innerHTML = "";
   
   reel.playlist.forEach((track, i) => {
-    const row = createTrackRow(track, i, reel, onChange, extractFileName);
+    const row = createTrackRow(track, i, reel, onChange);
     tracksEditor.appendChild(row);
   });
 
@@ -29,7 +21,7 @@ export function updateTracksEditor(reel, onChange) {
   tracksEditor.appendChild(addRow);
 }
 
-function createTrackRow(track, index, reel, onChange, extractFileName) {
+function createTrackRow(track, index, reel, onChange) {
   const row = document.createElement("div");
   row.style.display = "flex";
   row.style.gap = "0.5rem";
@@ -43,13 +35,13 @@ function createTrackRow(track, index, reel, onChange, extractFileName) {
   const titleField = createTitleField(track, onChange);
   
   // Copy filename button
-  const copyBtn = createCopyFilenameButton(track, titleField, onChange, extractFileName);
+  const copyBtn = createCopyFilenameButton(track, titleField, onChange);
   
   // File picker button
-  const filePickerBtn = createFilePickerButton(track, onChange, extractFileName);
+  const filePickerBtn = createFilePickerButton(track, onChange);
   
   // URL field with filename display
-  const { fileNameSpan, urlField } = createUrlField(track, onChange, extractFileName);
+  const { fileNameSpan, urlField } = createUrlField(track, onChange);
   
   // Remove button
   const removeBtn = createRemoveButton(index, reel, onChange);
@@ -110,7 +102,7 @@ function createTitleField(track, onChange) {
   return titleField;
 }
 
-function createUrlField(track, onChange, extractFileName) {
+function createUrlField(track, onChange) {
   const fileNameSpan = document.createElement("span");
   fileNameSpan.classList.add("filename-display");
   
@@ -175,14 +167,17 @@ function createUrlField(track, onChange, extractFileName) {
       fileNameSpan.classList.remove("placeholder");
     }
     
-    // Validate URL if provided
-    if (urlField.value.trim() && !ValidationUtils.isValidAudioUrl(urlField.value)) {
+    // Only validate and show error if URL is provided AND invalid
+    const trimmedUrl = urlField.value.trim();
+    if (trimmedUrl && !ValidationUtils.isValidAudioUrl(urlField.value)) {
+      // URL provided but invalid - show error
       ValidationUtils.showValidationFeedback(
         urlField, 
         "Please enter a valid audio file URL (mp3, wav, etc.) or supported streaming link",
         false
       );
     } else {
+      // URL is empty or valid - clear any error
       ValidationUtils.showValidationFeedback(urlField, "", true);
     }
     
@@ -203,7 +198,7 @@ function createUrlField(track, onChange, extractFileName) {
   return { fileNameSpan, urlField };
 }
 
-function createCopyFilenameButton(track, titleField, onChange, extractFileName) {
+function createCopyFilenameButton(track, titleField, onChange) {
   const copyBtn = document.createElement("button");
   copyBtn.className = "track-copy-btn";
   copyBtn.type = "button";
@@ -312,7 +307,7 @@ function setupDragAndDrop(row, index, reel, onChange) {
   });
 }
 
-function createFilePickerButton(track, onChange, extractFileName) {
+function createFilePickerButton(track, onChange) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "file-picker-btn";

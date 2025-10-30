@@ -19,8 +19,10 @@ export const playerApp = {
     showWaveformOnCollapse: true,
     settings: null,
     listeners: null,
-    playbackIdleTimeout: null,    // Single timeout for playback-idle transitions
-    collapsedIdleTimeout: null    // Single timeout for collapsed-idle transitions
+    playbackIdleTimeout: null,       // Single timeout for playback-idle transitions
+    collapsedIdleTimeout: null,      // Single timeout for collapsed-idle transitions
+    collapseDelayTimeout: null,      // Timeout for collapse delay
+    collapseFadeTimeout: null        // Timeout for collapse fade
   },
 
   // Background zoom animations (Web Animations API)
@@ -1560,17 +1562,30 @@ export const playerApp = {
    * @param {boolean} preservePosition - Whether to preserve current playback position
    * @returns {Promise} - Resolves when fade completes
    */
-  fadeOutVideo(videoElement, duration = 800, preservePosition = true) {
+  fadeOutVideo(videoElement, duration = 2000, preservePosition = true) {
     if (!videoElement) return Promise.resolve();
 
     return new Promise((resolve) => {
+      // Listen for transition end to ensure video pauses AFTER opacity reaches 0
+      const handleTransitionEnd = (e) => {
+        if (e.propertyName === 'opacity') {
+          videoElement.removeEventListener('transitionend', handleTransitionEnd);
+          videoElement.pause();
+          if (!preservePosition) videoElement.currentTime = 0;
+          resolve();
+        }
+      };
+      
+      videoElement.addEventListener('transitionend', handleTransitionEnd);
       videoElement.classList.remove('active');
       
+      // Fallback timeout in case transitionend doesn't fire
       setTimeout(() => {
+        videoElement.removeEventListener('transitionend', handleTransitionEnd);
         videoElement.pause();
         if (!preservePosition) videoElement.currentTime = 0;
         resolve();
-      }, duration);
+      }, duration + 500); // Extra safety margin
     });
   },
 
@@ -1665,24 +1680,6 @@ export const playerApp = {
       this.expandable.collapsedIdleTimeout = null;
     }
 
-    // Clear all idle transition timeouts to prevent orphaned callbacks
-    if (this.expandable.playbackIdleClassTimeout) {
-      clearTimeout(this.expandable.playbackIdleClassTimeout);
-      this.expandable.playbackIdleClassTimeout = null;
-    }
-    if (this.expandable.playbackIdleVideoTimeout) {
-      clearTimeout(this.expandable.playbackIdleVideoTimeout);
-      this.expandable.playbackIdleVideoTimeout = null;
-    }
-    if (this.expandable.collapsedIdleClassTimeout) {
-      clearTimeout(this.expandable.collapsedIdleClassTimeout);
-      this.expandable.collapsedIdleClassTimeout = null;
-    }
-    if (this.expandable.collapsedIdleVideoTimeout) {
-      clearTimeout(this.expandable.collapsedIdleVideoTimeout);
-      this.expandable.collapsedIdleVideoTimeout = null;
-    }
-
     // Check if we're in collapsed idle state with video playing
     const wasInCollapsedIdleWithVideo = wrapper.classList.contains('collapsed-idle') && 
                                          (this.videoState.mainVideoPlaying || this.videoState.trackVideoPlaying);
@@ -1717,16 +1714,6 @@ export const playerApp = {
   collapsePlayer() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
-
-    // Clear all playback idle transition timeouts
-    if (this.expandable.playbackIdleClassTimeout) {
-      clearTimeout(this.expandable.playbackIdleClassTimeout);
-      this.expandable.playbackIdleClassTimeout = null;
-    }
-    if (this.expandable.playbackIdleVideoTimeout) {
-      clearTimeout(this.expandable.playbackIdleVideoTimeout);
-      this.expandable.playbackIdleVideoTimeout = null;
-    }
 
     this.expandable.isExpanded = false;
     

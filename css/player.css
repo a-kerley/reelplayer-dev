@@ -337,7 +337,7 @@ button {
   opacity: 0;
   z-index: 2;
   border-radius: 8px;
-  transition: opacity var(--video-fade-duration) ease-in-out;
+  transition: opacity var(--video-fade-out-duration) ease-in-out;
   pointer-events: none;
   /* Force hardware acceleration and compositing */
   transform: translateZ(0);
