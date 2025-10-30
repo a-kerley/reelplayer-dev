@@ -166,10 +166,11 @@
 }
 
 /* ========================================
-   PLAYBACK IDLE STATE
+   IDLE STATES
+   Two types: playback-idle (expanded) and collapsed-idle (collapsed)
    ======================================== */
 
-/* Base transition for idle state elements (fast transition out) */
+/* Base transition for UI elements when exiting idle (fast transition out) */
 .player-wrapper.expandable-mode.expanded .volume-control,
 .player-wrapper.expandable-mode.expanded .playlist,
 .player-wrapper.expandable-mode.expanded .reel-title,
@@ -179,7 +180,8 @@
   transition: opacity var(--playback-idle-transition-out) ease-out;
 }
 
-/* Reduce UI opacity during playback when mouse is idle (slow transition in) */
+/* EXPANDED PLAYBACK IDLE STATE */
+/* Reduce UI opacity when player is expanded and idle during playback */
 .player-wrapper.expandable-mode.playback-idle #playPause,
 .player-wrapper.expandable-mode.playback-idle .volume-control,
 .player-wrapper.expandable-mode.playback-idle .playlist,
@@ -191,24 +193,52 @@
   transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
-/* Remove background blur and reduce overlay opacity during playback idle */
+/* Background overlay transitions (shared between both idle states) */
 .player-wrapper.expandable-mode::before {
   transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
               -webkit-backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
               opacity var(--playback-idle-overlay-transition-out) ease-out var(--playback-idle-overlay-delay-out);
 }
 
+/* Remove blur and reduce overlay opacity in expanded idle */
 .player-wrapper.expandable-mode.playback-idle::before {
   backdrop-filter: blur(0) !important;
   -webkit-backdrop-filter: blur(0) !important;
-  /* Note: opacity affects entire ::before layer (both background-color and backdrop-filter) */
   opacity: var(--playback-idle-overlay-opacity-multiplier);
   transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
               -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
               opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
 }
 
-/* Ensure play button stays aligned with waveform center despite margins */
+/* COLLAPSED IDLE STATE */
+/* Keep UI hidden (except waveform) when collapsed and idle during playback */
+.player-wrapper.expandable-mode.collapsed-idle #playPause,
+.player-wrapper.expandable-mode.collapsed-idle .volume-control,
+.player-wrapper.expandable-mode.collapsed-idle .playlist,
+.player-wrapper.expandable-mode.collapsed-idle .reel-title,
+.player-wrapper.expandable-mode.collapsed-idle .track-info,
+.player-wrapper.expandable-mode.collapsed-idle .playhead-time,
+.player-wrapper.expandable-mode.collapsed-idle #total-time {
+  opacity: 0 !important;
+}
+
+/* Reduce waveform opacity in collapsed idle */
+.player-wrapper.expandable-mode.playing-collapsed.collapsed-idle #waveform {
+  opacity: var(--playback-idle-collapsed-waveform-opacity) !important;
+  transition: opacity var(--playback-idle-transition-in) ease-out;
+}
+
+/* Remove blur and reduce overlay opacity in collapsed idle */
+.player-wrapper.expandable-mode.collapsed-idle::before {
+  backdrop-filter: blur(0) !important;
+  -webkit-backdrop-filter: blur(0) !important;
+  opacity: var(--playback-idle-overlay-opacity-multiplier) !important;
+  transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
+}
+
+/* Ensure play button stays aligned with waveform center */
 .player-wrapper.expandable-mode #playPause {
   transition: margin var(--expandable-transition-duration) var(--expandable-transition-easing),
               opacity var(--expandable-transition-duration) var(--expandable-transition-easing);

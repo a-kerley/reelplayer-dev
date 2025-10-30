@@ -869,8 +869,9 @@ export const playerApp = {
       if (!this.expandable.isExpanded) {
         this.expandPlayer();
       }
-      // Exit playback-idle state on mouse enter
+      // Exit both playback-idle and collapsed-idle states on mouse enter
       this.exitPlaybackIdle();
+      this.exitCollapsedIdle();
     };
 
     const handleMouseLeave = () => {
@@ -910,67 +911,98 @@ export const playerApp = {
       }
       this.expandable.listeners = null;
     }
-    // Clear any pending idle timeout
-    this.clearPlaybackIdleTimeout();
+    
+    // Clear all idle-related timeouts
+    this.clearAllIdleTimeouts();
+  },
+
+  clearAllIdleTimeouts() {
+    // Clear playback idle timer
+    if (this.expandable.playbackIdleTimeout) {
+      clearTimeout(this.expandable.playbackIdleTimeout);
+      this.expandable.playbackIdleTimeout = null;
+    }
+    
+    // Clear collapsed idle timer
+    if (this.expandable.collapsedIdleTimeout) {
+      clearTimeout(this.expandable.collapsedIdleTimeout);
+      this.expandable.collapsedIdleTimeout = null;
+    }
   },
 
   resetPlaybackIdleTimer() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
-    // Only set idle timer during playback
     const isPlaying = this.wavesurfer?.isPlaying();
     if (!isPlaying) return;
 
-    // Clear existing timeout
-    this.clearPlaybackIdleTimeout();
-
-    // Exit idle state immediately on movement
+    // Clear existing timeout and exit current idle state
+    if (this.expandable.playbackIdleTimeout) {
+      clearTimeout(this.expandable.playbackIdleTimeout);
+      this.expandable.playbackIdleTimeout = null;
+    }
     this.exitPlaybackIdle();
 
-    // Get idle delay from CSS variable
+    // Set new timeout to enter idle state
     const styles = getComputedStyle(document.documentElement);
     const idleDelay = parseInt(styles.getPropertyValue('--playback-idle-delay')) || 1000;
-
-    // Set new timeout
+    
     this.expandable.playbackIdleTimeout = setTimeout(() => {
       this.enterPlaybackIdle();
     }, idleDelay);
   },
 
-  clearPlaybackIdleTimeout() {
-    if (this.expandable.playbackIdleTimeout) {
-      clearTimeout(this.expandable.playbackIdleTimeout);
-      this.expandable.playbackIdleTimeout = null;
-    }
-  },
-
   // ========================================
-  // PLAYBACK-IDLE STATE MANAGEMENT
+  // IDLE STATE MANAGEMENT
   // ========================================
 
+  // Enter expanded playback idle state (when player is open and idle during playback)
   enterPlaybackIdle() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
-    // Only enter idle during playback
     const isPlaying = this.wavesurfer?.isPlaying();
     if (!isPlaying) return;
 
     wrapper.classList.add('playback-idle');
     
-    // Get speed-up duration from CSS and resume animations with smooth transition
     const duration = this.parseCssDuration('--playback-idle-zoom-speed-up-duration', 800);
     this.playBackgroundAnimations(true, duration);
   },
 
+  // Exit expanded playback idle state
   exitPlaybackIdle() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
     wrapper.classList.remove('playback-idle');
     
-    // Get slow-down duration from CSS and pause animations with smooth transition
+    const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
+    this.pauseBackgroundAnimations(true, duration);
+  },
+
+  // Enter collapsed idle state (when player is collapsed and idle during playback)
+  enterCollapsedIdle() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    const isPlaying = this.wavesurfer?.isPlaying();
+    if (!isPlaying || this.expandable.isExpanded) return;
+
+    wrapper.classList.add('collapsed-idle');
+    
+    const duration = this.parseCssDuration('--playback-idle-zoom-speed-up-duration', 800);
+    this.playBackgroundAnimations(true, duration);
+  },
+
+  // Exit collapsed idle state
+  exitCollapsedIdle() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    wrapper.classList.remove('collapsed-idle');
+    
     const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
     this.pauseBackgroundAnimations(true, duration);
   },
@@ -1206,6 +1238,13 @@ export const playerApp = {
       clearTimeout(this.expandable.collapseFadeTimeout);
       this.expandable.collapseFadeTimeout = null;
     }
+    if (this.expandable.collapsedIdleTimeout) {
+      clearTimeout(this.expandable.collapsedIdleTimeout);
+      this.expandable.collapsedIdleTimeout = null;
+    }
+
+    // Exit collapsed idle state if active
+    this.exitCollapsedIdle();
 
     // Remove collapsing classes and ensure expanded state
     wrapper.classList.remove('pre-collapsing');
@@ -1237,6 +1276,7 @@ export const playerApp = {
     const styles = getComputedStyle(document.documentElement);
     const collapseDelay = parseInt(styles.getPropertyValue('--expandable-collapse-delay')) || 1000;
     const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
+    const collapsedIdleDelay = parseInt(styles.getPropertyValue('--playback-idle-collapsed-delay')) || 1000;
     
     // Wait for delay, then trigger fade-out
     this.expandable.collapseDelayTimeout = setTimeout(() => {
@@ -1251,6 +1291,14 @@ export const playerApp = {
         // Clear timeout references
         this.expandable.collapseDelayTimeout = null;
         this.expandable.collapseFadeTimeout = null;
+        
+        // Re-enter idle state after collapse if still playing
+        this.expandable.collapsedIdleTimeout = setTimeout(() => {
+          const isPlaying = this.wavesurfer?.isPlaying();
+          if (isPlaying && !this.expandable.isExpanded) {
+            this.enterCollapsedIdle();
+          }
+        }, collapsedIdleDelay);
       }, fadeDuration);
     }, collapseDelay);
   },
