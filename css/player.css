@@ -401,6 +401,49 @@ button {
   z-index: 7;
 }
 
+/* ========================================
+   STATIC MODE PLAYBACK-IDLE STATE
+   ======================================== */
+
+/* Base transition for UI elements when exiting idle (fast transition out) */
+.player-wrapper:not(.expandable-mode) .volume-control,
+.player-wrapper:not(.expandable-mode) .playlist,
+.player-wrapper:not(.expandable-mode) .reel-title,
+.player-wrapper:not(.expandable-mode) .track-info,
+.player-wrapper:not(.expandable-mode) .playhead-time,
+.player-wrapper:not(.expandable-mode) #total-time {
+  transition: opacity var(--playback-idle-transition-out) ease-out;
+}
+
+/* Reduce UI opacity when player is in static mode and idle during playback */
+.player-wrapper:not(.expandable-mode).playback-idle #playPause,
+.player-wrapper:not(.expandable-mode).playback-idle .volume-control,
+.player-wrapper:not(.expandable-mode).playback-idle .playlist,
+.player-wrapper:not(.expandable-mode).playback-idle .reel-title,
+.player-wrapper:not(.expandable-mode).playback-idle .track-info,
+.player-wrapper:not(.expandable-mode).playback-idle .playhead-time,
+.player-wrapper:not(.expandable-mode).playback-idle #total-time {
+  opacity: var(--playback-idle-opacity) !important;
+  transition: opacity var(--playback-idle-transition-in) ease-out;
+}
+
+/* Background overlay transitions for static mode */
+.player-wrapper:not(.expandable-mode)::before {
+  transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
+              -webkit-backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
+              opacity var(--playback-idle-overlay-transition-out) ease-out var(--playback-idle-overlay-delay-out);
+}
+
+/* Remove blur and reduce overlay opacity in static mode idle */
+.player-wrapper:not(.expandable-mode).playback-idle::before {
+  backdrop-filter: blur(0) !important;
+  -webkit-backdrop-filter: blur(0) !important;
+  opacity: var(--playback-idle-overlay-opacity-multiplier);
+  transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
+              opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
+}
+
 .loading {
   position: absolute;
   top: 0;

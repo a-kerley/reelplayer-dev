@@ -25,6 +25,12 @@ export const playerApp = {
     collapseFadeTimeout: null        // Timeout for collapse fade
   },
 
+  // Static mode state - for idle state management
+  static: {
+    listeners: null,
+    playbackIdleTimeout: null        // Timeout for playback-idle in static mode
+  },
+
   // Background zoom animations (Web Animations API)
   backgroundAnimations: {
     main: null,        // Animation for main background (::after)
@@ -1042,14 +1048,63 @@ export const playerApp = {
     this.clearAllIdleTimeouts();
   },
 
-  clearAllIdleTimeouts() {
-    // Clear playback idle entry timer
-    if (this.expandable.playbackIdleTimeout) {
-      clearTimeout(this.expandable.playbackIdleTimeout);
-      this.expandable.playbackIdleTimeout = null;
+  setupStaticModeInteractions() {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper) return;
+
+    // Clean up old listeners if they exist
+    this.cleanupStaticModeListeners();
+
+    // Create new listener functions and store references for cleanup
+    const handleMouseEnter = () => {
+      // Exit playback-idle state on mouse enter
+      this.exitPlaybackIdle();
+    };
+
+    const handleMouseLeave = () => {
+      // Clear idle timeout when mouse leaves
+      this.clearPlaybackIdleTimeout();
+    };
+
+    const handleMouseMove = () => {
+      // Reset idle timer on mouse movement
+      this.resetPlaybackIdleTimer();
+    };
+
+    // Store listener references for cleanup
+    this.static.listeners = {
+      wrapper,
+      mouseEnter: handleMouseEnter,
+      mouseLeave: handleMouseLeave,
+      mouseMove: handleMouseMove
+    };
+
+    // Attach event listeners
+    wrapper.addEventListener('mouseenter', handleMouseEnter);
+    wrapper.addEventListener('mouseleave', handleMouseLeave);
+    wrapper.addEventListener('mousemove', handleMouseMove);
+  },
+
+  cleanupStaticModeListeners() {
+    if (this.static.listeners) {
+      const { wrapper, mouseEnter, mouseLeave, mouseMove } = this.static.listeners;
+      if (wrapper) {
+        wrapper.removeEventListener('mouseenter', mouseEnter);
+        wrapper.removeEventListener('mouseleave', mouseLeave);
+        wrapper.removeEventListener('mousemove', mouseMove);
+      }
+      this.static.listeners = null;
     }
     
-    // Clear all idle state timeouts
+    // Clear static mode idle timeout
+    if (this.static.playbackIdleTimeout) {
+      clearTimeout(this.static.playbackIdleTimeout);
+      this.static.playbackIdleTimeout = null;
+    }
+  },
+
+  clearAllIdleTimeouts() {
+    // Clear expandable mode idle timeouts
     if (this.expandable.playbackIdleTimeout) {
       clearTimeout(this.expandable.playbackIdleTimeout);
       this.expandable.playbackIdleTimeout = null;
@@ -1057,6 +1112,12 @@ export const playerApp = {
     if (this.expandable.collapsedIdleTimeout) {
       clearTimeout(this.expandable.collapsedIdleTimeout);
       this.expandable.collapsedIdleTimeout = null;
+    }
+    
+    // Clear static mode idle timeout
+    if (this.static.playbackIdleTimeout) {
+      clearTimeout(this.static.playbackIdleTimeout);
+      this.static.playbackIdleTimeout = null;
     }
   },
 
@@ -1080,16 +1141,23 @@ export const playerApp = {
     const styles = getComputedStyle(document.documentElement);
     const idleDelay = parseInt(styles.getPropertyValue('--playback-idle-delay')) || 1000;
     
-    this.expandable.playbackIdleTimeout = setTimeout(() => {
+    // Store timeout in the appropriate mode state
+    const timeoutRef = setTimeout(() => {
       this.enterPlaybackIdle();
     }, idleDelay);
+    
+    if (this.expandable.enabled) {
+      this.expandable.playbackIdleTimeout = timeoutRef;
+    } else {
+      this.static.playbackIdleTimeout = timeoutRef;
+    }
   },
 
   // ========================================
   // IDLE STATE MANAGEMENT
   // ========================================
 
-  // Enter expanded playback idle state (when player is open and idle during playback)
+  // Enter playback idle state (works for both expandable and static modes)
   enterPlaybackIdle() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
@@ -1103,15 +1171,19 @@ export const playerApp = {
     this.playBackgroundAnimations(true, duration);
   },
 
-  // Exit expanded playback idle state
+  // Exit playback idle state (works for both expandable and static modes)
   exitPlaybackIdle() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper || !wrapper.classList.contains('playback-idle')) return;
 
-    // Clear any pending timeouts
+    // Clear any pending timeouts from either mode
     if (this.expandable.playbackIdleTimeout) {
       clearTimeout(this.expandable.playbackIdleTimeout);
       this.expandable.playbackIdleTimeout = null;
+    }
+    if (this.static.playbackIdleTimeout) {
+      clearTimeout(this.static.playbackIdleTimeout);
+      this.static.playbackIdleTimeout = null;
     }
 
     // Remove idle class to trigger CSS transitions
@@ -2511,8 +2583,10 @@ export const playerApp = {
       } else {
         wrapper.classList.remove('playing-collapsed');
       }
+    }
 
-      // Handle playback-idle state
+    // Handle playback-idle state for BOTH expandable and static modes
+    if (wrapper) {
       if (playing) {
         // Start idle timer when playback starts
         this.resetPlaybackIdleTimer();
@@ -2527,6 +2601,7 @@ export const playerApp = {
   renderPlayer({ showTitle, title, playlist, reel }) {
     // Clean up old event listeners before re-rendering
     this.cleanupExpandableModeListeners();
+    this.cleanupStaticModeListeners();
     
     // Set expandable mode state - consolidated
     this.expandable.enabled = reel?.mode === 'expandable';
@@ -2611,10 +2686,13 @@ export const playerApp = {
     // Store current reel settings for background transitions
     this.currentReelSettings = reel;
     
-    // Set up expandable mode interactions if enabled
+    // Set up mode-specific interactions
     if (this.expandable.enabled) {
       this.setupExpandableModeInteractions();
       this.validateProjectTitleImage();
+    } else {
+      // Set up static mode interactions for idle state
+      this.setupStaticModeInteractions();
     }
     
     this.setupWaveSurfer();
