@@ -1,5 +1,5 @@
 {
-  "generated": "2025-10-29T17:00:18.513Z",
+  "generated": "2025-10-30T00:59:45.752Z",
   "directory": "assets/images/backgrounds",
   "extensions": [
     ".jpg",
@@ -9,5 +9,10 @@
     ".svg",
     ".webp"
   ],
-  "files": []
+  "files": [
+    {
+      "name": "BlackHoleSim.webp",
+      "path": "assets/images/backgrounds/Test-Images/BlackHoleSim.webp"
+    }
+  ]
 }
