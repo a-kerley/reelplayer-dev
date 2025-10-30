@@ -1,4 +1,5 @@
 // previewManager.js - Handles preview functionality with template-based approach
+import { getColorFilters } from './colorUtils.js';
 
 export class PreviewManager {
   constructor() {
@@ -9,68 +10,6 @@ export class PreviewManager {
         No tracks available. Please add some tracks in the builder.
       </div>
     `;
-  }
-
-  // Helper function to convert hex to HSL and calculate hue rotation for Lottie
-  hexToHue(hex) {
-    // Remove # if present
-    hex = hex.replace('#', '');
-    
-    // Convert hex to RGB
-    const r = parseInt(hex.substr(0, 2), 16) / 255;
-    const g = parseInt(hex.substr(2, 2), 16) / 255;
-    const b = parseInt(hex.substr(4, 2), 16) / 255;
-    
-    // Find max and min values
-    const max = Math.max(r, g, b);
-    const min = Math.min(r, g, b);
-    
-    let h = 0;
-    if (max !== min) {
-      const delta = max - min;
-      switch (max) {
-        case r: h = ((g - b) / delta + (g < b ? 6 : 0)) / 6; break;
-        case g: h = ((b - r) / delta + 2) / 6; break;
-        case b: h = ((r - g) / delta + 4) / 6; break;
-      }
-    }
-    
-    // Convert to degrees
-    return Math.round(h * 360);
-  }
-
-  // Helper function to get appropriate color filters for Lottie
-  getColorFilters(hexColor) {
-    // Remove # if present
-    hexColor = hexColor.replace('#', '');
-    
-    // Convert hex to RGB
-    const r = parseInt(hexColor.substr(0, 2), 16);
-    const g = parseInt(hexColor.substr(2, 2), 16);
-    const b = parseInt(hexColor.substr(4, 2), 16);
-    
-    // Calculate brightness (perceived luminance)
-    const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-    
-    // For white/light colors (brightness > 200), use a simpler approach
-    if (brightness > 200) {
-      return {
-        brightness: brightness / 128, // Scale to appropriate brightness
-        saturation: 0, // Remove saturation for neutral colors
-        hueRotation: 0
-      };
-    }
-    
-    // For colored values, use hue rotation
-    const baseHue = this.hexToHue("#2a0026");
-    const targetHue = this.hexToHue(hexColor);
-    const hueRotation = targetHue - baseHue;
-    
-    return {
-      brightness: 1,
-      saturation: 1.2,
-      hueRotation: hueRotation
-    };
   }
 
   initialize(containerId) {
@@ -160,7 +99,7 @@ export class PreviewManager {
     const uiAccentColor = reel.varUiAccent || "#2a0026";
     
     // For better color matching, especially with white/light colors
-    const colorFilters = this.getColorFilters(uiAccentColor);
+    const colorFilters = getColorFilters(uiAccentColor);
 
     return {
       // Color variables

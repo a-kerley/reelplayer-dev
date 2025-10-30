@@ -1,4 +1,6 @@
 // player.js
+import { colorToRgba } from './modules/colorUtils.js';
+
 export const playerApp = {
   elements: {},
   isWaveformReady: false,
@@ -16,7 +18,9 @@ export const playerApp = {
     isPlaying: false,
     showWaveformOnCollapse: true,
     settings: null,
-    listeners: null
+    listeners: null,
+    playbackIdleTimeout: null,    // Single timeout for playback-idle transitions
+    collapsedIdleTimeout: null    // Single timeout for collapsed-idle transitions
   },
 
   // Background zoom animations (Web Animations API)
@@ -24,6 +28,16 @@ export const playerApp = {
     main: null,        // Animation for main background (::after)
     layerA: null,      // Animation for track background layer A
     layerB: null       // Animation for track background layer B
+  },
+
+  // Video background state
+  videoState: {
+    mainVideo: null,           // Reference to main video element
+    trackVideo: null,          // Reference to track video element
+    currentMainVideoUrl: '',   // Currently loaded main video URL
+    currentTrackVideoUrl: '',  // Currently loaded track video URL
+    mainVideoPlaying: false,   // Is main video currently playing
+    trackVideoPlaying: false   // Is track video currently playing
   },
 
   cacheElements() {
@@ -41,6 +55,10 @@ export const playerApp = {
     this.elements.playlist = document.getElementById("playlist");
     this.elements.playerWrapper = document.querySelector(".player-wrapper");
     this.elements.projectTitleOverlay = document.querySelector(".project-title-overlay");
+    
+    // Cache video elements
+    this.videoState.mainVideo = document.querySelector(".main-video");
+    this.videoState.trackVideo = document.querySelector(".track-video");
   },
 
   renderPlaylist(playlist) {
@@ -83,10 +101,8 @@ export const playerApp = {
       setTimeout(() => this.preloadDurations(playlist), 200);
     }
     
-    // Initialize custom scrollbar with delay to ensure DOM is ready
-    setTimeout(() => {
-      this.initCustomScrollbar(playlistEl);
-    }, 300);
+    // Initialize custom scrollbar immediately - DOM is ready after innerHTML
+    this.initCustomScrollbar(playlistEl);
   },
 
   initCustomScrollbar(playlistEl) {
@@ -98,32 +114,6 @@ export const playerApp = {
 
     // Get UI accent color from CSS variable
     const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || '#2a0026';
-    
-    /**
-     * Convert any color format to rgba with specified opacity
-     * @param {string} color - Color in hex, rgb, or rgba format
-     * @param {number} opacity - Opacity value between 0 and 1
-     * @returns {string} Color in rgba format
-     */
-    const colorToRgba = (color, opacity) => {
-      // If already rgba/rgb, extract the rgb values
-      if (color.startsWith('rgb')) {
-        const match = color.match(/rgba?\(([\d.]+),\s*([\d.]+),\s*([\d.]+)/);
-        if (match) {
-          const r = Math.round(parseFloat(match[1]));
-          const g = Math.round(parseFloat(match[2]));
-          const b = Math.round(parseFloat(match[3]));
-          return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-        }
-      }
-      // If hex, convert to rgba
-      color = color.replace('#', '');
-      const r = parseInt(color.substring(0, 2), 16);
-      const g = parseInt(color.substring(2, 4), 16);
-      const b = parseInt(color.substring(4, 6), 16);
-      return `rgba(${r}, ${g}, ${b}, ${opacity})`;
-    };
-    
     const thumbColor = colorToRgba(accentColor, 0.3);
 
     // Create custom scrollbar elements - position relative to playlist's parent
@@ -305,9 +295,14 @@ export const playerApp = {
       }
     });
 
-    // Initial update with delay to ensure playlist is rendered
-    setTimeout(updateScrollbar, 100);
-    setTimeout(updateScrollbar, 500);
+    // Initial update immediately
+    updateScrollbar();
+    
+    // Additional delayed updates only if in expandable mode (height may change during transitions)
+    if (this.expandable.enabled) {
+      setTimeout(updateScrollbar, 100);
+      setTimeout(updateScrollbar, 500);
+    }
     
     // Update on window resize
     const resizeObserver = new ResizeObserver(updateScrollbar);
@@ -376,6 +371,9 @@ export const playerApp = {
     
     // Update track background with cross-dissolve
     this.updateTrackBackground(index);
+    
+    // Pre-load video for the new track (will play when audio starts)
+    this.preloadVideos();
     
     // Reset playhead to beginning when changing tracks
     if (playerApp.wavesurfer) {
@@ -705,6 +703,10 @@ export const playerApp = {
       this.wavesurfer.setOptions({ cursorColor: accentColor });
       this.elements.waveform.classList.add('playing');
       this.updatePlayingState(true);
+      
+      // Start video playback
+      this.playVideo();
+      
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
@@ -712,6 +714,10 @@ export const playerApp = {
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
       this.updatePlayingState(false);
+      
+      // Stop video playback
+      this.stopVideo();
+      
       document.dispatchEvent(new CustomEvent("playback:pause"));
     });
     this.wavesurfer.on("finish", () => {
@@ -719,6 +725,10 @@ export const playerApp = {
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
       this.updatePlayingState(false);
+      
+      // Stop video playback
+      this.stopVideo();
+      
       document.dispatchEvent(new CustomEvent("playback:finish"));
     });
     this.wavesurfer.on("seek", () => {
@@ -917,17 +927,26 @@ export const playerApp = {
   },
 
   clearAllIdleTimeouts() {
-    // Clear playback idle timer
+    // Clear playback idle entry timer
     if (this.expandable.playbackIdleTimeout) {
       clearTimeout(this.expandable.playbackIdleTimeout);
       this.expandable.playbackIdleTimeout = null;
     }
     
-    // Clear collapsed idle timer
+    // Clear all idle state timeouts
+    if (this.expandable.playbackIdleTimeout) {
+      clearTimeout(this.expandable.playbackIdleTimeout);
+      this.expandable.playbackIdleTimeout = null;
+    }
     if (this.expandable.collapsedIdleTimeout) {
       clearTimeout(this.expandable.collapsedIdleTimeout);
       this.expandable.collapsedIdleTimeout = null;
     }
+  },
+
+  clearPlaybackIdleTimeout() {
+    // Clear all idle timeouts (simplified - no separate entry/exit tracking)
+    this.clearAllIdleTimeouts();
   },
 
   resetPlaybackIdleTimer() {
@@ -938,10 +957,7 @@ export const playerApp = {
     if (!isPlaying) return;
 
     // Clear existing timeout and exit current idle state
-    if (this.expandable.playbackIdleTimeout) {
-      clearTimeout(this.expandable.playbackIdleTimeout);
-      this.expandable.playbackIdleTimeout = null;
-    }
+    this.clearPlaybackIdleTimeout();
     this.exitPlaybackIdle();
 
     // Set new timeout to enter idle state
@@ -965,8 +981,8 @@ export const playerApp = {
     const isPlaying = this.wavesurfer?.isPlaying();
     if (!isPlaying) return;
 
+    // Add idle class and start background animations
     wrapper.classList.add('playback-idle');
-    
     const duration = this.parseCssDuration('--playback-idle-zoom-speed-up-duration', 800);
     this.playBackgroundAnimations(true, duration);
   },
@@ -974,10 +990,18 @@ export const playerApp = {
   // Exit expanded playback idle state
   exitPlaybackIdle() {
     const wrapper = this.elements.playerWrapper;
-    if (!wrapper) return;
+    if (!wrapper || !wrapper.classList.contains('playback-idle')) return;
 
+    // Clear any pending timeouts
+    if (this.expandable.playbackIdleTimeout) {
+      clearTimeout(this.expandable.playbackIdleTimeout);
+      this.expandable.playbackIdleTimeout = null;
+    }
+
+    // Remove idle class to trigger CSS transitions
     wrapper.classList.remove('playback-idle');
-    
+
+    // Resume background animations
     const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
     this.pauseBackgroundAnimations(true, duration);
   },
@@ -990,8 +1014,8 @@ export const playerApp = {
     const isPlaying = this.wavesurfer?.isPlaying();
     if (!isPlaying || this.expandable.isExpanded) return;
 
+    // Add idle class and start background animations
     wrapper.classList.add('collapsed-idle');
-    
     const duration = this.parseCssDuration('--playback-idle-zoom-speed-up-duration', 800);
     this.playBackgroundAnimations(true, duration);
   },
@@ -999,10 +1023,18 @@ export const playerApp = {
   // Exit collapsed idle state
   exitCollapsedIdle() {
     const wrapper = this.elements.playerWrapper;
-    if (!wrapper) return;
+    if (!wrapper || !wrapper.classList.contains('collapsed-idle')) return;
 
+    // Clear any pending timeouts
+    if (this.expandable.collapsedIdleTimeout) {
+      clearTimeout(this.expandable.collapsedIdleTimeout);
+      this.expandable.collapsedIdleTimeout = null;
+    }
+
+    // Remove idle class to trigger CSS transitions
     wrapper.classList.remove('collapsed-idle');
-    
+
+    // Resume background animations
     const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
     this.pauseBackgroundAnimations(true, duration);
   },
@@ -1192,6 +1224,396 @@ export const playerApp = {
     this.stopAnimation(this.backgroundAnimations.layerB, smooth, duration);
   },
 
+  // ========================================
+  // VIDEO BACKGROUND MANAGEMENT
+  // ========================================
+
+  /**
+   * Get video transition duration from CSS variables
+   * @param {string} type - 'fadeIn' or 'fadeOut'
+   * @returns {number} - Duration in milliseconds
+   */
+  getVideoTransitionDuration(type = 'fadeIn') {
+    const varName = type === 'fadeIn' ? '--video-fade-in-duration' : '--video-fade-out-duration';
+    return this.parseCssDuration(varName, 800);
+  },
+
+  /**
+   * Start video playback (tied to audio playback)
+   * Loads and fades in the appropriate video for the current track
+   */
+  async playVideo() {
+    const track = this.currentReelSettings?.playlist?.[this.currentTrackIndex];
+    const reel = this.currentReelSettings;
+    const activeVideo = this.getActiveVideo(track, reel);
+    
+    if (!activeVideo.url) {
+      console.log('[Play Video] No video URL configured');
+      return;
+    }
+    
+    console.log(`[Play Video] Starting ${activeVideo.type} video playback`);
+
+    const targetElement = activeVideo.type === 'track' ? this.videoState.trackVideo : this.videoState.mainVideo;
+    const otherElement = activeVideo.type === 'track' ? this.videoState.mainVideo : this.videoState.trackVideo;
+    const currentUrlKey = activeVideo.type === 'track' ? 'currentTrackVideoUrl' : 'currentMainVideoUrl';
+
+    // Fade out other video if active
+    if (otherElement?.classList.contains('active')) {
+      this.fadeOutVideo(otherElement, this.getVideoTransitionDuration('fadeOut'), true);
+      this.videoState.mainVideoPlaying = activeVideo.type !== 'track' ? false : this.videoState.mainVideoPlaying;
+      this.videoState.trackVideoPlaying = activeVideo.type === 'track' ? false : this.videoState.trackVideoPlaying;
+    }
+
+    // If video already active with same URL, just ensure it's playing
+    if (targetElement.classList.contains('active') && this.videoState[currentUrlKey] === activeVideo.url) {
+      console.log(`[Play Video] ${activeVideo.type} video already active, resuming`);
+      this.resumeVideo(targetElement);
+      return;
+    }
+
+    // Load and fade in new video
+    try {
+      const loadStart = performance.now();
+      console.log(`[Play Video] Loading ${activeVideo.type} video - ReadyState: ${targetElement.readyState}`);
+      
+      await this.loadVideo(targetElement, activeVideo.url, activeVideo.type);
+      const loadTime = performance.now() - loadStart;
+      
+      console.log(`[Play Video] Video loaded in ${loadTime.toFixed(0)}ms, fading in...`);
+      this.videoState[currentUrlKey] = activeVideo.url;
+      
+      await this.fadeInVideo(targetElement, this.getVideoTransitionDuration('fadeIn'));
+      console.log(`[Play Video] ✓ ${activeVideo.type} video now playing`);
+      
+      if (activeVideo.type === 'track') {
+        this.videoState.trackVideoPlaying = true;
+      } else {
+        this.videoState.mainVideoPlaying = true;
+      }
+      
+      // Pause background animations when video is playing
+      this.pauseBackgroundAnimations(false, 0);
+    } catch (err) {
+      console.error('[Play Video] ✗ Error playing video:', err);
+    }
+  },
+
+  /**
+   * Stop video playback (tied to audio playback)
+   * Fades out any active videos
+   */
+  async stopVideo() {
+    const fadeOutDuration = this.getVideoTransitionDuration('fadeOut');
+    const promises = [];
+
+    if (this.videoState.mainVideo?.classList.contains('active')) {
+      promises.push(this.fadeOutVideo(this.videoState.mainVideo, fadeOutDuration, true));
+      this.videoState.mainVideoPlaying = false;
+    }
+
+    if (this.videoState.trackVideo?.classList.contains('active')) {
+      promises.push(this.fadeOutVideo(this.videoState.trackVideo, fadeOutDuration, true));
+      this.videoState.trackVideoPlaying = false;
+    }
+
+    await Promise.all(promises);
+    
+    // Resume background animations when video stops
+    const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
+    this.pauseBackgroundAnimations(true, duration);
+  },
+
+  /**
+   * Pre-load videos for the current track to enable smooth playback
+   * Called automatically when player renders and when tracks change
+   */
+  preloadVideos() {
+    const track = this.currentReelSettings?.playlist?.[this.currentTrackIndex];
+    const reel = this.currentReelSettings;
+    
+    if (!track || !reel) return;
+    
+    const activeVideo = this.getActiveVideo(track, reel);
+    if (!activeVideo.url) return;
+    
+    // Determine which video element to pre-load
+    const targetElement = activeVideo.type === 'track' ? this.videoState.trackVideo : this.videoState.mainVideo;
+    const currentUrlKey = activeVideo.type === 'track' ? 'currentTrackVideoUrl' : 'currentMainVideoUrl';
+    
+    // Only pre-load if URL has changed or video element doesn't have source loaded
+    const needsLoad = this.videoState[currentUrlKey] !== activeVideo.url || 
+                      !targetElement.src || 
+                      targetElement.src !== activeVideo.url;
+    
+    if (needsLoad) {
+      // Pre-load in background without blocking
+      this.loadVideo(targetElement, activeVideo.url, activeVideo.type)
+        .then(() => {
+          this.videoState[currentUrlKey] = activeVideo.url;
+        })
+        .catch(err => {
+          console.error('Video pre-load failed (will retry on idle):', err);
+        });
+    }
+  },
+
+  /**
+   * Load a video URL into a video element
+   * @param {HTMLVideoElement} videoElement - The video element to load into
+   * @param {string} videoUrl - The URL of the video to load
+   * @param {string} type - 'main' or 'track' for tracking purposes
+   * @returns {Promise} - Resolves when video is ready to play
+   */
+  loadVideo(videoElement, videoUrl, type = 'main') {
+    if (!videoElement || !videoUrl || !videoUrl.trim()) {
+      return Promise.reject(new Error('Invalid video element or URL'));
+    }
+
+    return new Promise((resolve, reject) => {
+      // Log buffering progress
+      let progressHandler;
+      
+      const cleanup = () => {
+        videoElement.removeEventListener('loadedmetadata', handleSuccess);
+        videoElement.removeEventListener('canplay', handleSuccess);
+        videoElement.removeEventListener('canplaythrough', handleSuccess);
+        videoElement.removeEventListener('error', handleError);
+        if (progressHandler) {
+          videoElement.removeEventListener('progress', progressHandler);
+        }
+        clearTimeout(timeoutId);
+      };
+
+      const handleSuccess = () => {
+        cleanup();
+        resolve();
+      };
+
+      const handleError = (e) => {
+        cleanup();
+        console.error(`Video load error (${type}):`, e, videoElement.error);
+        reject(new Error(`Failed to load video: ${videoUrl}`));
+      };
+
+      const handleTimeout = () => {
+        cleanup();
+        console.warn(`Video load timeout (${type}): ${videoUrl}. ReadyState: ${videoElement.readyState}`);
+        // If we have at least metadata, allow it to proceed
+        if (videoElement.readyState >= 1) {
+          resolve();
+        } else {
+          reject(new Error('Video load timeout'));
+        }
+      };
+
+      // Set 10 second timeout (increased for large videos)
+      const timeoutId = setTimeout(handleTimeout, 10000);
+
+      // Listen for various ready states (canplaythrough = fully buffered)
+      videoElement.addEventListener('loadedmetadata', handleSuccess, { once: true });
+      videoElement.addEventListener('canplay', handleSuccess, { once: true });
+      videoElement.addEventListener('canplaythrough', handleSuccess, { once: true });
+      videoElement.addEventListener('error', handleError, { once: true });
+
+      // Track buffering progress
+      progressHandler = () => {
+        if (videoElement.buffered.length > 0) {
+          const bufferedEnd = videoElement.buffered.end(0);
+          const duration = videoElement.duration;
+          const percentBuffered = duration > 0 ? (bufferedEnd / duration * 100).toFixed(1) : 0;
+          console.log(`[Video Load] ${type} buffering: ${percentBuffered}% (${bufferedEnd.toFixed(1)}s / ${duration.toFixed(1)}s) - ReadyState: ${videoElement.readyState}`);
+        }
+      };
+      videoElement.addEventListener('progress', progressHandler);
+
+      // Set video source and trigger load with aggressive preload
+      videoElement.src = videoUrl;
+      videoElement.preload = 'auto'; // Tell browser to buffer as much as possible
+      console.log(`[Video Load] Starting load for ${type} video:`, videoUrl);
+      videoElement.load();
+    });
+  },
+
+  /**
+   * Fade in a video element and start playback
+   * @param {HTMLVideoElement} videoElement - The video element to fade in
+   * @param {number} duration - Fade duration in milliseconds
+   * @returns {Promise} - Resolves when fade completes
+   */
+  async fadeInVideo(videoElement, duration = 800) {
+    if (!videoElement) return Promise.resolve();
+
+    // Ensure video is ready to play (readyState >= 2 means we have current frame data)
+    if (videoElement.readyState < 2) {
+      await new Promise((resolve) => {
+        const checkReady = () => {
+          if (videoElement.readyState >= 2) {
+            videoElement.removeEventListener('loadeddata', checkReady);
+            resolve();
+          }
+        };
+        
+        // If already ready, resolve immediately
+        if (videoElement.readyState >= 2) {
+          resolve();
+        } else {
+          videoElement.addEventListener('loadeddata', checkReady, { once: true });
+          // Fallback timeout after 2 seconds
+          setTimeout(() => {
+            videoElement.removeEventListener('loadeddata', checkReady);
+            resolve();
+          }, 2000);
+        }
+      });
+    }
+
+    return new Promise(async (resolve) => {
+      const startTime = performance.now();
+      const getTimestamp = () => `+${(performance.now() - startTime).toFixed(0)}ms`;
+      
+      console.log(`[Fade In Video] ${getTimestamp()} Starting playback - paused: ${videoElement.paused}, currentTime: ${videoElement.currentTime.toFixed(2)}s`);
+      
+      // Seek past first frame to avoid black/frozen frame (common with Cloudinary/streaming)
+      if (videoElement.currentTime === 0) {
+        videoElement.currentTime = 0.1;
+        console.log(`[Fade In Video] ${getTimestamp()} Seeked to 0.1s to skip first frame`);
+        
+        // Wait for seek to complete before playing
+        await new Promise(seekResolve => {
+          const seekHandler = () => {
+            console.log(`[Fade In Video] ${getTimestamp()} Seek completed`);
+            seekResolve();
+          };
+          videoElement.addEventListener('seeked', seekHandler, { once: true });
+          
+          // Timeout fallback
+          setTimeout(() => {
+            videoElement.removeEventListener('seeked', seekHandler);
+            console.log(`[Fade In Video] ${getTimestamp()} Seek timeout, proceeding anyway`);
+            seekResolve();
+          }, 500);
+        });
+      }
+      
+      console.log(`[Fade In Video] ${getTimestamp()} Starting play() call`);
+      
+      // Start video playback
+      const playPromise = videoElement.play();
+      
+      if (playPromise !== undefined) {
+        playPromise
+          .then(() => {
+            console.log(`[Fade In Video] ${getTimestamp()} ✓ Video playing successfully - paused: ${videoElement.paused}`);
+            
+            // Force webkit to render frames (common fix for video rendering issues)
+            videoElement.style.transform = 'translateZ(0)';
+            
+            // Force a repaint by toggling a property
+            requestAnimationFrame(() => {
+              videoElement.style.webkitTransform = 'translateZ(0)';
+              console.log(`[Fade In Video] ${getTimestamp()} Hardware acceleration forced`);
+            });
+            
+            // Check if video is progressing at multiple intervals
+            [100, 250, 500].forEach(delay => {
+              setTimeout(() => {
+                const computed = window.getComputedStyle(videoElement);
+                console.log(`[Fade In Video] ${getTimestamp()} (${delay}ms check)`, {
+                  currentTime: videoElement.currentTime.toFixed(2) + 's',
+                  paused: videoElement.paused,
+                  videoWidth: videoElement.videoWidth,
+                  videoHeight: videoElement.videoHeight,
+                  opacity: computed.opacity,
+                  display: computed.display,
+                  visibility: computed.visibility,
+                  zIndex: computed.zIndex,
+                  transform: computed.transform
+                });
+              }, delay);
+            });
+          })
+          .catch(err => {
+            console.error(`[Fade In Video] ${getTimestamp()} ✗ Video play error:`, err);
+            console.error('Video state:', {
+              paused: videoElement.paused,
+              readyState: videoElement.readyState,
+              networkState: videoElement.networkState,
+              error: videoElement.error
+            });
+          });
+      }
+
+      // Add active class to trigger CSS fade-in
+      videoElement.classList.add('active');
+      console.log(`[Fade In Video] ${getTimestamp()} Active class added - classList:`, videoElement.classList.toString());
+
+      // Resolve after fade duration
+      setTimeout(resolve, duration);
+    });
+  },
+
+  /**
+   * Fade out a video element and pause playback
+   * @param {HTMLVideoElement} videoElement - The video element to fade out
+   * @param {number} duration - Fade duration in milliseconds
+   * @param {boolean} preservePosition - Whether to preserve current playback position
+   * @returns {Promise} - Resolves when fade completes
+   */
+  fadeOutVideo(videoElement, duration = 800, preservePosition = true) {
+    if (!videoElement) return Promise.resolve();
+
+    return new Promise((resolve) => {
+      videoElement.classList.remove('active');
+      
+      setTimeout(() => {
+        videoElement.pause();
+        if (!preservePosition) videoElement.currentTime = 0;
+        resolve();
+      }, duration);
+    });
+  },
+
+  /**
+   * Resume video playback from current position
+   * @param {HTMLVideoElement} videoElement - The video element to resume
+   */
+  resumeVideo(videoElement) {
+    if (!videoElement) return;
+
+    try {
+      // Check if video has ended, restart if so
+      if (videoElement.currentTime >= videoElement.duration - 0.1) {
+        videoElement.currentTime = 0;
+      }
+      
+      videoElement.play().catch(err => {
+        console.error('Video resume error:', err);
+      });
+    } catch (err) {
+      console.error('Video resume error:', err);
+    }
+  },
+
+  /**
+   * Determine which video should be displayed based on track and reel settings
+   * @param {Object} track - Current track object with backgroundVideo property
+   * @param {Object} reel - Current reel settings with backgroundVideo and enabled flags
+   * @returns {Object} - { url, type } where type is 'track', 'main', or null
+   */
+  getActiveVideo(track, reel) {
+    // Check track video first (highest priority)
+    if (track?.backgroundVideo && track.backgroundVideo.trim()) {
+      return { url: track.backgroundVideo.trim(), type: 'track' };
+    }
+
+    // Check main video if enabled
+    if (reel?.backgroundVideoEnabled && reel?.backgroundVideo && reel.backgroundVideo.trim()) {
+      return { url: reel.backgroundVideo.trim(), type: 'main' };
+    }
+
+    return { url: null, type: null };
+  },
 
   validateProjectTitleImage() {
     const overlay = this.elements.projectTitleOverlay;
@@ -1243,19 +1665,68 @@ export const playerApp = {
       this.expandable.collapsedIdleTimeout = null;
     }
 
-    // Exit collapsed idle state if active
-    this.exitCollapsedIdle();
+    // Clear all idle transition timeouts to prevent orphaned callbacks
+    if (this.expandable.playbackIdleClassTimeout) {
+      clearTimeout(this.expandable.playbackIdleClassTimeout);
+      this.expandable.playbackIdleClassTimeout = null;
+    }
+    if (this.expandable.playbackIdleVideoTimeout) {
+      clearTimeout(this.expandable.playbackIdleVideoTimeout);
+      this.expandable.playbackIdleVideoTimeout = null;
+    }
+    if (this.expandable.collapsedIdleClassTimeout) {
+      clearTimeout(this.expandable.collapsedIdleClassTimeout);
+      this.expandable.collapsedIdleClassTimeout = null;
+    }
+    if (this.expandable.collapsedIdleVideoTimeout) {
+      clearTimeout(this.expandable.collapsedIdleVideoTimeout);
+      this.expandable.collapsedIdleVideoTimeout = null;
+    }
+
+    // Check if we're in collapsed idle state with video playing
+    const wasInCollapsedIdleWithVideo = wrapper.classList.contains('collapsed-idle') && 
+                                         (this.videoState.mainVideoPlaying || this.videoState.trackVideoPlaying);
+
+    // Exit collapsed idle state if active (but keep video playing)
+    this.exitCollapsedIdle(false);
 
     // Remove collapsing classes and ensure expanded state
     wrapper.classList.remove('pre-collapsing');
     wrapper.classList.remove('collapsing');
     this.expandable.isExpanded = true;
     wrapper.classList.add('expanded');
+    
+    // If we were in collapsed idle with video, transition to playback idle
+    if (wasInCollapsedIdleWithVideo) {
+      // Video is already playing, just need to apply the playback-idle class
+      // after a brief delay to ensure expand transition completes
+      setTimeout(() => {
+        if (this.wavesurfer?.isPlaying() && this.expandable.isExpanded) {
+          wrapper.classList.add('playback-idle');
+        }
+      }, 100);
+    }
+    
+    // Notify parent window if in iframe (for iframe height adjustment)
+    if (window.self !== window.top) {
+      const expandedHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--expandable-expanded-height')) || 500;
+      window.parent.postMessage({ type: 'reelplayer:resize', height: expandedHeight }, '*');
+    }
   },
 
   collapsePlayer() {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
+
+    // Clear all playback idle transition timeouts
+    if (this.expandable.playbackIdleClassTimeout) {
+      clearTimeout(this.expandable.playbackIdleClassTimeout);
+      this.expandable.playbackIdleClassTimeout = null;
+    }
+    if (this.expandable.playbackIdleVideoTimeout) {
+      clearTimeout(this.expandable.playbackIdleVideoTimeout);
+      this.expandable.playbackIdleVideoTimeout = null;
+    }
 
     this.expandable.isExpanded = false;
     
@@ -1291,6 +1762,12 @@ export const playerApp = {
         // Clear timeout references
         this.expandable.collapseDelayTimeout = null;
         this.expandable.collapseFadeTimeout = null;
+        
+        // Notify parent window if in iframe (for iframe height adjustment)
+        if (window.self !== window.top) {
+          const collapsedHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--expandable-collapsed-height')) || 120;
+          window.parent.postMessage({ type: 'reelplayer:resize', height: collapsedHeight }, '*');
+        }
         
         // Re-enter idle state after collapse if still playing
         this.expandable.collapsedIdleTimeout = setTimeout(() => {
@@ -1362,6 +1839,8 @@ export const playerApp = {
     <div class="${wrapperClasses}">
       <div class="track-background-layer track-bg-layer-a"></div>
       <div class="track-background-layer track-bg-layer-b"></div>
+      <video class="background-video main-video" preload="auto" loop muted playsinline></video>
+      <video class="background-video track-video" preload="auto" loop muted playsinline></video>
       ${projectTitleOverlayHTML}
       <div class="player-content">
         ${
@@ -1428,6 +1907,10 @@ export const playerApp = {
       const firstTrack = playlist[0];
       const url = this.convertDropboxLinkToDirect(firstTrack.url);
       this.initializePlayer(url, firstTrack.title, 0);
+      
+      // Pre-buffer video for first track
+      this.preloadVideos();
+      
       // Set track info for preview
       const trackInfo = this.elements.trackInfo;
       const fileName =

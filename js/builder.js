@@ -30,6 +30,8 @@ export function createEmptyReel() {
     // Background effects properties
     backgroundImage: "",
     backgroundImageEnabled: false,
+    backgroundVideo: "",
+    backgroundVideoEnabled: false,
     backgroundZoom: 1,
     backgroundOpacity: "1",
     backgroundBlur: "2",
@@ -260,6 +262,20 @@ function createColorPickersSection() {
           </button>
         </div>
         <div id="backgroundImagePreviewPane" class="bg-preview-pane" style="display:none;margin-top:0.5rem;padding:0.75rem;background:#fff;border:1px solid #ddd;border-radius:4px;"></div>
+      </div>
+      <div class="color-row">
+        <span>Background Video:</span>
+        <label class="toggle-switch" style="margin-right:0.5rem;">
+          <input type="checkbox" id="backgroundVideoEnabled" />
+          <span class="toggle-slider"></span>
+        </label>
+      </div>
+      <div id="backgroundVideoRowWrapper">
+        <div class="color-row" id="backgroundVideoRow" style="opacity:0.5;">
+          <span>Background Video URL:</span>
+          <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
+          <button id="backgroundVideoFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
+        </div>
       </div>
       <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
@@ -512,9 +528,12 @@ function renderPerTrackBackgrounds(reel, onChange) {
           });
           // Save without triggering onChange to prevent CPU spike
         });
-        // Save on change (when user finishes dragging)
+        // Save on change (when user finishes dragging) without triggering preview refresh
         zoomSlider.addEventListener('change', () => {
-          onChange();
+          // Save to localStorage without refreshing preview to preserve video state
+          if (window.saveReels && window.reels) {
+            window.saveReels(window.reels);
+          }
         });
       }
     };
@@ -546,11 +565,11 @@ function renderPerTrackBackgrounds(reel, onChange) {
       if (!previewOpen) cropBtn.style.color = '#333';
     });
     
-    // Clear button
+    // Clear button for image
     const clearBtn = document.createElement('button');
     clearBtn.type = 'button';
     clearBtn.innerHTML = '✕';
-    clearBtn.title = 'Clear';
+    clearBtn.title = 'Clear image';
     clearBtn.style.cssText = 'background:transparent;border:none;color:#666;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;';
     clearBtn.addEventListener('mouseenter', () => clearBtn.style.color = '#dc3545');
     clearBtn.addEventListener('mouseleave', () => clearBtn.style.color = '#666');
@@ -563,15 +582,110 @@ function renderPerTrackBackgrounds(reel, onChange) {
       }
     });
     
+    // Separator
+    const separator = document.createElement('div');
+    separator.style.cssText = 'width:1px;height:20px;background:#ddd;margin:0 0.3rem;flex-shrink:0;';
+    
+    // === VIDEO CONTROLS ===
+    
+    // Ensure track has backgroundVideo property
+    if (track.backgroundVideo === undefined) {
+      track.backgroundVideo = '';
+    }
+    
+    // Video URL input
+    const videoUrlInput = document.createElement('input');
+    videoUrlInput.type = 'url';
+    videoUrlInput.placeholder = 'Video URL';
+    videoUrlInput.value = track.backgroundVideo || '';
+    videoUrlInput.style.cssText = 'flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;';
+    
+    let videoUrlTimeout;
+    videoUrlInput.addEventListener('input', () => {
+      clearTimeout(videoUrlTimeout);
+      videoUrlTimeout = setTimeout(() => {
+        track.backgroundVideo = videoUrlInput.value;
+        onChange();
+      }, 300);
+    });
+    
+    // Video file picker button
+    const videoFilePickerBtn = document.createElement('button');
+    videoFilePickerBtn.type = 'button';
+    videoFilePickerBtn.className = 'file-picker-btn';
+    videoFilePickerBtn.innerHTML = `
+      <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 16px; height: 16px; color: #333;">
+        <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+      </svg>
+    `;
+    videoFilePickerBtn.setAttribute('aria-label', 'Browse videos');
+    videoFilePickerBtn.title = 'Browse video files';
+    
+    Object.assign(videoFilePickerBtn.style, {
+      background: 'transparent',
+      color: '#333',
+      border: 'none',
+      borderRadius: '3px',
+      padding: '0.2em 0.3em',
+      cursor: 'pointer',
+      display: 'flex',
+      alignItems: 'center',
+      justifyContent: 'center',
+      transition: 'all 0.2s ease',
+      flexShrink: '0'
+    });
+    
+    videoFilePickerBtn.addEventListener('mouseenter', () => {
+      const svg = videoFilePickerBtn.querySelector('svg');
+      if (svg) svg.style.color = '#4a90e2';
+    });
+    videoFilePickerBtn.addEventListener('mouseleave', () => {
+      const svg = videoFilePickerBtn.querySelector('svg');
+      if (svg) svg.style.color = '#333';
+    });
+    
+    videoFilePickerBtn.addEventListener('click', async () => {
+      const { openFilePicker } = await import('./modules/filePicker.js');
+      openFilePicker({
+        directory: 'assets/videos/backgrounds',
+        extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
+        title: 'Select Background Video',
+        onSelect: (filePath) => {
+          videoUrlInput.value = filePath;
+          track.backgroundVideo = filePath;
+          onChange();
+        }
+      });
+    });
+    
+    // Clear button for video
+    const videoClearBtn = document.createElement('button');
+    videoClearBtn.type = 'button';
+    videoClearBtn.innerHTML = '✕';
+    videoClearBtn.title = 'Clear video';
+    videoClearBtn.style.cssText = 'background:transparent;border:none;color:#666;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;';
+    videoClearBtn.addEventListener('mouseenter', () => videoClearBtn.style.color = '#dc3545');
+    videoClearBtn.addEventListener('mouseleave', () => videoClearBtn.style.color = '#666');
+    videoClearBtn.addEventListener('click', () => {
+      videoUrlInput.value = '';
+      track.backgroundVideo = '';
+      onChange();
+    });
+    
     // Create wrapper for row and preview
     const trackWrapper = document.createElement('div');
     trackWrapper.style.cssText = 'margin-bottom:0.4rem;';
     
+    // Append all elements to track row
     trackRow.appendChild(trackLabel);
     trackRow.appendChild(urlInput);
     trackRow.appendChild(filePickerBtn);
     trackRow.appendChild(cropBtn);
     trackRow.appendChild(clearBtn);
+    trackRow.appendChild(separator);
+    trackRow.appendChild(videoUrlInput);
+    trackRow.appendChild(videoFilePickerBtn);
+    trackRow.appendChild(videoClearBtn);
     
     trackWrapper.appendChild(trackRow);
     trackWrapper.appendChild(previewPane);
@@ -865,6 +979,101 @@ function setupBlendModeControls(reel, onChange) {
         // Initial state
         cropBtn.style.display = backgroundImageEnabled.checked ? 'inline-flex' : 'none';
         cropBtn.disabled = !backgroundImageEnabled.checked;
+      }
+    }
+
+    // Background Video Controls
+    const backgroundVideoEnabled = document.getElementById("backgroundVideoEnabled");
+    const backgroundVideoUrl = document.getElementById("backgroundVideoUrl");
+    const backgroundVideoRow = document.getElementById("backgroundVideoRow");
+    
+    if (backgroundVideoEnabled) {
+      backgroundVideoEnabled.checked = reel.backgroundVideoEnabled || false;
+      
+      const updateBackgroundVideoState = () => {
+        const isEnabled = backgroundVideoEnabled.checked;
+        const videoFilePickerBtn = document.getElementById('backgroundVideoFilePicker');
+        
+        backgroundVideoUrl.disabled = !isEnabled;
+        backgroundVideoRow.style.opacity = isEnabled ? "1" : "0.5";
+        
+        if (videoFilePickerBtn) {
+          videoFilePickerBtn.style.display = isEnabled ? 'inline-block' : 'none';
+          videoFilePickerBtn.disabled = !isEnabled;
+        }
+        
+        reel.backgroundVideoEnabled = isEnabled;
+      };
+      
+      updateBackgroundVideoState();
+      
+      backgroundVideoEnabled.addEventListener('change', () => {
+        updateBackgroundVideoState();
+        onChange();
+      });
+    }
+
+    if (backgroundVideoUrl) {
+      backgroundVideoUrl.value = reel.backgroundVideo || "";
+      let videoUrlTimeout;
+      backgroundVideoUrl.addEventListener('input', () => {
+        clearTimeout(videoUrlTimeout);
+        videoUrlTimeout = setTimeout(() => {
+          reel.backgroundVideo = backgroundVideoUrl.value;
+          onChange();
+        }, 300);
+      });
+      
+      // Wire up video file picker button
+      const videoFilePickerBtn = document.getElementById('backgroundVideoFilePicker');
+      if (videoFilePickerBtn) {
+        videoFilePickerBtn.innerHTML = `
+          <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+            <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+          </svg>
+        `;
+        videoFilePickerBtn.setAttribute("aria-label", "Browse videos");
+        videoFilePickerBtn.title = "Browse files from assets/videos/backgrounds";
+        
+        Object.assign(videoFilePickerBtn.style, {
+          background: "transparent",
+          color: "#000",
+          border: "none",
+          borderRadius: "4px",
+          padding: "0.35em 0.5em",
+          cursor: "pointer",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          transition: "all 0.2s ease"
+        });
+        
+        videoFilePickerBtn.addEventListener("mouseenter", () => {
+          if (!videoFilePickerBtn.disabled) {
+            const svg = videoFilePickerBtn.querySelector('svg');
+            if (svg) svg.style.color = "#4a90e2";
+          }
+        });
+        videoFilePickerBtn.addEventListener("mouseleave", () => {
+          const svg = videoFilePickerBtn.querySelector('svg');
+          if (svg) svg.style.color = "#000";
+        });
+        
+        videoFilePickerBtn.addEventListener("click", async () => {
+          const { openFilePicker } = await import('./modules/filePicker.js');
+          openFilePicker({
+            directory: 'assets/videos/backgrounds',
+            extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
+            title: 'Select Background Video',
+            onSelect: (filePath) => {
+              backgroundVideoUrl.value = filePath;
+              backgroundVideoUrl.dispatchEvent(new Event('input', { bubbles: true }));
+            }
+          });
+        });
+        
+        videoFilePickerBtn.style.display = backgroundVideoEnabled.checked ? 'inline-block' : 'none';
+        videoFilePickerBtn.disabled = !backgroundVideoEnabled.checked;
       }
     }
 

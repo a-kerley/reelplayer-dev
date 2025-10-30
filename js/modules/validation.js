@@ -51,6 +51,31 @@ export class ValidationUtils {
     
     return imageExtensions.test(trimmed) || imageHosts.test(trimmed);
   }
+
+  /**
+   * Validates if a URL appears to be a valid video file URL
+   * @param {string} url - The URL to validate
+   * @returns {boolean} - True if URL appears valid for videos
+   */
+  static isValidVideoUrl(url) {
+    if (!url || typeof url !== 'string') return false;
+    
+    const trimmed = url.trim();
+    if (trimmed === '') return true; // Allow empty for no video
+    
+    // Basic URL pattern check
+    try {
+      new URL(trimmed);
+    } catch {
+      return false;
+    }
+    
+    // Check for common video file extensions or known video hosting patterns
+    const videoExtensions = /\.(mp4|webm|mov|avi|mkv|m4v|ogv)(\?.*)?$/i;
+    const videoHosts = /(youtube\.com|vimeo\.com|cloudinary\.com|amazonaws\.com|wistia\.com)/i;
+    
+    return videoExtensions.test(trimmed) || videoHosts.test(trimmed);
+  }
   
   /**
    * Validates and sanitizes a color value

@@ -33,7 +33,9 @@ export class EmbedExporter {
     
     // Determine height based on mode
     let height;
-    if (reel.mode === 'expandable') {
+    const isExpandable = reel.mode === 'expandable';
+    
+    if (isExpandable) {
       // Use collapsed height for expandable mode embeds
       height = reel.expandableCollapsedHeight || 120;
     } else {
@@ -46,10 +48,27 @@ export class EmbedExporter {
       height = parseInt(height);
     }
     
-    return `<iframe src="${this.baseURL.replace('index.html', '')}player.html?id=${reelId}" 
+    // Generate unique ID for this iframe
+    const iframeId = `reelplayer-${reelId}`;
+    
+    // For expandable mode, include resize script
+    const resizeScript = isExpandable ? `
+<script>
+  // Listen for resize messages from the iframe
+  window.addEventListener('message', function(event) {
+    if (event.data && event.data.type === 'reelplayer:resize') {
+      const iframe = document.getElementById('${iframeId}');
+      if (iframe && event.source === iframe.contentWindow) {
+        iframe.style.height = event.data.height + 'px';
+      }
+    }
+  });
+</script>` : '';
+    
+    return `<iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player.html?id=${reelId}" 
            width="100%" height="${height}px" frameborder="0" 
-           style="border-radius: 8px; border: none; min-height: ${height}px;">
-          </iframe>`;
+           style="border-radius: 8px; border: none; min-height: ${height}px; transition: height 0.3s ease;">
+          </iframe>${resizeScript}`;
   }
 
   calculateEmbedHeight(reel) {
@@ -76,11 +95,18 @@ export class EmbedExporter {
     // Generate a short unique ID based on reel content
     const content = JSON.stringify({
       title: reel.title,
-      playlist: reel.playlist?.map(t => ({ title: t.title, url: t.url })),
+      playlist: reel.playlist?.map(t => ({ 
+        title: t.title, 
+        url: t.url, 
+        backgroundImage: t.backgroundImage,
+        backgroundZoom: t.backgroundZoom
+      })),
       settings: {
         accent: reel.varUiAccent,
         waveform: reel.varWaveformUnplayed,
-        background: reel.backgroundImage
+        background: reel.backgroundImage,
+        mode: reel.mode,
+        waveformBars: reel.settings?.waveform
       }
     });
     
@@ -96,11 +122,22 @@ export class EmbedExporter {
 
   storeReelData(reelId, reel) {
     // Store complete reel configuration for iframe player
+    // Ensure playlist tracks include all properties (background images, videos, zoom, etc.)
+    const playlist = (reel.playlist || [])
+      .filter(track => track.url && track.url.trim() !== "")
+      .map(track => ({
+        url: track.url,
+        title: track.title,
+        backgroundImage: track.backgroundImage || "",
+        backgroundVideo: track.backgroundVideo || "",
+        backgroundZoom: track.backgroundZoom || 1
+      }));
+    
     const reelData = {
       id: reelId,
       title: reel.title,
       showTitle: reel.showTitle,
-      playlist: reel.playlist?.filter(track => track.url && track.url.trim() !== "") || [],
+      playlist: playlist,
       playerHeight: reel.playerHeight || 500, // Player height setting
       mode: reel.mode || "static", // Player mode: "static" or "expandable"
       settings: {
@@ -113,6 +150,8 @@ export class EmbedExporter {
         // Background settings
         backgroundImage: reel.backgroundImage,
         backgroundImageEnabled: reel.backgroundImageEnabled,
+        backgroundVideo: reel.backgroundVideo,
+        backgroundVideoEnabled: reel.backgroundVideoEnabled,
         overlayColor: reel.overlayColor,
         overlayColorEnabled: reel.overlayColorEnabled,
         backgroundOpacity: reel.backgroundOpacity,

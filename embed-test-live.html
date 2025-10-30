@@ -14,7 +14,7 @@
     }
     
     .container {
-      max-width: 1200px;
+      max-width: 1600px;
       margin: 0 auto;
       background: white;
       border-radius: 12px;
@@ -121,9 +121,11 @@
       border: 2px solid #e9ecef;
       border-radius: 8px;
       margin: 20px 0;
-      min-height: 100px;
+      min-height: 900px;
       position: relative;
       background: white;
+      padding: 20px;
+      overflow: auto;
     }
     
     .placeholder {
@@ -267,23 +269,21 @@
         }
         
         try {
-          // Clear preview and add code
-          embedPreview.innerHTML = '';
+          // Clear preview and inject embed code directly
+          embedPreview.innerHTML = code;
           
-          // Create iframe for safer rendering
-          const iframe = document.createElement('iframe');
-          iframe.style.width = '100%';
-          iframe.style.height = '600px';
-          iframe.style.border = 'none';
-          iframe.style.borderRadius = '8px';
-          
-          embedPreview.appendChild(iframe);
-          
-          // Write content to iframe
-          const doc = iframe.contentDocument || iframe.contentWindow.document;
-          doc.open();
-          doc.write(code);
-          doc.close();
+          // Add resize listener for expandable mode players
+          window.addEventListener('message', function(event) {
+            if (event.data && event.data.type === 'reelplayer:resize') {
+              // Find the iframe that sent the message
+              const iframes = embedPreview.querySelectorAll('iframe');
+              iframes.forEach(iframe => {
+                if (iframe.contentWindow === event.source) {
+                  iframe.style.height = event.data.height + 'px';
+                }
+              });
+            }
+          });
           
           showSuccess('✅ Embed code loaded successfully! Audio should work perfectly on GitHub Pages.');
           

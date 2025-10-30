@@ -5,14 +5,15 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reel Player</title>
   
-  <!-- Import actual CSS files - single source of truth -->
+  <!-- Import actual CSS files - single source of truth (matching style.css imports) -->
   <link rel="stylesheet" href="css/variables.css">
+  <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/playlist.css">
   <link rel="stylesheet" href="css/expandable.css">
   
   <style>
-    /* Minimal embed-specific overrides only */
+    /* Minimal iframe-specific styles - DO NOT override imported CSS */
     html, body {
       margin: 0;
       padding: 0;
@@ -31,51 +32,6 @@
       overflow: hidden;
       display: flex;
       flex-direction: column;
-    }
-    
-    /* Player wrapper in embed should fill container */
-    #embedPlayer .player-wrapper {
-      width: 100%;
-      height: 100%;
-      max-height: 100%;
-      box-sizing: border-box;
-      margin: 0;
-    }
-    
-    /* Expandable mode specific overrides for embed */
-    #embedPlayer .player-wrapper.expandable-mode {
-      height: var(--expandable-collapsed-height, 120px);
-      max-height: none;
-    }
-    
-    #embedPlayer .player-wrapper.expandable-mode.expanded {
-      height: var(--expandable-expanded-height, 500px);
-    }
-    
-    /* Player container styles (from layout.css but needed for embed) */
-    .player-container {
-      display: flex;
-      justify-content: center;
-      gap: 1.5rem;
-      margin: 1rem auto;
-      align-items: center;
-    }
-    
-    /* Make playlist scrollable when height is constrained */
-    .playlist {
-      overflow-y: auto;
-      flex: 1;
-      min-height: 0;
-    }
-    
-    /* Hide scrollbar completely */
-    .playlist::-webkit-scrollbar {
-      display: none;
-    }
-    
-    .playlist {
-      -ms-overflow-style: none;
-      scrollbar-width: none;
     }
     
     .error-message {
@@ -97,6 +53,7 @@
   <script type="module">
     // Import actual player module - single source of truth
     import { playerApp } from './js/player.js';
+    import { getColorFilters } from './js/modules/colorUtils.js';
     
     // Get reel ID from URL
     const urlParams = new URLSearchParams(window.location.search);
@@ -196,7 +153,13 @@
       root.style.setProperty('--background-color', backgroundColor);
       root.style.setProperty('--background-opacity', settings.backgroundOpacity || '1');
       root.style.setProperty('--background-blur', (settings.backgroundBlur || '2') + 'px');
+      root.style.setProperty('--background-zoom', settings.backgroundZoom || '1');
       root.style.setProperty('--overlay-color', overlayColor);
+      
+      // Blend mode variables
+      if (settings.backgroundBlendMode) {
+        root.style.setProperty('--background-blend-mode', settings.backgroundBlendMode);
+      }
       
       // Lottie animation color variables (matching PreviewManager)
       root.style.setProperty('--lottie-brightness', colorFilters.brightness);
@@ -250,54 +213,6 @@
       }
     }
     
-    // Helper function to calculate Lottie color filters (matching PreviewManager)
-    function hexToHue(hex) {
-      hex = hex.replace('#', '');
-      const r = parseInt(hex.substr(0, 2), 16) / 255;
-      const g = parseInt(hex.substr(2, 2), 16) / 255;
-      const b = parseInt(hex.substr(4, 2), 16) / 255;
-      
-      const max = Math.max(r, g, b);
-      const min = Math.min(r, g, b);
-      
-      let h = 0;
-      if (max !== min) {
-        const delta = max - min;
-        switch (max) {
-          case r: h = ((g - b) / delta + (g < b ? 6 : 0)) / 6; break;
-          case g: h = ((b - r) / delta + 2) / 6; break;
-          case b: h = ((r - g) / delta + 4) / 6; break;
-        }
-      }
-      return Math.round(h * 360);
-    }
-    
-    function getColorFilters(hexColor) {
-      hexColor = hexColor.replace('#', '');
-      const r = parseInt(hexColor.substr(0, 2), 16);
-      const g = parseInt(hexColor.substr(2, 2), 16);
-      const b = parseInt(hexColor.substr(4, 2), 16);
-      const brightness = (r * 299 + g * 587 + b * 114) / 1000;
-      
-      if (brightness > 200) {
-        return {
-          brightness: brightness / 128,
-          saturation: 0,
-          hueRotation: 0
-        };
-      }
-      
-      const baseHue = hexToHue("#2a0026");
-      const targetHue = hexToHue(hexColor);
-      const hueRotation = targetHue - baseHue;
-      
-      return {
-        brightness: 1,
-        saturation: 1.2,
-        hueRotation: hueRotation
-      };
-    }
-    
     function renderPlayerHTML(reelData) {
       const container = document.getElementById('embedPlayer');
       const shouldHideTitle = !(reelData.showTitle && reelData.title && reelData.title.trim());
@@ -318,13 +233,15 @@
       let projectTitleOverlayHTML = '';
       if (mode === 'expandable' && settings.projectTitleImage) {
         projectTitleOverlayHTML = `
-          <div class="project-title-overlay" style="background-image: url('${settings.projectTitleImage}');"></div>
+          <div class="project-title-overlay" style="background-image: url('${settings.projectTitleImage}');" data-image-url="${settings.projectTitleImage}"></div>
         `;
       }
       
       // Use exact same HTML structure as playerApp.renderPlayer()
       const playerHTML = `
         <div class="${wrapperClasses}" style="position: relative; z-index: 2; ${elementBlendStyle}">
+          <div class="track-background-layer track-bg-layer-a"></div>
+          <div class="track-background-layer track-bg-layer-b"></div>
           ${projectTitleOverlayHTML}
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
@@ -375,18 +292,32 @@
       playerApp.reel = reelData.settings || {};
       playerApp.currentReelSettings = reelData;
       
-      // Set expandable mode state
-      playerApp.isExpandableMode = reelData.mode === 'expandable';
-      playerApp.isExpanded = false;
-      playerApp.isPlaying = false;
+      // Set expandable mode state properly (matching main player's renderPlayer method)
+      const mode = reelData.mode || 'static';
+      playerApp.expandable.enabled = (mode === 'expandable');
+      playerApp.expandable.isExpanded = false;
+      playerApp.expandable.isPlaying = false;
+      playerApp.expandable.settings = reelData; // CRITICAL: Store full reelData (not just settings) for collapsePlayer to access
+      playerApp.expandable.showWaveformOnCollapse = reelData.settings?.showWaveformOnCollapse !== false;
       
       // Cache DOM elements using playerApp's method
       playerApp.elements = {};
       playerApp.cacheElements();
       
       // Setup expandable mode interactions if enabled
-      if (playerApp.isExpandableMode) {
+      if (playerApp.expandable.enabled) {
         playerApp.setupExpandableModeInteractions();
+        playerApp.validateProjectTitleImage();
+      }
+      
+      // Apply waveform settings from reel data
+      const waveformSettings = reelData.settings?.waveform || {};
+      if (waveformSettings.barsEnabled) {
+        const root = document.documentElement;
+        root.style.setProperty('--waveform-bar-width', `${waveformSettings.barWidth || 2}px`);
+        root.style.setProperty('--waveform-bar-gap', `${waveformSettings.barGap || 1}px`);
+        root.style.setProperty('--waveform-bar-radius', `${waveformSettings.barRadius || 2}px`);
+        root.style.setProperty('--waveform-bar-height', waveformSettings.barHeight || 1);
       }
       
       // Setup player using actual playerApp methods
