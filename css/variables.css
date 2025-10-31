@@ -117,9 +117,9 @@
   /* ========================================
      VIDEO BACKGROUND TRANSITIONS
      ======================================== */
-  --video-fade-in-duration: 3000ms;                /* Duration of video fade-in transition */
-  --video-fade-out-duration: 2000ms;               /* Duration of video fade-out transition */
-  --video-track-switch-fade-duration: 50ms;      /* Duration when switching tracks during playback (faster transition) */
+  --video-fade-in-duration: 1200ms;                /* Duration of video fade-in transition */
+  --video-fade-out-duration: 1200ms;               /* Duration of video fade-out transition */
+  --video-track-switch-fade-duration: 500ms;      /* Duration when switching tracks during playback (faster transition) */
   
   /* ========================================
      AUDIO FADE-IN/OUT

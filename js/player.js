@@ -12,6 +12,7 @@ export const playerApp = {
   currentTrackIndex: 0,
   activeFadeOut: null, // Track active fade-out to allow cancellation
   wasPlayingBeforeTrackSwitch: false, // Track if we need to auto-resume with fade-in
+  isTrackSwitching: false, // Flag to prevent pause event from interfering during track switch
   
   // Expandable mode state - consolidated
   expandable: {
@@ -542,10 +543,17 @@ export const playerApp = {
     }
     console.log(`[TRACK SWITCH] wasPlayingBeforeTrackSwitch flag: ${this.wasPlayingBeforeTrackSwitch}`);
     
+    // Set flag to prevent pause event from interfering with video transitions
+    if (isPlaybackActive) {
+      this.isTrackSwitching = true;
+      console.log('[TRACK SWITCH] 🚩 Set isTrackSwitching flag to prevent pause event interference');
+    }
+    
     // If switching tracks during playback, fade out audio and pause to prevent pop
     if (isPlaybackActive) {
       console.log('[TRACK SWITCH] Applying audio fade-out before track switch');
       await this.applyAudioFadeOut(true); // Pass true to pause after fade
+      // Note: Pause event will fire but will skip stopVideo() due to isTrackSwitching flag
     }
     
     // Crossfade videos when switching tracks
@@ -621,6 +629,11 @@ export const playerApp = {
       } else {
         console.log(`[TRACK SWITCH] ⏭️ No main video layer found`);
       }
+      
+      // Clear the track switching flag after video fade-outs have been initiated
+      // The fades will complete in the background
+      console.log('[TRACK SWITCH] ✓ Video fade-outs initiated, clearing isTrackSwitching flag');
+      this.isTrackSwitching = false;
     } else {
       console.log(`[TRACK SWITCH] 🧹 Playback stopped - cleaning up active videos immediately`);
       // When stopped: clean up any active videos immediately
@@ -664,6 +677,22 @@ export const playerApp = {
     if (playerApp.wavesurfer) {
       playerApp.wavesurfer.seekTo(0);
     }
+    
+    // Fade out current waveform before loading new track
+    // Find the WaveSurfer wrapper (last child div without a class/id)
+    const waveformContainer = document.querySelector("#waveform");
+    const waveformWrapper = Array.from(waveformContainer?.children || [])
+      .find(child => child.tagName === 'DIV' && !child.className && !child.id);
+    
+    console.log(`[WAVEFORM FADE] Found waveform wrapper to fade out:`, waveformWrapper);
+    
+    if (waveformWrapper) {
+      console.log(`[WAVEFORM FADE] Setting wrapper opacity to 0, current: ${waveformWrapper.style.opacity}`);
+      waveformWrapper.style.opacity = "0";
+    }
+    
+    // Show loading indicator while new waveform loads
+    this.showLoading(true);
     
     playerApp.wavesurfer.load(audioURL);
     const event = new CustomEvent("track:change", {
@@ -955,13 +984,33 @@ export const playerApp = {
       this.showLoading(false);
       playPauseBtn.style.display = "inline-block";
       if (volumeControl) volumeControl.classList.remove("hidden");
+      
+      // Find the WaveSurfer wrapper element (div without class/id)
+      const waveformContainer = document.querySelector("#waveform");
+      const waveformWrapper = Array.from(waveformContainer?.children || [])
+        .find(child => child.tagName === 'DIV' && !child.className && !child.id);
+      
+      console.log(`[WAVEFORM FADE] Ready - Found waveform wrapper:`, waveformWrapper);
+      console.log(`[WAVEFORM FADE] Ready - expandable enabled: ${this.expandable.enabled}`);
+      
+      // Ensure waveform starts at opacity 0
+      if (waveformWrapper) {
+        console.log(`[WAVEFORM FADE] Setting wrapper opacity to 0 initially`);
+        waveformWrapper.style.opacity = "0";
+      }
+      
       setTimeout(() => {
-        // Set opacity for all canvases inside waveform (WaveSurfer v7 uses nested structure)
-        const canvases = document.querySelectorAll("#waveform canvas");
-        // In expandable mode, don't set inline opacity - let CSS handle it completely
-        // In static mode, set opacity as normal
+        // Fade in the new waveform after it's fully loaded
+        console.log(`[WAVEFORM FADE] Fading in waveform wrapper`);
+        
+        // Fade in the waveform wrapper
+        if (waveformWrapper) {
+          console.log(`[WAVEFORM FADE] Setting wrapper opacity to 1`);
+          waveformWrapper.style.opacity = "1";
+        }
+        
+        // Only fade in controls in static mode
         if (!this.expandable.enabled) {
-          canvases.forEach(canvas => canvas.style.opacity = "1");
           playPauseBtn.style.opacity = "1";
           if (volumeControl) {
             volumeControl.style.opacity = "1";
@@ -1046,8 +1095,9 @@ export const playerApp = {
       });
     });
     this.wavesurfer.on("play", () => {
-      // Cancel any active fade-out
+      // Cancel any active audio fade-out
       if (this.activeFadeOut) {
+        console.log('[Play Event] 🔄 Cancelling active audio fade-out');
         this.activeFadeOut.cancel = true;
         this.activeFadeOut = null;
       }
@@ -1061,17 +1111,35 @@ export const playerApp = {
       this.updatePlayingState(true);
       
       // Start video playback
+      // Note: playVideo() has built-in interruption handling via activeFades Map
+      // It will gracefully cancel any in-flight video fade-outs and start fresh
+      console.log('[Play Event] 🎬 Starting video playback');
       this.playVideo();
       
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
+      console.log('[Pause Event] ⏸️ Pause event triggered');
+      
       // Hide cursor when paused by making it transparent
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
+      
+      // Skip video fade-out if we're in the middle of a track switch
+      // Track switch handles its own video transitions with specific timing
+      if (this.isTrackSwitching) {
+        console.log('[Pause Event] ⏭️ Skipping stopVideo() - track switch will handle video transitions');
+        this.updatePlayingState(false);
+        document.dispatchEvent(new CustomEvent("playback:pause"));
+        return;
+      }
+      
+      console.log('[Pause Event] 🎬 Stopping videos (normal pause)');
       this.updatePlayingState(false);
       
-      // Stop video playback
+      // Stop video playback with fade-out
+      // Note: stopVideo() has built-in interruption handling via activeFades Map
+      // Audio has already faded out by this point (sequenced in button handler)
       this.stopVideo();
       
       document.dispatchEvent(new CustomEvent("playback:pause"));
@@ -1161,8 +1229,11 @@ export const playerApp = {
     const playPauseBtn = this.elements.playPauseBtn;
     playPauseBtn.onclick = () => {
       if (this.wavesurfer.isPlaying()) {
-        // Fade out before pausing
+        // Sequential approach: Audio fade → Pause (triggers video fade via event)
+        // This ensures proper sequencing without requiring matching durations
+        console.log('[Play/Pause] 🎵 Starting pause sequence with audio fade-out');
         this.applyAudioFadeOut().then(() => {
+          console.log('[Play/Pause] ⏸️ Audio fade complete, pausing (will trigger video fade)');
           this.wavesurfer.pause();
         });
       } else {
@@ -1170,17 +1241,20 @@ export const playerApp = {
         const currentTime = this.wavesurfer.getCurrentTime();
         const isResuming = currentTime > 0;
         
+        console.log('[Play/Pause] ▶️ Starting play sequence', { isResuming });
+        
         if (isResuming) {
-          // Resuming from pause: fade in
+          // Resuming from pause: fade in both audio and video
           const targetVolume = this.wavesurfer.getVolume();
           this.wavesurfer.setVolume(0);
-          this.wavesurfer.play();
+          this.wavesurfer.play(); // Triggers 'play' event which starts video
           requestAnimationFrame(() => {
+            console.log('[Play/Pause] 🎵 Starting audio fade-in');
             this.applyAudioFadeInFromZero(targetVolume);
           });
         } else {
           // Starting from beginning: no fade
-          this.wavesurfer.play();
+          this.wavesurfer.play(); // Triggers 'play' event which starts video
         }
       }
     };
@@ -1252,10 +1326,15 @@ export const playerApp = {
   showLoading(isLoading) {
     const loadingIndicator = this.elements.loadingIndicator;
     if (!loadingIndicator) return;
+    
     if (isLoading) {
       loadingIndicator.classList.remove("hidden");
+      // Force opacity to 1 immediately to override any lingering transition
+      loadingIndicator.style.opacity = "1";
     } else {
       loadingIndicator.classList.add("hidden");
+      // Let CSS transition handle the fade out
+      loadingIndicator.style.opacity = "";
     }
   },
 
@@ -2132,6 +2211,17 @@ export const playerApp = {
       previousFade.abort();
       this.videoState.activeFades.delete(videoElement);
       console.log(`[Fade In Video] ✓ Previous fade aborted`);
+      
+      // CRITICAL: Clear any inline styles from previous fade-out interruption
+      // Without this, inline opacity/transition styles override CSS transitions
+      if (previousFade.type === 'out') {
+        console.log(`[Fade In Video] 🧹 Clearing inline styles from interrupted fade-out`);
+        videoElement.style.opacity = '';
+        videoElement.style.transition = '';
+        // Force reflow to ensure styles are cleared before starting new fade
+        void videoElement.offsetHeight;
+        console.log(`[Fade In Video] ✓ Inline styles cleared, ready for CSS fade-in`);
+      }
     }
 
     // Ensure video is ready to play (readyState >= 2 means we have current frame data)
@@ -3034,14 +3124,6 @@ export const playerApp = {
               <div class="hover-time">0:00</div>
               <div class="playhead-time">0:00</div>
               <div id="total-time" class="total-time">0:00</div>
-              <div id="loading" class="loading">
-                <dotlottie-player 
-                  src="assets/Insider-loading.lottie" 
-                  autoplay 
-                  loop
-                  style="width: 120px; height: 120px;">
-                </dotlottie-player>
-              </div>
             </div>
             <div class="volume-control hidden">
               <button id="volumeToggle" class="icon-button">
@@ -3053,6 +3135,9 @@ export const playerApp = {
               <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
             </div>
           </div>
+        </div>
+        <div id="loading" class="loading">
+          <div class="spinner"></div>
         </div>
       </div>
       <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>

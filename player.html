@@ -48,7 +48,6 @@
   <div id="embedPlayer"></div>
 
   <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7"></script>
-  <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
   
   <script type="module">
     // Import actual player module - single source of truth
@@ -259,14 +258,6 @@
                   <div class="hover-time">0:00</div>
                   <div class="playhead-time">0:00</div>
                   <div id="total-time" class="total-time">0:00</div>
-                  <div id="loading" class="loading">
-                    <dotlottie-player 
-                      src="assets/Insider-loading.lottie" 
-                      autoplay 
-                      loop
-                      style="width: 120px; height: 120px;">
-                    </dotlottie-player>
-                  </div>
                 </div>
                 <div class="volume-control hidden">
                   <button id="volumeToggle" class="icon-button">
@@ -278,6 +269,9 @@
                   <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
                 </div>
               </div>
+            </div>
+            <div id="loading" class="loading">
+              <div class="spinner"></div>
             </div>
           </div>
           <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>

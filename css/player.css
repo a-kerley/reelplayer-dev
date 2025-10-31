@@ -1,13 +1,17 @@
 /* ========================================
-   WAVEFORM CANVAS
+   WAVEFORM WRAPPER
    ======================================== */
+/* Target the WaveSurfer wrapper div (last child without class/id) */
 /* Base state - let JS or expandable mode CSS control visibility */
-#waveform > canvas {
+#waveform > div:last-child {
   transition: opacity 0.4s ease;
+  /* Ensure waveform wrapper doesn't shift other absolutely positioned elements */
+  position: relative;
+  z-index: 1;
 }
 
 /* Only set initial hidden state for non-expandable mode */
-.player-wrapper:not(.expandable-mode) #waveform > canvas {
+.player-wrapper:not(.expandable-mode) #waveform > div:last-child {
   opacity: 0;
 }
 
@@ -500,29 +504,43 @@ button {
 }
 
 .loading {
+  /* Position relative to .player-content - centered over the player controls */
   position: absolute;
-  top: 0;
-  left: 0;
-  z-index: 10;
-  background: rgba(255, 255, 255, 0.9);
-  width: 100%;
-  height: 100%;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  border-radius: 8px;
+  top: 67%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 100; /* Above everything in player-content */
+  pointer-events: none; /* Prevent interaction */
+  transition: opacity 0.3s ease;
+  /* Ensure the container has dimensions */
+  width: 48px;
+  height: 48px;
 }
 
-.loading dotlottie-player {
-  /* Apply color overlay to match UI accent color */
-  filter: 
-    brightness(0) /* Make it black first */
-    saturate(100%) 
-    brightness(var(--lottie-brightness, 1)) 
-    sepia(1) 
-    hue-rotate(var(--lottie-hue-rotation, 0deg)) 
-    saturate(var(--lottie-saturation, 1));
-  transition: filter 0.3s ease;
+.loading.hidden {
+  opacity: 0;
+}
+
+/* Hide loading spinner in expandable mode when collapsed */
+.player-wrapper.expandable-mode:not(.expanded) .loading {
+  opacity: 0 !important;
+  display: none;
+}
+
+/* CSS Spinner that uses UI accent color */
+.spinner {
+  width: 48px;
+  height: 48px;
+  border: 3px solid rgba(255, 255, 255, 0.1);
+  border-top-color: var(--ui-accent, #2a0026);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to {
+    transform: rotate(360deg);
+  }
 }
 
 /* Remove old dot animation styles */
