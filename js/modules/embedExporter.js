@@ -140,6 +140,8 @@ export class EmbedExporter {
       playlist: playlist,
       playerHeight: reel.playerHeight || 500, // Player height setting
       mode: reel.mode || "static", // Player mode: "static" or "expandable"
+      // Store backgroundColor at top level for easy access (matches PreviewManager)
+      backgroundColor: reel.backgroundColor || "rgba(255, 255, 255, 1)",
       settings: {
         // Color settings
         varUiAccent: reel.varUiAccent || "#2a0026",
@@ -148,6 +150,7 @@ export class EmbedExporter {
         varPlayerBorder: reel.varPlayerBorder || "#ffffff",
         
         // Background settings
+        backgroundColor: reel.backgroundColor || "rgba(255, 255, 255, 1)", // Also in settings for backwards compatibility
         backgroundImage: reel.backgroundImage,
         backgroundImageEnabled: reel.backgroundImageEnabled,
         backgroundVideo: reel.backgroundVideo,

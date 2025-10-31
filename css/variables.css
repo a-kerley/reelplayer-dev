@@ -94,12 +94,12 @@
   --playback-idle-collapsed-waveform-opacity: 0.6; /* Waveform opacity in collapsed idle state */
   --playback-idle-transition-in: 0.8s;            /* Duration of opacity fade when entering idle */
   --playback-idle-transition-out: 0.3s;           /* Duration of opacity fade when exiting idle */
-  --playback-idle-blur-delay-in: 1s;              /* Delay before blur transition starts when entering idle state */
+  --playback-idle-blur-delay-in: 0s;              /* Delay before blur transition starts when entering idle state */
   --playback-idle-blur-delay-out: 0s;             /* Delay before blur transition starts when exiting idle state */
   --playback-idle-blur-transition-in: 3s;       /* Duration of blur transition into idle state */
   --playback-idle-blur-transition-out: 2.5s;      /* Duration of blur transition out of idle state (covers video fadeout) */
   --playback-idle-overlay-opacity-multiplier: 0.5; /* Opacity multiplier for entire ::before layer in idle state (affects both overlay color AND blur backdrop) */
-  --playback-idle-overlay-delay-in: 1s;           /* Delay before overlay transition starts when entering idle state */
+  --playback-idle-overlay-delay-in: 0.2s;           /* Delay before overlay transition starts when entering idle state */
   --playback-idle-overlay-delay-out: 0s;          /* Delay before overlay transition starts when exiting idle state */
   --playback-idle-overlay-transition-in: 3s;    /* Duration of overlay opacity transition into idle state */
   --playback-idle-overlay-transition-out: 2s;   /* Duration of overlay opacity transition out of idle state */

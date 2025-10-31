@@ -5,7 +5,10 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reel Player</title>
   
-  <!-- Import actual CSS files - single source of truth (matching style.css imports) -->
+  <!-- ============================================
+       CSS IMPORTS - Single Source of Truth
+       All styles imported from actual CSS files
+       ============================================ -->
   <link rel="stylesheet" href="css/variables.css">
   <link rel="stylesheet" href="css/layout.css">
   <link rel="stylesheet" href="css/player.css">
@@ -13,7 +16,10 @@
   <link rel="stylesheet" href="css/expandable.css">
   
   <style>
-    /* Minimal iframe-specific styles - DO NOT override imported CSS */
+    /* ============================================
+       IFRAME-SPECIFIC STYLES
+       Minimal overrides for embed context
+       ============================================ */
     html, body {
       margin: 0;
       padding: 0;
@@ -42,54 +48,64 @@
       border-radius: 8px;
       margin: 1rem;
     }
+    
+    .loading-message {
+      color: #6c757d;
+      text-align: center;
+      padding: 2rem;
+      font-size: 0.9rem;
+    }
   </style>
 </head>
 <body>
-  <div id="embedPlayer"></div>
+  <div id="embedPlayer">
+    <div class="loading-message">Loading player...</div>
+  </div>
 
+  <!-- WaveSurfer.js - Audio waveform library -->
   <script src="https://cdn.jsdelivr.net/npm/wavesurfer.js@7"></script>
   
   <script type="module">
-    // Import actual player module - single source of truth
+    /* ============================================
+       REEL PLAYER EMBED
+       Loads and initializes player from stored reel data
+       References player.js module for all functionality
+       ============================================ */
+    
+    // Import actual player module and utilities
     import { playerApp } from './js/player.js';
     import { getColorFilters } from './js/modules/colorUtils.js';
     
-    // Get reel ID from URL
+    // ============================================
+    // INITIALIZATION
+    // ============================================
+    
+    // Get reel ID from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const reelId = urlParams.get('id');
     
     if (!reelId) {
-      document.getElementById('embedPlayer').innerHTML = 
-        '<div class="error-message">❌ No reel ID provided</div>';
+      showError('No reel ID provided');
     } else {
       loadAndRenderReel(reelId);
     }
     
+    /* ============================================
+       MAIN LOADING FUNCTION
+       ============================================ */
     async function loadAndRenderReel(reelId) {
       try {
-        // Get reel data from localStorage
-        let reelData = null;
-        
-        const storedData = localStorage.getItem(`reel_${reelId}`);
-        if (storedData) {
-          reelData = JSON.parse(storedData);
-        } else {
-          // Try parent window if in iframe
-          try {
-            if (window.parent && window.parent !== window) {
-              const parentData = window.parent.localStorage.getItem(`reel_${reelId}`);
-              if (parentData) {
-                reelData = JSON.parse(parentData);
-              }
-            }
-          } catch (e) {
-            console.log('Cannot access parent localStorage (cross-origin)');
-          }
-        }
+        // Retrieve reel data from localStorage
+        const reelData = await loadReelData(reelId);
         
         if (!reelData) {
-          document.getElementById('embedPlayer').innerHTML = 
-            '<div class="error-message">❌ Reel not found</div>';
+          showError('Reel not found');
+          return;
+        }
+        
+        // Validate reel has tracks
+        if (!reelData.playlist || reelData.playlist.length === 0) {
+          showError('No tracks found in reel');
           return;
         }
         
@@ -104,11 +120,51 @@
         
       } catch (error) {
         console.error('Failed to load reel:', error);
-        document.getElementById('embedPlayer').innerHTML = 
-          '<div class="error-message">❌ Failed to load reel</div>';
+        showError('Failed to load reel');
       }
     }
     
+    /* ============================================
+       REEL DATA LOADING
+       Loads from localStorage with parent fallback
+       ============================================ */
+    async function loadReelData(reelId) {
+      // Try local storage first
+      const storedData = localStorage.getItem(`reel_${reelId}`);
+      if (storedData) {
+        console.log('✓ Loaded reel from local storage');
+        return JSON.parse(storedData);
+      }
+      
+      // Try parent window if in iframe (cross-origin safe)
+      try {
+        if (window.parent && window.parent !== window) {
+          const parentData = window.parent.localStorage.getItem(`reel_${reelId}`);
+          if (parentData) {
+            console.log('✓ Loaded reel from parent window storage');
+            return JSON.parse(parentData);
+          }
+        }
+      } catch (e) {
+        console.log('Cannot access parent localStorage (cross-origin)');
+      }
+      
+      return null;
+    }
+    
+    /* ============================================
+       ERROR DISPLAY
+       ============================================ */
+    function showError(message) {
+      document.getElementById('embedPlayer').innerHTML = 
+        `<div class="error-message">❌ ${message}</div>`;
+    }
+    
+    /* ============================================
+       APPLY REEL STYLES
+       Sets CSS variables and container styles
+       Matches PreviewManager behavior exactly
+       ============================================ */
     function applyReelStyles(reelData) {
       const settings = reelData.settings || {};
       const ta = settings.titleAppearance || {};
@@ -119,35 +175,48 @@
         paddingBottom = paddingBottom + "px";
       }
       
-      // Process background
-      const backgroundImage = (settings.backgroundImageEnabled && settings.backgroundImage) 
-        ? settings.backgroundImage : null;
-      let backgroundColor = `rgba(255, 255, 255, ${settings.backgroundOpacity || "1"})`;
-      let overlayColor = "rgba(255, 255, 255, 0)";
+      // Process background configuration
+      // NEW IMPLEMENTATION (matches PreviewManager exactly):
+      // - backgroundColor is ALWAYS the base solid color behind everything
+      // - overlayColor is ALWAYS applied to ::before pseudo-element (with blur)
+      // - backgroundImage is only included if enabled
       
+      const backgroundImage = (settings.backgroundImageEnabled && settings.backgroundImage && settings.backgroundImage.trim()) 
+        ? settings.backgroundImage 
+        : null;
+      
+      // backgroundColor is ALWAYS the base solid color
+      const backgroundColor = reelData.backgroundColor || settings.backgroundColor || "rgba(255, 255, 255, 1)";
+      
+      // overlayColor is ALWAYS applied to ::before (transparent by default)
+      let overlayColor = "rgba(255, 255, 255, 0)";
       if (settings.overlayColorEnabled && settings.overlayColor) {
-        if (backgroundImage) {
-          overlayColor = settings.overlayColor;
-        } else {
-          backgroundColor = settings.overlayColor;
-        }
+        overlayColor = settings.overlayColor;
       }
       
       const uiAccentColor = settings.varUiAccent || '#2a0026';
       
-      // Calculate Lottie color filters (same as PreviewManager)
+      // Calculate Lottie color filters for loading animation
       const colorFilters = getColorFilters(uiAccentColor);
       
-      // Apply CSS variables (matching PreviewManager exactly)
+      // ============================================
+      // Apply CSS variables to document root
+      // ============================================
       const root = document.documentElement;
+      
+      // Color variables
       root.style.setProperty('--ui-accent', uiAccentColor);
       root.style.setProperty('--waveform-unplayed', settings.varWaveformUnplayed || '#929292');
       root.style.setProperty('--waveform-hover', settings.varWaveformHover || 'rgba(0, 31, 103, 0.13)');
       root.style.setProperty('--player-border-color', settings.varPlayerBorder || '#ffffff');
+      
+      // Title appearance variables
       root.style.setProperty('--reel-title-size', ta.fontSize || '1.3rem');
       root.style.setProperty('--reel-title-weight', ta.fontWeight || '700');
       root.style.setProperty('--reel-title-align', ta.align || 'center');
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
+      
+      // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');
       root.style.setProperty('--background-color', backgroundColor);
       root.style.setProperty('--background-opacity', settings.backgroundOpacity || '1');
@@ -160,58 +229,61 @@
         root.style.setProperty('--background-blend-mode', settings.backgroundBlendMode);
       }
       
-      // Lottie animation color variables (matching PreviewManager)
+      // Lottie animation color variables
       root.style.setProperty('--lottie-brightness', colorFilters.brightness);
       root.style.setProperty('--lottie-saturation', colorFilters.saturation);
       root.style.setProperty('--lottie-hue-rotation', `${colorFilters.hueRotation}deg`);
       
-      // Player height setting
+      // Player height settings
       const playerHeight = reelData.playerHeight || 500;
       root.style.setProperty('--player-height', `${playerHeight}px`);
       
-      // Expandable mode settings
+      // Expandable mode height settings
       root.style.setProperty('--expandable-collapsed-height', `${settings.expandableCollapsedHeight || 120}px`);
       root.style.setProperty('--expandable-expanded-height', `${settings.expandableExpandedHeight || 500}px`);
       
-      // Apply background image and blend modes
+      // ============================================
+      // Apply container styles
+      // ============================================
       const container = document.getElementById('embedPlayer');
-      // Set minimum height for the container based on mode
       const mode = reelData.mode || 'static';
+      
+      // Set minimum height based on mode
       if (mode === 'expandable') {
         container.style.minHeight = `${settings.expandableCollapsedHeight || 120}px`;
       } else {
         container.style.minHeight = `${playerHeight}px`;
       }
       
+      // Apply base background color (always applied)
+      container.style.backgroundColor = backgroundColor;
+      
+      // Apply background image if present
       if (backgroundImage) {
         container.style.backgroundImage = `url("${backgroundImage}")`;
         container.style.backgroundSize = 'cover';
         container.style.backgroundPosition = 'center';
+      } else {
+        // Clear any previously set background image
+        container.style.backgroundImage = 'none';
       }
-      container.style.backgroundColor = backgroundColor;
       
+      // Apply blend mode if specified
       if (settings.backgroundBlendMode) {
         container.style.mixBlendMode = settings.backgroundBlendMode;
       }
       
-      // Create backdrop blur overlay
-      if (overlayColor !== "rgba(255, 255, 255, 0)") {
-        container.style.position = 'relative';
-        const overlay = document.createElement('div');
-        overlay.style.cssText = `
-          position: absolute;
-          top: 0; left: 0; right: 0; bottom: 0;
-          background-color: ${overlayColor};
-          backdrop-filter: blur(${settings.backgroundBlur || 2}px);
-          -webkit-backdrop-filter: blur(${settings.backgroundBlur || 2}px);
-          pointer-events: none;
-          z-index: 1;
-          border-radius: 8px;
-        `;
-        container.appendChild(overlay);
-      }
+      // NOTE: Overlay color and blur are now handled by CSS variables
+      // applied to .player-wrapper::before pseudo-element
+      // This ensures consistent behavior with the preview
+      // No need to create a separate overlay div
     }
     
+    /* ============================================
+       RENDER PLAYER HTML
+       Builds complete player structure
+       Matches playerApp.renderPlayer() structure exactly
+       ============================================ */
     function renderPlayerHTML(reelData) {
       const container = document.getElementById('embedPlayer');
       const shouldHideTitle = !(reelData.showTitle && reelData.title && reelData.title.trim());
@@ -236,11 +308,20 @@
         `;
       }
       
-      // Use exact same HTML structure as playerApp.renderPlayer()
+      // Build complete player HTML structure
+      // IMPORTANT: Must match playerApp.renderPlayer() structure exactly
       const playerHTML = `
         <div class="${wrapperClasses}" style="position: relative; z-index: 2; ${elementBlendStyle}">
+          <!-- Background layers for track-specific images -->
           <div class="track-background-layer track-bg-layer-a"></div>
           <div class="track-background-layer track-bg-layer-b"></div>
+          
+          <!-- Video background layers (dual-buffer for crossfade) -->
+          <video class="background-video main-video-a" muted loop playsinline></video>
+          <video class="background-video main-video-b" muted loop playsinline></video>
+          <video class="background-video track-video-a" muted loop playsinline></video>
+          <video class="background-video track-video-b" muted loop playsinline></video>
+          
           ${projectTitleOverlayHTML}
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
@@ -278,33 +359,51 @@
         </div>
       `;
       
+      // Clear loading message and insert player HTML
+      container.innerHTML = '';
       container.insertAdjacentHTML('beforeend', playerHTML);
     }
     
+    /* ============================================
+       INITIALIZE EMBED PLAYER
+       Sets up playerApp with reel configuration
+       Calls all necessary setup methods
+       ============================================ */
     function initializeEmbedPlayer(reelData) {
-      // Store reel reference with full reelData for expandable mode
+      console.log('🎵 Initializing embed player with reel:', reelData.id || 'unknown');
+      
+      // Store reel reference with full reelData
       playerApp.reel = reelData.settings || {};
       playerApp.currentReelSettings = reelData;
       
-      // Set expandable mode state properly (matching main player's renderPlayer method)
+      // Configure expandable mode state (matches main player's renderPlayer method)
       const mode = reelData.mode || 'static';
       playerApp.expandable.enabled = (mode === 'expandable');
       playerApp.expandable.isExpanded = false;
       playerApp.expandable.isPlaying = false;
-      playerApp.expandable.settings = reelData; // CRITICAL: Store full reelData (not just settings) for collapsePlayer to access
+      playerApp.expandable.settings = reelData; // Store full reelData for collapsePlayer access
       playerApp.expandable.showWaveformOnCollapse = reelData.settings?.showWaveformOnCollapse !== false;
       
-      // Cache DOM elements using playerApp's method
+      console.log(`✓ Mode: ${mode}${mode === 'expandable' ? ' (expandable)' : ' (static)'}`);
+      
+      // ============================================
+      // Cache DOM elements
+      // ============================================
       playerApp.elements = {};
       playerApp.cacheElements();
       
-      // Setup expandable mode interactions if enabled
+      // ============================================
+      // Setup expandable mode if enabled
+      // ============================================
       if (playerApp.expandable.enabled) {
         playerApp.setupExpandableModeInteractions();
         playerApp.validateProjectTitleImage();
+        console.log('✓ Expandable mode interactions enabled');
       }
       
-      // Apply waveform settings from reel data
+      // ============================================
+      // Apply waveform customization settings
+      // ============================================
       const waveformSettings = reelData.settings?.waveform || {};
       if (waveformSettings.barsEnabled) {
         const root = document.documentElement;
@@ -312,22 +411,29 @@
         root.style.setProperty('--waveform-bar-gap', `${waveformSettings.barGap || 1}px`);
         root.style.setProperty('--waveform-bar-radius', `${waveformSettings.barRadius || 2}px`);
         root.style.setProperty('--waveform-bar-height', waveformSettings.barHeight || 1);
+        console.log('✓ Custom waveform bars enabled');
       }
       
-      // Setup player using actual playerApp methods
+      // ============================================
+      // Setup player components
+      // All functionality imported from player.js module
+      // ============================================
       playerApp.setupWaveSurfer();
       playerApp.setupWaveformEvents();
       playerApp.setupPlayPauseUI();
       playerApp.setupVolumeControls();
+      console.log('✓ Player components initialized');
       
-      // Render and load playlist
+      // ============================================
+      // Load playlist and first track
+      // ============================================
       if (reelData.playlist && reelData.playlist.length) {
         playerApp.renderPlaylist(reelData.playlist);
         const firstTrack = reelData.playlist[0];
         const url = playerApp.convertDropboxLinkToDirect(firstTrack.url);
         playerApp.initializePlayer(url, firstTrack.title, 0);
         
-        // Set track info
+        // Set initial track info display
         const trackInfo = playerApp.elements.trackInfo;
         if (trackInfo) {
           const fileName = firstTrack.title || 
@@ -336,9 +442,28 @@
           trackInfo.textContent = fileName;
           trackInfo.classList.add('visible');
         }
+        
+        console.log(`✓ Loaded ${reelData.playlist.length} track(s)`);
       }
       
-      // Add spacebar play/pause for embed
+      // ============================================
+      // Setup keyboard controls
+      // ============================================
+      setupKeyboardControls();
+      
+      // ============================================
+      // Setup playback event listeners
+      // ============================================
+      setupPlaybackEventListeners();
+      
+      console.log('✅ Player initialization complete');
+    }
+    
+    /* ============================================
+       KEYBOARD CONTROLS
+       Spacebar play/pause for embed
+       ============================================ */
+    function setupKeyboardControls() {
       document.addEventListener("keydown", (e) => {
         const active = document.activeElement;
         const isTyping = active && (
@@ -346,6 +471,7 @@
           active.tagName === "TEXTAREA" ||
           active.isContentEditable
         );
+        
         if (!isTyping && (e.code === "Space" || e.key === " ")) {
           e.preventDefault();
           if (playerApp.wavesurfer && playerApp.isWaveformReady) {
@@ -353,8 +479,14 @@
           }
         }
       });
-      
-      // Update play/pause button icon
+    }
+    
+    /* ============================================
+       PLAYBACK EVENT LISTENERS
+       Updates play/pause button icons
+       ============================================ */
+    function setupPlaybackEventListeners() {
+      // Update to pause icon when playing
       document.addEventListener("playback:play", () => {
         const playPauseBtn = playerApp.elements.playPauseBtn;
         if (playPauseBtn) {
@@ -366,6 +498,7 @@
         }
       });
       
+      // Update to play icon when paused
       document.addEventListener("playback:pause", () => {
         const playPauseBtn = playerApp.elements.playPauseBtn;
         if (playPauseBtn) {
