@@ -1,12 +1,17 @@
+/* ==============================================
+   GLOBAL LAYOUT & BASE STYLES
+   ============================================== */
+
 html,
 body {
   height: 100%;
-}
-
-body {
   min-height: 100vh;
   margin: 0;
 }
+
+/* ==============================================
+   BUILDER APP LAYOUT
+   ============================================== */
 
 .builder-app {
   display: flex;
@@ -16,6 +21,10 @@ body {
   gap: 2.5rem;
   align-items: stretch;
 }
+
+/* ==============================================
+   SIDEBAR STYLES
+   ============================================== */
 
 .builder-sidebar {
   min-width: 220px;
@@ -32,45 +41,23 @@ body {
   box-sizing: border-box;
 }
 
-.track-drag-handle {
-  display: flex;
-  align-items: center;
-  margin-right: 0.5rem;
-  cursor: grab;
-  opacity: 0.6;
-  user-select: none;
-}
-.track-drag-handle svg {
-  display: block;
-  pointer-events: none;
-}
-.dragging {
-  opacity: 0.5;
-}
-.drag-over {
-  outline: 2px dashed #999;
-  background: #f3f3f3;
+.builder-sidebar > #newReelBtn {
+  width: 100%;
+  margin-bottom: 1.2rem;
+  background: var(--builder-accent);
+  color: white;
+  border-radius: 5px;
+  font-size: 1rem;
+  padding: 0.45rem 0;
+  border: none;
+  cursor: pointer;
+  font-weight: 700;
+  letter-spacing: 0.01em;
 }
 
-#tracksEditor input[type="text"] {
-  min-width: 14rem;
-  width: 18rem;
-  max-width: 100%;
-  font-size: 0.8rem;
-}
-
-#reelTitle {
-  margin-bottom: 1rem;
-}
-
-#reelShowTitle {
-  font-size: 1.2rem;
-  font-weight: 500;
-  color: var(--builder-accent);
-  margin-bottom: 1.5rem;
-}
-
-/* === START: Sidebar Reel List Section === */
+/* ==============================================
+   REEL LIST SIDEBAR SECTION
+   ============================================== */
 #reelList {
   list-style: none;
   margin: 0;
@@ -141,7 +128,10 @@ body {
   color: var(--builder-delete-hover);
   transform: scale(1.23);
 }
-/* === END: Sidebar Reel List Section === */
+
+/* ==============================================
+   MAIN CONTENT AREA
+   ============================================== */
 
 .builder-main {
   flex: 1 1 0;
@@ -151,8 +141,18 @@ body {
   overflow-y: auto;
   padding-top: 2.2rem;
   padding-right: 2.5rem;
-  /* Add bottom padding to accommodate expanding player */
   padding-bottom: 500px;
+}
+
+#reelTitle {
+  margin-bottom: 1rem;
+}
+
+#reelShowTitle {
+  font-size: 1.2rem;
+  font-weight: 500;
+  color: var(--builder-accent);
+  margin-bottom: 1.5rem;
 }
 
 #reelPlayerPreview {
@@ -160,54 +160,56 @@ body {
   margin-bottom: 4rem;
 }
 
-.builder-sidebar > #newReelBtn {
-  width: 100%;
-  margin-bottom: 1.2rem;
-  background: var(--builder-accent);
-  color: white;
-  border-radius: 5px;
-  font-size: 1rem;
-  padding: 0.45rem 0;
-  border: none;
-  cursor: pointer;
-  font-weight: 700;
-  letter-spacing: 0.01em;
+/* ==============================================
+   TRACKS EDITOR SECTION
+   ============================================== */
+
+#tracksEditor input[type="text"] {
+  min-width: 14rem;
+  width: 18rem;
+  max-width: 100%;
+  font-size: 0.8rem;
+}
+
+.track-drag-handle {
+  display: flex;
+  align-items: center;
+  margin-right: 0.5rem;
+  cursor: grab;
+  opacity: 0.6;
+  user-select: none;
+}
+
+.track-drag-handle svg {
+  display: block;
+  pointer-events: none;
+}
+
+.dragging {
+  opacity: 0.5;
+}
+
+.drag-over {
+  outline: 2px dashed #999;
+  background: #f3f3f3;
 }
 
 .phantom-track-row {
-  pointer-events: none; /* only button is clickable */
+  pointer-events: none;
   min-height: 32px;
   margin-bottom: 0.5rem;
 }
+
 .phantom-track-row .track-remove-btn {
   pointer-events: auto;
   opacity: 1;
 }
 
-#addTrackBtn,
-#exportEmbedBtn {
-  background: var(--builder-accent);
-  color: white;
-  border: none;
-  border-radius: 4px;
-  padding: 0.4rem 0.8rem;
-  font-weight: 600;
-  cursor: pointer;
-  margin-top: 1rem;
-  transition: background 0.2s ease;
-}
-
-#addTrackBtn:hover,
-#exportEmbedBtn:hover {
-  background: var(--builder-hover);
-}
-
-/* === Track Add/Remove/Copy Button Styles === */
+/* Track control buttons */
 .track-remove-btn,
 .track-add-btn,
 .track-copy-btn {
   background: none;
-  /* border: 1px solid var(--builder-border); */ /* border removed */
   border-radius: 4px;
   cursor: pointer;
   transition: transform 0.15s;
@@ -218,6 +220,7 @@ body {
   height: 32px;
   padding: 0;
 }
+
 .track-btn-svg {
   width: 22px;
   height: 22px;
@@ -225,36 +228,73 @@ body {
   color: var(--builder-accent);
   transition: transform 0.15s;
 }
+
+.track-remove-btn:hover,
+.track-add-btn:hover,
+.track-copy-btn:hover {
+  transform: scale(1.1);
+}
+
 .track-remove-btn:hover .track-btn-svg,
 .track-add-btn:hover .track-btn-svg,
 .track-copy-btn:hover .track-btn-svg {
   transform: scale(1.18);
-  /* No color or background change on hover */
 }
-.track-remove-btn:hover,
-.track-add-btn:hover,
-.track-copy-btn:hover {
-  /* background: var(--builder-hover); */
-  /* color: white; */
-  transform: scale(1.1);
-}
-
-/* Ensure .phantom-track-row .track-remove-btn is still present for pointer events */
 
 .track-remove-btn:hover .track-btn-svg {
-  color: #c00; /* red for minus */
-  transform: scale(1.18);
-}
-.track-remove-btn.add-btn:hover .track-btn-svg {
-  color: #219e36; /* green for plus */
-  transform: scale(1.18);
-}
-.track-copy-btn:hover .track-btn-svg {
-  color: #8b5cf6; /* purple for copy arrow */
-  transform: scale(1.18);
+  color: #c00;
 }
 
-/* More compact color picker area */
+.track-remove-btn.add-btn:hover .track-btn-svg {
+  color: #219e36;
+}
+
+.track-copy-btn:hover .track-btn-svg {
+  color: #8b5cf6;
+}
+
+.track-filename-label {
+  font-size: 0.3em;
+  color: #888;
+  margin-top: 0.2em;
+  margin-left: 0.4em;
+}
+
+/* ==============================================
+   BUTTONS AND ACTIONS
+   ============================================== */
+
+#addTrackBtn,
+#exportEmbedBtn,
+#refreshPreviewBtn {
+  background: var(--builder-accent);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 0.45rem 1.2rem;
+  font-weight: 700;
+  cursor: pointer;
+  margin-top: 1.2rem;
+  transition: background 0.18s;
+}
+
+#addTrackBtn,
+#exportEmbedBtn {
+  font-size: 1rem;
+  padding: 0.4rem 0.8rem;
+  margin-top: 1rem;
+}
+
+#addTrackBtn:hover,
+#exportEmbedBtn:hover,
+#refreshPreviewBtn:hover {
+  background: var(--builder-hover);
+}
+
+/* ==============================================
+   COLOR PICKERS & EFFECTS SECTION
+   ============================================== */
+
 .color-row {
   display: flex;
   align-items: center;
@@ -284,7 +324,9 @@ body {
   margin-right: 0.8rem;
 }
 
-/* Toggle Switch Styles */
+/* ==============================================
+   TOGGLE SWITCHES
+   ============================================== */
 .toggle-switch {
   position: relative;
   display: inline-block;
@@ -336,18 +378,19 @@ body {
   box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
 }
 
-/* Hover effect */
 .toggle-switch:hover .toggle-slider {
   box-shadow: 0 0 0 2px rgba(42, 0, 38, 0.1);
 }
 
-/* Disabled state styling */
 .toggle-switch input:disabled + .toggle-slider {
   opacity: 0.5;
   cursor: not-allowed;
 }
 
-/* Disabled input and button styling */
+/* ==============================================
+   DISABLED STATES
+   ============================================== */
+
 input:disabled,
 button:disabled {
   opacity: 0.5;
@@ -355,7 +398,10 @@ button:disabled {
   pointer-events: none;
 }
 
-/* Pickr (nano theme) swatch size hard override */
+/* ==============================================
+   PICKR COLOR PICKER CUSTOMIZATION
+   ============================================== */
+
 .pcr-app .pcr-swatches {
   display: flex !important;
   flex-wrap: wrap !important;
@@ -377,14 +423,9 @@ button:disabled {
   max-height: none !important;
 }
 
-.track-filename-label {
-  font-size: 0.3em;
-  color: #888;
-  margin-top: 0.2em;
-  margin-left: 0.4em;
-}
-
-/* === Filename display style for builder track rows === */
+/* ==============================================
+   FILENAME DISPLAY & INPUT
+   ============================================== */
 .filename-display {
   font-family: inherit;
   font-size: 0.8rem;
@@ -405,14 +446,12 @@ button:disabled {
   white-space: nowrap;
 }
 
-/* Placeholder style for filename display */
 .filename-display.placeholder {
   color: #888888;
   font-size: 0.7rem;
   padding: 0.7em 0.7em;
 }
 
-/* Apply filename-display styles also to inputs with this class */
 input.filename-display {
   font-family: inherit;
   font-size: 0.8rem;
@@ -435,26 +474,9 @@ input.filename-display:focus {
   outline-offset: 2px;
 }
 
-
-#refreshPreviewBtn {
-  background: var(--builder-accent);
-  color: #fff;
-  border: none;
-  border-radius: 5px;
-  font-size: 1rem;
-  font-weight: 700;
-  padding: 0.45rem 1.2rem;
-  cursor: pointer;
-  margin-top: 1.2rem;
-  margin-bottom: 1.2rem;
-  transition: background 0.18s;
-}
-
-#refreshPreviewBtn:hover {
-  background: var(--builder-hover);
-}
-
-/* --- Colour Preset Modal Styles --- */
+/* ==============================================
+   COLOUR PRESET MODAL
+   ============================================== */
 #colourPresetModal {
   display: none;
   position: fixed;
@@ -524,7 +546,8 @@ input.filename-display:focus {
 .close-preset-modal:hover {
   color: #b00000;
 }
-/* === Colour Preset Modal Row Layout Styles === */
+
+/* Preset row layout */
 .preset-row {
   display: flex;
   align-items: center;
@@ -572,6 +595,10 @@ input.filename-display:focus {
   pointer-events: none;
 }
 
+/* ==============================================
+   MATERIAL ICONS & ALIGNMENT
+   ============================================== */
+
 .material-symbols-outlined {
   font-size: 1.7em;
   color: #444;
@@ -579,10 +606,12 @@ input.filename-display:focus {
   vertical-align: middle;
   transition: color 0.18s, opacity 0.18s;
 }
+
 #reelTitleAppearanceSection .material-symbols-outlined {
   font-size: 1.2em;
   line-height: 1;
 }
+
 .align-icon {
   opacity: 0.5;
   cursor: pointer;
@@ -591,35 +620,22 @@ input.filename-display:focus {
   transition: opacity 0.18s, color 0.18s;
   margin-right: 0.25em;
 }
-.align-icon.active, .align-icon:hover {
-  opacity: 1;
-  color: var(--builder-accent);
-}
-#reelTitleAppearanceSection .material-symbols-outlined {
-  font-size: 1.2em;
-  line-height: 1;
-}
-.align-icon {
-  opacity: 0.5;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  transition: opacity 0.18s, color 0.18s;
-  margin-right: 0.25em;
-}
-.align-icon.active, .align-icon:hover {
+
+.align-icon.active,
+.align-icon:hover {
   opacity: 1;
   color: var(--builder-accent);
 }
 
-/* Grey out reel title appearance options if the title isn't visible */
 #reelTitleAppearanceSection.disabled .appearance-option,
 #reelTitleAppearanceSection.disabled .align-icon {
   opacity: 0.5;
   pointer-events: none;
 }
 
-/* Validation styles */
+/* ==============================================
+   VALIDATION STYLES
+   ============================================== */
 .validation-error {
   border-color: #dc3545 !important;
   box-shadow: 0 0 0 0.2rem rgba(220, 53, 69, 0.25) !important;
@@ -632,7 +648,9 @@ input.filename-display:focus {
   display: block;
 }
 
-/* Custom Range Slider Styles for Builder */
+/* ==============================================
+   RANGE SLIDERS
+   ============================================== */
 input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
@@ -700,15 +718,11 @@ input[type="range"]::-moz-range-track {
   border: none;
 }
 
-/* Focus styles for accessibility */
 input[type="range"]:focus {
   outline: none;
 }
 
-input[type="range"]:focus::-webkit-slider-thumb {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
-}
-
+input[type="range"]:focus::-webkit-slider-thumb,
 input[type="range"]:focus::-moz-range-thumb {
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
 }
