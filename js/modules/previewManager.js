@@ -81,19 +81,15 @@ export class PreviewManager {
       ? `url("${reel.backgroundImage}")` 
       : "none";
 
-    // Process overlay color - acts as background when background image is disabled
-    let overlayColor = "rgba(255, 255, 255, 0)";
-    let backgroundColor = `rgba(255, 255, 255, ${reel.backgroundOpacity || "1"})`;
+    // Process overlay color and background color
+    // backgroundColor is ALWAYS the base solid color behind everything
+    let backgroundColor = reel.backgroundColor || "rgba(255, 255, 255, 1)";
     
+    // overlayColor is ALWAYS applied to the ::before pseudo-element (with blur)
+    // It works whether background image is on or off
+    let overlayColor = "rgba(255, 255, 255, 0)"; // Transparent by default
     if (reel.overlayColorEnabled && reel.overlayColor) {
-      if (reel.backgroundImageEnabled && reel.backgroundImage && reel.backgroundImage.trim()) {
-        // Background image enabled: overlay color acts as overlay
-        overlayColor = reel.overlayColor;
-      } else {
-        // Background image disabled: overlay color acts as background
-        backgroundColor = reel.overlayColor;
-        overlayColor = "rgba(255, 255, 255, 0)";
-      }
+      overlayColor = reel.overlayColor;
     }
 
     const uiAccentColor = reel.varUiAccent || "#2a0026";

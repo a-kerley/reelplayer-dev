@@ -31,6 +31,12 @@ export function createColorPickers(reel, onChange) {
       alpha: 0.13,
     },
     {
+      id: "pickr-background-color",
+      var: "--background-color",
+      default: reel.backgroundColor || "rgba(255, 255, 255, 1)",
+      reelKey: "backgroundColor",
+    },
+    {
       id: "pickr-overlay-color",
       var: "--overlay-color",
       default: reel.overlayColor || "rgba(255, 255, 255, 0.5)",

@@ -16,6 +16,15 @@ document.addEventListener("DOMContentLoaded", async () => {
   if (builderRoot) {
     // --- Reel Builder SPA mode ---
     let reels = loadReels();
+    
+    // Migrate existing reels to add backgroundColor if missing
+    reels = reels.map(reel => {
+      if (!reel.backgroundColor) {
+        reel.backgroundColor = "rgba(255, 255, 255, 1)";
+      }
+      return reel;
+    });
+    
     let savedId = localStorage.getItem('currentReelId');
 
     // Make reels and saveReels globally accessible for blend mode controls

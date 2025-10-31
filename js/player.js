@@ -10,6 +10,8 @@ export const playerApp = {
   isHoveringSlider: false,
   isHoveringIcon: false,
   currentTrackIndex: 0,
+  activeFadeOut: null, // Track active fade-out to allow cancellation
+  wasPlayingBeforeTrackSwitch: false, // Track if we need to auto-resume with fade-in
   
   // Expandable mode state - consolidated
   expandable: {
@@ -59,6 +61,14 @@ export const playerApp = {
     trackVideoPlaying: false,
     // In-progress fade tracking (to handle interruptions)
     activeFades: new Map() // Maps videoElement -> {type: 'in'|'out', abort: Function}
+  },
+
+  // Image preloading cache - stores Image objects to keep images in browser cache
+  imageCache: {
+    preloadedImages: new Map(), // Map of URL -> Image object
+    preloadQueue: [],           // Array of URLs pending preload
+    isPreloading: false,        // Flag to prevent concurrent preload operations
+    maxCacheSize: 10            // Maximum number of images to keep in cache
   },
 
   cacheElements() {
@@ -122,6 +132,16 @@ export const playerApp = {
       requestIdleCallback(() => this.preloadDurations(playlist));
     } else {
       setTimeout(() => this.preloadDurations(playlist), 200);
+    }
+    
+    // Preload background images for first track and adjacent tracks
+    if (playlist.length > 0) {
+      // Use idle callback for image preloading to avoid blocking
+      if ("requestIdleCallback" in window) {
+        requestIdleCallback(() => this.preloadBackgroundImages(0, playlist));
+      } else {
+        setTimeout(() => this.preloadBackgroundImages(0, playlist), 300);
+      }
     }
     
     // Initialize custom scrollbar immediately - DOM is ready after innerHTML
@@ -366,6 +386,129 @@ export const playerApp = {
     });
   },
 
+  /**
+   * Preload background images for current and upcoming tracks
+   * @param {number} currentIndex - Current track index
+   * @param {Array} playlist - Playlist array with track data
+   */
+  preloadBackgroundImages(currentIndex, playlist) {
+    if (!playlist || playlist.length === 0) return;
+
+    const imagesToPreload = [];
+    
+    // Get current track image
+    const currentTrack = playlist[currentIndex];
+    if (currentTrack?.backgroundImage) {
+      imagesToPreload.push(currentTrack.backgroundImage);
+    }
+    
+    // Get next track image (loop to start if at end)
+    const nextIndex = (currentIndex + 1) % playlist.length;
+    const nextTrack = playlist[nextIndex];
+    if (nextTrack?.backgroundImage) {
+      imagesToPreload.push(nextTrack.backgroundImage);
+    }
+    
+    // Get previous track image (loop to end if at start)
+    const prevIndex = currentIndex === 0 ? playlist.length - 1 : currentIndex - 1;
+    const prevTrack = playlist[prevIndex];
+    if (prevTrack?.backgroundImage) {
+      imagesToPreload.push(prevTrack.backgroundImage);
+    }
+    
+    // Get project title image from reel settings
+    const reelSettings = this.currentReelSettings || window.currentReelSettings;
+    if (reelSettings?.projectTitleImage) {
+      imagesToPreload.push(reelSettings.projectTitleImage);
+    }
+    
+    // Get main background image
+    if (reelSettings?.backgroundImage && reelSettings?.backgroundImageEnabled) {
+      imagesToPreload.push(reelSettings.backgroundImage);
+    }
+    
+    // Remove duplicates
+    const uniqueImages = [...new Set(imagesToPreload)];
+    
+    // Add to preload queue
+    this.imageCache.preloadQueue = uniqueImages;
+    
+    // Start preloading
+    this.processImagePreloadQueue();
+    
+    console.log(`[Image Preload] Queued ${uniqueImages.length} images for preloading`);
+  },
+
+  /**
+   * Process the image preload queue
+   */
+  processImagePreloadQueue() {
+    // Already preloading, skip
+    if (this.imageCache.isPreloading) return;
+    
+    // No images to preload
+    if (this.imageCache.preloadQueue.length === 0) return;
+    
+    this.imageCache.isPreloading = true;
+    
+    // Process images one at a time to avoid overwhelming the browser
+    const preloadNext = () => {
+      if (this.imageCache.preloadQueue.length === 0) {
+        this.imageCache.isPreloading = false;
+        return;
+      }
+      
+      const imageUrl = this.imageCache.preloadQueue.shift();
+      
+      // Skip if already cached
+      if (this.imageCache.preloadedImages.has(imageUrl)) {
+        preloadNext();
+        return;
+      }
+      
+      // Create new Image object to trigger browser cache
+      const img = new Image();
+      
+      img.onload = () => {
+        console.log(`[Image Preload] ✓ Loaded: ${imageUrl.split('/').pop()}`);
+        
+        // Add to cache
+        this.imageCache.preloadedImages.set(imageUrl, img);
+        
+        // Enforce cache size limit (remove oldest entries)
+        if (this.imageCache.preloadedImages.size > this.imageCache.maxCacheSize) {
+          const firstKey = this.imageCache.preloadedImages.keys().next().value;
+          this.imageCache.preloadedImages.delete(firstKey);
+          console.log(`[Image Preload] Cache full, removed: ${firstKey.split('/').pop()}`);
+        }
+        
+        // Preload next image
+        preloadNext();
+      };
+      
+      img.onerror = () => {
+        console.warn(`[Image Preload] ✗ Failed to load: ${imageUrl}`);
+        // Continue with next image even if one fails
+        preloadNext();
+      };
+      
+      // Start loading
+      img.src = imageUrl;
+    };
+    
+    // Start the preload chain
+    preloadNext();
+  },
+
+  /**
+   * Clear the image cache
+   */
+  clearImageCache() {
+    this.imageCache.preloadedImages.clear();
+    this.imageCache.preloadQueue = [];
+    console.log('[Image Preload] Cache cleared');
+  },
+
   convertDropboxLinkToDirect(url) {
     if (!url.includes("dropbox.com")) return url;
     return url
@@ -388,11 +531,25 @@ export const playerApp = {
       this.initMainBackgroundAnimation();
     }
     
-    // Crossfade videos when switching tracks
-    // This happens in background, no need to wait - new track loads while fade occurs
+    // Check if playback is active
     const isPlaybackActive = this.wavesurfer?.isPlaying() || false;
     console.log(`[TRACK SWITCH] Playback state: ${isPlaybackActive ? '▶️ PLAYING' : '⏸️ STOPPED'}`);
     
+    // Store state for auto-resume with fade-in after load
+    // Don't overwrite if already set (e.g., by auto-play from finish event)
+    if (!this.wasPlayingBeforeTrackSwitch) {
+      this.wasPlayingBeforeTrackSwitch = isPlaybackActive;
+    }
+    console.log(`[TRACK SWITCH] wasPlayingBeforeTrackSwitch flag: ${this.wasPlayingBeforeTrackSwitch}`);
+    
+    // If switching tracks during playback, fade out audio and pause to prevent pop
+    if (isPlaybackActive) {
+      console.log('[TRACK SWITCH] Applying audio fade-out before track switch');
+      await this.applyAudioFadeOut(true); // Pass true to pause after fade
+    }
+    
+    // Crossfade videos when switching tracks
+    // This happens in background, no need to wait - new track loads while fade occurs
     if (isPlaybackActive) {
       // During playback: crossfade old video out (revealing background)
       // New video will be preloaded and ready to fade in when playback starts
@@ -488,6 +645,12 @@ export const playerApp = {
     // Update track background with cross-dissolve
     this.updateTrackBackground(index);
     
+    // Preload background images for current and adjacent tracks
+    const reelSettings = this.currentReelSettings || window.currentReelSettings;
+    if (reelSettings?.playlist) {
+      this.preloadBackgroundImages(index, reelSettings.playlist);
+    }
+    
     // Pre-load video for the new track (will play when audio starts)
     // SKIP preloading if playback is active - let it load when play is pressed
     // This prevents loading on a layer that's currently fading out
@@ -507,6 +670,54 @@ export const playerApp = {
       detail: { audioURL, title, index },
     });
     document.dispatchEvent(event);
+  },
+
+  /**
+   * Check if there's a next track in the playlist
+   * @returns {boolean} True if there's a next track
+   */
+  hasNextTrack() {
+    const playlist = this.currentReelSettings?.playlist;
+    if (!playlist || playlist.length === 0) return false;
+    
+    const nextIndex = this.currentTrackIndex + 1;
+    return nextIndex < playlist.length;
+  },
+
+  /**
+   * Play the next track in the playlist
+   * Called automatically when a track finishes
+   */
+  playNextTrack() {
+    // Get the current playlist
+    const playlist = this.currentReelSettings?.playlist;
+    
+    if (!playlist || playlist.length === 0) {
+      console.log('[Auto-play] No playlist available');
+      return;
+    }
+    
+    // Check if there's a next track
+    const nextIndex = this.currentTrackIndex + 1;
+    
+    if (nextIndex >= playlist.length) {
+      console.log('[Auto-play] Reached end of playlist, stopping playback');
+      return;
+    }
+    
+    console.log(`[Auto-play] Moving to next track: ${nextIndex}`);
+    
+    // Get the next track
+    const nextTrack = playlist[nextIndex];
+    const url = this.convertDropboxLinkToDirect(nextTrack.url);
+    
+    // Set flag to indicate we should auto-resume playback
+    console.log('[Auto-play] Setting wasPlayingBeforeTrackSwitch = true');
+    this.wasPlayingBeforeTrackSwitch = true;
+    
+    // Initialize the next track (will auto-play due to flag)
+    console.log('[Auto-play] Calling initializePlayer');
+    this.initializePlayer(url, nextTrack.title, nextIndex);
   },
 
   updateTrackBackground(trackIndex) {
@@ -791,6 +1002,23 @@ export const playerApp = {
       // Update again after a delay for OGG files
       setTimeout(updateTotalTime, 100);
       setTimeout(updateTotalTime, 500);
+      
+      // Auto-resume with fade-in if track was switched during playback
+      console.log('[Track Ready] Checking auto-resume flag:', this.wasPlayingBeforeTrackSwitch);
+      if (this.wasPlayingBeforeTrackSwitch) {
+        console.log('[Track Ready] Auto-resuming playback with fade-in after track switch');
+        this.wasPlayingBeforeTrackSwitch = false; // Reset flag
+        
+        // Set volume to 0, start playback, then fade in
+        const targetVolume = this.wavesurfer.getVolume();
+        console.log('[Track Ready] Target volume:', targetVolume);
+        this.wavesurfer.setVolume(0);
+        this.wavesurfer.play();
+        
+        requestAnimationFrame(() => {
+          this.applyAudioFadeInFromZero(targetVolume);
+        });
+      }
       waveformEl.addEventListener("mousemove", (e) => {
         const rect = waveformEl.getBoundingClientRect();
         const percent = Math.min(
@@ -818,6 +1046,12 @@ export const playerApp = {
       });
     });
     this.wavesurfer.on("play", () => {
+      // Cancel any active fade-out
+      if (this.activeFadeOut) {
+        this.activeFadeOut.cancel = true;
+        this.activeFadeOut = null;
+      }
+      
       // Show cursor when playing using UI accent color
       const accentColor = getComputedStyle(document.documentElement)
         .getPropertyValue("--ui-accent")
@@ -843,15 +1077,29 @@ export const playerApp = {
       document.dispatchEvent(new CustomEvent("playback:pause"));
     });
     this.wavesurfer.on("finish", () => {
+      // Check if we should auto-play next track BEFORE updating state
+      const shouldAutoPlay = this.hasNextTrack();
+      console.log('[Finish] Should auto-play next track:', shouldAutoPlay);
+      
       // Hide cursor when finished
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
-      this.updatePlayingState(false);
+      
+      // Only update playing state to false if NOT auto-playing next track
+      if (!shouldAutoPlay) {
+        this.updatePlayingState(false);
+      }
       
       // Stop video playback
       this.stopVideo();
       
       document.dispatchEvent(new CustomEvent("playback:finish"));
+      
+      // Auto-play next track if available
+      if (shouldAutoPlay) {
+        console.log('[Finish] Calling playNextTrack()');
+        this.playNextTrack();
+      }
     });
     this.wavesurfer.on("seek", () => {
       // Update playhead time immediately when seeking
@@ -912,7 +1160,29 @@ export const playerApp = {
   setupPlayPauseUI() {
     const playPauseBtn = this.elements.playPauseBtn;
     playPauseBtn.onclick = () => {
-      this.wavesurfer.playPause();
+      if (this.wavesurfer.isPlaying()) {
+        // Fade out before pausing
+        this.applyAudioFadeOut().then(() => {
+          this.wavesurfer.pause();
+        });
+      } else {
+        // Check if resuming from pause (not at start)
+        const currentTime = this.wavesurfer.getCurrentTime();
+        const isResuming = currentTime > 0;
+        
+        if (isResuming) {
+          // Resuming from pause: fade in
+          const targetVolume = this.wavesurfer.getVolume();
+          this.wavesurfer.setVolume(0);
+          this.wavesurfer.play();
+          requestAnimationFrame(() => {
+            this.applyAudioFadeInFromZero(targetVolume);
+          });
+        } else {
+          // Starting from beginning: no fade
+          this.wavesurfer.play();
+        }
+      }
     };
   },
 
@@ -2596,6 +2866,114 @@ export const playerApp = {
         this.exitPlaybackIdle();
       }
     }
+  },
+
+  /**
+   * Apply audio fade-in effect from current volume 0 to target
+   * Assumes volume is already set to 0 before calling
+   * @param {number} targetVolume - The target volume to fade to
+   */
+  applyAudioFadeInFromZero(targetVolume) {
+    if (!this.wavesurfer) return;
+
+    // Get the fade-in duration from CSS variables
+    const fadeDuration = parseFloat(
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--audio-fade-in-duration') || '0.4'
+    ) * 1000; // Convert to milliseconds
+    
+    console.log(`[Audio Fade-In] Starting fade from 0 to ${targetVolume} over ${fadeDuration}ms`);
+    
+    // Animate volume increase
+    const startTime = performance.now();
+    
+    const fadeStep = () => {
+      const elapsed = performance.now() - startTime;
+      const progress = Math.min(elapsed / fadeDuration, 1);
+      
+      // Use ease-in curve for smooth fade
+      const easedProgress = progress * progress;
+      const currentVolume = targetVolume * easedProgress;
+      
+      this.wavesurfer.setVolume(currentVolume);
+      
+      if (progress < 1) {
+        requestAnimationFrame(fadeStep);
+      } else {
+        console.log(`[Audio Fade-In] Complete at volume ${targetVolume}`);
+      }
+    };
+    
+    requestAnimationFrame(fadeStep);
+  },
+
+  /**
+   * Apply audio fade-out effect when playback stops
+   * Smoothly ramps down volume from current level to 0
+   * @param {boolean} pauseAfterFade - Whether to pause playback after fade completes
+   * @returns {Promise} Resolves when fade-out completes
+   */
+  applyAudioFadeOut(pauseAfterFade = false) {
+    if (!this.wavesurfer) return Promise.resolve();
+
+    // Get the fade-out duration from CSS variables
+    const fadeDuration = parseFloat(
+      getComputedStyle(document.documentElement)
+        .getPropertyValue('--audio-fade-out-duration') || '0.3'
+    ) * 1000; // Convert to milliseconds
+
+    // Store the starting volume
+    const startVolume = this.wavesurfer.getVolume();
+    
+    console.log(`[Audio Fade-Out] Starting fade from ${startVolume} to 0 over ${fadeDuration}ms (pauseAfter: ${pauseAfterFade})`);
+    
+    return new Promise((resolve) => {
+      // Track this fade-out for potential cancellation
+      const fadeState = { cancel: false };
+      this.activeFadeOut = fadeState;
+      
+      const startTime = performance.now();
+      
+      const fadeStep = () => {
+        // Check if fade was cancelled
+        if (fadeState.cancel) {
+          console.log('[Audio Fade-Out] Cancelled');
+          resolve();
+          return;
+        }
+        
+        const elapsed = performance.now() - startTime;
+        const progress = Math.min(elapsed / fadeDuration, 1);
+        
+        // Use ease-out curve for smooth fade
+        const easedProgress = 1 - Math.pow(1 - progress, 2);
+        const currentVolume = startVolume * (1 - easedProgress);
+        
+        this.wavesurfer.setVolume(currentVolume);
+        
+        if (progress < 1) {
+          requestAnimationFrame(fadeStep);
+        } else {
+          console.log('[Audio Fade-Out] Complete');
+          
+          // If pausing after fade (track switch), keep volume at 0 and pause immediately
+          if (pauseAfterFade) {
+            console.log('[Audio Fade-Out] Pausing playback to prevent audio pop');
+            this.wavesurfer.pause();
+            // Restore volume for next track (will start at 0 and fade in)
+            this.wavesurfer.setVolume(startVolume);
+          } else {
+            // For manual pause, restore volume for next play
+            this.wavesurfer.setVolume(startVolume);
+          }
+          
+          this.activeFadeOut = null;
+          resolve();
+        }
+      };
+      
+      requestAnimationFrame(fadeStep);
+    });
   },
 
   renderPlayer({ showTitle, title, playlist, reel }) {

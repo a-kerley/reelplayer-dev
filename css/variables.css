@@ -33,6 +33,7 @@
   /* ========================================
      BACKGROUND EFFECTS
      ======================================== */
+  --background-color: rgba(255, 255, 255, 1);     /* Static background color fallback when no image */
   --background-image: none;                       /* Background image URL */
   --background-opacity: 1;                        /* Opacity of background */
   --background-zoom: 1;                           /* Base zoom level for background (1 = 100%, 1.1 = 110%) */
@@ -40,30 +41,38 @@
   --overlay-color: rgba(255, 255, 255, 0);        /* Overlay color on background */
   
   /* ========================================
-     EXPANDABLE MODE - HEIGHT SETTINGS
+     SHARED LAYOUT VARIABLES
+     Used by both static and expandable modes
      ======================================== */
-  --expandable-waveform-height: 86px;             /* Fixed height of waveform in expandable mode */
+  --expandable-waveform-height: 86px;             /* Fixed height of waveform (both modes) */
+  --expandable-player-gap: 0.5rem;                /* Gap between play button, waveform, volume (both modes) */
+  --expandable-content-gap: 0rem;                 /* Gap between waveform and playlist (both modes) */
+  --expandable-waveform-margin-top: 0rem;         /* Margin above waveform container (both modes) */
+  --expandable-waveform-margin-bottom: 1.2rem;    /* Margin below waveform container (both modes) */
   
   /* ========================================
-     EXPANDABLE MODE - SPACING & LAYOUT
-     ======================================== */
-  --expandable-overlay-padding: 0.75rem;          /* Vertical padding for project title overlay */
-  --expandable-player-gap: 0.5rem;                /* Gap between play button, waveform, volume when expanded */
-  --expandable-content-gap: 0rem;                 /* Gap between waveform and playlist when expanded */
-  --expandable-waveform-margin-top: 0rem;       /* Margin above waveform container when expanded */
-  --expandable-waveform-margin-bottom: 1.2rem;      /* Margin below waveform container when expanded */
-  --expandable-collapsed-waveform-offset: -1.5rem; /* Vertical offset for waveform when collapsed during playback */
-  --expandable-playlist-inset: 2rem;              /* How much narrower playlist is from edges */
-  --expandable-playlist-bottom-margin: 1rem;      /* Space between bottom of playlist and player edge */
-  --expandable-playlist-internal-padding: 1rem;   /* Internal padding at bottom of playlist content */
-  
-  /* ========================================
-     EXPANDABLE MODE - TRACK INFO POSITIONING
+     SHARED TRACK INFO POSITIONING
+     Used by both static and expandable modes
      ======================================== */
   --expandable-track-info-left: 3.7rem;           /* Left offset for track info (matches play button width) */
   --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text */
-  --expandable-track-info-top: 1rem;            /* Top margin above track info */
-  --expandable-track-info-bottom: 0.5rem;           /* Bottom margin below track info */
+  --expandable-track-info-top: 1rem;              /* Top margin above track info */
+  --expandable-track-info-bottom: 0.5rem;         /* Bottom margin below track info */
+  
+  /* ========================================
+     SHARED PLAYLIST SPACING
+     Used by both static and expandable modes
+     ======================================== */
+  --expandable-playlist-inset: 2rem;              /* How much narrower playlist is from edges (both modes) */
+  --expandable-playlist-bottom-margin: 1rem;      /* Space between bottom of playlist and player edge (both modes) */
+  --expandable-playlist-internal-padding: 1rem;   /* Internal padding at bottom of playlist content (both modes) */
+  
+  /* ========================================
+     EXPANDABLE MODE - SPECIFIC SETTINGS
+     Only used by expandable mode
+     ======================================== */
+  --expandable-overlay-padding: 0.75rem;          /* Vertical padding for project title overlay */
+  --expandable-collapsed-waveform-offset: -1.5rem; /* Vertical offset for waveform when collapsed during playback */
   
   /* ========================================
      EXPANDABLE MODE - TRANSITIONS
@@ -110,7 +119,13 @@
      ======================================== */
   --video-fade-in-duration: 3000ms;                /* Duration of video fade-in transition */
   --video-fade-out-duration: 2000ms;               /* Duration of video fade-out transition */
-  --video-track-switch-fade-duration: 100ms;      /* Duration when switching tracks during playback (faster transition) */
+  --video-track-switch-fade-duration: 50ms;      /* Duration when switching tracks during playback (faster transition) */
+  
+  /* ========================================
+     AUDIO FADE-IN/OUT
+     ======================================== */
+  --audio-fade-in-duration: 0.4s;                  /* Duration of audio fade-in effect at playback start */
+  --audio-fade-out-duration: 0.3s;                 /* Duration of audio fade-out effect when playback stops */
   
   /* ========================================
      EXPANDABLE MODE - SCROLLBAR

@@ -28,6 +28,7 @@ export function createEmptyReel() {
     playlist: [{ title: "", url: "" }],
     createdAt: Date.now(),
     // Background effects properties
+    backgroundColor: "rgba(255, 255, 255, 1)", // Static color fallback
     backgroundImage: "",
     backgroundImageEnabled: false,
     backgroundVideo: "",
@@ -243,6 +244,10 @@ function createColorPickersSection() {
     </div>
     <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;">
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Image & Effects</h4>
+      <div class="color-row">
+        <span>Static Background Colour:</span>
+        <button id="pickr-background-color" class="pickr-button" type="button"></button>
+      </div>
       <div class="color-row">
         <span>Background Image:</span>
         <label class="toggle-switch" style="margin-right:0.5rem;">

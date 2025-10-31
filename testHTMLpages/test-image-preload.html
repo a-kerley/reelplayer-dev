@@ -1,0 +1,241 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Image Preloading Test</title>
+  <style>
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', sans-serif;
+      max-width: 1200px;
+      margin: 40px auto;
+      padding: 0 20px;
+      background: #1a1a1a;
+      color: #fff;
+    }
+    
+    h1 {
+      border-bottom: 2px solid #2a0026;
+      padding-bottom: 10px;
+    }
+    
+    .section {
+      background: #2a2a2a;
+      border-radius: 8px;
+      padding: 20px;
+      margin: 20px 0;
+    }
+    
+    .status {
+      display: flex;
+      gap: 20px;
+      margin: 20px 0;
+    }
+    
+    .stat-box {
+      flex: 1;
+      background: #1a1a1a;
+      padding: 15px;
+      border-radius: 6px;
+      border-left: 3px solid #2a0026;
+    }
+    
+    .stat-label {
+      font-size: 12px;
+      color: #999;
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    
+    .stat-value {
+      font-size: 24px;
+      font-weight: bold;
+      color: #fff;
+      margin-top: 5px;
+    }
+    
+    .log-container {
+      background: #000;
+      border-radius: 6px;
+      padding: 15px;
+      max-height: 300px;
+      overflow-y: auto;
+      font-family: 'Monaco', 'Courier New', monospace;
+      font-size: 12px;
+      line-height: 1.6;
+    }
+    
+    .log-entry {
+      margin: 2px 0;
+      white-space: pre-wrap;
+    }
+    
+    .log-success { color: #4ade80; }
+    .log-error { color: #f87171; }
+    .log-warning { color: #fbbf24; }
+    .log-info { color: #60a5fa; }
+    
+    button {
+      background: #2a0026;
+      color: #fff;
+      border: none;
+      padding: 10px 20px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 14px;
+      margin: 5px;
+    }
+    
+    button:hover {
+      background: #3d0039;
+    }
+    
+    .controls {
+      display: flex;
+      gap: 10px;
+      flex-wrap: wrap;
+    }
+  </style>
+</head>
+<body>
+  <h1>🖼️ Image Preloading System Test</h1>
+  
+  <div class="section">
+    <h2>Cache Status</h2>
+    <div class="status">
+      <div class="stat-box">
+        <div class="stat-label">Cached Images</div>
+        <div class="stat-value" id="cached-count">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Queue Length</div>
+        <div class="stat-value" id="queue-length">0</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Is Preloading</div>
+        <div class="stat-value" id="is-preloading">No</div>
+      </div>
+      <div class="stat-box">
+        <div class="stat-label">Max Cache Size</div>
+        <div class="stat-value" id="max-cache">10</div>
+      </div>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Controls</h2>
+    <div class="controls">
+      <button onclick="testPreload()">Test Preload (3 Images)</button>
+      <button onclick="testLargePreload()">Test Large Preload (15 Images)</button>
+      <button onclick="checkCacheStatus()">Refresh Status</button>
+      <button onclick="clearCache()">Clear Cache</button>
+      <button onclick="clearLog()">Clear Log</button>
+    </div>
+  </div>
+  
+  <div class="section">
+    <h2>Console Log</h2>
+    <div class="log-container" id="log"></div>
+  </div>
+  
+  <script type="module">
+    import { playerApp } from './js/player.js';
+    
+    // Make playerApp available globally for button clicks
+    window.playerApp = playerApp;
+    
+    // Override console.log to capture output
+    const originalLog = console.log;
+    const originalWarn = console.warn;
+    const originalError = console.error;
+    
+    function addLogEntry(message, type = 'info') {
+      const logContainer = document.getElementById('log');
+      const entry = document.createElement('div');
+      entry.className = `log-entry log-${type}`;
+      entry.textContent = `[${new Date().toLocaleTimeString()}] ${message}`;
+      logContainer.appendChild(entry);
+      logContainer.scrollTop = logContainer.scrollHeight;
+    }
+    
+    console.log = function(...args) {
+      originalLog.apply(console, args);
+      const message = args.join(' ');
+      if (message.includes('[Image Preload]')) {
+        if (message.includes('✓')) addLogEntry(message, 'success');
+        else addLogEntry(message, 'info');
+        checkCacheStatus();
+      }
+    };
+    
+    console.warn = function(...args) {
+      originalWarn.apply(console, args);
+      const message = args.join(' ');
+      if (message.includes('[Image Preload]')) {
+        addLogEntry(message, 'warning');
+        checkCacheStatus();
+      }
+    };
+    
+    console.error = function(...args) {
+      originalError.apply(console, args);
+      const message = args.join(' ');
+      if (message.includes('[Image Preload]')) {
+        addLogEntry(message, 'error');
+        checkCacheStatus();
+      }
+    };
+    
+    // Test functions
+    window.testPreload = function() {
+      addLogEntry('Starting test preload (3 images)...', 'info');
+      
+      const testPlaylist = [
+        { backgroundImage: 'assets/images/backgrounds/Test-Images/BlackHoleSim.webp' },
+        { backgroundImage: 'assets/images/backgrounds/Test-Images/CosmicBeauty.webp' },
+        { backgroundImage: 'assets/images/backgrounds/Test-Images/DarkMatter.webp' }
+      ];
+      
+      playerApp.preloadBackgroundImages(0, testPlaylist);
+      checkCacheStatus();
+    };
+    
+    window.testLargePreload = function() {
+      addLogEntry('Starting large preload test (15 images)...', 'info');
+      
+      const testPlaylist = Array.from({ length: 15 }, (_, i) => ({
+        backgroundImage: `assets/images/backgrounds/Test-Images/test-${i}.jpg`
+      }));
+      
+      playerApp.preloadBackgroundImages(0, testPlaylist);
+      checkCacheStatus();
+    };
+    
+    window.checkCacheStatus = function() {
+      const cachedCount = playerApp.imageCache.preloadedImages.size;
+      const queueLength = playerApp.imageCache.preloadQueue.length;
+      const isPreloading = playerApp.imageCache.isPreloading;
+      const maxCache = playerApp.imageCache.maxCacheSize;
+      
+      document.getElementById('cached-count').textContent = cachedCount;
+      document.getElementById('queue-length').textContent = queueLength;
+      document.getElementById('is-preloading').textContent = isPreloading ? 'Yes' : 'No';
+      document.getElementById('max-cache').textContent = maxCache;
+    };
+    
+    window.clearCache = function() {
+      playerApp.clearImageCache();
+      addLogEntry('Cache cleared manually', 'warning');
+      checkCacheStatus();
+    };
+    
+    window.clearLog = function() {
+      document.getElementById('log').innerHTML = '';
+    };
+    
+    // Initial status check
+    checkCacheStatus();
+    addLogEntry('Image preloading test page loaded', 'success');
+  </script>
+</body>
+</html>

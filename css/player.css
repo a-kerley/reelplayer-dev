@@ -83,7 +83,7 @@
   position: absolute;
   bottom: 100%;
   left: 50%;
-  margin-bottom: 0.2rem; /* Gap between icon and slider */
+  margin-bottom: 1.8rem; /* Gap between icon and slider */
   background: transparent;
   border-radius: 4px;
   outline: none;
@@ -112,7 +112,7 @@
   background: var(--ui-accent);
   border: none;
   cursor: pointer;
-  margin-top: -0.22rem; /* Center thumb on track */
+  margin-top: -0.27rem; /* Center thumb on track */
 }
 
 /* ========================================
@@ -122,15 +122,20 @@
   position: relative;
   overflow: visible;
   flex: 1;
-  width: 100%;
+  width: auto; /* Match expandable mode */
   max-width: none;
+  height: var(--expandable-waveform-height); /* Use same height variable */
+  min-height: var(--expandable-waveform-height);
+  flex-shrink: 0;
 }
 .waveform-and-volume {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-grow: 1;
-  height: 85px; /* Waveform height */
+  gap: var(--expandable-player-gap); /* Use same gap as expandable mode */
+  flex: 1;
+  min-height: var(--expandable-waveform-height); /* Use same height variable as expandable mode */
+  margin-top: var(--expandable-waveform-margin-top);
+  margin-bottom: var(--expandable-waveform-margin-bottom);
 }
 .hover-overlay {
   position: absolute;
@@ -224,9 +229,11 @@ button {
   opacity: 0;
   visibility: hidden;
   transition: opacity 0.4s ease, visibility 0.4s ease;
-  margin-bottom: 0.75rem;
-  margin-left: 3.7rem;
-  padding-left: 0.5rem;
+  /* Use same positioning variables as expandable mode */
+  margin-top: var(--expandable-track-info-top);
+  margin-bottom: var(--expandable-track-info-bottom);
+  margin-left: var(--expandable-track-info-left);
+  padding-left: var(--expandable-track-info-padding);
   font-size: 0.9rem;
   font-weight: 600;
   color: var(--ui-accent);
@@ -248,11 +255,11 @@ button {
   min-height: 120px;
   display: flex;
   flex-direction: column;
-  /* Background color - set by JS based on overlay color when no image, or default when image present */
+  /* Background color - static color fallback when no background image */
   background-color: var(--background-color, rgba(255, 255, 255, 1));
   border-radius: 8px;
   overflow: hidden;
-  padding: var(--player-padding);
+  padding: 0;
 }
 
 /* Static mode specific height - don't apply to expandable mode */
@@ -401,6 +408,54 @@ button {
   z-index: 7;
 }
 
+/* Static mode padding and layout - matches expandable expanded state structure */
+.player-wrapper:not(.expandable-mode) .player-content {
+  padding: var(--player-padding);
+  padding-bottom: var(--player-padding-bottom);
+  display: flex;
+  flex-direction: column;
+  gap: var(--expandable-content-gap); /* Use same gap variable as expandable mode */
+}
+
+/* Static mode player controls container - matches expandable mode structure */
+.player-wrapper:not(.expandable-mode) .player-container {
+  display: flex;
+  align-items: center;
+  width: 100%;
+  box-sizing: border-box;
+  margin: 0;
+  flex-shrink: 0;
+  gap: var(--expandable-player-gap); /* Use same gap as expandable mode */
+}
+
+/* Static mode play button alignment - matches expandable expanded state */
+.player-wrapper:not(.expandable-mode) #playPause {
+  align-self: center;
+  margin-top: var(--expandable-waveform-margin-top);
+  margin-bottom: var(--expandable-waveform-margin-bottom);
+}
+
+/* Static mode playlist spacing - matches expandable mode structure */
+.player-wrapper:not(.expandable-mode) .playlist {
+  /* Override base playlist.css margin-top - gap handled by player-content gap property */
+  margin-top: 0 !important;
+  
+  /* Use same spacing variables as expandable mode */
+  margin-bottom: var(--expandable-playlist-bottom-margin) !important;
+  margin-left: var(--expandable-playlist-inset) !important;
+  margin-right: var(--expandable-playlist-inset) !important;
+  
+  /* Add internal bottom padding for spacing inside the playlist */
+  padding-bottom: var(--expandable-playlist-internal-padding) !important;
+  
+  /* Width adjusted for insets while keeping scrollbar-hiding */
+  width: calc(100% - (var(--expandable-playlist-inset) * 2) + var(--expandable-scrollbar-width)) !important;
+  max-width: calc(100% - (var(--expandable-playlist-inset) * 2) + var(--expandable-scrollbar-width)) !important;
+  
+  /* Adjust padding-right to account for insets */
+  padding-right: calc(var(--expandable-scrollbar-width) + var(--expandable-playlist-inset)) !important;
+}
+
 /* ========================================
    STATIC MODE PLAYBACK-IDLE STATE
    ======================================== */
@@ -482,6 +537,7 @@ button {
   text-align: var(--reel-title-align, center);
   font-size: var(--reel-title-size, 1.3rem);
   font-weight: var(--reel-title-weight, 700);
+  margin-top: 0; /* Consistent with expandable mode */
   margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
   color: var(--ui-accent);
 }
