@@ -42,10 +42,31 @@
   background-clip: content-box;
   z-index: 10;
   pointer-events: none;
-  opacity: 1;
+  opacity: 1; /* Default visible state - restored original behavior */
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
   padding: var(--expandable-overlay-padding) 0;
   box-sizing: border-box;
+}
+
+/* Hide overlay initially only when it needs intro animation */
+.player-wrapper.expandable-mode .project-title-overlay.needs-intro {
+  opacity: 0;
+}
+
+/* Project title intro animation - only plays once on initial load */
+@keyframes projectTitleIntro {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.player-wrapper.expandable-mode .project-title-overlay.intro-animation {
+  animation: projectTitleIntro 0.8s ease-out forwards;
 }
 
 /* Hide overlay when expanded or when playing in collapsed state */
@@ -430,4 +451,14 @@
 /* Loading indicator */
 .player-wrapper.expandable-mode #loading {
   z-index: 15;
+}
+
+/* ========================================
+   8. PLAYER CLOSED IDLE STATE
+   ======================================== */
+
+/* Make background images transparent during player-closed-idle state */
+.player-wrapper.expandable-mode.player-closed-idle .track-background-layer {
+  opacity: var(--player-closed-idle-bg-opacity, 0);
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
 }

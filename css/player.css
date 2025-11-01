@@ -392,7 +392,7 @@ button {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: var(--overlay-color);
+  background-color: rgba(var(--overlay-base-color), var(--overlay-opacity));
   backdrop-filter: blur(var(--background-blur));
   -webkit-backdrop-filter: blur(var(--background-blur));
   pointer-events: none;
@@ -563,4 +563,18 @@ button {
 /* Add extra padding at the top when reel title is hidden */
 .player-wrapper.no-title .player-content {
   padding-top: 3rem;
+}
+
+/* ========================================
+   PLAYER CLOSED IDLE - BACKGROUND IMAGE CONTROL
+   ======================================== */
+/* When player-closed-idle feature is enabled, automatically hide background images when collapsed */
+.player-wrapper.expandable-mode.player-closed-idle-enabled:not(.expanded) {
+  --background-opacity: 0;
+}
+
+/* When actively in player-closed-idle state, apply blur and overlay effects */
+.player-wrapper.expandable-mode.player-closed-idle-enabled.player-closed-idle:not(.expanded) {
+  --background-blur: var(--player-closed-idle-blur);
+  --overlay-opacity: var(--player-closed-idle-overlay-opacity);
 }

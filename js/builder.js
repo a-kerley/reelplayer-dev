@@ -51,7 +51,9 @@ export function createEmptyReel() {
     expandableCollapsedHeight: 120,
     expandableExpandedHeight: 500,
     projectTitleImage: "",
-    showWaveformOnCollapse: true
+    showWaveformOnCollapse: true,
+    enablePlayerClosedIdle: false,
+    playerClosedIdleVideo: ""
   };
   
   // Apply default preset colors if available
@@ -279,7 +281,7 @@ function createColorPickersSection() {
       </div>
       <div class="color-row">
         <span>Blur Amount:</span>
-        <input id="backgroundBlur" type="range" min="0" max="20" step="1" style="flex:1;" />
+        <input id="backgroundBlur" type="range" min="0" max="50" step="1" style="flex:1;" />
         <span id="backgroundBlurValue" style="min-width:2.5rem;text-align:right;font-size:0.9rem;"></span>
       </div>
       <div class="color-row">

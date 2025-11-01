@@ -92,6 +92,24 @@ export class PreviewManager {
       overlayColor = reel.overlayColor;
     }
 
+    // Extract RGB and alpha values from overlayColor for separated control
+    const parseRGBA = (rgbaString) => {
+      const match = rgbaString.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      if (match) {
+        return {
+          r: parseInt(match[1]),
+          g: parseInt(match[2]), 
+          b: parseInt(match[3]),
+          a: match[4] !== undefined ? parseFloat(match[4]) : 1
+        };
+      }
+      return { r: 255, g: 255, b: 255, a: 0 }; // Default fallback
+    };
+
+    const overlayRGBA = parseRGBA(overlayColor);
+    const overlayBaseColor = `${overlayRGBA.r}, ${overlayRGBA.g}, ${overlayRGBA.b}`;
+    const overlayOpacity = overlayRGBA.a;
+
     const uiAccentColor = reel.varUiAccent || "#2a0026";
     
     // For better color matching, especially with white/light colors
@@ -116,7 +134,9 @@ export class PreviewManager {
       "--background-opacity": reel.backgroundOpacity || "1",
       "--background-blur": `${reel.backgroundBlur || "2"}px`,
       "--background-zoom": reel.backgroundZoom || "1",
-      "--overlay-color": overlayColor,
+      "--overlay-color": overlayColor, // Keep for backward compatibility
+      "--overlay-base-color": overlayBaseColor,
+      "--overlay-opacity": overlayOpacity,
       
       // Player height (used for static mode)
       "--player-height": `${reel.playerHeight || 500}px`,

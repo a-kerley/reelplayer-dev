@@ -38,7 +38,9 @@
   --background-opacity: 1;                        /* Opacity of background */
   --background-zoom: 1;                           /* Base zoom level for background (1 = 100%, 1.1 = 110%) */
   --background-blur: 2px;                         /* Blur amount for backdrop filter */
-  --overlay-color: rgba(255, 255, 255, 0);        /* Overlay color on background */
+  --overlay-color: rgba(255, 255, 255, 0);        /* Overlay color on background (for backward compatibility) */
+  --overlay-base-color: 255, 255, 255;            /* RGB values for overlay color (set by builder) */
+  --overlay-opacity: 0;                           /* Opacity for overlay color (set by builder) */
   
   /* ========================================
      SHARED LAYOUT VARIABLES
@@ -104,11 +106,19 @@
   --playback-idle-overlay-transition-in: 3s;    /* Duration of overlay opacity transition into idle state */
   --playback-idle-overlay-transition-out: 2s;   /* Duration of overlay opacity transition out of idle state */
   
+  /* Player-Closed-Idle State Transitions */
+  --player-closed-idle-fade-in-duration: 1s;      /* Duration of background video fade-in when entering player-closed-idle */
+  --player-closed-idle-fade-out-duration: 1s;     /* Duration of background video fade-out when exiting player-closed-idle */
+  
+  /* Player-Closed-Idle State Visual Effects */
+  --player-closed-idle-blur: 12px;                 /* Blur amount when in player-closed-idle state */
+  --player-closed-idle-overlay-opacity: 0.75;      /* Overlay opacity when in player-closed-idle state */
+  
   /* ========================================
      PLAYBACK-IDLE BACKGROUND ANIMATION
      Controlled by Web Animations API in JavaScript
      ======================================== */
-  --playback-idle-zoom-speed: 120s;                 /* Duration for one full zoom cycle (min → max → min) */
+  --playback-idle-zoom-speed: 100s;                 /* Duration for one full zoom cycle (min → max → min) */
   --playback-idle-zoom-multiplier: 1.4;            /* Maximum zoom multiplier (1.4 = 140% of base zoom) */
   --playback-idle-zoom-ease: ease-in-out;          /* Easing function applied at keyframe transitions */
   --playback-idle-zoom-speed-up-duration: 900ms;   /* Time to smoothly ramp animation speed when entering idle */

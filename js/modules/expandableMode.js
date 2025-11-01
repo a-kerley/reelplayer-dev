@@ -251,6 +251,30 @@ export function createExpandableModeSettings(reel, onChange) {
   );
   settingsContainer.appendChild(waveformRow);
 
+  // Enable Player Closed Idle checkbox
+  const closedIdleRow = createCheckboxInput(
+    'Enable player closed idle state',
+    'enablePlayerClosedIdle',
+    reel.enablePlayerClosedIdle === true, // Default to false
+    'Enable special idle state when playback stops and player is closed'
+  );
+  settingsContainer.appendChild(closedIdleRow);
+
+  // Player Closed Idle Video input
+  const closedIdleVideoRow = createTextInput(
+    'Closed idle video',
+    'playerClosedIdleVideo',
+    reel.playerClosedIdleVideo || '',
+    'Video to play during closed idle state (highest priority)',
+    true, // Enable file picker
+    {
+      directory: 'assets/video',
+      extensions: ['.mp4', '.webm', '.ogg', '.mov'],
+      title: 'Select Closed Idle Video'
+    }
+  );
+  settingsContainer.appendChild(closedIdleVideoRow);
+
   section.appendChild(settingsContainer);
 
   return section;
@@ -317,6 +341,28 @@ export function setupExpandableModeSettings(section, reel, onChange) {
     showWaveform.addEventListener('change', () => {
       reel.showWaveformOnCollapse = showWaveform.checked;
       onChange();
+    });
+  }
+
+  // Enable Player Closed Idle
+  const enableClosedIdle = section.querySelector('#enablePlayerClosedIdle');
+  if (enableClosedIdle) {
+    enableClosedIdle.addEventListener('change', () => {
+      reel.enablePlayerClosedIdle = enableClosedIdle.checked;
+      onChange();
+    });
+  }
+
+  // Player Closed Idle Video
+  const closedIdleVideo = section.querySelector('#playerClosedIdleVideo');
+  if (closedIdleVideo) {
+    let urlTimeout;
+    closedIdleVideo.addEventListener('input', () => {
+      clearTimeout(urlTimeout);
+      urlTimeout = setTimeout(() => {
+        reel.playerClosedIdleVideo = closedIdleVideo.value.trim();
+        onChange();
+      }, 300);
     });
   }
 }

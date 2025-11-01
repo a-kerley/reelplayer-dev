@@ -1,5 +1,5 @@
 {
-  "generated": "2025-11-01T15:45:24.562Z",
+  "generated": "2025-11-01T18:27:47.995Z",
   "directory": "assets/video",
   "extensions": [
     ".mp4",
@@ -9,6 +9,10 @@
     ".webm"
   ],
   "files": [
+    {
+      "name": "BlackHoleSim_AV1.mp4",
+      "path": "assets/video/backgrounds/BlackHoleSim_AV1.mp4"
+    },
     {
       "name": "CosmicBeauty.mp4",
       "path": "assets/video/backgrounds/Test-Videos/CosmicBeauty.mp4"
