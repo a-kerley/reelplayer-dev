@@ -342,11 +342,9 @@ export const playerApp = {
     // Initial update immediately
     updateScrollbar();
     
-    // Additional delayed updates only if in expandable mode (height may change during transitions)
-    if (this.expandable.enabled) {
-      setTimeout(updateScrollbar, 100);
-      setTimeout(updateScrollbar, 500);
-    }
+    // Additional delayed updates for both modes to handle layout transitions
+    setTimeout(updateScrollbar, 100);
+    setTimeout(updateScrollbar, 500);
     
     // Update on window resize
     const resizeObserver = new ResizeObserver(updateScrollbar);
