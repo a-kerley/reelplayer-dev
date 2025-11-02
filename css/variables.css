@@ -90,7 +90,7 @@
      IDLE STATE SETTINGS
      Two types: playback-idle (expanded) and collapsed-idle (collapsed)
      ======================================== */
-  --playback-idle-delay: 1000ms;                  /* Time of no mouse movement before entering expanded idle (in ms for JS) */
+  --playback-idle-delay: 1300ms;                  /* Time of no mouse movement before entering expanded idle (in ms for JS) */
   --playback-idle-collapsed-delay: 1000ms;        /* Time after collapse before entering collapsed idle (in ms for JS) */
   --playback-idle-opacity: 0.18;                  /* UI opacity in expanded idle state */
   --playback-idle-collapsed-waveform-opacity: 0.6; /* Waveform opacity in collapsed idle state */
@@ -107,12 +107,12 @@
   --playback-idle-overlay-transition-out: 2s;   /* Duration of overlay opacity transition out of idle state */
   
   /* Player-Closed-Idle State Transitions */
-  --player-closed-idle-fade-in-duration: 1s;      /* Duration of background video fade-in when entering player-closed-idle */
-  --player-closed-idle-fade-out-duration: 1s;     /* Duration of background video fade-out when exiting player-closed-idle */
+  --player-closed-idle-fade-in-duration: 0.3s;      /* Duration of background video fade-in when entering player-closed-idle */
+  --player-closed-idle-fade-out-duration: 0.3s;     /* Duration of background video fade-out when exiting player-closed-idle */
   
   /* Player-Closed-Idle State Visual Effects */
-  --player-closed-idle-blur: 12px;                 /* Blur amount when in player-closed-idle state */
-  --player-closed-idle-overlay-opacity: 0.75;      /* Overlay opacity when in player-closed-idle state */
+  --player-closed-idle-blur: 8px;                 /* Blur amount when in player-closed-idle state */
+  --player-closed-idle-overlay-opacity: 0.7;      /* Overlay opacity when in player-closed-idle state */
   
   /* ========================================
      PLAYBACK-IDLE BACKGROUND ANIMATION

@@ -1,5 +1,6 @@
 // player.js
 import { colorToRgba } from './modules/colorUtils.js';
+import { createPlayerClosedIdleManager } from './modules/playerClosedIdle.js';
 
 export const playerApp = {
   elements: {},
@@ -26,10 +27,12 @@ export const playerApp = {
     listeners: null,
     playbackIdleTimeout: null,       // Single timeout for playback-idle transitions
     collapsedIdleTimeout: null,      // Single timeout for collapsed-idle transitions
-    playerClosedIdleTimeout: null,   // Single timeout for player-closed-idle transitions
     collapseDelayTimeout: null,      // Timeout for collapse delay
     collapseFadeTimeout: null        // Timeout for collapse fade
   },
+
+  // Player closed idle manager
+  closedIdleManager: null,
 
   // Static mode state - for idle state management
   static: {
@@ -1024,7 +1027,7 @@ export const playerApp = {
         
         // Check for player-closed-idle state after initial load (with additional delay)
         setTimeout(() => {
-          this.checkPlayerClosedIdleConditions();
+          this.closedIdleManager?.checkConditions();
         }, 200); // Extra delay to ensure all initialization is complete
       }, 50);
       if (volumeControl) {
@@ -1123,8 +1126,8 @@ export const playerApp = {
       
       // Exit player-closed-idle state when audio starts playing
       // But NOT when player-closed-idle videos are being activated
-      if (!this.isActivatingPlayerClosedIdleVideo) {
-        this.exitPlayerClosedIdle();
+      if (!this.closedIdleManager?.isActivatingVideo) {
+        this.closedIdleManager?.exit();
       } else {
         console.log('[Play Event] Skipping player-closed-idle exit - video activation in progress');
       }
@@ -1593,250 +1596,10 @@ export const playerApp = {
     this.pauseBackgroundAnimations(true, duration);
   },
 
-  // Update CSS class for player-closed-idle feature
-  updatePlayerClosedIdleCSSClass() {
-    const wrapper = this.elements.playerWrapper;
-    if (!wrapper) return;
-    
-    if (this.currentReelSettings?.enablePlayerClosedIdle) {
-      wrapper.classList.add('player-closed-idle-enabled');
-      console.log('[Player Closed Idle] CSS class enabled - background images will auto-hide when collapsed');
-      console.log('[Player Closed Idle] Current wrapper classes:', wrapper.className);
-    } else {
-      wrapper.classList.remove('player-closed-idle-enabled');
-      console.log('[Player Closed Idle] CSS class disabled - background images always visible');
-    }
-  },
-
-  // Enter player closed idle state (when playback stops and player is closed)
-  enterPlayerClosedIdle() {
-    const wrapper = this.elements.playerWrapper;
-    if (!wrapper || !this.expandable.enabled) return;
-
-    // Prevent multiple concurrent entries
-    if (wrapper.classList.contains('player-closed-idle')) return;
-
-    // Double-check conditions 
-    if (!this.currentReelSettings?.enablePlayerClosedIdle) return;
-    const isPlaying = this.wavesurfer?.isPlaying();
-    if (isPlaying || this.expandable.isExpanded) return;
-
-    console.log('[Player Closed Idle] ✓ Entering player-closed-idle state');
-    
-    // Exit any existing playback-idle state to prevent conflicts
-    this.exitPlaybackIdle();
-    
-    // Add player-closed-idle class
-    wrapper.classList.add('player-closed-idle');
-
-    // Start background video using existing system
-    this.activatePlayerClosedIdleVideo();
-  },
-
-  // Exit player closed idle state
-  exitPlayerClosedIdle() {
-    const wrapper = this.elements.playerWrapper;
-    if (!wrapper || !wrapper.classList.contains('player-closed-idle')) return;
-    
-    console.log('[Player Closed Idle] ❌ Exiting player-closed-idle state');
-    console.trace('[Player Closed Idle] Exit called from:');
-
-    // Remove player-closed-idle class
-    wrapper.classList.remove('player-closed-idle');
-
-    // Fade out any active videos using existing system
-    this.deactivatePlayerClosedIdleVideo();
-  },
-
-  // Activate video for player closed idle state
-  activatePlayerClosedIdleVideo() {
-    // Determine video to play using existing logic
-    const track = this.currentReelSettings?.playlist?.[this.currentTrackIndex];
-    const reel = this.currentReelSettings;
-    const activeVideo = this.getActiveVideo(track, reel);
-    
-    if (!activeVideo.url) {
-      console.log('[Player Closed Idle] No video available');
-      return;
-    }
-
-    console.log('[Player Closed Idle] Playing video:', activeVideo.url);
-    
-    // Get the video element for the appropriate layer
-    const videoElement = (activeVideo.type === 'main') 
-      ? this.videoState[`mainVideo${this.videoState.currentMainLayer.toUpperCase()}`]
-      : this.videoState[`trackVideo${this.videoState.currentTrackLayer.toUpperCase()}`]; // Use track layers for both 'track' and 'closed-idle' types
-
-    if (!videoElement) {
-      console.log('[Player Closed Idle] ❌ Video element not found');
-      return;
-    }
-
-    // Debug current state of the video element
-    console.log('[Player Closed Idle] Video element state before activation:', {
-      className: videoElement.className,
-      src: videoElement.src,
-      currentTime: videoElement.currentTime.toFixed(2) + 's',
-      paused: videoElement.paused,
-      opacity: getComputedStyle(videoElement).opacity,
-      hasActiveClass: videoElement.classList.contains('active'),
-      isBeingFadedOut: this.activeFades?.has(videoElement) || false
-    });
-
-    // Check if this video element is currently fading out from playback
-    if (this.activeFades?.has(videoElement)) {
-      console.log('[Player Closed Idle] ⏳ Waiting for playback video to finish fading out...');
-      
-      // Wait for the fade-out to complete, then activate
-      const fadePromise = new Promise(resolve => {
-        const checkFade = () => {
-          if (!this.activeFades?.has(videoElement)) {
-            console.log('[Player Closed Idle] ✓ Playback fade-out complete, now activating idle video');
-            resolve();
-          } else {
-            setTimeout(checkFade, 50); // Check every 50ms
-          }
-        };
-        checkFade();
-      });
-      
-      fadePromise.then(() => {
-        this.startPlayerClosedIdleVideo(videoElement, activeVideo);
-      });
-    } else {
-      // No active fade-out, start immediately
-      this.startPlayerClosedIdleVideo(videoElement, activeVideo);
-    }
-  },
-
-  // Helper function to start the player-closed-idle video
-  startPlayerClosedIdleVideo(videoElement, activeVideo) {
-    console.log('[Player Closed Idle] Starting video activation...');
-    
-    // Set flag to prevent interference with audio play events
-    this.isActivatingPlayerClosedIdleVideo = true;
-    
-    // Simple video activation with CSS transition
-    videoElement.src = activeVideo.url;
-    videoElement.currentTime = 0;
-    videoElement.load();
-    
-    videoElement.play().then(() => {
-      videoElement.classList.add('active');
-      
-      // Update video state tracking so deactivation can find the video
-      if (activeVideo.type === 'main') {
-        this.videoState.mainVideoPlaying = true;
-      } else {
-        this.videoState.trackVideoPlaying = true;
-      }
-      
-      console.log('[Player Closed Idle] ✓ Video activated');
-      
-      // Clear the flag after a brief delay
-      setTimeout(() => {
-        this.isActivatingPlayerClosedIdleVideo = false;
-      }, 100);
-    }).catch(err => {
-      console.warn('[Player Closed Idle] Video play failed:', err);
-      this.isActivatingPlayerClosedIdleVideo = false;
-    });
-    
-    // Hide background images 
-    this.setBackgroundImageOpacity(0);
-  },
 
 
 
-  // Deactivate video for player closed idle state
-  deactivatePlayerClosedIdleVideo() {
-    const fadeOutDuration = this.getVideoTransitionDuration('playerClosedIdleFadeOut');
-    
-    console.log('[Player Closed Idle] Deactivating videos');
-    
-    // Fade out any currently playing videos
-    const promises = [];
-    
-    // Check main videos
-    if (this.videoState.mainVideoPlaying) {
-      const mainVideoA = this.videoState.mainVideoA;
-      const mainVideoB = this.videoState.mainVideoB;
-      
-      if (mainVideoA && mainVideoA.classList.contains('active')) {
-        promises.push(this.fadeOutVideo(mainVideoA, fadeOutDuration, true));
-      }
-      if (mainVideoB && mainVideoB.classList.contains('active')) {
-        promises.push(this.fadeOutVideo(mainVideoB, fadeOutDuration, true));
-      }
-      this.videoState.mainVideoPlaying = false;
-    }
 
-    // Check track videos  
-    if (this.videoState.trackVideoPlaying) {
-      const trackVideoA = this.videoState.trackVideoA;
-      const trackVideoB = this.videoState.trackVideoB;
-      
-      if (trackVideoA && trackVideoA.classList.contains('active')) {
-        promises.push(this.fadeOutVideo(trackVideoA, fadeOutDuration, true));
-      }
-      if (trackVideoB && trackVideoB.classList.contains('active')) {
-        promises.push(this.fadeOutVideo(trackVideoB, fadeOutDuration, true));
-      }
-      this.videoState.trackVideoPlaying = false;
-    }
-
-    // Restore background image opacity
-    this.setBackgroundImageOpacity(1);
-    
-    return Promise.all(promises);
-  },
-
-  // Helper to set background image opacity for player-closed-idle state
-  setBackgroundImageOpacity(opacity) {
-    const wrapper = this.elements.playerWrapper;
-    if (!wrapper) return;
-    
-    // Set CSS custom property to control background image opacity
-    wrapper.style.setProperty('--player-closed-idle-bg-opacity', opacity.toString());
-  },
-
-  // Check conditions for entering player-closed-idle state
-  checkPlayerClosedIdleConditions() {
-    // Core conditions: expandable mode + feature enabled + collapsed + not playing
-    if (!this.expandable.enabled || 
-        !this.currentReelSettings?.enablePlayerClosedIdle ||
-        this.expandable.isExpanded || 
-        this.wavesurfer?.isPlaying()) {
-      return;
-    }
-
-    // Debug: Check if videos are currently fading out from playback
-    const hasActiveVideos = this.videoState.mainVideoPlaying || this.videoState.trackVideoPlaying;
-    const activeFadesCount = this.activeFades?.size || 0;
-    
-    console.log('[Player Closed Idle] Transition debugging:', {
-      hasActiveVideos,
-      activeFadesCount,
-      mainVideoPlaying: this.videoState.mainVideoPlaying,
-      trackVideoPlaying: this.videoState.trackVideoPlaying,
-      activeFades: this.activeFades ? Array.from(this.activeFades.keys()).map(el => el.className) : []
-    });
-
-    // Don't enter player-closed-idle while videos are still playing or fading out
-    if (hasActiveVideos || activeFadesCount > 0) {
-      console.log('[Player Closed Idle] ⏳ Waiting for playback videos to complete fade-out before entering idle state');
-      
-      // Set up a delayed check to enter player-closed-idle after fade-out completes
-      setTimeout(() => {
-        this.checkPlayerClosedIdleConditions();
-      }, 1300); // Wait slightly longer than the 1200ms fade-out duration
-      
-      return;
-    }
-
-    console.log('[Player Closed Idle] Conditions met - entering player-closed-idle state');
-    this.enterPlayerClosedIdle();
-  },
 
   // ========================================
   // BACKGROUND ZOOM ANIMATION SYSTEM
@@ -3150,7 +2913,7 @@ export const playerApp = {
     this.exitCollapsedIdle(false);
 
     // Exit player closed idle state if active
-    this.exitPlayerClosedIdle();
+    this.closedIdleManager?.exit();
 
     // Remove collapsing classes and ensure expanded state
     wrapper.classList.remove('pre-collapsing');
@@ -3241,7 +3004,7 @@ export const playerApp = {
               this.enterCollapsedIdle();
             } else {
               // Check if we should enter player-closed-idle state when collapsed and not playing
-              this.checkPlayerClosedIdleConditions();
+              this.closedIdleManager?.checkConditions();
             }
           }
         }, collapsedIdleDelay);
@@ -3278,7 +3041,7 @@ export const playerApp = {
         // Check if we should enter player-closed-idle after playback stops (with delay)
         if (this.expandable.enabled && !this.expandable.isExpanded) {
           setTimeout(() => {
-            this.checkPlayerClosedIdleConditions();
+            this.closedIdleManager?.checkConditions();
           }, 1000); // Delay to allow for user interaction
         }
       }
@@ -3479,8 +3242,11 @@ export const playerApp = {
     // Store current reel settings for background transitions
     this.currentReelSettings = reel;
     
-    // Update CSS class for player-closed-idle feature
-    this.updatePlayerClosedIdleCSSClass();
+    // Initialize player closed idle manager
+    if (!this.closedIdleManager) {
+      this.closedIdleManager = createPlayerClosedIdleManager(this);
+    }
+    this.closedIdleManager.initialize();
     
     // Set up mode-specific interactions
     if (this.expandable.enabled) {
