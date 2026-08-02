@@ -59,11 +59,9 @@ class ManifestCache {
       const cached = JSON.parse(cachedData);
       if (this.isValid(cached.timestamp)) {
         const cacheAge = Date.now() - cached.timestamp;
-        console.log(`[Cache] Hit for ${manifestPath} (${Math.round(cacheAge / 1000)}s old)`);
         return cached.files;
       } else {
         const cacheAge = Date.now() - cached.timestamp;
-        console.log(`[Cache] Expired for ${manifestPath} (${Math.round(cacheAge / 1000)}s old)`);
         return null;
       }
     } catch (e) {
@@ -84,7 +82,6 @@ class ManifestCache {
         timestamp: Date.now(),
         files: files
       }));
-      console.log(`[Cache] Stored ${manifestPath}`);
     } catch (e) {
       console.warn(`[Cache] Failed to store ${manifestPath}:`, e);
     }
@@ -113,7 +110,6 @@ class ManifestCache {
     oldKeys.forEach(key => {
       if (localStorage.getItem(key)) {
         localStorage.removeItem(key);
-        console.log(`[Cache] Cleared old entry: ${key}`);
       }
     });
   }
@@ -128,7 +124,6 @@ class ManifestCache {
         localStorage.removeItem(key);
       }
     });
-    console.log(`[Cache] Cleared all entries`);
   }
 }
 
@@ -226,7 +221,6 @@ export function openFilePicker(options) {
     onSelect
   } = options;
 
-  console.log(`[File Picker] Opening file browser for ${directory}...`);
   
   // Create modal components
   const modal = createModalOverlay();
@@ -267,7 +261,6 @@ export function openFilePicker(options) {
       const manifestPath = manifestMap[directory];
       
       if (manifestPath) {
-        console.log(`[File Picker] Loading manifest for ${directory}: ${manifestPath}`);
         
         // Clear old cache entries (one-time migration)
         cache.clearOldEntries();
@@ -279,7 +272,6 @@ export function openFilePicker(options) {
             const lowerPath = file.path.toLowerCase();
             return extensions.some(ext => lowerPath.endsWith(ext));
           });
-          console.log(`[File Picker] Loaded ${files.length} files from cache`);
         } else {
           // Fetch fresh data
           try {
@@ -292,22 +284,18 @@ export function openFilePicker(options) {
                 const lowerPath = file.path.toLowerCase();
                 return extensions.some(ext => lowerPath.endsWith(ext));
               });
-              console.log(`[File Picker] Loaded ${files.length} files from manifest`);
               
               // Cache the manifest
               cache.set(manifestPath, manifest.files);
             } else {
-              console.log(`[File Picker] Manifest not found (${response.status}), falling back to directory scan`);
               await fallbackDirectoryScan();
             }
           } catch (error) {
-            console.log(`[File Picker] Error loading manifest, falling back to directory scan`, error);
             await fallbackDirectoryScan();
           }
         }
       } else {
         // For directories without manifests, use directory scanning
-        console.log(`[File Picker] No manifest configured for ${directory}, using directory scan`);
         await fallbackDirectoryScan();
       }
     } catch (error) {
@@ -319,7 +307,6 @@ export function openFilePicker(options) {
       // Recursive function to scan a directory and its subdirectories
       async function scanDir(dir) {
         try {
-          console.log(`[File Picker] Scanning directory: ${dir}`);
           
           // Fetch directory listing
           const response = await fetch(dir);
@@ -370,12 +357,9 @@ export function openFilePicker(options) {
       await scanDir(directory);
     }
     
-    console.log(`[File Picker] Found ${files.length} files in ${directory}`);
-    console.log(`[File Picker] Files:`, files);
     
     // Build folder structure from flat file list
     const folderStructure = buildFolderStructure(files, directory);
-    console.log(`[File Picker] Folder structure:`, folderStructure);
     
     // Display the folder structure
     displayFolderStructure(folderStructure, directory);
@@ -434,7 +418,6 @@ export function openFilePicker(options) {
     const totalFiles = countFilesInFolder(structure);
     const folderCount = Object.keys(structure.folders).length;
     
-    console.log(`[File Picker] Display: ${totalFiles} total files, ${folderCount} folders at root`);
     
     if (totalFiles === 0 && folderCount === 0) {
       const noFilesMsg = document.createElement("p");
@@ -451,10 +434,8 @@ export function openFilePicker(options) {
     
     // Display folders first
     const folderNames = Object.keys(structure.folders).sort();
-    console.log(`[File Picker] Displaying ${folderNames.length} folders:`, folderNames);
     folderNames.forEach(folderName => {
       const folder = structure.folders[folderName];
-      console.log(`[File Picker] Folder "${folderName}":`, folder);
       const folderItem = createFolderItem(folderName, folder, currentPath);
       fileList.appendChild(folderItem);
     });
@@ -591,7 +572,6 @@ export function openFilePicker(options) {
     
     // Click to select
     fileItem.addEventListener("click", () => {
-      console.log(`[File Picker] Selected: ${file.path}`);
       onSelect(file.path);
       document.body.removeChild(modal);
     });

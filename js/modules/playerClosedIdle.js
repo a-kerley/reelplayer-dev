@@ -57,10 +57,8 @@ export class PlayerClosedIdleManager {
     
     if (isEnabled) {
       wrapper.classList.add(CONSTANTS.CSS_CLASSES.PLAYER_CLOSED_IDLE_ENABLED);
-      console.log('[Player Closed Idle] Feature enabled - background images will auto-hide when collapsed');
     } else {
       wrapper.classList.remove(CONSTANTS.CSS_CLASSES.PLAYER_CLOSED_IDLE_ENABLED);
-      console.log('[Player Closed Idle] Feature disabled - background images always visible');
     }
   }
 
@@ -83,7 +81,6 @@ export class PlayerClosedIdleManager {
     const videoState = this._getVideoState();
     
     if (videoState.hasActiveVideos || videoState.activeFadesCount > 0) {
-      console.log('[Player Closed Idle] ⏳ Waiting for playback videos to complete fade-out');
       
       // Schedule delayed recheck
       this.conditionCheckTimeout = setTimeout(() => {
@@ -93,7 +90,6 @@ export class PlayerClosedIdleManager {
       return;
     }
 
-    console.log('[Player Closed Idle] Conditions met - entering state');
     this.enter();
   }
 
@@ -110,7 +106,6 @@ export class PlayerClosedIdleManager {
     // Final validation
     if (!this._areBasicConditionsMet()) return;
 
-    console.log('[Player Closed Idle] ✓ Entering state');
     
     // Clean up conflicting states
     this.player.exitPlaybackIdle();
@@ -129,7 +124,6 @@ export class PlayerClosedIdleManager {
       return;
     }
     
-    console.log('[Player Closed Idle] ❌ Exiting state');
     
     // Remove state class
     wrapper.classList.remove(CONSTANTS.CSS_CLASSES.PLAYER_CLOSED_IDLE);
@@ -155,21 +149,17 @@ export class PlayerClosedIdleManager {
     const activeVideo = this._getActiveVideo();
     
     if (!activeVideo.url) {
-      console.log('[Player Closed Idle] No video available');
       return;
     }
 
-    console.log('[Player Closed Idle] Activating video:', activeVideo.url);
     
     const videoElement = this._getVideoElement(activeVideo.type);
     if (!videoElement) {
-      console.log('[Player Closed Idle] ❌ Video element not found');
       return;
     }
 
     // Check if video is currently fading out
     if (this.player.activeFades?.has(videoElement)) {
-      console.log('[Player Closed Idle] ⏳ Waiting for fade-out completion');
       this._waitForFadeCompletion(videoElement, activeVideo);
     } else {
       this._startVideo(videoElement, activeVideo);
@@ -182,7 +172,6 @@ export class PlayerClosedIdleManager {
   _waitForFadeCompletion(videoElement, activeVideo) {
     const checkFade = () => {
       if (!this.player.activeFades?.has(videoElement)) {
-        console.log('[Player Closed Idle] ✓ Fade-out complete, starting video');
         this._startVideo(videoElement, activeVideo);
       } else {
         setTimeout(checkFade, CONSTANTS.TIMEOUTS.FADE_COMPLETE_CHECK);
@@ -196,7 +185,6 @@ export class PlayerClosedIdleManager {
    * Start playing the video
    */
   _startVideo(videoElement, activeVideo) {
-    console.log('[Player Closed Idle] Starting video activation');
     
     // Set activation flag to prevent audio event interference
     this.isActivatingVideo = true;
@@ -213,7 +201,6 @@ export class PlayerClosedIdleManager {
         this._updateVideoState(activeVideo.type, true);
         this._hideBackgroundImages();
         
-        console.log('[Player Closed Idle] ✓ Video activated');
         
         // Clear activation flag
         setTimeout(() => {
@@ -230,7 +217,6 @@ export class PlayerClosedIdleManager {
    * Deactivate videos for closed idle state
    */
   _deactivateVideo() {
-    console.log('[Player Closed Idle] Deactivating videos');
     
     const fadeOutDuration = this.player.getVideoTransitionDuration('playerClosedIdleFadeOut');
     const promises = [];

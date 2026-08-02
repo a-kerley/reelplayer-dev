@@ -441,7 +441,6 @@ export const playerApp = {
     // Start preloading
     this.processImagePreloadQueue();
     
-    console.log(`[Image Preload] Queued ${uniqueImages.length} images for preloading`);
   },
 
   /**
@@ -475,7 +474,6 @@ export const playerApp = {
       const img = new Image();
       
       img.onload = () => {
-        console.log(`[Image Preload] ✓ Loaded: ${imageUrl.split('/').pop()}`);
         
         // Add to cache
         this.imageCache.preloadedImages.set(imageUrl, img);
@@ -484,7 +482,6 @@ export const playerApp = {
         if (this.imageCache.preloadedImages.size > this.imageCache.maxCacheSize) {
           const firstKey = this.imageCache.preloadedImages.keys().next().value;
           this.imageCache.preloadedImages.delete(firstKey);
-          console.log(`[Image Preload] Cache full, removed: ${firstKey.split('/').pop()}`);
         }
         
         // Preload next image
@@ -511,7 +508,6 @@ export const playerApp = {
   clearImageCache() {
     this.imageCache.preloadedImages.clear();
     this.imageCache.preloadQueue = [];
-    console.log('[Image Preload] Cache cleared');
   },
 
   convertDropboxLinkToDirect(url) {
@@ -524,10 +520,6 @@ export const playerApp = {
   },
 
   async initializePlayer(audioURL, title, index) {
-    console.log(`\n${'='.repeat(80)}`);
-    console.log(`[TRACK SWITCH] 🎵 Starting track switch to index ${index}: "${title}"`);
-    console.log(`[TRACK SWITCH] Audio URL: ${audioURL}`);
-    console.log(`${'='.repeat(80)}\n`);
     
     this.showLoading(true);
     
@@ -538,24 +530,20 @@ export const playerApp = {
     
     // Check if playback is active
     const isPlaybackActive = this.wavesurfer?.isPlaying() || false;
-    console.log(`[TRACK SWITCH] Playback state: ${isPlaybackActive ? '▶️ PLAYING' : '⏸️ STOPPED'}`);
     
     // Store state for auto-resume with fade-in after load
     // Don't overwrite if already set (e.g., by auto-play from finish event)
     if (!this.wasPlayingBeforeTrackSwitch) {
       this.wasPlayingBeforeTrackSwitch = isPlaybackActive;
     }
-    console.log(`[TRACK SWITCH] wasPlayingBeforeTrackSwitch flag: ${this.wasPlayingBeforeTrackSwitch}`);
     
     // Set flag to prevent pause event from interfering with video transitions
     if (isPlaybackActive) {
       this.isTrackSwitching = true;
-      console.log('[TRACK SWITCH] 🚩 Set isTrackSwitching flag to prevent pause event interference');
     }
     
     // If switching tracks during playback, fade out audio and pause to prevent pop
     if (isPlaybackActive) {
-      console.log('[TRACK SWITCH] Applying audio fade-out before track switch');
       await this.applyAudioFadeOut(true); // Pass true to pause after fade
       // Note: Pause event will fire but will skip stopVideo() due to isTrackSwitching flag
     }
@@ -566,29 +554,12 @@ export const playerApp = {
       // During playback: crossfade old video out (revealing background)
       // New video will be preloaded and ready to fade in when playback starts
       const fadeOutDuration = this.getVideoTransitionDuration('trackSwitch');
-      console.log(`[TRACK SWITCH] Using track-switch fade duration: ${fadeOutDuration}ms`);
       
       // Fade out current layers (both track and main if active)
       // Use getActiveOrFadingVideo to catch videos that are mid-fade
       const currentTrackLayer = this.getActiveOrFadingVideo('track');
       const currentMainLayer = this.getActiveOrFadingVideo('main');
       
-      console.log(`[TRACK SWITCH] Current video layer state:`, {
-        trackLayer: this.videoState.currentTrackLayer,
-        mainLayer: this.videoState.currentMainLayer,
-        trackVideo: currentTrackLayer ? {
-          className: currentTrackLayer.className,
-          hasActive: currentTrackLayer.classList.contains('active'),
-          opacity: window.getComputedStyle(currentTrackLayer).opacity,
-          src: currentTrackLayer.src ? currentTrackLayer.src.substring(currentTrackLayer.src.lastIndexOf('/') + 1) : 'none'
-        } : 'null',
-        mainVideo: currentMainLayer ? {
-          className: currentMainLayer.className,
-          hasActive: currentMainLayer.classList.contains('active'),
-          opacity: window.getComputedStyle(currentMainLayer).opacity,
-          src: currentMainLayer.src ? currentMainLayer.src.substring(currentMainLayer.src.lastIndexOf('/') + 1) : 'none'
-        } : 'null'
-      });
       
       // Check if track video needs fade-out (either fully active OR currently fading)
       if (currentTrackLayer) {
@@ -598,18 +569,14 @@ export const playerApp = {
         
         if (hasActiveClass || trackFadeState || currentOpacity > 0) {
           if (trackFadeState) {
-            console.log(`[TRACK SWITCH] 🔄 Interrupting ${trackFadeState.type === 'in' ? 'fade-in' : 'fade-out'} on track video (${this.videoState.currentTrackLayer})`);
           } else {
-            console.log(`[TRACK SWITCH] 🎬 Fading out track video (${this.videoState.currentTrackLayer})`);
           }
           this.fadeOutVideo(currentTrackLayer, fadeOutDuration, true).catch(err => 
             console.error('[TRACK SWITCH] ❌ Track video fadeout error:', err)
           );
         } else {
-          console.log(`[TRACK SWITCH] ⏭️ No active track video to fade out`);
         }
       } else {
-        console.log(`[TRACK SWITCH] ⏭️ No track video layer found`);
       }
       
       // Check if main video needs fade-out (either fully active OR currently fading)
@@ -620,31 +587,24 @@ export const playerApp = {
         
         if (hasActiveClass || mainFadeState || currentOpacity > 0) {
           if (mainFadeState) {
-            console.log(`[TRACK SWITCH] 🔄 Interrupting ${mainFadeState.type === 'in' ? 'fade-in' : 'fade-out'} on main video (${this.videoState.currentMainLayer})`);
           } else {
-            console.log(`[TRACK SWITCH] 🎬 Fading out main video (${this.videoState.currentMainLayer})`);
           }
           this.fadeOutVideo(currentMainLayer, fadeOutDuration, true).catch(err =>
             console.error('[TRACK SWITCH] ❌ Main video fadeout error:', err)
           );
         } else {
-          console.log(`[TRACK SWITCH] ⏭️ No active main video to fade out`);
         }
       } else {
-        console.log(`[TRACK SWITCH] ⏭️ No main video layer found`);
       }
       
       // Clear the track switching flag after video fade-outs have been initiated
       // The fades will complete in the background
-      console.log('[TRACK SWITCH] ✓ Video fade-outs initiated, clearing isTrackSwitching flag');
       this.isTrackSwitching = false;
     } else {
-      console.log(`[TRACK SWITCH] 🧹 Playback stopped - cleaning up active videos immediately`);
       // When stopped: clean up any active videos immediately
       ['track', 'main'].forEach(type => {
         const currentLayer = this.getCurrentLayerVideo(type);
         if (currentLayer?.classList.contains('active')) {
-          console.log(`[TRACK SWITCH] 🗑️ Cleaning up ${type} video`);
           this.cleanupVideo(currentLayer, type);
         }
       });
@@ -674,7 +634,6 @@ export const playerApp = {
     if (!isPlaybackActive) {
       this.preloadVideos();
     } else {
-      console.log(`[TRACK SWITCH] ⏭️ Skipping preload during playback - will load when play is pressed`);
     }
     
     // Reset playhead to beginning when changing tracks
@@ -688,10 +647,8 @@ export const playerApp = {
     const waveformWrapper = Array.from(waveformContainer?.children || [])
       .find(child => child.tagName === 'DIV' && !child.className && !child.id);
     
-    console.log(`[WAVEFORM FADE] Found waveform wrapper to fade out:`, waveformWrapper);
     
     if (waveformWrapper) {
-      console.log(`[WAVEFORM FADE] Setting wrapper opacity to 0, current: ${waveformWrapper.style.opacity}`);
       waveformWrapper.style.opacity = "0";
     }
     
@@ -726,7 +683,6 @@ export const playerApp = {
     const playlist = this.currentReelSettings?.playlist;
     
     if (!playlist || playlist.length === 0) {
-      console.log('[Auto-play] No playlist available');
       return;
     }
     
@@ -734,22 +690,18 @@ export const playerApp = {
     const nextIndex = this.currentTrackIndex + 1;
     
     if (nextIndex >= playlist.length) {
-      console.log('[Auto-play] Reached end of playlist, stopping playback');
       return;
     }
     
-    console.log(`[Auto-play] Moving to next track: ${nextIndex}`);
     
     // Get the next track
     const nextTrack = playlist[nextIndex];
     const url = this.convertDropboxLinkToDirect(nextTrack.url);
     
     // Set flag to indicate we should auto-resume playback
-    console.log('[Auto-play] Setting wasPlayingBeforeTrackSwitch = true');
     this.wasPlayingBeforeTrackSwitch = true;
     
     // Initialize the next track (will auto-play due to flag)
-    console.log('[Auto-play] Calling initializePlayer');
     this.initializePlayer(url, nextTrack.title, nextIndex);
   },
 
@@ -994,22 +946,17 @@ export const playerApp = {
       const waveformWrapper = Array.from(waveformContainer?.children || [])
         .find(child => child.tagName === 'DIV' && !child.className && !child.id);
       
-      console.log(`[WAVEFORM FADE] Ready - Found waveform wrapper:`, waveformWrapper);
-      console.log(`[WAVEFORM FADE] Ready - expandable enabled: ${this.expandable.enabled}`);
       
       // Ensure waveform starts at opacity 0
       if (waveformWrapper) {
-        console.log(`[WAVEFORM FADE] Setting wrapper opacity to 0 initially`);
         waveformWrapper.style.opacity = "0";
       }
       
       setTimeout(() => {
         // Fade in the new waveform after it's fully loaded
-        console.log(`[WAVEFORM FADE] Fading in waveform wrapper`);
         
         // Fade in the waveform wrapper
         if (waveformWrapper) {
-          console.log(`[WAVEFORM FADE] Setting wrapper opacity to 1`);
           waveformWrapper.style.opacity = "1";
         }
         
@@ -1062,14 +1009,11 @@ export const playerApp = {
       setTimeout(updateTotalTime, 500);
       
       // Auto-resume with fade-in if track was switched during playback
-      console.log('[Track Ready] Checking auto-resume flag:', this.wasPlayingBeforeTrackSwitch);
       if (this.wasPlayingBeforeTrackSwitch) {
-        console.log('[Track Ready] Auto-resuming playback with fade-in after track switch');
         this.wasPlayingBeforeTrackSwitch = false; // Reset flag
         
         // Set volume to 0, start playback, then fade in
         const targetVolume = this.wavesurfer.getVolume();
-        console.log('[Track Ready] Target volume:', targetVolume);
         this.wavesurfer.setVolume(0);
         this.wavesurfer.play();
         
@@ -1106,7 +1050,6 @@ export const playerApp = {
     this.wavesurfer.on("play", () => {
       // Cancel any active audio fade-out
       if (this.activeFadeOut) {
-        console.log('[Play Event] 🔄 Cancelling active audio fade-out');
         this.activeFadeOut.cancel = true;
         this.activeFadeOut = null;
       }
@@ -1122,14 +1065,12 @@ export const playerApp = {
       // Start video playback
       // Note: playVideo() has built-in interruption handling via activeFades Map
       // It will gracefully cancel any in-flight video fade-outs and start fresh
-      console.log('[Play Event] 🎬 Starting video playback');
       
       // Exit player-closed-idle state when audio starts playing
       // But NOT when player-closed-idle videos are being activated
       if (!this.closedIdleManager?.isActivatingVideo) {
         this.closedIdleManager?.exit();
       } else {
-        console.log('[Play Event] Skipping player-closed-idle exit - video activation in progress');
       }
       
       this.playVideo();
@@ -1137,7 +1078,6 @@ export const playerApp = {
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
-      console.log('[Pause Event] ⏸️ Pause event triggered');
       
       // Hide cursor when paused by making it transparent
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
@@ -1146,13 +1086,11 @@ export const playerApp = {
       // Skip video fade-out if we're in the middle of a track switch
       // Track switch handles its own video transitions with specific timing
       if (this.isTrackSwitching) {
-        console.log('[Pause Event] ⏭️ Skipping stopVideo() - track switch will handle video transitions');
         this.updatePlayingState(false);
         document.dispatchEvent(new CustomEvent("playback:pause"));
         return;
       }
       
-      console.log('[Pause Event] 🎬 Stopping videos (normal pause)');
       this.updatePlayingState(false);
       
       // Stop video playback with fade-out
@@ -1165,7 +1103,6 @@ export const playerApp = {
     this.wavesurfer.on("finish", () => {
       // Check if we should auto-play next track BEFORE updating state
       const shouldAutoPlay = this.hasNextTrack();
-      console.log('[Finish] Should auto-play next track:', shouldAutoPlay);
       
       // Hide cursor when finished
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
@@ -1183,7 +1120,6 @@ export const playerApp = {
       
       // Auto-play next track if available
       if (shouldAutoPlay) {
-        console.log('[Finish] Calling playNextTrack()');
         this.playNextTrack();
       }
     });
@@ -1249,9 +1185,7 @@ export const playerApp = {
       if (this.wavesurfer.isPlaying()) {
         // Sequential approach: Audio fade → Pause (triggers video fade via event)
         // This ensures proper sequencing without requiring matching durations
-        console.log('[Play/Pause] 🎵 Starting pause sequence with audio fade-out');
         this.applyAudioFadeOut().then(() => {
-          console.log('[Play/Pause] ⏸️ Audio fade complete, pausing (will trigger video fade)');
           this.wavesurfer.pause();
         });
       } else {
@@ -1259,7 +1193,6 @@ export const playerApp = {
         const currentTime = this.wavesurfer.getCurrentTime();
         const isResuming = currentTime > 0;
         
-        console.log('[Play/Pause] ▶️ Starting play sequence', { isResuming });
         
         if (isResuming) {
           // Resuming from pause: fade in both audio and video
@@ -1267,7 +1200,6 @@ export const playerApp = {
           this.wavesurfer.setVolume(0);
           this.wavesurfer.play(); // Triggers 'play' event which starts video
           requestAnimationFrame(() => {
-            console.log('[Play/Pause] 🎵 Starting audio fade-in');
             this.applyAudioFadeInFromZero(targetVolume);
           });
         } else {
@@ -1596,11 +1528,6 @@ export const playerApp = {
     this.pauseBackgroundAnimations(true, duration);
   },
 
-
-
-
-
-
   // ========================================
   // BACKGROUND ZOOM ANIMATION SYSTEM
   // ========================================
@@ -1828,14 +1755,9 @@ export const playerApp = {
     const activeVideo = this.getActiveVideo(track, reel);
     
     if (!activeVideo.url) {
-      console.log('[Play Video] ⏭️ No video URL configured, skipping');
       return;
     }
     
-    console.log(`\n${'▶'.repeat(40)}`);
-    console.log(`[Play Video] 🎬 START - ${activeVideo.type} video playback`);
-    console.log(`[Play Video] URL: ${activeVideo.url.substring(activeVideo.url.lastIndexOf('/') + 1)}`);
-    console.log(`${'▶'.repeat(40)}\n`);
 
     // Get current layer (might be active) and next layer (preloaded)
     const currentLayer = this.getCurrentLayerVideo(activeVideo.type);
@@ -1845,37 +1767,17 @@ export const playerApp = {
       ? (this.videoState.currentTrackLayer === 'a' ? 'b' : 'a')
       : (this.videoState.currentMainLayer === 'a' ? 'b' : 'a');
     
-    console.log(`[Play Video] Layer info:`, {
-      type: activeVideo.type,
-      currentLayer: currentLayerName,
-      nextLayer: nextLayerName,
-      currentLayerState: currentLayer ? {
-        className: currentLayer.className,
-        hasActive: currentLayer.classList.contains('active'),
-        opacity: window.getComputedStyle(currentLayer).opacity,
-        src: currentLayer.src ? currentLayer.src.substring(currentLayer.src.lastIndexOf('/') + 1) : 'none'
-      } : 'null',
-      nextLayerState: nextLayer ? {
-        className: nextLayer.className,
-        hasActive: nextLayer.classList.contains('active'),
-        opacity: window.getComputedStyle(nextLayer).opacity,
-        src: nextLayer.src ? nextLayer.src.substring(nextLayer.src.lastIndexOf('/') + 1) : 'none'
-      } : 'null'
-    });
     
     // Get opposite video type (main vs track) to fade it out
     const oppositeType = activeVideo.type === 'track' ? 'main' : 'track';
     const oppositeLayer = this.getCurrentLayerVideo(oppositeType);
     
-    console.log(`[Play Video] Opposite type: ${oppositeType}, hasActive: ${oppositeLayer?.classList.contains('active') || false}`);
 
     // Fade out opposite type if active (e.g., fade out main when track video plays)
     if (oppositeLayer?.classList.contains('active')) {
       const fadeOutDuration = this.getVideoTransitionDuration('fadeOut');
-      console.log(`[Play Video] 🎬 Fading out opposite ${oppositeType} video (duration: ${fadeOutDuration}ms)`);
       this.fadeOutVideo(oppositeLayer, fadeOutDuration, true);
     } else {
-      console.log(`[Play Video] ⏭️ No opposite ${oppositeType} video to fade out`);
     }
 
     // Check if current layer already has the right video playing
@@ -1885,18 +1787,8 @@ export const playerApp = {
                            currentLayer.src && 
                            currentLayer.readyState >= 2;
     
-    console.log(`[Play Video] Checking if already active:`, {
-      hasActiveClass: currentLayer?.classList.contains('active'),
-      currentLayerUrl: currentLayerUrl ? currentLayerUrl.substring(currentLayerUrl.lastIndexOf('/') + 1) : 'none',
-      targetUrl: activeVideo.url.substring(activeVideo.url.lastIndexOf('/') + 1),
-      urlsMatch: currentLayerUrl === activeVideo.url,
-      hasSrc: !!currentLayer?.src,
-      readyState: currentLayer?.readyState,
-      isAlreadyActive
-    });
     
     if (isAlreadyActive) {
-      console.log(`[Play Video] ✅ ${activeVideo.type} video already active on layer ${currentLayerName}, resuming`);
       this.resumeVideo(currentLayer);
       return;
     }
@@ -1906,64 +1798,42 @@ export const playerApp = {
     const isPreloaded = nextLayerUrl === activeVideo.url && 
                        nextLayer.src === activeVideo.url;
     
-    console.log(`[Play Video] Checking preload status:`, {
-      nextLayerUrl: nextLayerUrl ? nextLayerUrl.substring(nextLayerUrl.lastIndexOf('/') + 1) : 'none',
-      targetUrl: activeVideo.url.substring(activeVideo.url.lastIndexOf('/') + 1),
-      urlsMatch: nextLayerUrl === activeVideo.url,
-      elementSrc: nextLayer.src ? nextLayer.src.substring(nextLayer.src.lastIndexOf('/') + 1) : 'none',
-      isPreloaded
-    });
     
     try {
       // Load video on next layer if not already preloaded
       if (!isPreloaded) {
-        console.log(`[Play Video] ⚠️ Video not preloaded, loading on layer ${nextLayerName}...`);
         const loadStart = performance.now();
         await this.loadVideo(nextLayer, activeVideo.url, activeVideo.type);
         this.setLayerUrl(activeVideo.type, nextLayerName, activeVideo.url);
-        console.log(`[Play Video] ✓ Loaded in ${(performance.now() - loadStart).toFixed(0)}ms`);
       } else {
-        console.log(`[Play Video] ✓ Using preloaded video on layer ${nextLayerName}`);
       }
       
       // Crossfade: fade out old layer while fading in new layer
       const fadeInDuration = this.getVideoTransitionDuration('fadeIn');
-      console.log(`[Play Video] Starting crossfade sequence (duration: ${fadeInDuration}ms)`);
       
       // Start fade-in on next layer
-      console.log(`[Play Video] 📈 Starting fade-in on layer ${nextLayerName}`);
       const fadeInPromise = this.fadeInVideo(nextLayer, fadeInDuration);
       
       // If current layer is active, fade it out simultaneously (crossfade)
       if (currentLayer?.classList.contains('active')) {
-        console.log(`[Play Video] 🔀 CROSSFADE: Fading out layer ${currentLayerName} while fading in layer ${nextLayerName}`);
         this.fadeOutVideo(currentLayer, fadeInDuration, true).catch(err =>
           console.error('[Play Video] ❌ Crossfade out error:', err)
         );
       } else {
-        console.log(`[Play Video] 📈 Simple fade-in (no current layer to crossfade)`);
       }
       
-      console.log(`[Play Video] ⏳ Waiting for fade-in to complete...`);
       await fadeInPromise;
-      console.log(`[Play Video] ✓ Fade-in complete`);
       
       // Switch to the new layer as current
-      console.log(`[Play Video] 🔄 Switching current ${activeVideo.type} layer: ${currentLayerName} → ${nextLayerName}`);
       this.switchToNextLayer(activeVideo.type);
       
       // Update playback state
       if (activeVideo.type === 'track') {
         this.videoState.trackVideoPlaying = true;
-        console.log(`[Play Video] ✓ Track video playing state = true`);
       } else {
         this.videoState.mainVideoPlaying = true;
-        console.log(`[Play Video] ✓ Main video playing state = true`);
       }
       
-      console.log(`\n${'✅'.repeat(20)}`);
-      console.log(`[Play Video] ✅ SUCCESS - ${activeVideo.type} video now playing on layer ${nextLayerName}`);
-      console.log(`${'✅'.repeat(20)}\n`);
       
       // Pause background animations when video is playing
       this.pauseBackgroundAnimations(false, 0);
@@ -1979,12 +1849,8 @@ export const playerApp = {
    * Fades out and cleans up any active videos
    */
   async stopVideo() {
-    console.log(`\n${'⏹'.repeat(40)}`);
-    console.log(`[Stop Video] ⏹️ Stopping all active videos`);
-    console.log(`${'⏹'.repeat(40)}\n`);
     
     const fadeOutDuration = this.getVideoTransitionDuration('fadeOut');
-    console.log(`[Stop Video] Fade-out duration: ${fadeOutDuration}ms`);
     const promises = [];
 
     // Check BOTH layers (A and B) for each video type
@@ -1994,32 +1860,6 @@ export const playerApp = {
     const mainVideoA = this.videoState.mainVideoA;
     const mainVideoB = this.videoState.mainVideoB;
     
-    console.log(`[Stop Video] Checking all video layers:`, {
-      trackVideoA: trackVideoA ? {
-        className: trackVideoA.className,
-        hasActive: trackVideoA.classList.contains('active'),
-        hasFade: this.videoState.activeFades.has(trackVideoA),
-        opacity: window.getComputedStyle(trackVideoA).opacity
-      } : 'null',
-      trackVideoB: trackVideoB ? {
-        className: trackVideoB.className,
-        hasActive: trackVideoB.classList.contains('active'),
-        hasFade: this.videoState.activeFades.has(trackVideoB),
-        opacity: window.getComputedStyle(trackVideoB).opacity
-      } : 'null',
-      mainVideoA: mainVideoA ? {
-        className: mainVideoA.className,
-        hasActive: mainVideoA.classList.contains('active'),
-        hasFade: this.videoState.activeFades.has(mainVideoA),
-        opacity: window.getComputedStyle(mainVideoA).opacity
-      } : 'null',
-      mainVideoB: mainVideoB ? {
-        className: mainVideoB.className,
-        hasActive: mainVideoB.classList.contains('active'),
-        hasFade: this.videoState.activeFades.has(mainVideoB),
-        opacity: window.getComputedStyle(mainVideoB).opacity
-      } : 'null'
-    });
     
     // Stop track video A if it's active OR has a fade in progress
     const shouldStopTrackA = trackVideoA && 
@@ -2027,7 +1867,6 @@ export const playerApp = {
     
     if (shouldStopTrackA) {
       const hasFade = this.videoState.activeFades.has(trackVideoA);
-      console.log(`[Stop Video] 🎬 Stopping track video A${hasFade ? ' [interrupting fade]' : ''}`);
       promises.push(this.fadeOutVideo(trackVideoA, fadeOutDuration, true));
     }
 
@@ -2037,7 +1876,6 @@ export const playerApp = {
     
     if (shouldStopTrackB) {
       const hasFade = this.videoState.activeFades.has(trackVideoB);
-      console.log(`[Stop Video] 🎬 Stopping track video B${hasFade ? ' [interrupting fade]' : ''}`);
       promises.push(this.fadeOutVideo(trackVideoB, fadeOutDuration, true));
     }
 
@@ -2047,7 +1885,6 @@ export const playerApp = {
     
     if (shouldStopMainA) {
       const hasFade = this.videoState.activeFades.has(mainVideoA);
-      console.log(`[Stop Video] 🎬 Stopping main video A${hasFade ? ' [interrupting fade]' : ''}`);
       promises.push(this.fadeOutVideo(mainVideoA, fadeOutDuration, true));
     }
 
@@ -2057,30 +1894,21 @@ export const playerApp = {
     
     if (shouldStopMainB) {
       const hasFade = this.videoState.activeFades.has(mainVideoB);
-      console.log(`[Stop Video] 🎬 Stopping main video B${hasFade ? ' [interrupting fade]' : ''}`);
       promises.push(this.fadeOutVideo(mainVideoB, fadeOutDuration, true));
     }
     
     if (!shouldStopTrackA && !shouldStopTrackB && !shouldStopMainA && !shouldStopMainB) {
-      console.log(`[Stop Video] ⏭️ No active videos to stop`);
     }
 
     if (promises.length > 0) {
-      console.log(`[Stop Video] ⏳ Waiting for ${promises.length} video(s) to fade out...`);
       await Promise.all(promises);
-      console.log(`[Stop Video] ✓ All videos stopped`);
     } else {
-      console.log(`[Stop Video] ✓ No videos were active`);
     }
     
     // Resume background animations when video stops
     const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
-    console.log(`[Stop Video] 🎨 Resuming background animations (duration: ${duration}ms)`);
     this.pauseBackgroundAnimations(true, duration);
     
-    console.log(`\n${'✅'.repeat(20)}`);
-    console.log(`[Stop Video] ✅ Complete`);
-    console.log(`${'✅'.repeat(20)}\n`);
   },
 
   /**
@@ -2110,18 +1938,15 @@ export const playerApp = {
                       nextLayer.src !== activeVideo.url;
     
     if (needsLoad) {
-      console.log(`[Preload Video] Loading ${activeVideo.type} video on layer ${nextLayerName}:`, activeVideo.url);
       // Pre-load in background on inactive layer (stays hidden with opacity: 0)
       this.loadVideo(nextLayer, activeVideo.url, activeVideo.type)
         .then(() => {
           this.setLayerUrl(activeVideo.type, nextLayerName, activeVideo.url);
-          console.log(`[Preload Video] ✓ ${activeVideo.type} video ready on layer ${nextLayerName}`);
         })
         .catch(err => {
           console.error(`[Preload Video] Failed on layer ${nextLayerName}:`, err);
         });
     } else {
-      console.log(`[Preload Video] ${activeVideo.type} video already loaded on layer ${nextLayerName}`);
     }
   },
 
@@ -2189,7 +2014,6 @@ export const playerApp = {
           const bufferedEnd = videoElement.buffered.end(0);
           const duration = videoElement.duration;
           const percentBuffered = duration > 0 ? (bufferedEnd / duration * 100).toFixed(1) : 0;
-          console.log(`[Video Load] ${type} buffering: ${percentBuffered}% (${bufferedEnd.toFixed(1)}s / ${duration.toFixed(1)}s) - ReadyState: ${videoElement.readyState}`);
         }
       };
       videoElement.addEventListener('progress', progressHandler);
@@ -2200,7 +2024,6 @@ export const playerApp = {
       // Set video source and trigger load with aggressive preload
       videoElement.src = videoUrl;
       videoElement.preload = 'auto'; // Tell browser to buffer as much as possible
-      console.log(`[Video Load] Starting load for ${type} video:`, videoUrl);
       videoElement.load();
     });
   },
@@ -2225,33 +2048,20 @@ export const playerApp = {
 
     // Identify which video element this is
     const videoId = videoElement.className.split(' ').filter(c => c.includes('video')).join(' ');
-    console.log(`[Fade In Video] 🎬 START for ${videoId}, duration: ${duration}ms`);
-    console.log(`[Fade In Video] Initial state:`, {
-      hasActiveClass: videoElement.classList.contains('active'),
-      currentOpacity: window.getComputedStyle(videoElement).opacity,
-      paused: videoElement.paused,
-      currentTime: videoElement.currentTime.toFixed(2) + 's',
-      readyState: videoElement.readyState,
-      src: videoElement.src ? videoElement.src.substring(videoElement.src.lastIndexOf('/') + 1) : 'none'
-    });
 
     // Cancel any in-progress fade on this element
     if (this.videoState.activeFades.has(videoElement)) {
       const previousFade = this.videoState.activeFades.get(videoElement);
-      console.log(`[Fade In Video] 🔄 INTERRUPTING previous ${previousFade.type} fade on ${videoId}`);
       previousFade.abort();
       this.videoState.activeFades.delete(videoElement);
-      console.log(`[Fade In Video] ✓ Previous fade aborted`);
       
       // CRITICAL: Clear any inline styles from previous fade-out interruption
       // Without this, inline opacity/transition styles override CSS transitions
       if (previousFade.type === 'out') {
-        console.log(`[Fade In Video] 🧹 Clearing inline styles from interrupted fade-out`);
         videoElement.style.opacity = '';
         videoElement.style.transition = '';
         // Force reflow to ensure styles are cleared before starting new fade
         void videoElement.offsetHeight;
-        console.log(`[Fade In Video] ✓ Inline styles cleared, ready for CSS fade-in`);
       }
     }
 
@@ -2283,17 +2093,14 @@ export const playerApp = {
       const startTime = performance.now();
       const getTimestamp = () => `+${(performance.now() - startTime).toFixed(0)}ms`;
       
-      console.log(`[Fade In Video] ${getTimestamp()} Starting playback - paused: ${videoElement.paused}, currentTime: ${videoElement.currentTime.toFixed(2)}s`);
       
       // Seek past first frame to avoid black/frozen frame (common with Cloudinary/streaming)
       if (videoElement.currentTime === 0) {
         videoElement.currentTime = 0.1;
-        console.log(`[Fade In Video] ${getTimestamp()} Seeked to 0.1s to skip first frame`);
         
         // Wait for seek to complete before playing
         await new Promise(seekResolve => {
           const seekHandler = () => {
-            console.log(`[Fade In Video] ${getTimestamp()} Seek completed`);
             seekResolve();
           };
           videoElement.addEventListener('seeked', seekHandler, { once: true });
@@ -2301,13 +2108,11 @@ export const playerApp = {
           // Timeout fallback
           setTimeout(() => {
             videoElement.removeEventListener('seeked', seekHandler);
-            console.log(`[Fade In Video] ${getTimestamp()} Seek timeout, proceeding anyway`);
             seekResolve();
           }, 500);
         });
       }
       
-      console.log(`[Fade In Video] ${getTimestamp()} Starting play() call`);
       
       // Start video playback
       const playPromise = videoElement.play();
@@ -2315,7 +2120,6 @@ export const playerApp = {
       if (playPromise !== undefined) {
         playPromise
           .then(() => {
-            console.log(`[Fade In Video] ${getTimestamp()} ✓ Video playing successfully - paused: ${videoElement.paused}`);
             
             // Force webkit to render frames (common fix for video rendering issues)
             videoElement.style.transform = 'translateZ(0)';
@@ -2323,24 +2127,12 @@ export const playerApp = {
             // Force a repaint by toggling a property
             requestAnimationFrame(() => {
               videoElement.style.webkitTransform = 'translateZ(0)';
-              console.log(`[Fade In Video] ${getTimestamp()} Hardware acceleration forced`);
             });
             
             // Check if video is progressing at multiple intervals
             [100, 250, 500].forEach(delay => {
               setTimeout(() => {
                 const computed = window.getComputedStyle(videoElement);
-                console.log(`[Fade In Video] ${getTimestamp()} (${delay}ms check)`, {
-                  currentTime: videoElement.currentTime.toFixed(2) + 's',
-                  paused: videoElement.paused,
-                  videoWidth: videoElement.videoWidth,
-                  videoHeight: videoElement.videoHeight,
-                  opacity: computed.opacity,
-                  display: computed.display,
-                  visibility: computed.visibility,
-                  zIndex: computed.zIndex,
-                  transform: computed.transform
-                });
               }, delay);
             });
           })
@@ -2360,36 +2152,22 @@ export const playerApp = {
       let isAborted = false;
       
       const abortFade = () => {
-        console.log(`[Fade In Video] ❌ ABORT called for ${videoId} at ${getTimestamp()}`);
         isAborted = true;
         clearTimeout(fadeTimeout);
         this.videoState.activeFades.delete(videoElement);
-        console.log(`[Fade In Video] ✓ Fade aborted, timeout cleared`);
       };
       
       this.videoState.activeFades.set(videoElement, { type: 'in', abort: abortFade });
-      console.log(`[Fade In Video] 📝 Registered in activeFades Map (size: ${this.videoState.activeFades.size})`);
       
       // Add active class to trigger CSS fade-in
       videoElement.classList.add('active');
-      console.log(`[Fade In Video] ${getTimestamp()} ✓ 'active' class added`);
-      console.log(`[Fade In Video] ${getTimestamp()} classList: ${videoElement.classList.toString()}`);
-      console.log(`[Fade In Video] ${getTimestamp()} Computed opacity: ${window.getComputedStyle(videoElement).opacity}`);
 
       // Resolve after fade duration (unless aborted)
       fadeTimeout = setTimeout(() => {
         if (!isAborted) {
-          console.log(`[Fade In Video] ✅ COMPLETE for ${videoId} at ${getTimestamp()}`);
-          console.log(`[Fade In Video] Final state:`, {
-            opacity: window.getComputedStyle(videoElement).opacity,
-            paused: videoElement.paused,
-            currentTime: videoElement.currentTime.toFixed(2) + 's',
-            hasActiveClass: videoElement.classList.contains('active')
-          });
           this.videoState.activeFades.delete(videoElement);
           resolve();
         } else {
-          console.log(`[Fade In Video] ⏭️ Skipping completion (was aborted) for ${videoId}`);
         }
       }, duration);
     });
@@ -2417,22 +2195,12 @@ export const playerApp = {
 
     // Identify which video element this is
     const videoId = videoElement.className.split(' ').filter(c => c.includes('video')).join(' ');
-    console.log(`[Fade Out Video] 🎬 START for ${videoId}, duration: ${duration}ms, fullCleanup: ${fullCleanup}`);
-    console.log(`[Fade Out Video] Initial state:`, {
-      hasActiveClass: videoElement.classList.contains('active'),
-      currentOpacity: window.getComputedStyle(videoElement).opacity,
-      paused: videoElement.paused,
-      currentTime: videoElement.currentTime.toFixed(2) + 's',
-      src: videoElement.src ? videoElement.src.substring(videoElement.src.lastIndexOf('/') + 1) : 'none'
-    });
 
     // Cancel any in-progress fade on this element
     if (this.videoState.activeFades.has(videoElement)) {
       const previousFade = this.videoState.activeFades.get(videoElement);
-      console.log(`[Fade Out Video] 🔄 INTERRUPTING previous ${previousFade.type} fade on ${videoId}`);
       previousFade.abort();
       this.videoState.activeFades.delete(videoElement);
-      console.log(`[Fade Out Video] ✓ Previous fade aborted`);
       
       // Interruption Strategy: "Freeze & Animate"
       // 1. Capture current opacity (mid-transition state)
@@ -2443,41 +2211,33 @@ export const playerApp = {
       
       // If interrupting a fade-in, we need special handling
       if (previousFade.type === 'in') {
-        console.log(`[Fade Out Video] ⚠️ Interrupting FADE-IN - forcing immediate fade-out`);
         // Remove active class immediately to start fade-out
         videoElement.classList.remove('active');
         // Get current opacity and freeze it
         const currentOpacity = window.getComputedStyle(videoElement).opacity;
-        console.log(`[Fade Out Video] 🔒 Freezing opacity at ${currentOpacity}`);
         videoElement.style.opacity = currentOpacity;
         // Trigger reflow
         void videoElement.offsetHeight;
         // Now animate to 0
         videoElement.style.transition = `opacity ${duration}ms ease-in-out`;
         videoElement.style.opacity = '0';
-        console.log(`[Fade Out Video] ✓ Animating from ${currentOpacity} → 0`);
       } else {
         // For fade-out interrupting another fade-out, check if transition has started
         const currentOpacity = window.getComputedStyle(videoElement).opacity;
-        console.log(`[Fade Out Video] 🔒 Current opacity: ${currentOpacity}`);
         
         // If opacity is still at original value (1 for fade-out), transition hasn't started yet
         // Animate from 1 to 0 using inline styles (similar to fade-in interruption)
         if (parseFloat(currentOpacity) === 1.0) {
-          console.log(`[Fade Out Video] ⚠️ Previous transition never started (opacity still 1), animating manually`);
           videoElement.style.transition = `opacity ${duration}ms ease-in-out`;
           videoElement.style.opacity = '0';
-          console.log(`[Fade Out Video] ✓ Animating from 1 → 0 with ${duration}ms duration`);
         } else {
           // Transition has started, freeze at current value then restart via CSS
-          console.log(`[Fade Out Video] 🔒 Freezing opacity at ${currentOpacity} to prevent transition conflict`);
           videoElement.style.opacity = currentOpacity;
           // Trigger reflow to apply the style
           void videoElement.offsetHeight;
           // Now animate to 0 via inline styles (CSS transition already removed by previous fade)
           videoElement.style.transition = `opacity ${duration}ms ease-in-out`;
           videoElement.style.opacity = '0';
-          console.log(`[Fade Out Video] ✓ Animating from ${currentOpacity} → 0 with ${duration}ms duration`);
         }
       }
     }
@@ -2492,82 +2252,57 @@ export const playerApp = {
       
       const complete = (skipCleanup = false) => {
         if (isCompleted) {
-          console.log(`[Fade Out Video] ⏭️ complete() called again for ${videoId}, skipping (already completed)`);
           return;
         }
         isCompleted = true;
         
-        console.log(`[Fade Out Video] ✅ COMPLETE for ${videoId}${skipCleanup ? ' [skip cleanup - interrupted]' : ''}`);
-        console.log(`[Fade Out Video] Final state:`, {
-          opacity: window.getComputedStyle(videoElement).opacity,
-          hasActiveClass: videoElement.classList.contains('active'),
-          paused: videoElement.paused,
-          fullCleanup: fullCleanup,
-          skipCleanup
-        });
         
         videoElement.removeEventListener('transitionend', handleTransitionEnd);
         clearTimeout(fallbackTimeout);
         this.videoState.activeFades.delete(videoElement);
-        console.log(`[Fade Out Video] 🗑️ Removed from activeFades Map (size: ${this.videoState.activeFades.size})`);
         
         if (!skipCleanup) {
           if (fullCleanup) {
-            console.log(`[Fade Out Video] 🧹 Performing full cleanup for ${videoId}`);
             this.cleanupVideo(videoElement, videoType);
           } else {
-            console.log(`[Fade Out Video] ⏸️ Pausing video (no cleanup) for ${videoId}`);
             videoElement.pause();
           }
         } else {
-          console.log(`[Fade Out Video] ⏭️ Skipping cleanup - will be handled by interrupting fade`);
         }
         resolve();
       };
       
       const abortFade = () => {
-        console.log(`[Fade Out Video] ❌ ABORT called for ${videoId} (being interrupted by new fade)`);
         isAborted = true;
         // Complete WITHOUT cleanup - let the interrupting fade handle it
         complete(true);
-        console.log(`[Fade Out Video] ✓ Fade aborted, cleanup skipped`);
       };
       
       // Track this fade operation
       this.videoState.activeFades.set(videoElement, { type: 'out', abort: abortFade });
-      console.log(`[Fade Out Video] 📝 Registered in activeFades Map (size: ${this.videoState.activeFades.size})`);
       
       // Listen for transition end to ensure video pauses AFTER opacity reaches 0
       const handleTransitionEnd = (e) => {
         if (e.propertyName === 'opacity') {
-          console.log(`[Fade Out Video] 🎯 transitionend event fired for ${videoId}`);
           complete();
         }
       };
       
       videoElement.addEventListener('transitionend', handleTransitionEnd);
-      console.log(`[Fade Out Video] 👂 Listening for transitionend`);
       
       // Check if we already set inline opacity during interruption handling
       const hasInlineOpacity = videoElement.style.opacity !== '';
       
       if (hasInlineOpacity) {
         // Interruption case: inline styles already set, just wait for transitionend
-        console.log(`[Fade Out Video] ℹ️ Fading via inline style (interruption), waiting for transitionend`);
         fallbackTimeout = setTimeout(() => {
-          console.log(`[Fade Out Video] ⏰ FALLBACK TIMEOUT triggered for ${videoId} (transitionend didn't fire)`);
           complete();
         }, duration + 500);
       } else {
         // Normal case: start fade-out by removing active class
-        console.log(`[Fade Out Video] 📉 Normal fade-out via class removal`);
         videoElement.classList.remove('active');
-        console.log(`[Fade Out Video] ✓ 'active' class removed`);
-        console.log(`[Fade Out Video] classList: ${videoElement.classList.toString()}`);
-        console.log(`[Fade Out Video] Computed opacity: ${window.getComputedStyle(videoElement).opacity}`);
         
         fallbackTimeout = setTimeout(() => {
-          console.log(`[Fade Out Video] ⏰ FALLBACK TIMEOUT triggered for ${videoId} (transitionend didn't fire)`);
           complete();
         }, duration + 500);
       }
@@ -2640,40 +2375,23 @@ export const playerApp = {
     const isLayerB = videoElement.classList.contains(`${type}-video-b`);
     const layerName = isLayerA ? 'a' : (isLayerB ? 'b' : 'unknown');
     
-    console.log(`\n${'🧹'.repeat(30)}`);
-    console.log(`[Cleanup Video] 🧹 START - ${type} video layer ${layerName}`);
-    console.log(`[Cleanup Video] State before cleanup:`, {
-      className: videoElement.className,
-      hasActive: videoElement.classList.contains('active'),
-      opacity: window.getComputedStyle(videoElement).opacity,
-      paused: videoElement.paused,
-      currentTime: videoElement.currentTime.toFixed(2) + 's',
-      src: videoElement.src ? videoElement.src.substring(videoElement.src.lastIndexOf('/') + 1) : 'none',
-      readyState: videoElement.readyState
-    });
     
     // Cancel any in-progress fade operations on this element
     if (this.videoState.activeFades.has(videoElement)) {
       const fade = this.videoState.activeFades.get(videoElement);
-      console.log(`[Cleanup Video] ❌ Aborting in-progress ${fade.type} fade on ${type} layer ${layerName}`);
       fade.abort();
       this.videoState.activeFades.delete(videoElement);
-      console.log(`[Cleanup Video] ✓ Fade aborted and removed from activeFades (size: ${this.videoState.activeFades.size})`);
     } else {
-      console.log(`[Cleanup Video] ℹ️ No active fade to cancel`);
     }
     
     // Pause playback
-    console.log(`[Cleanup Video] ⏸️ Pausing playback`);
     videoElement.pause();
     
     // Remove active class and force-hidden class
     if (videoElement.classList.contains('active')) {
-      console.log(`[Cleanup Video] 🏷️ Removing 'active' class`);
       videoElement.classList.remove('active');
     }
     if (videoElement.classList.contains('force-hidden')) {
-      console.log(`[Cleanup Video] 🏷️ Removing 'force-hidden' class`);
       videoElement.classList.remove('force-hidden');
     }
     
@@ -2682,7 +2400,6 @@ export const playerApp = {
     videoElement.style.transition = '';
     
     // Clear the source and force unload to free memory
-    console.log(`[Cleanup Video] 🗑️ Clearing source and unloading media`);
     videoElement.removeAttribute('src');
     videoElement.load(); // Aborts current loading and clears buffered data
     
@@ -2691,7 +2408,6 @@ export const playerApp = {
     
     // Clear URL tracking for this specific layer
     if (layerName !== 'unknown') {
-      console.log(`[Cleanup Video] 📝 Clearing URL tracking for ${type} layer ${layerName}`);
       this.setLayerUrl(type, layerName, '');
     }
     
@@ -2701,18 +2417,13 @@ export const playerApp = {
     
     if (isCurrentLayer) {
       if (type === 'track') {
-        console.log(`[Cleanup Video] 📝 Setting trackVideoPlaying = false`);
         this.videoState.trackVideoPlaying = false;
       } else if (type === 'main') {
-        console.log(`[Cleanup Video] 📝 Setting mainVideoPlaying = false`);
         this.videoState.mainVideoPlaying = false;
       }
     } else {
-      console.log(`[Cleanup Video] ℹ️ Not the current active layer, playback state unchanged`);
     }
     
-    console.log(`[Cleanup Video] ✅ Complete - ${type} video layer ${layerName} cleaned up`);
-    console.log(`${'✅'.repeat(30)}\n`);
   },
 
   /**
@@ -2789,10 +2500,8 @@ export const playerApp = {
   switchToNextLayer(type) {
     if (type === 'track') {
       this.videoState.currentTrackLayer = this.videoState.currentTrackLayer === 'a' ? 'b' : 'a';
-      console.log(`[Switch Layer] Track video now on layer ${this.videoState.currentTrackLayer}`);
     } else {
       this.videoState.currentMainLayer = this.videoState.currentMainLayer === 'a' ? 'b' : 'a';
-      console.log(`[Switch Layer] Main video now on layer ${this.videoState.currentMainLayer}`);
     }
   },
 
@@ -2923,8 +2632,6 @@ export const playerApp = {
     
     // Debug: Check if background should be visible now
     if (wrapper.classList.contains('player-closed-idle-enabled')) {
-      console.log('[Expand] Player expanded with player-closed-idle enabled - background should be visible');
-      console.log('[Expand] Current wrapper classes:', wrapper.className);
     }
     
     // If we were in collapsed idle with video, transition to playback idle
@@ -2982,8 +2689,6 @@ export const playerApp = {
         
         // Debug: Check if background should be hidden now
         if (wrapper.classList.contains('player-closed-idle-enabled')) {
-          console.log('[Collapse] Player collapsed with player-closed-idle enabled - background should be hidden');
-          console.log('[Collapse] Current wrapper classes:', wrapper.className);
         }
         
         // Clear timeout references
@@ -3062,7 +2767,6 @@ export const playerApp = {
         .getPropertyValue('--audio-fade-in-duration') || '0.4'
     ) * 1000; // Convert to milliseconds
     
-    console.log(`[Audio Fade-In] Starting fade from 0 to ${targetVolume} over ${fadeDuration}ms`);
     
     // Animate volume increase
     const startTime = performance.now();
@@ -3080,7 +2784,6 @@ export const playerApp = {
       if (progress < 1) {
         requestAnimationFrame(fadeStep);
       } else {
-        console.log(`[Audio Fade-In] Complete at volume ${targetVolume}`);
       }
     };
     
@@ -3105,7 +2808,6 @@ export const playerApp = {
     // Store the starting volume
     const startVolume = this.wavesurfer.getVolume();
     
-    console.log(`[Audio Fade-Out] Starting fade from ${startVolume} to 0 over ${fadeDuration}ms (pauseAfter: ${pauseAfterFade})`);
     
     return new Promise((resolve) => {
       // Track this fade-out for potential cancellation
@@ -3117,7 +2819,6 @@ export const playerApp = {
       const fadeStep = () => {
         // Check if fade was cancelled
         if (fadeState.cancel) {
-          console.log('[Audio Fade-Out] Cancelled');
           resolve();
           return;
         }
@@ -3134,11 +2835,9 @@ export const playerApp = {
         if (progress < 1) {
           requestAnimationFrame(fadeStep);
         } else {
-          console.log('[Audio Fade-Out] Complete');
           
           // If pausing after fade (track switch), keep volume at 0 and pause immediately
           if (pauseAfterFade) {
-            console.log('[Audio Fade-Out] Pausing playback to prevent audio pop');
             this.wavesurfer.pause();
             // Restore volume for next track (will start at 0 and fade in)
             this.wavesurfer.setVolume(startVolume);

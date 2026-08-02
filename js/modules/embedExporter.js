@@ -187,7 +187,6 @@ export class EmbedExporter {
     
     // Store the reel data in localStorage (in production, this would be a server endpoint)
     localStorage.setItem(`reel_${reelId}`, JSON.stringify(reelData));
-    console.log(`🎵 Reel stored with ID: ${reelId}`);
     
     return reelData;
   }
