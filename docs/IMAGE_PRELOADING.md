@@ -241,6 +241,5 @@ imagePreloadSettings: {
 
 ## See Also
 
-- [ASSET_MANAGEMENT.md](./ASSET_MANAGEMENT.md) - Asset organization and manifest system
 - [PLAYER_DESIGN_SPEC.md](./PLAYER_DESIGN_SPEC.md) - Overall player architecture
 - [TESTING_GUIDE.md](./TESTING_GUIDE.md) - Testing procedures

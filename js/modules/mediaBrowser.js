@@ -203,15 +203,13 @@ function promptForText(message, defaultValue = "") {
  * @param {string[]|null} options.extensions - filter, e.g. ['.mp3', '.wav'] (matched case-insensitively against the filename)
  * @param {string} options.startFolder - initial folder to open, e.g. 'audio/'
  * @param {Function} options.onSelect - (url) => void, called in 'select' mode when a row is clicked
- * @param {Array} options.extraFiles - additional read-only files to merge in (e.g. git-committed test assets), shaped like the internal file record: {key, name, size, uploaded, readOnly: true, url}
  */
 export async function renderMediaBrowser(container, options = {}) {
   const {
     mode = 'manage',
     extensions = null,
     startFolder = '',
-    onSelect = null,
-    extraFiles = []
+    onSelect = null
   } = options;
 
   const state = {
@@ -246,7 +244,7 @@ export async function renderMediaBrowser(container, options = {}) {
     ? files.filter(f => extensions.some(ext => f.name.toLowerCase().endsWith(ext)))
     : files;
 
-  state.files = [...applyExtFilter(r2Files), ...extraFiles];
+  state.files = applyExtFilter(r2Files);
 
   render();
 
@@ -284,7 +282,7 @@ export async function renderMediaBrowser(container, options = {}) {
       dialog.alert(error.message);
       return;
     }
-    state.files = [...applyExtFilter(r2Files), ...extraFiles];
+    state.files = applyExtFilter(r2Files);
     state.selected.clear();
     render();
   }
