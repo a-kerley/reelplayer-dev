@@ -1,4 +1,6 @@
 // embedExporter.js - Handles exporting embed code for Squarespace and other platforms
+import { WORKER_BASE_URL } from "../config.js";
+import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 
 export class EmbedExporter {
   constructor() {
@@ -6,7 +8,7 @@ export class EmbedExporter {
   }
 
   // Generate iframe embed code
-  generateEmbedOptions(reel) {
+  async generateEmbedOptions(reel) {
     // Filter valid tracks
     const playlist = (reel.playlist || []).filter(
       track => track.url && track.url.trim() !== ""
@@ -17,20 +19,20 @@ export class EmbedExporter {
     }
 
     return {
-      iframe: this.generateIframeEmbed(reel)
+      iframe: await this.generateIframeEmbed(reel)
     };
   }
 
   // Generate embed code (for backward compatibility)
-  generateEmbedCode(reel) {
-    const options = this.generateEmbedOptions(reel);
+  async generateEmbedCode(reel) {
+    const options = await this.generateEmbedOptions(reel);
     return options.iframe;
   }
 
-  generateIframeEmbed(reel) {
+  async generateIframeEmbed(reel) {
     const reelId = this.generateReelId(reel);
-    this.storeReelData(reelId, reel);
-    
+    await this.storeReelData(reelId, reel);
+
     // Determine height based on mode
     let height;
     const isExpandable = reel.mode === 'expandable';
@@ -120,7 +122,7 @@ export class EmbedExporter {
     return Math.abs(hash).toString(36).substring(0, 8);
   }
 
-  storeReelData(reelId, reel) {
+  async storeReelData(reelId, reel) {
     // Store complete reel configuration for iframe player
     // Ensure playlist tracks include all properties (background images, videos, zoom, etc.)
     const playlist = (reel.playlist || [])
@@ -172,10 +174,30 @@ export class EmbedExporter {
       },
       created: new Date().toISOString()
     };
-    
-    // Store the reel data in localStorage (in production, this would be a server endpoint)
-    localStorage.setItem(`reel_${reelId}`, JSON.stringify(reelData));
-    
+
+    const password = await getBuilderPassword();
+    if (!password) {
+      throw new Error("A password is required to publish this reel.");
+    }
+
+    const response = await fetch(`${WORKER_BASE_URL}/reels/${reelId}`, {
+      method: "POST",
+      headers: {
+        "Content-Type": "application/json",
+        "Authorization": `Bearer ${password}`
+      },
+      body: JSON.stringify(reelData)
+    });
+
+    if (response.status === 401) {
+      clearBuilderPassword();
+      throw new Error("Incorrect password. Please try exporting again.");
+    }
+
+    if (!response.ok) {
+      throw new Error(`Failed to publish reel (server responded with status ${response.status}).`);
+    }
+
     return reelData;
   }
 

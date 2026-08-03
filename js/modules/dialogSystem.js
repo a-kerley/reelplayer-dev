@@ -337,19 +337,26 @@ export class DialogSystem {
   closeDialog() {
     if (!this.activeDialog) return;
 
+    // Capture the specific overlay being closed, rather than relying on
+    // this.activeDialog inside the timeout below - if a new dialog is opened
+    // before this timeout fires (e.g. one dialog's button handler
+    // immediately triggers another), this.activeDialog will have moved on to
+    // point at that new overlay, and using it here would remove the wrong one.
+    const overlayToClose = this.activeDialog;
+    this.activeDialog = null;
+
     // Add exit animation
-    this.activeDialog.style.animation = 'fadeOut 0.15s ease-out';
-    const dialogBox = this.activeDialog.querySelector('.dialog-box');
+    overlayToClose.style.animation = 'fadeOut 0.15s ease-out';
+    const dialogBox = overlayToClose.querySelector('.dialog-box');
     if (dialogBox) {
       dialogBox.style.animation = 'slideOut 0.15s ease-out';
     }
 
     // Remove after animation
     setTimeout(() => {
-      if (this.activeDialog && this.activeDialog.parentNode) {
-        this.activeDialog.parentNode.removeChild(this.activeDialog);
+      if (overlayToClose.parentNode) {
+        overlayToClose.parentNode.removeChild(overlayToClose);
       }
-      this.activeDialog = null;
     }, 150);
   }
 }

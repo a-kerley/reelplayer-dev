@@ -75,6 +75,7 @@
     // Import actual player module and utilities
     import { playerApp } from './js/player.js';
     import { getColorFilters } from './js/modules/colorUtils.js';
+    import { WORKER_BASE_URL } from './js/config.js';
     
     // ============================================
     // INITIALIZATION
@@ -126,30 +127,18 @@
     
     /* ============================================
        REEL DATA LOADING
-       Loads from localStorage with parent fallback
+       Fetches from the Cloudflare Worker so any visitor's browser can
+       resolve the reel, regardless of where it was originally published from.
        ============================================ */
     async function loadReelData(reelId) {
-      // Try local storage first
-      const storedData = localStorage.getItem(`reel_${reelId}`);
-      if (storedData) {
-        console.log('✓ Loaded reel from local storage');
-        return JSON.parse(storedData);
-      }
-      
-      // Try parent window if in iframe (cross-origin safe)
       try {
-        if (window.parent && window.parent !== window) {
-          const parentData = window.parent.localStorage.getItem(`reel_${reelId}`);
-          if (parentData) {
-            console.log('✓ Loaded reel from parent window storage');
-            return JSON.parse(parentData);
-          }
-        }
+        const response = await fetch(`${WORKER_BASE_URL}/reels/${reelId}`);
+        if (!response.ok) return null;
+        return await response.json();
       } catch (e) {
-        console.log('Cannot access parent localStorage (cross-origin)');
+        console.error('Failed to fetch reel from Worker:', e);
+        return null;
       }
-      
-      return null;
     }
     
     /* ============================================

@@ -9,6 +9,7 @@ import { renderBuilder, createEmptyReel } from "./builder.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
 import { embedExporter } from "./modules/embedExporter.js";
+import { setupEmbedManagerButton } from "./modules/embedManager.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -97,6 +98,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderBuilder(current, updateCurrentReel);
       setupRefreshPreviewButton();
       setupExportEmbedButton();
+      setupEmbedManagerButton();
       // showPreview(); // preview is only refreshed via button now
       showPreview();
     }
@@ -115,7 +117,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
-    function exportEmbedCode() {
+    async function exportEmbedCode() {
       const current = reels.find((r) => r.id === currentId);
       if (!current) {
         dialog.alert("No reel selected for export.");
@@ -123,8 +125,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       try {
-        const embedOptions = embedExporter.generateEmbedOptions(current);
-        
+        const embedOptions = await embedExporter.generateEmbedOptions(current);
+
         dialog.createDialog({
           type: 'custom',
           message: "Your embed code is ready!",
