@@ -79,19 +79,30 @@ export function renderBuilder(reel, onChange) {
   destroyPickrInstances();
   removeOldSections();
 
-  // Create and insert all sections in order
-  const playerModeSection = createPlayerModeSection(reel, onChange);
-  insertPlayerModeSection(playerModeSection, titleInput, reelForm);
+  // Sections that share a uniform create(reel, onChange) -> element,
+  // setup(element, reel, onChange) shape. Each is inserted immediately after
+  // the previous one; to add a new section here, add one entry to this list.
+  const sectionDefs = [
+    { create: createPlayerModeSection, setup: setupPlayerModeControls },
+    { create: createStaticModeSettings, setup: setupStaticModeSettings },
+    { create: createExpandableModeSettings, setup: setupExpandableModeSettings },
+    { create: createTitleAppearanceSection, setup: setupTitleAppearanceControls },
+  ];
 
-  const staticModeSettings = createStaticModeSettings(reel, onChange);
-  insertElement(staticModeSettings, playerModeSection, reelForm, "after");
+  const sectionElements = [];
+  sectionDefs.forEach(({ create }, i) => {
+    const element = create(reel, onChange);
+    if (i === 0) {
+      insertPlayerModeSection(element, titleInput, reelForm);
+    } else {
+      insertElement(element, sectionElements[i - 1], reelForm, "after");
+    }
+    sectionElements.push(element);
+  });
 
-  const expandableModeSettings = createExpandableModeSettings(reel, onChange);
-  insertElement(expandableModeSettings, staticModeSettings, reelForm, "after");
-
-  const titleAppearanceSection = createTitleAppearanceSection(reel, onChange);
-  insertElement(titleAppearanceSection, expandableModeSettings, reelForm, "after");
-
+  // Tracks and color pickers don't fit the uniform shape above (they look up
+  // their own DOM internally rather than operating on a passed element), so
+  // they're created and inserted explicitly.
   const exportBtn = document.getElementById("exportEmbedBtn");
 
   const tracksSection = createTracksSection();
@@ -107,17 +118,8 @@ export function renderBuilder(reel, onChange) {
   // Set up title input
   setupTitleInput(titleInput, reel, onChange);
 
-  // Set up player mode controls
-  setupPlayerModeControls(playerModeSection, reel, onChange);
-
-  // Set up static mode settings
-  setupStaticModeSettings(staticModeSettings, reel, onChange);
-
-  // Set up expandable mode settings
-  setupExpandableModeSettings(expandableModeSettings, reel, onChange);
-
-  // Set up title appearance controls
-  setupTitleAppearanceControls(titleAppearanceSection, reel, onChange);
+  // Set up the uniform-shaped sections in the same order they were created
+  sectionDefs.forEach(({ setup }, i) => setup(sectionElements[i], reel, onChange));
 
   // Set up tracks editor with callback to update per-track backgrounds
   const onChangeWithBackgrounds = () => {
