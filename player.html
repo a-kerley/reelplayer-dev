@@ -208,8 +208,7 @@
       root.style.setProperty('--ui-accent', uiAccentColor);
       root.style.setProperty('--waveform-unplayed', settings.varWaveformUnplayed || '#929292');
       root.style.setProperty('--waveform-hover', settings.varWaveformHover || 'rgba(0, 31, 103, 0.13)');
-      root.style.setProperty('--player-border-color', settings.varPlayerBorder || '#ffffff');
-      
+
       // Title appearance variables
       root.style.setProperty('--reel-title-size', ta.fontSize || '1.3rem');
       root.style.setProperty('--reel-title-weight', ta.fontWeight || '700');
@@ -223,12 +222,7 @@
       root.style.setProperty('--background-blur', (settings.backgroundBlur || '2') + 'px');
       root.style.setProperty('--background-zoom', settings.backgroundZoom || '1');
       root.style.setProperty('--overlay-color', overlayColor);
-      
-      // Blend mode variables
-      if (settings.backgroundBlendMode) {
-        root.style.setProperty('--background-blend-mode', settings.backgroundBlendMode);
-      }
-      
+
       // Lottie animation color variables
       root.style.setProperty('--lottie-brightness', colorFilters.brightness);
       root.style.setProperty('--lottie-saturation', colorFilters.saturation);
@@ -267,12 +261,7 @@
         // Clear any previously set background image
         container.style.backgroundImage = 'none';
       }
-      
-      // Apply blend mode if specified
-      if (settings.backgroundBlendMode) {
-        container.style.mixBlendMode = settings.backgroundBlendMode;
-      }
-      
+
       // NOTE: Overlay color and blur are now handled by CSS variables
       // applied to .player-wrapper::before pseudo-element
       // This ensures consistent behavior with the preview
@@ -289,12 +278,7 @@
       const shouldHideTitle = !(reelData.showTitle && reelData.title && reelData.title.trim());
       const settings = reelData.settings || {};
       const mode = reelData.mode || 'static';
-      
-      // Apply element blend mode to wrapper if specified
-      const elementBlendStyle = settings.elementBlendMode 
-        ? `mix-blend-mode: ${settings.elementBlendMode};` 
-        : '';
-      
+
       // Determine player wrapper classes
       let wrapperClasses = 'player-wrapper';
       if (shouldHideTitle) wrapperClasses += ' no-title';
@@ -311,7 +295,7 @@
       // Build complete player HTML structure
       // IMPORTANT: Must match playerApp.renderPlayer() structure exactly
       const playerHTML = `
-        <div class="${wrapperClasses}" style="position: relative; z-index: 2; ${elementBlendStyle}">
+        <div class="${wrapperClasses}" style="position: relative; z-index: 2;">
           <!-- Background layers for track-specific images -->
           <div class="track-background-layer track-bg-layer-a"></div>
           <div class="track-background-layer track-bg-layer-b"></div>
@@ -400,20 +384,7 @@
         playerApp.validateProjectTitleImage();
         console.log('✓ Expandable mode interactions enabled');
       }
-      
-      // ============================================
-      // Apply waveform customization settings
-      // ============================================
-      const waveformSettings = reelData.settings?.waveform || {};
-      if (waveformSettings.barsEnabled) {
-        const root = document.documentElement;
-        root.style.setProperty('--waveform-bar-width', `${waveformSettings.barWidth || 2}px`);
-        root.style.setProperty('--waveform-bar-gap', `${waveformSettings.barGap || 1}px`);
-        root.style.setProperty('--waveform-bar-radius', `${waveformSettings.barRadius || 2}px`);
-        root.style.setProperty('--waveform-bar-height', waveformSettings.barHeight || 1);
-        console.log('✓ Custom waveform bars enabled');
-      }
-      
+
       // ============================================
       // Setup player components
       // All functionality imported from player.js module

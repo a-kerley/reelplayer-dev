@@ -147,8 +147,7 @@ export class EmbedExporter {
         varUiAccent: reel.varUiAccent || "#2a0026",
         varWaveformUnplayed: reel.varWaveformUnplayed || "#929292",
         varWaveformHover: reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
-        varPlayerBorder: reel.varPlayerBorder || "#ffffff",
-        
+
         // Background settings
         backgroundColor: reel.backgroundColor || "rgba(255, 255, 255, 1)", // Also in settings for backwards compatibility
         backgroundImage: reel.backgroundImage,
@@ -159,28 +158,17 @@ export class EmbedExporter {
         overlayColorEnabled: reel.overlayColorEnabled,
         backgroundOpacity: reel.backgroundOpacity,
         backgroundBlur: reel.backgroundBlur,
-        
+
         // Title appearance
         titleAppearance: reel.titleAppearance || {},
-        
-        // Blend modes and effects
-        backgroundBlendMode: reel.backgroundBlendMode,
-        elementBlendMode: reel.elementBlendMode,
-        
+
         // Expandable mode settings
         expandableCollapsedHeight: reel.expandableCollapsedHeight || 120,
         expandableExpandedHeight: reel.expandableExpandedHeight || 500,
         projectTitleImage: reel.projectTitleImage || "",
         showWaveformOnCollapse: reel.showWaveformOnCollapse !== false, // Default to true
-        
-        // Waveform settings
-        waveform: reel.settings?.waveform || {
-          barsEnabled: true,
-          barWidth: 2,
-          barGap: 1,
-          barRadius: 2,
-          barHeight: 1
-        }
+        enablePlayerClosedIdle: reel.enablePlayerClosedIdle === true,
+        playerClosedIdleVideo: reel.playerClosedIdleVideo || ""
       },
       created: new Date().toISOString()
     };

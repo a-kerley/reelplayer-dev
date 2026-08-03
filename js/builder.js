@@ -29,7 +29,6 @@ export function createEmptyReel() {
   const reel = {
     id: "reel-" + Date.now(),
     title: "",
-    accent: "#2a0026",
     showTitle: true,
     playlist: [{ title: "", url: "" }],
     createdAt: Date.now(),

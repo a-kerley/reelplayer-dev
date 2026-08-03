@@ -120,8 +120,7 @@ export class PreviewManager {
       "--ui-accent": uiAccentColor,
       "--waveform-unplayed": reel.varWaveformUnplayed || "#929292",
       "--waveform-hover": reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
-      "--player-border-color": reel.varPlayerBorder || "#ffffff",
-      
+
       // Title appearance variables
       "--reel-title-size": ta.fontSize || "1.3rem",
       "--reel-title-weight": ta.fontWeight || "700",
