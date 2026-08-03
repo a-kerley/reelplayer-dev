@@ -20,6 +20,17 @@ body {
   height: 100vh;
   gap: 2.5rem;
   align-items: stretch;
+  background: #1e1e1e;
+  /* Scoped here rather than on `body` (shared with player.html, which must
+     keep its own per-reel appearance) - lets native form controls (selects,
+     checkboxes, number spinners) render with dark-mode defaults. */
+  color-scheme: dark;
+  /* Default text color for the whole builder chrome - without this, any
+     label/span that never had an explicit color (most of them - they simply
+     relied on the browser's default black) stays black-on-dark and
+     unreadable. Specific elements still override this where needed
+     (accent-colored legends, muted #888/#999 labels, etc). */
+  color: #ccc;
 }
 
 /* ==============================================
@@ -41,7 +52,7 @@ body {
   box-sizing: border-box;
 }
 
-.builder-sidebar > #newReelBtn {
+#reelsPanel > #newReelBtn {
   width: 100%;
   margin-bottom: 1.2rem;
   background: var(--builder-accent);
@@ -53,6 +64,33 @@ body {
   cursor: pointer;
   font-weight: 700;
   letter-spacing: 0.01em;
+}
+
+/* ==============================================
+   SIDEBAR TABS (Reels / Media Library)
+   ============================================== */
+.sidebar-tabs {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 1rem;
+}
+
+.sidebar-tab {
+  flex: 1;
+  background: none;
+  border: 1px solid var(--builder-border);
+  border-radius: 5px;
+  padding: 0.4rem 0.3rem;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  color: var(--builder-accent);
+}
+
+.sidebar-tab.active {
+  background: var(--builder-accent);
+  color: white;
+  border-color: var(--builder-accent);
 }
 
 /* ==============================================
@@ -87,7 +125,7 @@ body {
   cursor: pointer;
   font-size: 1.05rem;
   font-weight: 500;
-  color: #222;
+  color: #ccc;
   background: none;
   transition: background 0.18s, color 0.18s;
   position: relative;
@@ -144,6 +182,20 @@ body {
   padding-bottom: 500px;
 }
 
+/* The 500px bottom padding above exists only for the reel form's scroll
+   comfort - it's irrelevant (and would starve #mediaLibraryView's flex-grow
+   down to a sliver) while the Media Library tab is showing, so drop it then. */
+.builder-main.media-library-active {
+  padding-bottom: 2rem;
+}
+
+#mediaLibraryView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
 #reelTitle {
   margin-bottom: 1rem;
 }
@@ -191,7 +243,7 @@ body {
 
 .drag-over {
   outline: 2px dashed #999;
-  background: #f3f3f3;
+  background: #3a3a3a;
 }
 
 .phantom-track-row {
@@ -266,6 +318,7 @@ body {
 
 #addTrackBtn,
 #exportEmbedBtn,
+#manageEmbedsBtn,
 #refreshPreviewBtn {
   background: var(--builder-accent);
   color: white;
@@ -279,7 +332,8 @@ body {
 }
 
 #addTrackBtn,
-#exportEmbedBtn {
+#exportEmbedBtn,
+#manageEmbedsBtn {
   font-size: 1rem;
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
@@ -287,6 +341,7 @@ body {
 
 #addTrackBtn:hover,
 #exportEmbedBtn:hover,
+#manageEmbedsBtn:hover,
 #refreshPreviewBtn:hover {
   background: var(--builder-hover);
 }
@@ -349,7 +404,7 @@ body {
   left: 0;
   right: 0;
   bottom: 0;
-  background-color: #ccc;
+  background-color: #555;
   transition: 0.3s ease;
   border-radius: 20px;
   user-select: none;
@@ -379,7 +434,7 @@ body {
 }
 
 .toggle-switch:hover .toggle-slider {
-  box-shadow: 0 0 0 2px rgba(42, 0, 38, 0.1);
+  box-shadow: 0 0 0 2px rgba(74, 144, 226, 0.2);
 }
 
 .toggle-switch input:disabled + .toggle-slider {
@@ -430,10 +485,10 @@ button:disabled {
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 400;
-  color: #222;
+  color: #fff;
   padding: 0.35em 0.7em;
-  background: #fff;
-  border: 1px solid #ccc;
+  background: #1e1e1e;
+  border: 1px solid #444;
   border-radius: 3px;
   line-height: 1.5;
   cursor: text;
@@ -456,10 +511,10 @@ input.filename-display {
   font-family: inherit;
   font-size: 0.8rem;
   font-weight: 400;
-  color: #222;
+  color: #fff;
   padding: 0.35em 0.7em;
-  background: #fff;
-  border: 1px solid #ccc;
+  background: #1e1e1e;
+  border: 1px solid #444;
   border-radius: 3px;
   line-height: 1.5;
   cursor: text;
@@ -482,6 +537,7 @@ input.filename-display:focus {
   position: fixed;
   top: 0; left: 0; width: 100vw; height: 100vh;
   z-index: 1000;
+  color-scheme: dark;
 }
 #colourPresetModal[style*="display: block"] {
   display: block;
@@ -497,7 +553,7 @@ input.filename-display:focus {
   margin-bottom: 0.65em;
 }
 .preset-row:hover {
-  background: #f7f7fa;
+  background: #3a3a3a;
 }
 .preset-swatch {
   border: 1.5px solid #bbb !important;
@@ -522,10 +578,10 @@ input.filename-display:focus {
   vertical-align: middle;
 }
 .preset-edit:hover svg {
-  stroke: #001f67;
+  stroke: #4a90e2;
 }
 .preset-delete:hover svg {
-  stroke: #b00000;
+  stroke: #dc3545;
 }
 .preset-load-btn {
   transition: background 0.13s, color 0.13s;
@@ -535,7 +591,7 @@ input.filename-display:focus {
   color: #fff;
 }
 .preset-modal-header {
-  border-bottom: 1px solid #eee;
+  border-bottom: 1px solid #444;
   margin-bottom: 1em;
   padding-bottom: 0.2em;
 }
@@ -548,7 +604,7 @@ input.filename-display:focus {
   transition: color 0.16s;
 }
 .close-preset-modal:hover {
-  color: #b00000;
+  color: #dc3545;
 }
 
 .preset-name-col {
@@ -570,11 +626,12 @@ input.filename-display:focus {
   padding: 0.2em 0.4em;
   font-size: 1em;
   font-family: inherit;
+  color: #fff;
 }
 .preset-name-col input {
-  border: 1px solid #bbb;
+  border: 1px solid #444;
   border-radius: 3px;
-  background: #f9f9f9;
+  background: #1e1e1e;
 }
 .preset-actions {
   display: flex;
@@ -597,7 +654,7 @@ input.filename-display:focus {
 
 .material-symbols-outlined {
   font-size: 1.7em;
-  color: #444;
+  color: #ccc;
   user-select: none;
   vertical-align: middle;
   transition: color 0.18s, opacity 0.18s;
@@ -651,7 +708,7 @@ input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 6px;
-  background: #e0e0e0;
+  background: #555;
   border-radius: 6px;
   outline: none;
   cursor: pointer;
@@ -659,7 +716,7 @@ input[type="range"] {
 }
 
 input[type="range"]:hover {
-  background: #d0d0d0;
+  background: #666;
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -709,7 +766,7 @@ input[type="range"]::-moz-range-thumb:active {
 
 input[type="range"]::-moz-range-track {
   height: 6px;
-  background: #e0e0e0;
+  background: #555;
   border-radius: 6px;
   border: none;
 }

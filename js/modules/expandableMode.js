@@ -71,7 +71,7 @@ export function createPlayerModeSection(reel, onChange) {
   const description = document.createElement('p');
   description.id = 'modeDescription';
   description.style.fontSize = '0.85rem';
-  description.style.color = '#666';
+  description.style.color = '#ccc';
   description.style.marginTop = '0.75rem';
   description.style.marginBottom = '0';
   description.textContent = reel.mode === 'expandable' 
@@ -387,10 +387,10 @@ function validateHeightSettings(reel, changedInput, section) {
     warning.className = 'height-validation-warning';
     warning.style.padding = '0.5rem';
     warning.style.marginTop = '0.5rem';
-    warning.style.backgroundColor = '#fff3cd';
+    warning.style.backgroundColor = 'rgba(255, 193, 7, 0.15)';
     warning.style.border = '1px solid #ffc107';
     warning.style.borderRadius = '4px';
-    warning.style.color = '#856404';
+    warning.style.color = '#ffda6a';
     warning.style.fontSize = '0.85rem';
     warning.innerHTML = '⚠️ Collapsed height should be smaller than expanded height for proper functionality.';
     
@@ -443,6 +443,8 @@ function createNumberInput(label, id, value, min, max, tooltip) {
   input.style.padding = '0.4rem';
   input.style.borderRadius = '4px';
   input.style.border = '1px solid var(--builder-border)';
+  input.style.background = '#1e1e1e';
+  input.style.color = '#fff';
 
   row.appendChild(labelEl);
   row.appendChild(input);
@@ -481,6 +483,8 @@ function createTextInput(label, id, value, tooltip, withFilePicker = false, pick
   input.style.padding = '0.4rem';
   input.style.borderRadius = '4px';
   input.style.border = '1px solid var(--builder-border)';
+  input.style.background = '#1e1e1e';
+  input.style.color = '#fff';
   input.style.flex = '1';
   input.placeholder = 'https://example.com/title-image.jpg';
 

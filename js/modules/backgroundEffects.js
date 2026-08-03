@@ -32,24 +32,24 @@ export function createExpandablePreview(imageUrl, reel, zoom = 1) {
   
   return `
     <div style="display:flex;flex-direction:column;gap:1rem;">
-      <div style="text-align:center;font-size:0.85rem;color:#666;font-weight:500;">Expandable Mode Preview</div>
+      <div style="text-align:center;font-size:0.85rem;color:#ccc;font-weight:500;">Expandable Mode Preview</div>
       
       <div style="display:flex;align-items:center;gap:0.75rem;padding:0 1rem;">
-        <label style="font-size:0.75rem;color:#666;white-space:nowrap;">Zoom:</label>
+        <label style="font-size:0.75rem;color:#ccc;white-space:nowrap;">Zoom:</label>
         <input type="range" class="zoom-slider" min="1" max="3" step="0.1" value="${zoom}" style="flex:1;" />
-        <span class="zoom-value" style="font-size:0.75rem;color:#666;min-width:3rem;text-align:right;">${(zoom * 100).toFixed(0)}%</span>
+        <span class="zoom-value" style="font-size:0.75rem;color:#ccc;min-width:3rem;text-align:right;">${(zoom * 100).toFixed(0)}%</span>
       </div>
       
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
         <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:0.75rem;color:#666;text-align:center;">Collapsed (${collapsedHeight}px)</div>
-          <div style="width:${previewWidth}px;height:${collapsedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+          <div style="font-size:0.75rem;color:#ccc;text-align:center;">Collapsed (${collapsedHeight}px)</div>
+          <div style="width:${previewWidth}px;height:${collapsedPreviewHeight}px;border:1px solid #444;border-radius:4px;overflow:hidden;position:relative;">
             <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
           </div>
         </div>
         <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:0.75rem;color:#666;text-align:center;">Expanded (${expandedHeight}px)</div>
-          <div style="width:${previewWidth}px;height:${expandedPreviewHeight}px;border:1px solid #ddd;border-radius:4px;overflow:hidden;position:relative;">
+          <div style="font-size:0.75rem;color:#ccc;text-align:center;">Expanded (${expandedHeight}px)</div>
+          <div style="width:${previewWidth}px;height:${expandedPreviewHeight}px;border:1px solid #444;border-radius:4px;overflow:hidden;position:relative;">
             <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
           </div>
         </div>
@@ -109,7 +109,7 @@ export function setupCropPreviewToggle(cropBtn, previewPane, updatePreview) {
       updatePreview();
     } else {
       previewPane.style.display = "none";
-      if (svg) svg.style.color = "#000";
+      if (svg) svg.style.color = "#ccc";
     }
   };
   
@@ -126,7 +126,7 @@ export function setupCropPreviewToggle(cropBtn, previewPane, updatePreview) {
   cropBtn.addEventListener("mouseleave", () => {
     if (!previewOpen) {
       const svg = cropBtn.querySelector("svg");
-      if (svg) svg.style.color = "#000";
+      if (svg) svg.style.color = "#ccc";
     }
   });
   
@@ -146,7 +146,7 @@ export function createFilenameDisplay({ filename, placeholder, urlInput }) {
   display.classList.add("filename-display");
   display.textContent = filename || placeholder;
   display.tabIndex = 0;
-  display.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;background:#fff;cursor:text;";
+  display.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #444;border-radius:3px;font-size:0.75rem;background:#1e1e1e;color:#fff;cursor:text;";
   
   if (filename === placeholder || !filename) {
     display.classList.add("placeholder");
@@ -177,7 +177,7 @@ export function createUrlInput({ value, placeholder, filenameDisplay, onUpdate, 
   input.type = "url";
   input.placeholder = placeholder;
   input.value = value || "";
-  input.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #ddd;border-radius:3px;font-size:0.75rem;color:#333;display:none;";
+  input.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #444;border-radius:3px;font-size:0.75rem;background:#1e1e1e;color:#fff;display:none;";
   
   // Update on blur
   input.onblur = () => {
@@ -231,11 +231,11 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     
     const trackRow = document.createElement("div");
     trackRow.className = "per-track-bg-row";
-    trackRow.style.cssText = "display:flex;gap:0.4rem;align-items:center;margin-bottom:0.4rem;padding:0.35rem 0.5rem;background:#fafafa;border-radius:3px;border:1px solid #eee;";
+    trackRow.style.cssText = "display:flex;gap:0.4rem;align-items:center;margin-bottom:0.4rem;padding:0.35rem 0.5rem;background:#262626;border-radius:3px;border:1px solid #444;";
     
     // Track label
     const trackLabel = document.createElement("span");
-    trackLabel.style.cssText = "width:180px;font-size:0.75rem;font-weight:500;color:#333;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;";
+    trackLabel.style.cssText = "width:180px;font-size:0.75rem;font-weight:500;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;";
     const trackTitle = track.title || `Track ${index + 1}`;
     trackLabel.textContent = trackTitle;
     trackLabel.title = trackTitle;
@@ -291,7 +291,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     const cropBtn = createCropPreviewButton({ id: `track-${index}-crop` });
     const previewPane = document.createElement("div");
     previewPane.className = "bg-preview-pane";
-    previewPane.style.cssText = "display:none;margin-top:0.5rem;padding:0.75rem;background:#fff;border:1px solid #ddd;border-radius:4px;";
+    previewPane.style.cssText = "display:none;margin-top:0.5rem;padding:0.75rem;background:#1e1e1e;border:1px solid #444;border-radius:4px;";
     
     const updatePreview = () => {
       if (track.backgroundImage) {
@@ -326,7 +326,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     
     // Separator
     const separator = document.createElement("div");
-    separator.style.cssText = "width:1px;height:20px;background:#ddd;margin:0 0.3rem;flex-shrink:0;";
+    separator.style.cssText = "width:1px;height:20px;background:#444;margin:0 0.3rem;flex-shrink:0;";
     
     // Video controls
     const videoFilenameDisplay = createFilenameDisplay({

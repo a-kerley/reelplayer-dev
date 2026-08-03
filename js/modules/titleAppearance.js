@@ -18,7 +18,7 @@ export function createTitleAppearanceSection(reel, onChange) {
   const titleAppearanceSection = document.createElement("fieldset");
   titleAppearanceSection.id = "reelTitleAppearanceSection";
   titleAppearanceSection.style.marginTop = "1.2rem";
-  titleAppearanceSection.style.border = "1px solid #eee";
+  titleAppearanceSection.style.border = "1px solid #444";
   titleAppearanceSection.style.borderRadius = "8px";
   titleAppearanceSection.style.padding = "1rem";
   

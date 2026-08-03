@@ -125,9 +125,9 @@ function createUrlField(track, onChange) {
     fontFamily: "inherit",
     fontSize: "0.8rem",
     fontWeight: "400",
-    border: "1px solid #ccc",
+    border: "1px solid #444",
     borderRadius: "4px",
-    backgroundColor: "#fff"
+    backgroundColor: "#1e1e1e"
   });
   fileNameSpan.tabIndex = 0;
 
@@ -146,7 +146,11 @@ function createUrlField(track, onChange) {
     fontFamily: "inherit",
     fontSize: "0.8rem",
     fontWeight: "400",
-    display: "none"
+    display: "none",
+    background: "#1e1e1e",
+    color: "#fff",
+    border: "1px solid #444",
+    borderRadius: "4px"
   });
 
   // Click filename to edit URL
@@ -316,15 +320,15 @@ function createFilePickerButton(track, onChange) {
   
   // Folder icon SVG
   btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
     </svg>
   `;
-  
+
   // Styling
   Object.assign(btn.style, {
     background: "transparent",
-    color: "#000",
+    color: "#ccc",
     border: "none",
     borderRadius: "4px",
     padding: "0.35em 0.5em",
@@ -334,16 +338,16 @@ function createFilePickerButton(track, onChange) {
     justifyContent: "center",
     transition: "all 0.2s ease"
   });
-  
+
   // Hover effect - changes icon color to blue
   btn.addEventListener("mouseenter", () => {
     const svg = btn.querySelector('svg');
     if (svg) svg.style.color = "#4a90e2";
   });
-  
+
   btn.addEventListener("mouseleave", () => {
     const svg = btn.querySelector('svg');
-    if (svg) svg.style.color = "#000";
+    if (svg) svg.style.color = "#ccc";
   });
   
   // Click handler - uses the file picker module

@@ -36,13 +36,13 @@ async function deleteReel(id, password) {
 
 function renderListHTML(entries) {
   if (!entries.length) {
-    return '<p style="color:#666;font-style:italic;">No published reels yet.</p>';
+    return '<p style="color:#ccc;font-style:italic;">No published reels yet.</p>';
   }
 
   return `
     <div style="max-height:300px;overflow-y:auto;">
       ${entries.map(entry => `
-        <div class="embed-manager-row" data-id="${entry.id}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #eee;">
+        <div class="embed-manager-row" data-id="${entry.id}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;">
           <div>
             <div style="font-weight:600;">${entry.title || "(untitled)"}</div>
             <div style="font-size:0.8rem;color:#888;">${entry.id}${entry.created ? " &middot; " + new Date(entry.created).toLocaleString() : ""}</div>

@@ -43,13 +43,13 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
   }
   
   function loadBtn() {
-    return `<button type="button" class="preset-load-btn" data-tooltip="Load preset" style="margin-left:0.6em;padding:0.13em 0.55em;border-radius:3px;border:1px solid #bbb;background:#f7f7f7;color:#222;font-size:0.76em;cursor:pointer;">Load</button>`;
+    return `<button type="button" class="preset-load-btn" data-tooltip="Load preset" style="margin-left:0.6em;padding:0.13em 0.55em;border-radius:3px;border:1px solid #444;background:#3a3a3a;color:#fff;font-size:0.76em;cursor:pointer;">Load</button>`;
   }
 
   let html = `
     <div class="preset-modal-content">
       <div class="preset-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1em;">
-        <span style="font-size:1.15rem;font-weight:700;">Colour Presets</span>
+        <span style="font-size:1.15rem;font-weight:700;color:#fff;">Colour Presets</span>
         <button type="button" class="close-preset-modal" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#888;padding:0 0.5em;">&times;</button>
       </div>
       <div class="preset-list" style="max-height:260px;overflow-y:auto;">
@@ -122,9 +122,10 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
       top: "50%",
       left: "50%",
       transform: "translate(-50%,-50%)",
-      background: "#fff",
+      background: "#2f2f2f",
+      color: "#ccc",
       borderRadius: "10px",
-      boxShadow: "0 6px 32px rgba(60,0,60,0.12)",
+      boxShadow: "0 6px 32px rgba(0,0,0,0.4)",
       padding: "2.1em 2.2em 1.4em 2.2em",
       minWidth: "420px",
       width: "420px",
@@ -219,6 +220,11 @@ function handlePresetRename(row, preset, currentPickrValues, reel, colourPresetM
   input.style.width = "100%";
   input.style.boxSizing = "border-box";
   input.style.display = "block";
+  input.style.background = "#1e1e1e";
+  input.style.color = "#fff";
+  input.style.border = "1px solid #444";
+  input.style.borderRadius = "3px";
+  input.style.padding = "0.2em 0.4em";
   
   nameSpan.replaceWith(input);
   input.focus();

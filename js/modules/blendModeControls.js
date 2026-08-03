@@ -25,14 +25,12 @@ export function setupBackgroundImageControls(reel, onChange) {
     
     backgroundImageUrl.disabled = !isEnabled;
     backgroundImageRow.style.opacity = isEnabled ? "1" : "0.5";
-    
+
     if (filePickerBtn) {
-      filePickerBtn.style.display = isEnabled ? "inline-block" : "none";
       filePickerBtn.disabled = !isEnabled;
     }
-    
+
     if (cropBtn) {
-      cropBtn.style.display = isEnabled ? "inline-flex" : "none";
       cropBtn.disabled = !isEnabled;
     }
     
@@ -80,7 +78,6 @@ export async function setupBackgroundImageFilePicker(reel) {
     });
   });
   
-  filePickerBtn.style.display = backgroundImageEnabled.checked ? "inline-block" : "none";
   filePickerBtn.disabled = !backgroundImageEnabled.checked;
 }
 
@@ -118,7 +115,6 @@ export function setupBackgroundImagePreview(reel, onChange) {
     }
   });
   
-  cropBtn.style.display = backgroundImageEnabled.checked ? "inline-flex" : "none";
   cropBtn.disabled = !backgroundImageEnabled.checked;
 }
 
@@ -142,9 +138,8 @@ export function setupBackgroundVideoControls(reel, onChange) {
     
     backgroundVideoUrl.disabled = !isEnabled;
     backgroundVideoRow.style.opacity = isEnabled ? "1" : "0.5";
-    
+
     if (videoFilePickerBtn) {
-      videoFilePickerBtn.style.display = isEnabled ? "inline-block" : "none";
       videoFilePickerBtn.disabled = !isEnabled;
     }
     
@@ -189,7 +184,6 @@ export async function setupBackgroundVideoFilePicker() {
     });
   });
   
-  videoFilePickerBtn.style.display = backgroundVideoEnabled.checked ? "inline-block" : "none";
   videoFilePickerBtn.disabled = !backgroundVideoEnabled.checked;
 }
 

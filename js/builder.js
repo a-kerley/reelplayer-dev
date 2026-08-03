@@ -192,7 +192,7 @@ function createColorPickersSection() {
       <span>Waveform Hover Colour:</span>
       <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
     </div>
-    <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #eee;">
+    <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #444;">
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Image & Effects</h4>
       <div class="color-row">
         <span>Static Background Colour:</span>
@@ -208,11 +208,19 @@ function createColorPickersSection() {
       <div id="backgroundImageRowWrapper">
         <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
           <span>Background Image URL:</span>
-          <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
-          <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
-          <button id="backgroundImageCropBtn" type="button" class="crop-preview-btn" style="display:none;" disabled></button>
+          <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.9rem;background:#1e1e1e;color:#fff;" disabled />
+          <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" aria-label="Browse background images" title="Browse background images" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+            </svg>
+          </button>
+          <button id="backgroundImageCropBtn" type="button" class="crop-preview-btn" aria-label="Preview & Crop" title="Preview & Crop" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
+            </svg>
+          </button>
         </div>
-        <div id="backgroundImagePreviewPane" class="bg-preview-pane" style="display:none;margin-top:0.5rem;padding:0.75rem;background:#fff;border:1px solid #ddd;border-radius:4px;"></div>
+        <div id="backgroundImagePreviewPane" class="bg-preview-pane" style="display:none;margin-top:0.5rem;padding:0.75rem;background:#1e1e1e;border:1px solid #444;border-radius:4px;"></div>
       </div>
       <div class="color-row">
         <span>Background Video:</span>
@@ -224,8 +232,12 @@ function createColorPickersSection() {
       <div id="backgroundVideoRowWrapper">
         <div class="color-row" id="backgroundVideoRow" style="opacity:0.5;">
           <span>Background Video URL:</span>
-          <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #ddd;border-radius:4px;font-size:0.9rem;" disabled />
-          <button id="backgroundVideoFilePicker" type="button" class="file-picker-btn" style="display:none;" disabled></button>
+          <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.9rem;background:#1e1e1e;color:#fff;" disabled />
+          <button id="backgroundVideoFilePicker" type="button" class="file-picker-btn" aria-label="Browse background videos" title="Browse background videos" disabled>
+            <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
+              <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
+            </svg>
+          </button>
         </div>
       </div>
       <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">

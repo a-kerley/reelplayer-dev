@@ -10,6 +10,7 @@ import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
+import { setupMediaLibraryTab } from "./modules/mediaLibrary.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -99,6 +100,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setupRefreshPreviewButton();
       setupExportEmbedButton();
       setupEmbedManagerButton();
+      setupMediaLibraryTab();
       // showPreview(); // preview is only refreshed via button now
       showPreview();
     }
@@ -134,11 +136,11 @@ document.addEventListener("DOMContentLoaded", async () => {
             <div style="margin-bottom: 1.5rem;">
               <h3 style="color: var(--builder-accent); margin: 0 0 1rem 0; font-size: 1.1rem;">🎯 iframe Embed Code</h3>
               
-              <div style="background: #f8f9fa; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
-                <strong>Perfect for:</strong> Squarespace, WordPress, Wix, and most website platforms. Ultra-concise 3-line embed code that inherits all your styling automatically.
+              <div style="background: #1e1e1e; color: #ccc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+                <strong style="color:#fff;">Perfect for:</strong> Squarespace, WordPress, Wix, and most website platforms. Ultra-concise 3-line embed code that inherits all your styling automatically.
               </div>
-              
-              <textarea id="embedCodeArea" readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #ccc; border-radius: 4px; resize: vertical;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+
+              <textarea id="embedCodeArea" readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #444; border-radius: 4px; resize: vertical; background: #1e1e1e; color: #fff;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
             </div>
           `,
           buttons: [

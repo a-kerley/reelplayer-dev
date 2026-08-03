@@ -4,3 +4,8 @@
 // (see worker/README.md). Both player.html and embedExporter.js/embedManager.js
 // import this so there's exactly one place to change it.
 export const WORKER_BASE_URL = "https://reelplayer-api.ali-27a.workers.dev";
+
+// Base URL for the R2 bucket's public Development URL (see worker/README.md
+// for how to enable it). Media files are served directly from R2, not
+// proxied through the Worker - construct a file's URL as `${R2_PUBLIC_URL}/${key}`.
+export const R2_PUBLIC_URL = "https://pub-b152d4fc85b241c5b9b75d6ccdb5dc5a.r2.dev";

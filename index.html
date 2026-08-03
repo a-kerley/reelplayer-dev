@@ -22,25 +22,34 @@
     <!-- === Builder UI (start) === -->
     <div class="builder-app">
       <aside class="builder-sidebar">
-        <button id="newReelBtn">+ New Reel</button>
-        <ul id="reelList"></ul>
+        <div class="sidebar-tabs">
+          <button type="button" id="tabReelsBtn" class="sidebar-tab active">Reels</button>
+          <button type="button" id="tabMediaBtn" class="sidebar-tab">Media Library</button>
+        </div>
+        <div id="reelsPanel">
+          <button id="newReelBtn">+ New Reel</button>
+          <ul id="reelList"></ul>
+        </div>
       </aside>
       <main class="builder-main">
-        <form id="reelForm" autocomplete="off">
-          <label>
-            Title:
-            <input type="text" id="reelTitle" class="filename-display" />
-          </label>
-          <label style="margin-top: 1rem; display: block">
-            <input type="checkbox" id="reelShowTitle" />
-            Display Reel Title in Player
-          </label>
-          <!-- Tracks editor section now inserted dynamically by JS in builder.js -->
-          <button type="button" id="exportEmbedBtn">Export Embed Code</button>
-          <button type="button" id="manageEmbedsBtn">Manage Published Embeds</button>
-        </form>
-        <button type="button" id="refreshPreviewBtn">Refresh Preview</button>
-        <div id="reelPlayerPreview"></div>
+        <div id="reelBuilderView">
+          <form id="reelForm" autocomplete="off">
+            <label>
+              Title:
+              <input type="text" id="reelTitle" class="filename-display" />
+            </label>
+            <label style="margin-top: 1rem; display: block">
+              <input type="checkbox" id="reelShowTitle" />
+              Display Reel Title in Player
+            </label>
+            <!-- Tracks editor section now inserted dynamically by JS in builder.js -->
+            <button type="button" id="exportEmbedBtn">Export Embed Code</button>
+            <button type="button" id="manageEmbedsBtn">Manage Published Embeds</button>
+          </form>
+          <button type="button" id="refreshPreviewBtn">Refresh Preview</button>
+          <div id="reelPlayerPreview"></div>
+        </div>
+        <div id="mediaLibraryView" style="display: none;"></div>
       </main>
     </div>
     <!-- === Builder UI (end) === -->

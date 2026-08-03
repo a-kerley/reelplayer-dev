@@ -87,15 +87,17 @@ export class DialogSystem {
       align-items: center;
       justify-content: center;
       animation: fadeIn 0.15s ease-out;
+      color-scheme: dark;
     `;
 
     // Create dialog
     const dialog = document.createElement('div');
     dialog.className = 'dialog-box';
     dialog.style.cssText = `
-      background: white;
+      background: #2f2f2f;
+      color: #ccc;
       border-radius: 12px;
-      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.2);
+      box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
       max-width: 400px;
       width: 90vw;
       max-height: 90vh;
@@ -125,7 +127,7 @@ export class DialogSystem {
         margin: ${icon ? '16px 0 24px 0' : '0 0 24px 0'};
         font-size: 16px;
         line-height: 1.5;
-        color: #333;
+        color: #fff;
       `;
       content.appendChild(messageEl);
     }
@@ -248,9 +250,9 @@ export class DialogSystem {
         color: white;
       `,
       secondary: `
-        background: #f8f9fa;
-        color: #6c757d;
-        border: 1px solid #dee2e6;
+        background: #3a3a3a;
+        color: #ccc;
+        border: 1px solid #444;
       `,
       danger: `
         background: #dc3545;
@@ -263,19 +265,19 @@ export class DialogSystem {
     // Hover effects
     button.addEventListener('mouseenter', () => {
       if (buttonConfig.type === 'secondary') {
-        button.style.background = '#e2e6ea';
-        button.style.borderColor = '#dae0e5';
+        button.style.background = '#4a4a4a';
+        button.style.borderColor = '#555';
       } else if (buttonConfig.type === 'danger') {
         button.style.background = '#c82333';
       } else {
-        button.style.background = '#1e001d';
+        button.style.background = '#5aa0f2';
       }
     });
 
     button.addEventListener('mouseleave', () => {
       if (buttonConfig.type === 'secondary') {
-        button.style.background = '#f8f9fa';
-        button.style.borderColor = '#dee2e6';
+        button.style.background = '#3a3a3a';
+        button.style.borderColor = '#444';
       } else if (buttonConfig.type === 'danger') {
         button.style.background = '#dc3545';
       } else {

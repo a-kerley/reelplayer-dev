@@ -5,3 +5,7 @@ compatibility_date = "2024-11-01"
 kv_namespaces = [
   { binding = "REELS", id = "5114e49752a3447fb64d946f9ce7606b" }
 ]
+
+r2_buckets = [
+  { binding = "MEDIA", bucket_name = "reelplayer-media" }
+]

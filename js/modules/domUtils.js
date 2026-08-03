@@ -16,7 +16,7 @@ export function createFieldset({ id, legend, content, styles = {} }) {
   // Apply default styles
   Object.assign(fieldset.style, {
     marginTop: "2rem",
-    border: "1px solid #eee",
+    border: "1px solid #444",
     borderRadius: "8px",
     padding: "1rem",
     ...styles
@@ -107,14 +107,14 @@ export function createFilePickerButton({ id, ariaLabel, title, disabled = false 
   button.disabled = disabled;
   
   button.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
       <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
     </svg>
   `;
-  
+
   Object.assign(button.style, {
     background: "transparent",
-    color: "#000",
+    color: "#ccc",
     border: "none",
     borderRadius: "4px",
     padding: "0.35em 0.5em",
@@ -124,7 +124,7 @@ export function createFilePickerButton({ id, ariaLabel, title, disabled = false 
     justifyContent: "center",
     transition: "all 0.2s ease"
   });
-  
+
   // Add hover effects
   button.addEventListener("mouseenter", () => {
     if (!button.disabled) {
@@ -132,12 +132,12 @@ export function createFilePickerButton({ id, ariaLabel, title, disabled = false 
       if (svg) svg.style.color = "#4a90e2";
     }
   });
-  
+
   button.addEventListener("mouseleave", () => {
     const svg = button.querySelector("svg");
-    if (svg) svg.style.color = "#000";
+    if (svg) svg.style.color = "#ccc";
   });
-  
+
   return button;
 }
 
@@ -158,14 +158,14 @@ export function createCropPreviewButton({ id, disabled = false }) {
   button.disabled = disabled;
   
   button.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #000;">
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
       <path stroke-linecap="round" stroke-linejoin="round" d="m16.862 4.487 1.687-1.688a1.875 1.875 0 1 1 2.652 2.652L10.582 16.07a4.5 4.5 0 0 1-1.897 1.13L6 18l.8-2.685a4.5 4.5 0 0 1 1.13-1.897l8.932-8.931Zm0 0L19.5 7.125M18 14v4.75A2.25 2.25 0 0 1 15.75 21H5.25A2.25 2.25 0 0 1 3 18.75V8.25A2.25 2.25 0 0 1 5.25 6H10" />
     </svg>
   `;
-  
+
   Object.assign(button.style, {
     background: "transparent",
-    color: "#333",
+    color: "#ccc",
     border: "none",
     borderRadius: "4px",
     padding: "0.35em 0.5em",
@@ -192,10 +192,10 @@ export function createClearButton({ onClick }) {
   button.innerHTML = "✕";
   button.title = "Clear";
   
-  button.style.cssText = "background:transparent;border:none;color:#666;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;";
-  
+  button.style.cssText = "background:transparent;border:none;color:#ccc;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;";
+
   button.addEventListener("mouseenter", () => button.style.color = "#dc3545");
-  button.addEventListener("mouseleave", () => button.style.color = "#666");
+  button.addEventListener("mouseleave", () => button.style.color = "#ccc");
   
   if (onClick) {
     button.addEventListener("click", onClick);
