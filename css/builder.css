@@ -491,6 +491,10 @@ input.filename-display:focus {
   transition: background 0.13s;
   border-radius: 5px;
   padding: 0.16em 0.3em;
+  display: flex;
+  align-items: center;
+  gap: 0.7em;
+  margin-bottom: 0.65em;
 }
 .preset-row:hover {
   background: #f7f7fa;
@@ -545,14 +549,6 @@ input.filename-display:focus {
 }
 .close-preset-modal:hover {
   color: #b00000;
-}
-
-/* Preset row layout */
-.preset-row {
-  display: flex;
-  align-items: center;
-  gap: 0.7em;
-  margin-bottom: 0.65em;
 }
 
 .preset-name-col {

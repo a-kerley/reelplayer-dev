@@ -11,6 +11,9 @@
   padding-right: 30px; /* Push content back and push scrollbar out of view */
   margin-right: -30px; /* Pull back to align content */
   scroll-behavior: smooth; /* Smooth scrolling with inertia */
+  -ms-overflow-style: none !important; /* IE/Edge: hide native scrollbar */
+  scrollbar-width: thin !important; /* Firefox: minimal overlay style */
+  scrollbar-color: rgba(0, 0, 0, 0.3) transparent !important;
 }
 
 /* Fade mask only when scrollable - default state with both fades */
@@ -79,11 +82,6 @@
   display: none !important;
 }
 
-.playlist {
-  -ms-overflow-style: none !important;
-  scrollbar-width: none !important;
-}
-
 /* Custom scrollbar container */
 .custom-scrollbar {
   position: absolute;
@@ -116,12 +114,6 @@
 
 .custom-scrollbar-thumb:active {
   background: rgba(0, 0, 0, 0.6);
-}
-
-/* Firefox scrollbar - minimal overlay style */
-.playlist {
-  scrollbar-width: thin !important;
-  scrollbar-color: rgba(0, 0, 0, 0.3) transparent !important;
 }
 
 /* Add extra padding when reel title is hidden */
