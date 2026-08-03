@@ -16,7 +16,7 @@ import {
   createExpandableModeSettings,
   setupExpandableModeSettings
 } from "./modules/expandableMode.js";
-import { createFieldset, removeElementsByIds } from "./modules/domUtils.js";
+import { createFieldset, removeElementsByIds, insertElement } from "./modules/domUtils.js";
 import { renderPerTrackBackgrounds } from "./modules/backgroundEffects.js";
 
 /**
@@ -84,19 +84,21 @@ export function renderBuilder(reel, onChange) {
   insertPlayerModeSection(playerModeSection, titleInput, reelForm);
 
   const staticModeSettings = createStaticModeSettings(reel, onChange);
-  insertStaticModeSettings(staticModeSettings, playerModeSection, reelForm);
+  insertElement(staticModeSettings, playerModeSection, reelForm, "after");
 
   const expandableModeSettings = createExpandableModeSettings(reel, onChange);
-  insertExpandableModeSettings(expandableModeSettings, staticModeSettings, reelForm);
+  insertElement(expandableModeSettings, staticModeSettings, reelForm, "after");
 
   const titleAppearanceSection = createTitleAppearanceSection(reel, onChange);
-  insertTitleAppearanceSection(titleAppearanceSection, expandableModeSettings, reelForm);
+  insertElement(titleAppearanceSection, expandableModeSettings, reelForm, "after");
+
+  const exportBtn = document.getElementById("exportEmbedBtn");
 
   const tracksSection = createTracksSection();
-  insertTracksSection(tracksSection, reelForm);
+  insertElement(tracksSection, exportBtn, reelForm, "before");
 
   const colorFieldset = createColorPickersSection();
-  insertColorPickersSection(colorFieldset, reelForm);
+  insertElement(colorFieldset, exportBtn, reelForm, "before");
 
   // Set up preset modal
   const colourPresetModal = createPresetModal();
@@ -146,46 +148,16 @@ function removeOldSections() {
 }
 
 function insertPlayerModeSection(playerModeSection, titleInput, reelForm) {
-  // Insert after the show title checkbox
+  // Insert after the show title checkbox's row, falling back to after the
+  // title input's row, falling back to the very front of the form
   const showTitleCheckbox = document.getElementById("reelShowTitle");
-  if (showTitleCheckbox && showTitleCheckbox.parentNode) {
-    if (showTitleCheckbox.parentNode.nextSibling) {
-      reelForm.insertBefore(playerModeSection, showTitleCheckbox.parentNode.nextSibling);
-    } else {
-      reelForm.appendChild(playerModeSection);
-    }
-  } else if (titleInput && titleInput.parentNode) {
-    if (titleInput.parentNode.nextSibling) {
-      reelForm.insertBefore(playerModeSection, titleInput.parentNode.nextSibling);
-    } else {
-      reelForm.appendChild(playerModeSection);
-    }
-  } else {
-    reelForm.insertBefore(playerModeSection, reelForm.firstChild);
-  }
-}
+  const anchor = (showTitleCheckbox && showTitleCheckbox.parentNode) ||
+                 (titleInput && titleInput.parentNode);
 
-function insertStaticModeSettings(staticModeSettings, playerModeSection, reelForm) {
-  if (playerModeSection && playerModeSection.nextSibling) {
-    reelForm.insertBefore(staticModeSettings, playerModeSection.nextSibling);
+  if (anchor) {
+    insertElement(playerModeSection, anchor, reelForm, "after");
   } else {
-    reelForm.appendChild(staticModeSettings);
-  }
-}
-
-function insertExpandableModeSettings(expandableModeSettings, staticModeSettings, reelForm) {
-  if (staticModeSettings && staticModeSettings.nextSibling) {
-    reelForm.insertBefore(expandableModeSettings, staticModeSettings.nextSibling);
-  } else {
-    reelForm.appendChild(expandableModeSettings);
-  }
-}
-
-function insertTitleAppearanceSection(titleAppearanceSection, expandableModeSettings, reelForm) {
-  if (expandableModeSettings && expandableModeSettings.nextSibling) {
-    reelForm.insertBefore(titleAppearanceSection, expandableModeSettings.nextSibling);
-  } else {
-    reelForm.appendChild(titleAppearanceSection);
+    insertElement(playerModeSection, reelForm.firstChild, reelForm, "before");
   }
 }
 
@@ -199,15 +171,6 @@ function createTracksSection() {
     legend: "Tracks",
     content: '<div id="tracksEditor"></div>'
   });
-}
-
-function insertTracksSection(tracksSection, reelForm) {
-  const exportBtn = document.getElementById("exportEmbedBtn");
-  if (exportBtn) {
-    reelForm.insertBefore(tracksSection, exportBtn);
-  } else {
-    reelForm.appendChild(tracksSection);
-  }
 }
 
 /**
@@ -315,15 +278,6 @@ function createColorPickersSection() {
   }
   
   return fieldset;
-}
-
-function insertColorPickersSection(colorFieldset, reelForm) {
-  const exportBtn = document.getElementById("exportEmbedBtn");
-  if (exportBtn) {
-    reelForm.insertBefore(colorFieldset, exportBtn);
-  } else {
-    reelForm.appendChild(colorFieldset);
-  }
 }
 
 // Per-track backgrounds are now handled in backgroundEffects.js module
