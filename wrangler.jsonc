@@ -1,0 +1,13 @@
+{
+  // Deploys the repo root as a static-assets Worker (Cloudflare's current
+  // hosting path for a plain no-build static site, replacing classic Pages
+  // project creation in the dashboard). Unrelated to worker/wrangler.toml,
+  // which deploys the separate reelplayer-api Worker from that subdirectory -
+  // wrangler only reads config from the current working directory, so the two
+  // never collide.
+  "name": "reelplayer-app",
+  "compatibility_date": "2024-11-01",
+  "assets": {
+    "directory": "./"
+  }
+}
