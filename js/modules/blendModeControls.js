@@ -218,52 +218,85 @@ export function setupOverlayColorControls(reel, onChange) {
 }
 
 /**
- * Sets up opacity and blur sliders
+ * Sets up opacity and blur value controls
  * @param {Object} reel - Reel configuration
  */
 export function setupOpacityAndBlurControls(reel) {
+  // Stored as a 0-1 fraction (fed straight into a CSS opacity value elsewhere),
+  // but the control itself displays/edits it as a 0-100 percentage.
   const backgroundOpacity = document.getElementById("backgroundOpacity");
-  const backgroundOpacityValue = document.getElementById("backgroundOpacityValue");
-  const backgroundBlur = document.getElementById("backgroundBlur");
-  const backgroundBlurValue = document.getElementById("backgroundBlurValue");
-  
-  if (backgroundOpacity && backgroundOpacityValue) {
-    backgroundOpacity.value = reel.backgroundOpacity || "1";
-    const updateOpacityDisplay = () => {
-      const value = Math.round(backgroundOpacity.value * 100);
-      backgroundOpacityValue.textContent = `${value}%`;
-    };
-    updateOpacityDisplay();
-    
+  const backgroundOpacitySlider = document.getElementById("backgroundOpacitySlider");
+
+  if (backgroundOpacity) {
+    const initialPercent = Math.round((parseFloat(reel.backgroundOpacity) || 1) * 100);
+    backgroundOpacity.value = initialPercent;
+    if (backgroundOpacitySlider) backgroundOpacitySlider.value = initialPercent;
+
     backgroundOpacity.addEventListener("input", () => {
-      reel.backgroundOpacity = backgroundOpacity.value;
-      updateOpacityDisplay();
+      reel.backgroundOpacity = (parseFloat(backgroundOpacity.value) / 100).toString();
     });
-    
+
     backgroundOpacity.addEventListener("change", () => {
       if (window.saveReels && window.reels) {
         window.saveReels(window.reels);
       }
     });
   }
-  
-  if (backgroundBlur && backgroundBlurValue) {
+
+  const backgroundBlur = document.getElementById("backgroundBlur");
+  const backgroundBlurSlider = document.getElementById("backgroundBlurSlider");
+  if (backgroundBlur) {
     backgroundBlur.value = reel.backgroundBlur || "2";
-    const updateBlurDisplay = () => {
-      const value = backgroundBlur.value;
-      backgroundBlurValue.textContent = `${value}px`;
-    };
-    updateBlurDisplay();
-    
+    if (backgroundBlurSlider) backgroundBlurSlider.value = backgroundBlur.value;
+
     backgroundBlur.addEventListener("input", () => {
       reel.backgroundBlur = backgroundBlur.value;
-      updateBlurDisplay();
     });
-    
+
     backgroundBlur.addEventListener("change", () => {
       if (window.saveReels && window.reels) {
         window.saveReels(window.reels);
       }
     });
   }
+}
+
+/**
+ * Sets up hover-darken toggle and amount slider
+ * @param {Object} reel - Reel configuration
+ * @param {Function} onChange - Change callback
+ */
+export function setupHoverDarkenControls(reel, onChange) {
+  const hoverDarkenEnabled = document.getElementById("hoverDarkenEnabled");
+  const hoverDarkenAmount = document.getElementById("hoverDarkenAmount");
+  const hoverDarkenAmountSlider = document.getElementById("hoverDarkenAmountSlider");
+
+  if (!hoverDarkenEnabled || !hoverDarkenAmount) return;
+
+  hoverDarkenEnabled.checked = reel.hoverDarkenEnabled || false;
+  hoverDarkenAmount.value = reel.hoverDarkenAmount ?? 15;
+  if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.value = hoverDarkenAmount.value;
+
+  const updateEnabledState = () => {
+    const isEnabled = hoverDarkenEnabled.checked;
+    hoverDarkenAmount.disabled = !isEnabled;
+    if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.disabled = !isEnabled;
+    reel.hoverDarkenEnabled = isEnabled;
+  };
+  updateEnabledState();
+
+  hoverDarkenEnabled.addEventListener("change", () => {
+    updateEnabledState();
+    onChange();
+  });
+
+  hoverDarkenAmount.addEventListener("input", () => {
+    reel.hoverDarkenAmount = parseInt(hoverDarkenAmount.value);
+  });
+
+  hoverDarkenAmount.addEventListener("change", () => {
+    if (window.saveReels && window.reels) {
+      window.saveReels(window.reels);
+    }
+  });
 }

@@ -205,57 +205,69 @@ export function createClearButton({ onClick }) {
 }
 
 /**
- * Creates a range slider with value display
+ * Creates a URL input row with an optional file-picker button, matching the
+ * Background Image/Video URL rows in the Colours & Effects section (single
+ * .color-row: label, input, browse button - not a separate stacked label).
  * @param {Object} options - Configuration options
  * @param {string} options.id - Input element ID
  * @param {string} options.label - Label text
- * @param {number} options.min - Minimum value
- * @param {number} options.max - Maximum value
- * @param {number} options.step - Step increment
- * @param {number} options.value - Initial value
+ * @param {string} options.value - Initial value
+ * @param {string} options.placeholder - Input placeholder
+ * @param {string} options.tooltip - Optional title attribute for the label
+ * @param {Object} options.pickerOptions - openFilePicker options; omit to skip the browse button
  * @param {Function} options.onInput - Input event handler
- * @param {Function} options.onChange - Change event handler
- * @param {Function} options.formatValue - Function to format display value
- * @returns {HTMLDivElement}
+ * @returns {{row: HTMLDivElement, input: HTMLInputElement}}
  */
-export function createRangeSlider({ id, label, min, max, step, value, onInput, onChange, formatValue }) {
+export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onInput = null }) {
   const row = document.createElement("div");
   row.className = "color-row";
-  
+
   const labelSpan = document.createElement("span");
   labelSpan.textContent = label;
-  
+  if (tooltip) {
+    labelSpan.title = tooltip;
+  }
+
   const input = document.createElement("input");
   input.id = id;
-  input.type = "range";
-  input.min = min;
-  input.max = max;
-  input.step = step;
+  input.type = "url";
   input.value = value;
-  input.style.flex = "1";
-  
-  const valueSpan = document.createElement("span");
-  valueSpan.id = `${id}Value`;
-  valueSpan.style.cssText = "min-width:2.5rem;text-align:right;font-size:0.9rem;";
-  valueSpan.textContent = formatValue ? formatValue(value) : value;
-  
-  if (onInput) {
-    input.addEventListener("input", (e) => {
-      valueSpan.textContent = formatValue ? formatValue(e.target.value) : e.target.value;
-      onInput(e);
-    });
-  }
-  
-  if (onChange) {
-    input.addEventListener("change", onChange);
-  }
-  
+  input.placeholder = placeholder;
+  input.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
+
   row.appendChild(labelSpan);
   row.appendChild(input);
-  row.appendChild(valueSpan);
-  
-  return row;
+
+  if (onInput) {
+    input.addEventListener("input", onInput);
+  }
+
+  if (pickerOptions) {
+    const pickerBtn = createFilePickerButton({
+      id: `${id}FilePicker`,
+      ariaLabel: pickerOptions.ariaLabel || `Browse ${label}`,
+      title: pickerOptions.title || `Browse ${label}`
+    });
+    pickerBtn.addEventListener("click", async () => {
+      const { openFilePicker } = await import("./filePicker.js");
+      openFilePicker({
+        ...pickerOptions,
+        onSelect: (filePath) => {
+          input.value = filePath;
+          input.dispatchEvent(new Event("input", { bubbles: true }));
+        }
+      });
+    });
+    row.appendChild(pickerBtn);
+  }
+
+  return { row, input };
 }
+
+// Range-slider-with-value-display row (formerly createRangeSlider here) is
+// superseded by createValueControl() in valueControl.js - a single value
+// with both a number box and a hover-reveal slider, rather than a bare
+// slider plus a read-only echo of its value.
 
 /**
  * Inserts an element relative to a reference element

@@ -106,10 +106,10 @@ function createUrlField(track, onChange) {
   const fileNameSpan = document.createElement("span");
   fileNameSpan.classList.add("filename-display");
   
-  const filenameText = extractFileName(track.url) || "Paste Cloudinary Link or Select File";
+  const filenameText = extractFileName(track.url) || "Paste an audio file URL or select from Media Library";
   fileNameSpan.textContent = filenameText;
   
-  if (filenameText === "Paste Cloudinary Link or Select File") {
+  if (filenameText === "Paste an audio file URL or select from Media Library") {
     fileNameSpan.classList.add("placeholder");
   } else {
     fileNameSpan.classList.remove("placeholder");
@@ -135,7 +135,7 @@ function createUrlField(track, onChange) {
   const urlField = document.createElement("input");
   urlField.type = "text";
   urlField.value = track.url;
-  urlField.placeholder = "Paste Cloudinary Link or Select File";
+  urlField.placeholder = "Paste an audio file URL or select from Media Library";
   
   Object.assign(urlField.style, {
     flex: "2",
@@ -162,10 +162,10 @@ function createUrlField(track, onChange) {
 
   // URL field events
   urlField.onblur = () => {
-    const newFilenameText = extractFileName(urlField.value) || "Paste Cloudinary Link or Select File";
+    const newFilenameText = extractFileName(urlField.value) || "Paste an audio file URL or select from Media Library";
     fileNameSpan.textContent = newFilenameText;
     
-    if (newFilenameText === "Paste Cloudinary Link or Select File") {
+    if (newFilenameText === "Paste an audio file URL or select from Media Library") {
       fileNameSpan.classList.add("placeholder");
     } else {
       fileNameSpan.classList.remove("placeholder");
@@ -354,7 +354,7 @@ function createFilePickerButton(track, onChange) {
   btn.onclick = () => {
     openFilePicker({
       directory: 'assets/audio',
-      extensions: ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.aac', '.m4a', '.webm', '.alac'],
+      extensions: ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.aac', '.m4a', '.alac'],
       title: 'Select Audio File',
       onSelect: (selectedFilePath) => {
         track.url = selectedFilePath;

@@ -56,7 +56,7 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
   `;
   
   if (presets.length === 0) {
-    html += `<div style="text-align:center;color:#888;font-style:italic;padding:1.1em;">No presets saved yet.</div>`;
+    html += `<div class="builder-empty-state builder-empty-state--block">No presets saved yet.</div>`;
   } else {
     presets.forEach((preset, idx) => {
       html += `

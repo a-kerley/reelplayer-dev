@@ -1,5 +1,8 @@
 // expandableMode.js - Handles expandable mode UI and controls in the builder
 
+import { createUrlInputRow, createToggleSwitch } from "./domUtils.js";
+import { createValueControl } from "./valueControl.js";
+
 /**
  * Creates the Player Mode section with Static/Expandable toggle
  */
@@ -13,8 +16,9 @@ export function createPlayerModeSection(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Player Mode';
-  legend.style.fontWeight = '600';
-  legend.style.fontSize = '0.95rem';
+  legend.style.fontWeight = 'var(--builder-weight-bold)';
+  legend.style.fontSize = 'var(--builder-text-md)';
+  legend.style.color = 'var(--builder-accent)';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
@@ -132,8 +136,9 @@ export function createStaticModeSettings(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Static Mode Settings';
-  legend.style.fontWeight = '600';
-  legend.style.fontSize = '0.95rem';
+  legend.style.fontWeight = 'var(--builder-weight-bold)';
+  legend.style.fontSize = 'var(--builder-text-md)';
+  legend.style.color = 'var(--builder-accent)';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
@@ -144,14 +149,16 @@ export function createStaticModeSettings(reel, onChange) {
   settingsContainer.style.marginTop = '0.75rem';
 
   // Player Height
-  const playerHeightRow = createNumberInput(
-    'Player Height (px):',
-    'playerHeight',
-    reel.playerHeight || 500,
-    200,
-    1000,
-    'Height of the player in static mode'
-  );
+  const { row: playerHeightRow } = createValueControl({
+    id: 'playerHeight',
+    label: 'Player Height (px):',
+    value: reel.playerHeight || 500,
+    min: 200,
+    max: 1000,
+    step: 10,
+    unit: 'px',
+    tooltip: 'Height of the player in static mode'
+  });
   settingsContainer.appendChild(playerHeightRow);
 
   section.appendChild(settingsContainer);
@@ -194,8 +201,9 @@ export function createExpandableModeSettings(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Expandable Mode Settings';
-  legend.style.fontWeight = '600';
-  legend.style.fontSize = '0.95rem';
+  legend.style.fontWeight = 'var(--builder-weight-bold)';
+  legend.style.fontSize = 'var(--builder-text-md)';
+  legend.style.color = 'var(--builder-accent)';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
@@ -206,74 +214,102 @@ export function createExpandableModeSettings(reel, onChange) {
   settingsContainer.style.marginTop = '0.75rem';
 
   // Collapsed Height
-  const collapsedHeightRow = createNumberInput(
-    'Collapsed Height (px):',
-    'expandableCollapsedHeight',
-    reel.expandableCollapsedHeight || 120,
-    50,
-    300,
-    'Height of the player when collapsed (banner mode)'
-  );
+  const { row: collapsedHeightRow } = createValueControl({
+    id: 'expandableCollapsedHeight',
+    label: 'Collapsed Height (px):',
+    value: reel.expandableCollapsedHeight || 120,
+    min: 50,
+    max: 300,
+    step: 5,
+    unit: 'px',
+    tooltip: 'Height of the player when collapsed (banner mode)'
+  });
   settingsContainer.appendChild(collapsedHeightRow);
 
   // Expanded Height
-  const expandedHeightRow = createNumberInput(
-    'Expanded Height (px):',
-    'expandableExpandedHeight',
-    reel.expandableExpandedHeight || 500,
-    200,
-    1000,
-    'Height of the player when fully expanded'
-  );
+  const { row: expandedHeightRow } = createValueControl({
+    id: 'expandableExpandedHeight',
+    label: 'Expanded Height (px):',
+    value: reel.expandableExpandedHeight || 500,
+    min: 200,
+    max: 1000,
+    step: 10,
+    unit: 'px',
+    tooltip: 'Height of the player when fully expanded'
+  });
   settingsContainer.appendChild(expandedHeightRow);
 
   // Project Title Image
-  const titleImageRow = createTextInput(
-    'Project Title Image URL:',
-    'projectTitleImage',
-    reel.projectTitleImage || '',
-    'URL of the image to display when collapsed',
-    true, // Enable file picker
-    {
+  const { row: titleImageRow } = createUrlInputRow({
+    id: 'projectTitleImage',
+    label: 'Collapsed Banner Image URL:',
+    value: reel.projectTitleImage || '',
+    placeholder: 'https://example.com/title-image.jpg',
+    tooltip: 'Shown in place of the reel title when the player is collapsed',
+    pickerOptions: {
       directory: 'assets/images/project-titles',
       extensions: ['.jpg', '.jpeg', '.png', '.gif', '.svg', '.webp'],
-      title: 'Select Project Title Image'
+      title: 'Select Collapsed Banner Image'
     }
-  );
+  });
   settingsContainer.appendChild(titleImageRow);
 
-  // Show Waveform on Collapse checkbox
-  const waveformRow = createCheckboxInput(
+  // Show Waveform on Collapse toggle
+  const waveformRow = createToggleRow(
     'Show waveform when playing (collapsed)',
     'showWaveformOnCollapse',
     reel.showWaveformOnCollapse !== false, // Default to true
-    'Keep waveform visible when collapsed during playback'
+    'Keep the waveform visible in the collapsed banner while a track plays'
   );
   settingsContainer.appendChild(waveformRow);
 
-  // Enable Player Closed Idle checkbox
-  const closedIdleRow = createCheckboxInput(
-    'Enable player closed idle state',
+  // Enable Player Closed Idle toggle - reads as a heading for the idle
+  // video/overlay/blur controls below it, since it gates all three.
+  const closedIdleRow = createToggleRow(
+    'Fade to idle video when paused & collapsed',
     'enablePlayerClosedIdle',
     reel.enablePlayerClosedIdle === true, // Default to false
-    'Enable special idle state when playback stops and player is closed'
+    'When playback stops and the player is collapsed, fade in the idle video below instead of the normal collapsed banner',
+    { heading: true }
   );
   settingsContainer.appendChild(closedIdleRow);
 
   // Player Closed Idle Video input
-  const closedIdleVideoRow = createTextInput(
-    'Closed idle video',
-    'playerClosedIdleVideo',
-    reel.playerClosedIdleVideo || '',
-    'Video to play during closed idle state (highest priority)',
-    true, // Enable file picker
-    {
+  const { row: closedIdleVideoRow } = createUrlInputRow({
+    id: 'playerClosedIdleVideo',
+    label: 'Idle Background Video:',
+    value: reel.playerClosedIdleVideo || '',
+    placeholder: 'https://example.com/idle-video.mp4',
+    tooltip: 'Plays during the idle state above. Fallback order: this video, then the collapsed banner image, then the current track\'s background',
+    pickerOptions: {
       directory: 'assets/video',
-      extensions: ['.mp4', '.webm', '.ogg', '.mov'],
-      title: 'Select Closed Idle Video'
+      extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
+      title: 'Select Idle Background Video'
     }
-  );
+  });
   settingsContainer.appendChild(closedIdleVideoRow);
+
+  // Player Closed Idle Overlay Colour (matches the Background Image & Effects
+  // section's .color-row / .pickr-button pattern - wired up by colorPicker.js)
+  const closedIdleOverlayRow = createColorPickerRow(
+    'Idle Overlay Colour:',
+    'pickr-player-closed-idle-overlay-color',
+    'Tint (color + opacity) applied over the idle video/background'
+  );
+  settingsContainer.appendChild(closedIdleOverlayRow);
+
+  // Player Closed Idle Blur
+  const { row: closedIdleBlurRow } = createValueControl({
+    id: 'playerClosedIdleBlur',
+    label: 'Idle Background Blur (px):',
+    value: reel.playerClosedIdleBlur ?? 8,
+    min: 0,
+    max: 50,
+    step: 1,
+    unit: 'px',
+    tooltip: 'Backdrop blur strength applied over the idle video/background'
+  });
+  settingsContainer.appendChild(closedIdleBlurRow);
 
   section.appendChild(settingsContainer);
 
@@ -365,6 +401,22 @@ export function setupExpandableModeSettings(section, reel, onChange) {
       }, 300);
     });
   }
+
+  // Player Closed Idle Overlay Colour is wired up by colorPicker.js
+  // (pickr-player-closed-idle-overlay-color, saved to reel.playerClosedIdleOverlayColor)
+
+  // Player Closed Idle Blur
+  const closedIdleBlur = section.querySelector('#playerClosedIdleBlur');
+  if (closedIdleBlur) {
+    closedIdleBlur.addEventListener('input', () => {
+      reel.playerClosedIdleBlur = parseInt(closedIdleBlur.value);
+    });
+    closedIdleBlur.addEventListener('change', () => {
+      if (window.saveReels && window.reels) {
+        window.saveReels(window.reels);
+      }
+    });
+  }
 }
 
 /**
@@ -415,121 +467,58 @@ function validateHeightSettings(reel, changedInput, section) {
 }
 
 /**
- * Helper: Create a number input row
+ * Helper: Create a Pickr color-swatch row, matching the Background Image &
+ * Effects section's styling (.color-row / .pickr-button). The Pickr instance
+ * itself is created by colorPicker.js, keyed off the button's id.
  */
-function createNumberInput(label, id, value, min, max, tooltip) {
+function createColorPickerRow(label, buttonId, tooltip) {
   const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '0.75rem';
+  row.className = 'color-row';
 
-  const labelEl = document.createElement('label');
-  labelEl.htmlFor = id;
+  const labelEl = document.createElement('span');
   labelEl.textContent = label;
-  labelEl.style.flex = '0 0 auto';
-  labelEl.style.fontSize = '0.9rem';
   if (tooltip) {
     labelEl.title = tooltip;
   }
 
-  const input = document.createElement('input');
-  input.type = 'number';
-  input.id = id;
-  input.value = value;
-  input.min = min;
-  input.max = max;
-  input.step = '1';
-  input.style.flex = '1';
-  input.style.padding = '0.4rem';
-  input.style.borderRadius = '4px';
-  input.style.border = '1px solid var(--builder-border)';
-  input.style.background = '#1e1e1e';
-  input.style.color = '#fff';
+  const button = document.createElement('button');
+  button.id = buttonId;
+  button.className = 'pickr-button';
+  button.type = 'button';
 
   row.appendChild(labelEl);
-  row.appendChild(input);
+  row.appendChild(button);
 
   return row;
 }
 
 /**
- * Helper: Create a text input row
+ * Helper: Create a toggle-switch row, matching the Background Image/Video
+ * enable toggles in the Colours & Effects section (.color-row, label on the
+ * left, toggle-switch on the right). Pass { heading: true } for a toggle
+ * that gates a group of rows below it, so it reads as a mini section
+ * heading (bold, accent-coloured) rather than a plain option.
  */
-function createTextInput(label, id, value, tooltip, withFilePicker = false, pickerOptions = null) {
+function createToggleRow(label, id, checked, tooltip, { heading = false } = {}) {
   const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.flexDirection = 'column';
-  row.style.gap = '0.4rem';
+  row.className = 'color-row';
 
   const labelEl = document.createElement('label');
   labelEl.htmlFor = id;
   labelEl.textContent = label;
-  labelEl.style.fontSize = '0.9rem';
-  labelEl.style.fontWeight = '500';
-  if (tooltip) {
-    labelEl.title = tooltip;
-  }
-
-  // Input wrapper for input + button
-  const inputWrapper = document.createElement('div');
-  inputWrapper.style.display = 'flex';
-  inputWrapper.style.gap = '0.5rem';
-  inputWrapper.style.alignItems = 'center';
-
-  const input = document.createElement('input');
-  input.type = 'text';
-  input.id = id;
-  input.value = value;
-  input.style.padding = '0.4rem';
-  input.style.borderRadius = '4px';
-  input.style.border = '1px solid var(--builder-border)';
-  input.style.background = '#1e1e1e';
-  input.style.color = '#fff';
-  input.style.flex = '1';
-  input.placeholder = 'https://example.com/title-image.jpg';
-
-  inputWrapper.appendChild(input);
-  
-  // Add file picker button if requested
-  if (withFilePicker && pickerOptions) {
-    // Import and create file picker button dynamically
-    import('./filePicker.js').then(({ createFilePickerButton }) => {
-      const pickerBtn = createFilePickerButton(input, pickerOptions);
-      inputWrapper.appendChild(pickerBtn);
-    });
-  }
-
-  row.appendChild(labelEl);
-  row.appendChild(inputWrapper);
-
-  return row;
-}
-
-/**
- * Helper: Create a checkbox input row
- */
-function createCheckboxInput(label, id, checked, tooltip) {
-  const row = document.createElement('div');
-  row.style.display = 'flex';
-  row.style.alignItems = 'center';
-  row.style.gap = '0.5rem';
-
-  const input = document.createElement('input');
-  input.type = 'checkbox';
-  input.id = id;
-  input.checked = checked;
-
-  const labelEl = document.createElement('label');
-  labelEl.htmlFor = id;
-  labelEl.textContent = label;
-  labelEl.style.fontSize = '0.9rem';
   labelEl.style.cursor = 'pointer';
+  if (heading) {
+    labelEl.style.color = 'var(--builder-accent)';
+    labelEl.style.fontWeight = 'var(--builder-weight-bold)';
+  }
   if (tooltip) {
     labelEl.title = tooltip;
   }
 
-  row.appendChild(input);
+  const toggle = createToggleSwitch({ id, checked });
+
   row.appendChild(labelEl);
+  row.appendChild(toggle);
 
   return row;
 }

@@ -42,6 +42,12 @@ export function createColorPickers(reel, onChange) {
       default: reel.overlayColor || "rgba(255, 255, 255, 0.5)",
       reelKey: "overlayColor",
     },
+    {
+      id: "pickr-player-closed-idle-overlay-color",
+      var: "--player-closed-idle-overlay-base-color",
+      default: reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)",
+      reelKey: "playerClosedIdleOverlayColor",
+    },
   ];
 
   // Create Pickr instances with a small delay for DOM readiness

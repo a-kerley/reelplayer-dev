@@ -1,6 +1,9 @@
 // backgroundEffects.js - Background image, video, and per-track background management
 
 import { createFilePickerButton, createCropPreviewButton, createClearButton, setupDebouncedInput } from "./domUtils.js";
+import { buildValueControl, wireValueControl } from "./valueControl.js";
+
+let zoomControlIdCounter = 0;
 
 /**
  * Generates expandable mode preview HTML with zoom control
@@ -29,17 +32,28 @@ export function createExpandablePreview(imageUrl, reel, zoom = 1) {
   const previewWidth = playerWidth * scaleFactor;
   const collapsedPreviewHeight = collapsedHeight * scaleFactor;
   const expandedPreviewHeight = expandedHeight * scaleFactor;
-  
+
+  // Built (not wired) here since this is assembled into an HTML string and
+  // re-parsed via innerHTML - attachZoomListener() wires it after mounting.
+  const zoomControl = buildValueControl({
+    id: `zoomControl${zoomControlIdCounter++}`,
+    label: '',
+    value: Math.round(zoom * 100),
+    min: 100,
+    max: 300,
+    step: 10,
+    unit: '%'
+  });
+
   return `
     <div style="display:flex;flex-direction:column;gap:1rem;">
-      <div style="text-align:center;font-size:0.85rem;color:#ccc;font-weight:500;">Expandable Mode Preview</div>
-      
+      <div style="text-align:center;font-size:var(--builder-text-base);color:#ccc;font-weight:var(--builder-weight-medium);">Expandable Mode Preview</div>
+
       <div style="display:flex;align-items:center;gap:0.75rem;padding:0 1rem;">
-        <label style="font-size:0.75rem;color:#ccc;white-space:nowrap;">Zoom:</label>
-        <input type="range" class="zoom-slider" min="1" max="3" step="0.1" value="${zoom}" style="flex:1;" />
-        <span class="zoom-value" style="font-size:0.75rem;color:#ccc;min-width:3rem;text-align:right;">${(zoom * 100).toFixed(0)}%</span>
+        <label style="font-size:var(--builder-text-sm);color:#ccc;white-space:nowrap;">Zoom:</label>
+        ${zoomControl.control.outerHTML}
       </div>
-      
+
       <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
         <div style="display:flex;flex-direction:column;gap:0.5rem;">
           <div style="font-size:0.75rem;color:#ccc;text-align:center;">Collapsed (${collapsedHeight}px)</div>
@@ -65,27 +79,29 @@ export function createExpandablePreview(imageUrl, reel, zoom = 1) {
  * @param {Function} onChange - Optional callback for final save
  */
 export function attachZoomListener(previewPane, track, onChange = null) {
-  const zoomSlider = previewPane.querySelector(".zoom-slider");
-  const zoomValue = previewPane.querySelector(".zoom-value");
+  const zoomControl = previewPane.querySelector(".value-control");
   const previewImages = previewPane.querySelectorAll(".preview-img");
-  
-  if (zoomSlider && zoomValue && previewImages.length) {
-    zoomSlider.addEventListener("input", (e) => {
-      const zoom = parseFloat(e.target.value);
-      track.backgroundZoom = zoom;
-      zoomValue.textContent = `${(zoom * 100).toFixed(0)}%`;
-      previewImages.forEach(img => {
-        img.style.transform = `scale(${zoom})`;
-      });
+
+  if (!zoomControl || !previewImages.length) return;
+
+  wireValueControl(zoomControl);
+  const zoomInput = zoomControl.querySelector(".value-control-input");
+
+  // Control displays/edits 100-300 (%); stored as a 1-3 multiplier.
+  zoomInput.addEventListener("input", () => {
+    const zoom = parseFloat(zoomInput.value) / 100;
+    track.backgroundZoom = zoom;
+    previewImages.forEach(img => {
+      img.style.transform = `scale(${zoom})`;
     });
-    
-    if (onChange) {
-      zoomSlider.addEventListener("change", () => {
-        if (window.saveReels && window.reels) {
-          window.saveReels(window.reels);
-        }
-      });
-    }
+  });
+
+  if (onChange) {
+    zoomInput.addEventListener("change", () => {
+      if (window.saveReels && window.reels) {
+        window.saveReels(window.reels);
+      }
+    });
   }
 }
 

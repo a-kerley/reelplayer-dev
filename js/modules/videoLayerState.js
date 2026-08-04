@@ -6,14 +6,20 @@ export const videoLayerState = {
    * Determine which video should be displayed based on track and reel settings
    * @param {Object} track - Current track object with backgroundVideo property
    * @param {Object} reel - Current reel settings with backgroundVideo and enabled flags
-   * @returns {Object} - { url, type } where type is 'closed-idle', 'main', 'track', or null
+   * @returns {Object} - { url, type } where type is 'main', 'track', or null
    */
   getActiveVideo(track, reel) {
-    // Check closed idle video first (highest priority) - only used during player-closed-idle state
+    // Check closed idle video first (highest priority) - only used during player-closed-idle state.
+    // Reported as type 'track' (not a distinct 'closed-idle' type) because every downstream
+    // consumer (getCurrentLayerVideo/getNextLayerVideo/switchToNextLayer/getLayerUrl/setLayerUrl,
+    // and playVideo()'s oppositeType crossfade logic) only branches on `=== 'track'` vs.
+    // implicitly-else-'main' - an unrecognized third type silently fell into the 'main' branch
+    // everywhere, so the idle video was loading onto the main video layer instead of the track
+    // layer, fighting any real main background video for the same elements/state.
     if (reel?.playerClosedIdleVideo && reel.playerClosedIdleVideo.trim()) {
       const wrapper = this.elements.playerWrapper;
       if (wrapper && wrapper.classList.contains('player-closed-idle')) {
-        return { url: reel.playerClosedIdleVideo.trim(), type: 'closed-idle' };
+        return { url: reel.playerClosedIdleVideo.trim(), type: 'track' };
       }
     }
 

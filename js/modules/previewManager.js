@@ -6,7 +6,7 @@ export class PreviewManager {
     this.container = null;
     this.currentStyles = {};
     this.noTracksTemplate = `
-      <div style="padding: 1rem; font-style: italic; color: #666; text-align: center;">
+      <div class="builder-empty-state builder-empty-state--block">
         No tracks available. Please add some tracks in the builder.
       </div>
     `;
@@ -110,6 +110,10 @@ export class PreviewManager {
     const overlayBaseColor = `${overlayRGBA.r}, ${overlayRGBA.g}, ${overlayRGBA.b}`;
     const overlayOpacity = overlayRGBA.a;
 
+    const closedIdleOverlayRGBA = parseRGBA(reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)");
+    const closedIdleOverlayBaseColor = `${closedIdleOverlayRGBA.r}, ${closedIdleOverlayRGBA.g}, ${closedIdleOverlayRGBA.b}`;
+    const closedIdleOverlayOpacity = closedIdleOverlayRGBA.a;
+
     const uiAccentColor = reel.varUiAccent || "#2a0026";
     
     // For better color matching, especially with white/light colors
@@ -143,7 +147,16 @@ export class PreviewManager {
       // Expandable mode variables
       "--expandable-collapsed-height": `${reel.expandableCollapsedHeight || 120}px`,
       "--expandable-expanded-height": `${reel.expandableExpandedHeight || 500}px`,
-      
+
+      // Player closed idle variables
+      "--player-closed-idle-overlay-base-color": closedIdleOverlayBaseColor,
+      "--player-closed-idle-overlay-opacity": closedIdleOverlayOpacity,
+      "--player-closed-idle-blur": `${reel.playerClosedIdleBlur ?? 8}px`,
+
+      // Hover darken - amount is a 0-100 darkness percentage; brightness() wants
+      // 1 (no change) down to 0 (black), so it's inverted here.
+      "--hover-darken-target-brightness": 1 - (reel.hoverDarkenAmount ?? 15) / 100,
+
       // Lottie animation color variables
       "--lottie-brightness": colorFilters.brightness,
       "--lottie-saturation": colorFilters.saturation,

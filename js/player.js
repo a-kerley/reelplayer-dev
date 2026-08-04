@@ -13,11 +13,21 @@ const playerAppCore = {
   isWaveformReady: false,
   wavesurfer: null,
   previousVolume: 1,
+  // The "nominal" volume - what the volume should be when nothing is
+  // actively fading. Tracked separately from the live GainNode value
+  // (read via wavesurfer.getVolume()) because that reflects whatever a
+  // fade is doing to it moment-to-moment; if a fade-out gets interrupted
+  // mid-ramp (rapid pause->resume click), getVolume() would read back
+  // whatever partial value the fade had reached, not the real volume - and
+  // the next fade-in would then ramp up to that reduced value instead of
+  // back to full, quietly ratcheting the volume down on repeated interrupts.
+  lastKnownVolume: 1,
   isDraggingSlider: false,
   isHoveringSlider: false,
   isHoveringIcon: false,
   currentTrackIndex: 0,
   activeFadeOut: null, // Track active fade-out to allow cancellation
+  activeFadeIn: null, // Track active fade-in to allow cancellation
   wasPlayingBeforeTrackSwitch: false, // Track if we need to auto-resume with fade-in
   isTrackSwitching: false, // Flag to prevent pause event from interfering during track switch
   isFirstLoad: true, // Flag to track if this is the initial player load for intro animation
@@ -73,7 +83,12 @@ const playerAppCore = {
     mainVideoPlaying: false,
     trackVideoPlaying: false,
     // In-progress fade tracking (to handle interruptions)
-    activeFades: new Map() // Maps videoElement -> {type: 'in'|'out', abort: Function}
+    activeFades: new Map(), // Maps videoElement -> {type: 'in'|'out', abort: Function}
+    // In-flight loadVideo() calls, so a second caller targeting the same element+url
+    // (e.g. playVideo() racing a preloadIdleVideo()/preloadVideos() still buffering)
+    // awaits the existing canplaythrough wait instead of restarting it via .load()
+    // or skipping it outright. Maps videoElement -> {url, promise}
+    pendingLoads: new Map()
   },
 
   // Image preloading cache - stores Image objects to keep images in browser cache
@@ -161,18 +176,18 @@ const playerAppCore = {
     
     // Check if playback is active
     const isPlaybackActive = this.wavesurfer?.isPlaying() || false;
-    
+
     // Store state for auto-resume with fade-in after load
     // Don't overwrite if already set (e.g., by auto-play from finish event)
     if (!this.wasPlayingBeforeTrackSwitch) {
       this.wasPlayingBeforeTrackSwitch = isPlaybackActive;
     }
-    
+
     // Set flag to prevent pause event from interfering with video transitions
     if (isPlaybackActive) {
       this.isTrackSwitching = true;
     }
-    
+
     // If switching tracks during playback, fade out audio and pause to prevent pop
     if (isPlaybackActive) {
       await this.applyAudioFadeOut(true); // Pass true to pause after fade
@@ -500,6 +515,7 @@ const playerAppCore = {
       volumeSlider.addEventListener("input", (e) => {
         const volume = parseFloat(e.target.value);
         playerApp.wavesurfer.setVolume(volume);
+        playerApp.lastKnownVolume = volume;
         volumeToggle.innerHTML =
           volume === 0 ? volumeIconMuted : volumeIconLoud;
       });
@@ -566,6 +582,38 @@ const playerAppCore = {
     const playPauseBtn = this.elements.playPauseBtn;
     const volumeControl = this.elements.volumeControl;
     const playheadTime = this.elements.playheadTime;
+
+    // Attached once here, NOT inside the "ready" handler below: "ready" fires on
+    // every wavesurfer.load() call, i.e. every track switch (track switching
+    // reuses this same persistent instance/DOM node, it doesn't destroy and
+    // recreate them - see js/player.js:299). These previously lived inside that
+    // handler, so every track switch permanently stacked another pair of
+    // listeners onto waveformEl with no removal - after enough track switches in
+    // one session, each mousemove over the waveform (a continuous, high-frequency
+    // event) fired every accumulated duplicate, saturating the main thread enough
+    // to visibly degrade audio timing and eventually make playback stop working.
+    waveformEl.addEventListener("mousemove", (e) => {
+      const rect = waveformEl.getBoundingClientRect();
+      const percent = Math.min(
+        Math.max((e.clientX - rect.left) / rect.width, 0),
+        1
+      );
+      const duration = this.wavesurfer.getDuration();
+      const time = duration * percent;
+      hoverOverlay.style.width = `${percent * 100}%`;
+      hoverTime.textContent = this.formatTime(time);
+      hoverTime.style.opacity = "1";
+      const pixelX = e.clientX - rect.left;
+      hoverTime.style.left = `${Math.max(
+        Math.min(pixelX, rect.width - 40),
+        30
+      )}px`;
+    });
+    waveformEl.addEventListener("mouseleave", () => {
+      hoverOverlay.style.width = `0%`;
+      hoverTime.style.opacity = "0";
+    });
+
     this.wavesurfer.on("ready", () => {
       this.isWaveformReady = true;
       this.showLoading(false);
@@ -603,6 +651,11 @@ const playerAppCore = {
           .getPropertyValue("--ui-accent")
           .trim();
         
+        // Give the idle video a head start on buffering - the player starts collapsed
+        // by default, and checkConditions() below won't fire enter() for several more
+        // seconds (its own delay chain), so this is otherwise wasted lead time.
+        this.closedIdleManager?.preloadIdleVideo();
+
         // Check for player-closed-idle state after initial load (with additional delay)
         setTimeout(() => {
           this.closedIdleManager?.checkConditions();
@@ -642,49 +695,48 @@ const playerAppCore = {
       // Auto-resume with fade-in if track was switched during playback
       if (this.wasPlayingBeforeTrackSwitch) {
         this.wasPlayingBeforeTrackSwitch = false; // Reset flag
-        
-        // Set volume to 0, start playback, then fade in
-        const targetVolume = this.wavesurfer.getVolume();
+
+        // Set volume to 0, start playback, then fade in. Read the nominal
+        // volume (not wavesurfer.getVolume(), which reflects whatever a
+        // fade currently has gain at, not necessarily the real volume).
+        const targetVolume = this.lastKnownVolume;
+        // Cancel any still-active fade automation first - wavesurfer's own
+        // setVolume() does a direct gainNode.gain.value= write, which throws
+        // if it lands inside an active setValueCurveAtTime's time range.
+        this.cancelActiveFades();
         this.wavesurfer.setVolume(0);
         this.wavesurfer.play();
-        
-        requestAnimationFrame(() => {
+
+        // A short delay, not requestAnimationFrame, before scheduling the
+        // fade-in curve: verified directly (50+ run stress test) that
+        // scheduling new GainNode automation via rAF (or with no delay at
+        // all) shortly after play() starts a fresh AudioBufferSourceNode
+        // hits a real, intermittent Chromium bug where gain briefly reads
+        // back as the node's construction-time default (1) - an audible
+        // full-volume blip before the ramp takes over. A plain setTimeout of
+        // 16ms+ reliably avoided it every time (rAF did not, despite being a
+        // similar delay) in the same test; 20ms is inaudible here since gain
+        // is already at 0 throughout the wait.
+        setTimeout(() => {
           this.applyAudioFadeInFromZero(targetVolume);
-        });
+        }, 20);
       }
-      waveformEl.addEventListener("mousemove", (e) => {
-        const rect = waveformEl.getBoundingClientRect();
-        const percent = Math.min(
-          Math.max((e.clientX - rect.left) / rect.width, 0),
-          1
-        );
-        const duration = this.wavesurfer.getDuration();
-        const time = duration * percent;
-        hoverOverlay.style.width = `${percent * 100}%`;
-        hoverTime.textContent = this.formatTime(time);
-        hoverTime.style.opacity = "1";
-        const pixelX = e.clientX - rect.left;
-        hoverTime.style.left = `${Math.max(
-          Math.min(pixelX, rect.width - 40),
-          30
-        )}px`;
-        const isPlaying = this.wavesurfer.isPlaying();
-        const currentTime = this.wavesurfer.getCurrentTime();
-        const hoverDiff = Math.abs(time - currentTime);
-        const threshold = 5;
-      });
-      waveformEl.addEventListener("mouseleave", () => {
-        hoverOverlay.style.width = `0%`;
-        hoverTime.style.opacity = "0";
-      });
     });
     this.wavesurfer.on("play", () => {
-      // Cancel any active audio fade-out
-      if (this.activeFadeOut) {
-        this.activeFadeOut.cancel = true;
-        this.activeFadeOut = null;
-      }
-      
+      // Deliberately NOT calling cancelActiveFades() here. This handler
+      // fires asynchronously relative to whatever called wavesurfer.play()
+      // (that call isn't awaited, and 'play' can fire anywhere from
+      // immediately to some delay later depending on the browser's audio
+      // context resume timing). Every resume/track-switch path that starts
+      // a fade-in already calls cancelActiveFades() explicitly BEFORE
+      // calling play() and BEFORE scheduling the fade-in - a cancel here
+      // was purely redundant with that, and being timing-dependent, it
+      // could just as easily fire *after* a fade-in had already been
+      // scheduled and silently cancel it mid-ramp, with gain left frozen
+      // wherever it was interrupted and no error to show for it. If a
+      // genuinely new, unmanaged play() call ever needs a fade cancelled,
+      // that call site should cancel explicitly, not rely on this event.
+
       // Show cursor when playing using UI accent color
       const accentColor = getComputedStyle(document.documentElement)
         .getPropertyValue("--ui-accent")
@@ -697,13 +749,11 @@ const playerAppCore = {
       // Note: playVideo() has built-in interruption handling via activeFades Map
       // It will gracefully cancel any in-flight video fade-outs and start fresh
       
-      // Exit player-closed-idle state when audio starts playing
-      // But NOT when player-closed-idle videos are being activated
-      if (!this.closedIdleManager?.isActivatingVideo) {
-        this.closedIdleManager?.exit();
-      } else {
-      }
-      
+      // Exit player-closed-idle state when audio starts playing. exit() removes the
+      // idle-video priority class before playVideo() runs below, so playVideo()
+      // resolves and crossfades to the real track/main video instead.
+      this.closedIdleManager?.exit();
+
       this.playVideo();
       
       document.dispatchEvent(new CustomEvent("playback:play"));
@@ -814,11 +864,12 @@ const playerAppCore = {
     const playPauseBtn = this.elements.playPauseBtn;
     playPauseBtn.onclick = () => {
       if (this.wavesurfer.isPlaying()) {
-        // Sequential approach: Audio fade → Pause (triggers video fade via event)
-        // This ensures proper sequencing without requiring matching durations
-        this.applyAudioFadeOut().then(() => {
-          this.wavesurfer.pause();
-        });
+        // pauseAfterFade: true so the actual pause() (and the 'pause' event
+        // that triggers video fade-out) happens *inside* the fade-out, right
+        // after gain reaches silence - not in a separate .then() here, which
+        // left a window where gain got restored to full volume while audio
+        // was still actually playing, audible as a pop right before pausing.
+        this.applyAudioFadeOut(true);
       } else {
         // Check if resuming from pause (not at start)
         const currentTime = this.wavesurfer.getCurrentTime();
@@ -826,13 +877,21 @@ const playerAppCore = {
         
         
         if (isResuming) {
-          // Resuming from pause: fade in both audio and video
-          const targetVolume = this.wavesurfer.getVolume();
+          // Resuming from pause: fade in both audio and video. Read the
+          // nominal volume, not wavesurfer.getVolume() - see the lastKnownVolume
+          // comment in playerAppCore for why (interrupted-fade edge case).
+          const targetVolume = this.lastKnownVolume;
+          // Cancel any still-active fade automation first - see comment on
+          // the equivalent call above (wasPlayingBeforeTrackSwitch branch).
+          this.cancelActiveFades();
           this.wavesurfer.setVolume(0);
           this.wavesurfer.play(); // Triggers 'play' event which starts video
-          requestAnimationFrame(() => {
+          // See the equivalent comment above (wasPlayingBeforeTrackSwitch
+          // branch) - a plain delay here, not rAF, avoids a real Chromium
+          // GainNode automation bug.
+          setTimeout(() => {
             this.applyAudioFadeInFromZero(targetVolume);
-          });
+          }, 20);
         } else {
           // Starting from beginning: no fade
           this.wavesurfer.play(); // Triggers 'play' event which starts video
@@ -1123,11 +1182,7 @@ const playerAppCore = {
     wrapper.classList.remove('collapsing');
     this.expandable.isExpanded = true;
     wrapper.classList.add('expanded');
-    
-    // Debug: Check if background should be visible now
-    if (wrapper.classList.contains('player-closed-idle-enabled')) {
-    }
-    
+
     // If we were in collapsed idle with video, transition to playback idle
     if (wasInCollapsedIdleWithVideo) {
       // Video is already playing, just need to apply the playback-idle class
@@ -1151,7 +1206,12 @@ const playerAppCore = {
     if (!wrapper) return;
 
     this.expandable.isExpanded = false;
-    
+
+    // Give the idle video a head start on buffering - it won't actually be needed
+    // until the collapse animation and idle delay below finish (several seconds),
+    // and starting the load now uses that dead time instead of wasting it.
+    this.closedIdleManager?.preloadIdleVideo();
+
     // Check playing state immediately to set playing-collapsed class
     const isCurrentlyPlaying = this.wavesurfer?.isPlaying();
     const shouldShowWaveform = isCurrentlyPlaying && this.expandable.settings?.showWaveformOnCollapse !== false;
@@ -1180,11 +1240,7 @@ const playerAppCore = {
       this.expandable.collapseFadeTimeout = setTimeout(() => {
         wrapper.classList.remove('expanded');
         wrapper.classList.remove('collapsing');
-        
-        // Debug: Check if background should be hidden now
-        if (wrapper.classList.contains('player-closed-idle-enabled')) {
-        }
-        
+
         // Clear timeout references
         this.expandable.collapseDelayTimeout = null;
         this.expandable.collapseFadeTimeout = null;
@@ -1273,6 +1329,7 @@ const playerAppCore = {
     let wrapperClasses = 'player-wrapper';
     if (shouldHideTitle) wrapperClasses += ' no-title';
     if (this.expandable.enabled) wrapperClasses += ' expandable-mode';
+    if (reel?.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
     
     // Build project title overlay HTML for expandable mode
     let projectTitleOverlayHTML = '';
@@ -1293,6 +1350,7 @@ const playerAppCore = {
       <video class="background-video main-video main-video-b" preload="auto" loop muted playsinline></video>
       <video class="background-video track-video track-video-a" preload="auto" loop muted playsinline></video>
       <video class="background-video track-video track-video-b" preload="auto" loop muted playsinline></video>
+      <div class="player-closed-idle-overlay"></div>
       ${projectTitleOverlayHTML}
       <div class="player-content">
         ${
@@ -1324,9 +1382,9 @@ const playerAppCore = {
               <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
             </div>
           </div>
-        </div>
-        <div id="loading" class="loading">
-          <div class="spinner"></div>
+          <div id="loading" class="loading">
+            <div class="spinner"></div>
+          </div>
         </div>
       </div>
       <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
@@ -1334,7 +1392,26 @@ const playerAppCore = {
   `;
     this.elements = {};
     this.cacheElements();
-    
+
+    // The innerHTML rebuild above just discarded the previous video elements
+    // (main/track A+B) without ever pausing/fading them - cacheElements() re-points
+    // videoState's element refs at the fresh, blank replacements, but the *tracked*
+    // state (playing flags, in-flight fades, per-layer URLs) is core-level and
+    // survives a re-render untouched. Left stale, a "trackVideoPlaying: true" left
+    // over from before a mid-idle refresh makes checkConditions() believe a video is
+    // still active forever (nothing will ever flip it back), so it just reschedules
+    // its recheck indefinitely and never calls enter() - the idle video can never
+    // start again until a full page reload. Reset it to match the actually-blank DOM.
+    this.videoState.activeFades.clear();
+    this.videoState.mainVideoPlaying = false;
+    this.videoState.trackVideoPlaying = false;
+    this.videoState.mainVideoA_Url = '';
+    this.videoState.mainVideoB_Url = '';
+    this.videoState.trackVideoA_Url = '';
+    this.videoState.trackVideoB_Url = '';
+    this.videoState.currentMainLayer = 'a';
+    this.videoState.currentTrackLayer = 'a';
+
     // Store current reel settings for background transitions
     this.currentReelSettings = reel;
     

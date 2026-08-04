@@ -18,6 +18,7 @@ import {
 } from "./modules/expandableMode.js";
 import { createFieldset, removeElementsByIds, insertElement } from "./modules/domUtils.js";
 import { renderPerTrackBackgrounds } from "./modules/backgroundEffects.js";
+import { buildValueControl, wireValueControl } from "./modules/valueControl.js";
 
 /**
  * Creates a new empty reel with default configuration
@@ -43,6 +44,8 @@ export function createEmptyReel() {
     backgroundBlur: "2",
     overlayColor: "rgba(255, 255, 255, 0.5)",
     overlayColorEnabled: false,
+    hoverDarkenEnabled: false,
+    hoverDarkenAmount: 15,
     // Player configuration
     playerHeight: 500,
     mode: "static",
@@ -52,7 +55,9 @@ export function createEmptyReel() {
     projectTitleImage: "",
     showWaveformOnCollapse: true,
     enablePlayerClosedIdle: false,
-    playerClosedIdleVideo: ""
+    playerClosedIdleVideo: "",
+    playerClosedIdleOverlayColor: "rgba(0, 0, 0, 0.7)",
+    playerClosedIdleBlur: 8
   };
   
   // Apply default preset colors if available
@@ -143,6 +148,7 @@ function removeOldSections() {
     "playerModeSection",
     "staticModeSettings",
     "expandableModeSettings",
+    "reelTitleAppearanceSection",
     "tracksSection",
     "playerColoursSection"
   ]);
@@ -179,6 +185,44 @@ function createTracksSection() {
  * @returns {HTMLFieldSetElement}
  */
 function createColorPickersSection() {
+  // Built (not wired) here since this markup gets embedded in a template
+  // string and re-parsed via innerHTML - see the wireValueControl() pass
+  // below, after the fieldset is actually mounted.
+  // Values are placeholders - blendModeControls.js's setup functions
+  // overwrite them with the reel's actual values right after this mounts.
+  const backgroundOpacityRow = buildValueControl({
+    id: 'backgroundOpacity',
+    label: 'Background Opacity (%):',
+    value: 100,
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: '%'
+  }).row.outerHTML;
+
+  const backgroundBlurRow = buildValueControl({
+    id: 'backgroundBlur',
+    label: 'Blur Amount (px):',
+    value: 2,
+    min: 0,
+    max: 50,
+    step: 1,
+    unit: 'px'
+  }).row.outerHTML;
+
+  const hoverDarkenAmountBuilt = buildValueControl({
+    id: 'hoverDarkenAmount',
+    label: '',
+    value: 15,
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: '%'
+  });
+  hoverDarkenAmountBuilt.input.disabled = true;
+  hoverDarkenAmountBuilt.slider.disabled = true;
+  const hoverDarkenAmountRow = hoverDarkenAmountBuilt.control.outerHTML;
+
   const content = `
     <div class="color-row">
       <span>UI Accent Colour:</span>
@@ -208,7 +252,7 @@ function createColorPickersSection() {
       <div id="backgroundImageRowWrapper">
         <div class="color-row" id="backgroundImageRow" style="opacity:0.5;">
           <span>Background Image URL:</span>
-          <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.9rem;background:#1e1e1e;color:#fff;" disabled />
+          <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" disabled />
           <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" aria-label="Browse background images" title="Browse background images" disabled>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
@@ -232,7 +276,7 @@ function createColorPickersSection() {
       <div id="backgroundVideoRowWrapper">
         <div class="color-row" id="backgroundVideoRow" style="opacity:0.5;">
           <span>Background Video URL:</span>
-          <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.9rem;background:#1e1e1e;color:#fff;" disabled />
+          <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" disabled />
           <button id="backgroundVideoFilePicker" type="button" class="file-picker-btn" aria-label="Browse background videos" title="Browse background videos" disabled>
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
               <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
@@ -250,16 +294,8 @@ function createColorPickersSection() {
         </div>
         <div id="perTrackBackgroundsList" style="display:none;margin-top:0.2rem;"></div>
       </div>
-      <div class="color-row">
-        <span>Background Opacity:</span>
-        <input id="backgroundOpacity" type="range" min="0" max="1" step="0.1" style="flex:1;" />
-        <span id="backgroundOpacityValue" style="min-width:2.5rem;text-align:right;font-size:0.9rem;"></span>
-      </div>
-      <div class="color-row">
-        <span>Blur Amount:</span>
-        <input id="backgroundBlur" type="range" min="0" max="50" step="1" style="flex:1;" />
-        <span id="backgroundBlurValue" style="min-width:2.5rem;text-align:right;font-size:0.9rem;"></span>
-      </div>
+      ${backgroundOpacityRow}
+      ${backgroundBlurRow}
       <div class="color-row">
         <span>Overlay Colour:</span>
         <label class="toggle-switch" style="margin-right:0.5rem;">
@@ -267,6 +303,14 @@ function createColorPickersSection() {
           <span class="toggle-slider"></span>
         </label>
         <button id="pickr-overlay-color" class="pickr-button" type="button" disabled style="opacity:0.5;"></button>
+      </div>
+      <div class="color-row">
+        <span>Darken on Hover:</span>
+        <label class="toggle-switch" style="margin-right:0.5rem;">
+          <input type="checkbox" id="hoverDarkenEnabled" />
+          <span class="toggle-slider"></span>
+        </label>
+        ${hoverDarkenAmountRow}
       </div>
     </div>
   `;
@@ -289,7 +333,11 @@ function createColorPickersSection() {
     legend.style.alignItems = "center";
     legend.style.gap = "0.5rem";
   }
-  
+
+  // The value controls above were assembled as markup and re-parsed via
+  // innerHTML, so their behavior needs wiring up now that they're mounted.
+  fieldset.querySelectorAll(".value-control").forEach(wireValueControl);
+
   return fieldset;
 }
 
@@ -342,21 +390,23 @@ async function setupBlendModeControls(reel, onChange) {
     setupBackgroundVideoControls,
     setupBackgroundVideoFilePicker,
     setupOverlayColorControls,
-    setupOpacityAndBlurControls
+    setupOpacityAndBlurControls,
+    setupHoverDarkenControls
   } = await import("./modules/blendModeControls.js");
-  
+
   setTimeout(async () => {
     // Set up all background effects controls
     setupBackgroundImageControls(reel, onChange);
     await setupBackgroundImageFilePicker(reel);
     setupBackgroundImagePreview(reel, onChange);
-    
+
     setupBackgroundVideoControls(reel, onChange);
     await setupBackgroundVideoFilePicker();
-    
+
     setupOverlayColorControls(reel, onChange);
     setupOpacityAndBlurControls(reel);
-    
+    setupHoverDarkenControls(reel, onChange);
+
     // Render per-track backgrounds UI
     renderPerTrackBackgrounds(reel, onChange);
   }, 100);

@@ -17,12 +17,6 @@ export const videoPlayback = {
       case 'trackSwitch':
         varName = '--video-track-switch-fade-duration';
         break;
-      case 'playerClosedIdleFadeIn':
-        varName = '--player-closed-idle-fade-in-duration';
-        break;
-      case 'playerClosedIdleFadeOut':
-        varName = '--player-closed-idle-fade-out-duration';
-        break;
       case 'fadeOut':
       default:
         varName = '--video-fade-out-duration';
@@ -79,7 +73,13 @@ export const videoPlayback = {
       return;
     }
 
-    // Check if next layer has the video preloaded
+    // Check if next layer has the video preloaded - i.e. a prior load already
+    // confirmed canplaythrough for this exact url (bookkeeping is only set once
+    // that fires, see loadVideo()). If a preload is still mid-buffer instead,
+    // this is false and we fall into loadVideo() below, but loadVideo() itself
+    // now dedupes against that same in-flight load (via videoState.pendingLoads)
+    // rather than restarting it - so we still always wait for genuine
+    // canplaythrough, we just don't throw away buffering progress to do it.
     const nextLayerUrl = this.getLayerUrl(activeVideo.type, nextLayerName);
     const isPreloaded = nextLayerUrl === activeVideo.url &&
                        nextLayer.src === activeVideo.url;
@@ -248,19 +248,33 @@ export const videoPlayback = {
       return Promise.reject(new Error('Invalid video element or URL'));
     }
 
-    return new Promise((resolve, reject) => {
+    // If a load for this exact element+url is already in flight (e.g. a
+    // preloadIdleVideo()/preloadVideos() call still waiting on canplaythrough),
+    // join that same wait instead of calling videoElement.load() again - a second
+    // .load() call restarts buffering from scratch, discarding whatever the
+    // first one had already buffered right as it might have been about to
+    // resolve. Joining also means playVideo() still genuinely waits for
+    // canplaythrough itself (never skipping the readiness gate), rather than
+    // just trusting that .src already matches.
+    const pending = this.videoState.pendingLoads.get(videoElement);
+    if (pending && pending.url === videoUrl) {
+      return pending.promise;
+    }
+
+    const promise = new Promise((resolve, reject) => {
       // Log buffering progress
       let progressHandler;
 
       const cleanup = () => {
-        videoElement.removeEventListener('loadedmetadata', handleSuccess);
-        videoElement.removeEventListener('canplay', handleSuccess);
         videoElement.removeEventListener('canplaythrough', handleSuccess);
         videoElement.removeEventListener('error', handleError);
         if (progressHandler) {
           videoElement.removeEventListener('progress', progressHandler);
         }
         clearTimeout(timeoutId);
+        if (this.videoState.pendingLoads.get(videoElement)?.promise === promise) {
+          this.videoState.pendingLoads.delete(videoElement);
+        }
       };
 
       const handleSuccess = () => {
@@ -277,20 +291,23 @@ export const videoPlayback = {
       const handleTimeout = () => {
         cleanup();
         console.warn(`Video load timeout (${type}): ${videoUrl}. ReadyState: ${videoElement.readyState}`);
-        // If we have at least metadata, allow it to proceed
-        if (videoElement.readyState >= 1) {
-          resolve();
-        } else {
-          reject(new Error('Video load timeout'));
-        }
+        // Deliberately reject even if some data has loaded (e.g. readyState >= 1,
+        // metadata only) rather than starting playback anyway on a partial load -
+        // a video that hasn't reached canplaythrough within a generous timeout
+        // isn't buffering fast enough to play smoothly, and starting it anyway
+        // just moves the stall from "before it appears" to "partway through
+        // playing," which is worse. Callers (playVideo()) already treat a
+        // rejected loadVideo() as "don't show this video," not a crash.
+        reject(new Error('Video load timeout'));
       };
 
       // Set 10 second timeout (increased for large videos)
       const timeoutId = setTimeout(handleTimeout, 10000);
 
-      // Listen for various ready states (canplaythrough = fully buffered)
-      videoElement.addEventListener('loadedmetadata', handleSuccess, { once: true });
-      videoElement.addEventListener('canplay', handleSuccess, { once: true });
+      // Only resolve on canplaythrough (the browser's "should be able to play
+      // through without buffering" estimate) - not loadedmetadata/canplay, which
+      // fire as soon as the first frame is decoded and say nothing about whether
+      // enough is buffered to play smoothly from there.
       videoElement.addEventListener('canplaythrough', handleSuccess, { once: true });
       videoElement.addEventListener('error', handleError, { once: true });
 
@@ -312,6 +329,9 @@ export const videoPlayback = {
       videoElement.preload = 'auto'; // Tell browser to buffer as much as possible
       videoElement.load();
     });
+
+    this.videoState.pendingLoads.set(videoElement, { url: videoUrl, promise });
+    return promise;
   },
 
   /**
@@ -642,6 +662,12 @@ export const videoPlayback = {
     } else {
     }
 
+    // Drop any in-flight loadVideo() registration for this element - the
+    // videoElement.load() call below aborts its network request without
+    // reliably settling that promise, so a stale entry could otherwise be
+    // joined by a later, unrelated loadVideo() call for a different url.
+    this.videoState.pendingLoads.delete(videoElement);
+
     // Pause playback
     videoElement.pause();
 
@@ -651,6 +677,13 @@ export const videoPlayback = {
     }
     if (videoElement.classList.contains('force-hidden')) {
       videoElement.classList.remove('force-hidden');
+    }
+    // Only place the player-closed-idle-video marker (playerClosedIdle.js) gets
+    // removed - once this element's own fade has actually finished, not the
+    // instant player-closed-idle state toggles - so the idle blur override
+    // (css/player.css) stays in effect for this element's entire fade-out.
+    if (videoElement.classList.contains('player-closed-idle-video')) {
+      videoElement.classList.remove('player-closed-idle-video');
     }
 
     // Clear inline styles that may have been set

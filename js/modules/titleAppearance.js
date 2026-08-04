@@ -1,6 +1,7 @@
 // titleAppearance.js - Handles title appearance controls
 
 import { ValidationUtils } from './validation.js';
+import { createValueControl } from './valueControl.js';
 
 export function createTitleAppearanceSection(reel, onChange) {
   // Remove old section if present
@@ -31,7 +32,7 @@ export function createTitleAppearanceSection(reel, onChange) {
     <div style="display:flex;flex-wrap:wrap;gap:1.1rem 2.2rem;">
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Font Size:
-        <input type="number" id="reelTitleFontSizePt" min="8" max="72" step="1" style="width:4em"> pt
+        <span id="fontSizeControlSlot"></span>
       </label>
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Font Weight:
@@ -53,10 +54,32 @@ export function createTitleAppearanceSection(reel, onChange) {
       </label>
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Padding Below:
-        <input type="number" id="reelTitlePaddingBottom" min="0" max="100" step="1" style="width:4.5em" /> px
+        <span id="paddingControlSlot"></span>
       </label>
     </div>
   `;
+
+  const fontSizeControl = createValueControl({
+    id: 'reelTitleFontSizePt',
+    label: '',
+    value: 11,
+    min: 8,
+    max: 72,
+    step: 1,
+    unit: 'pt'
+  });
+  titleAppearanceSection.querySelector('#fontSizeControlSlot').replaceWith(fontSizeControl.control);
+
+  const paddingControl = createValueControl({
+    id: 'reelTitlePaddingBottom',
+    label: '',
+    value: 0,
+    min: 0,
+    max: 100,
+    step: 1,
+    unit: 'px'
+  });
+  titleAppearanceSection.querySelector('#paddingControlSlot').replaceWith(paddingControl.control);
 
   return titleAppearanceSection;
 }

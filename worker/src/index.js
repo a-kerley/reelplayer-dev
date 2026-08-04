@@ -44,6 +44,69 @@ function isValidMediaKey(key) {
     !key.startsWith("/") && !key.includes("..");
 }
 
+const AUDIO_EXTS = ["mp3", "wav", "ogg", "opus", "flac", "aac", "m4a", "alac"];
+function isAudioKey(key) {
+  const ext = key.split(".").pop().toLowerCase();
+  return AUDIO_EXTS.includes(ext);
+}
+
+// Pulls the track number out of an ID3v2 tag at the front of an audio
+// file's bytes, if present. Only handles the common ID3v2.3/2.4 case
+// (ID3v1, which lives in a trailer at the *end* of the file, would need a
+// separate read - skipped, since most modern encoders write ID3v2 anyway).
+// Never throws - worst case, returns null and the upload proceeds with no
+// track-number metadata.
+function extractTrackNumber(buf) {
+  try {
+    if (buf.length < 10) return null;
+    // "ID3" magic, then major version byte (3 or 4 supported), revision,
+    // flags, then a 4-byte syncsafe size (7 bits used per byte).
+    if (buf[0] !== 0x49 || buf[1] !== 0x44 || buf[2] !== 0x33) return null; // not "ID3"
+    const majorVersion = buf[3];
+    if (majorVersion !== 3 && majorVersion !== 4) return null;
+    const tagSize =
+      ((buf[6] & 0x7f) << 21) | ((buf[7] & 0x7f) << 14) | ((buf[8] & 0x7f) << 7) | (buf[9] & 0x7f);
+    const tagEnd = Math.min(10 + tagSize, buf.length);
+
+    let offset = 10;
+    const frameHeaderSize = 10; // 4-byte id + 4-byte size + 2-byte flags (v2.3/v2.4)
+    while (offset + frameHeaderSize <= tagEnd) {
+      const frameId = String.fromCharCode(buf[offset], buf[offset + 1], buf[offset + 2], buf[offset + 3]);
+      if (frameId === "\0\0\0\0") break; // padding reached
+
+      const frameSize =
+        majorVersion === 4
+          ? ((buf[offset + 4] & 0x7f) << 21) | ((buf[offset + 5] & 0x7f) << 14) |
+            ((buf[offset + 6] & 0x7f) << 7) | (buf[offset + 7] & 0x7f)
+          : (buf[offset + 4] << 24) | (buf[offset + 5] << 16) | (buf[offset + 6] << 8) | buf[offset + 7];
+
+      const frameDataStart = offset + frameHeaderSize;
+      const frameDataEnd = frameDataStart + frameSize;
+
+      if (frameId === "TRCK" && frameDataEnd <= buf.length) {
+        const encodingByte = buf[frameDataStart];
+        const textBytes = buf.slice(frameDataStart + 1, frameDataEnd);
+        let text;
+        if (encodingByte === 0 || encodingByte === 3) {
+          // ISO-8859-1 or UTF-8 - both fine to decode as UTF-8 for ASCII digits.
+          text = new TextDecoder("utf-8").decode(textBytes);
+        } else {
+          // UTF-16 (with or without BOM) - rare for a numeric field, but handle it.
+          text = new TextDecoder("utf-16").decode(textBytes);
+        }
+        const trackNumber = text.replace(/\0/g, "").trim().split("/")[0].trim();
+        return trackNumber || null;
+      }
+
+      offset = frameDataEnd;
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const { pathname } = new URL(request.url);
@@ -121,7 +184,23 @@ export default {
         return jsonResponse({ error: "Invalid key" }, 400);
       }
       const contentType = request.headers.get("Content-Type") || "application/octet-stream";
-      await env.MEDIA.put(key, request.body, { httpMetadata: { contentType } });
+
+      let uploadBody = request.body;
+      let customMetadata;
+      if (isAudioKey(key)) {
+        // Buffer the whole upload so we can both scan it for an ID3 tag and
+        // write it to R2 - simpler and more robust than trying to tee the
+        // request stream and read both branches independently.
+        const bytes = new Uint8Array(await request.arrayBuffer());
+        uploadBody = bytes;
+        const trackNumber = extractTrackNumber(bytes);
+        if (trackNumber) customMetadata = { trackNumber };
+      }
+
+      await env.MEDIA.put(key, uploadBody, {
+        httpMetadata: { contentType },
+        ...(customMetadata ? { customMetadata } : {}),
+      });
       return jsonResponse({ key });
     }
 
@@ -147,6 +226,7 @@ export default {
           prefix,
           ...(flat ? {} : { delimiter: "/" }),
           ...(cursor ? { cursor } : {}),
+          include: ["customMetadata"],
         });
         if (!flat) {
           folders.push(...(list.delimitedPrefixes || []).map((p) => p.replace(/\/$/, "")));
@@ -155,6 +235,7 @@ export default {
           key: obj.key,
           size: obj.size,
           uploaded: obj.uploaded,
+          trackNumber: obj.customMetadata?.trackNumber || null,
         })));
         cursor = list.truncated ? list.cursor : undefined;
       } while (cursor);
@@ -181,7 +262,10 @@ export default {
       if (!existing) {
         return jsonResponse({ error: "Not found" }, 404);
       }
-      await env.MEDIA.put(to, existing.body, { httpMetadata: existing.httpMetadata });
+      await env.MEDIA.put(to, existing.body, {
+        httpMetadata: existing.httpMetadata,
+        customMetadata: existing.customMetadata,
+      });
       await env.MEDIA.delete(from);
       return jsonResponse({ ok: true });
     }

@@ -176,7 +176,7 @@
   padding: 0 0.5rem;
   pointer-events: none;
   white-space: nowrap;
-  z-index: 10;
+  z-index: 11;
   opacity: 0;
   transition: opacity 0.2s ease;
   transform: translateX(-50%);
@@ -288,15 +288,29 @@ button {
 .player-wrapper::after {
   content: '';
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /* Oversized 3x past the blur radius on every edge, clipped back down by
+     .player-wrapper's overflow:hidden. filter: blur() doesn't extend an
+     element's paint region to compensate for the blur radius - it blurs
+     within the box's existing edges, so a box sized exactly to the visible
+     area fades toward transparent right at that boundary and lets whatever
+     is stacked underneath show through as a faint vignette. Overscanning
+     the box pushes that fade-out past the clip line instead. */
+  top: calc(-1 * var(--background-blur) * 3);
+  left: calc(-1 * var(--background-blur) * 3);
+  right: calc(-1 * var(--background-blur) * 3);
+  bottom: calc(-1 * var(--background-blur) * 3);
   background-image: var(--background-image);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   opacity: var(--background-opacity);
+  /* Blur lives on the layer itself (not a shared backdrop-filter overlay above
+     everything) so it's intrinsic to this image and can never bleed onto - or be
+     bled onto by - whatever else is stacked above it (videos, the idle overlay).
+     Hover-darken (brightness) lives here too, for the same reason - and stays
+     1 (a no-op) unless .hover-darken-enabled is on the wrapper and it's hovered. */
+  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
+  transition: filter var(--hover-darken-transition-duration) ease-in-out;
   z-index: 0;
   border-radius: 8px;
   /* Apply zoom from animated custom property */
@@ -307,17 +321,20 @@ button {
 /* Zoom animation controlled by Web Animations API via transform: scale() */
 .track-background-layer {
   position: absolute;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
+  /* Overscan past the blur radius - same reasoning as .player-wrapper::after above. */
+  top: calc(-1 * var(--background-blur) * 3);
+  left: calc(-1 * var(--background-blur) * 3);
+  right: calc(-1 * var(--background-blur) * 3);
+  bottom: calc(-1 * var(--background-blur) * 3);
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0;
+  /* Same reasoning as .player-wrapper::after - intrinsic per-layer blur and hover-darken. */
+  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
   z-index: 1;
   border-radius: 8px;
-  transition: opacity 0.8s ease-in-out;
+  transition: opacity 0.8s ease-in-out, filter var(--hover-darken-transition-duration) ease-in-out;
   pointer-events: none;
 }
 
@@ -337,16 +354,27 @@ button {
 /* Video background layers - positioned above background images but below overlay (z-index: 2) */
 .background-video {
   position: absolute;
-  top: 0;
-  left: 0;
-  width: 100%;
-  height: 100%;
+  /* Overscan past the blur radius - same reasoning as .player-wrapper::after
+     above. object-fit: cover means the extra size just crops in a bit more
+     video rather than distorting it. Re-overscanned to the larger idle blur
+     radius by .background-video.player-closed-idle-video below, since that
+     rule swaps in --player-closed-idle-blur on the same element. */
+  top: calc(-1 * var(--background-blur) * 3);
+  left: calc(-1 * var(--background-blur) * 3);
+  width: calc(100% + var(--background-blur) * 6);
+  height: calc(100% + var(--background-blur) * 6);
   object-fit: cover;
   object-position: center;
   opacity: 0;
+  /* Base background blur applies here too by default (matches a video crossfading
+     as a track/main background outside of idle) - overridden below specifically
+     for the idle video while player-closed-idle is active (which preserves the
+     brightness() term too, so hover-darken keeps working during idle). Intrinsic
+     to this element, so it never depends on what's stacked above or below it. */
+  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
   z-index: 2;
   border-radius: 8px;
-  transition: opacity var(--video-fade-out-duration) ease-in-out;
+  transition: opacity var(--video-fade-out-duration) ease-in-out, filter var(--hover-darken-transition-duration) ease-in-out;
   pointer-events: none;
   /* Force hardware acceleration and compositing */
   transform: translateZ(0);
@@ -382,7 +410,12 @@ button {
   z-index: 5;
 }
 
-/* Overlay color layer - MUST be above ALL videos to apply blur/color effects */
+/* Overlay color tint layer - MUST be above ALL videos to apply the color effect.
+   Blur used to live here too (backdrop-filter over everything behind it), but
+   that couldn't blur the background while leaving a video crossfading on top of
+   it unblurred - one shared filter can't treat what's behind it differently.
+   Blur now lives directly on each layer (see .player-wrapper::after,
+   .track-background-layer, .background-video) instead. */
 .player-wrapper::before {
   content: '';
   position: absolute;
@@ -391,15 +424,13 @@ button {
   right: 0;
   bottom: 0;
   background-color: rgba(var(--overlay-base-color), var(--overlay-opacity));
-  backdrop-filter: blur(var(--background-blur));
-  -webkit-backdrop-filter: blur(var(--background-blur));
   pointer-events: none;
   z-index: 6;
   border-radius: 8px;
 }
 
 /* Exclude background layers and videos from automatic z-index */
-.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay) {
+.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay):not(.player-closed-idle-overlay) {
   position: relative;
   z-index: 7;
 }
@@ -421,6 +452,7 @@ button {
 
 /* Static mode player controls container - matches expandable mode structure */
 .player-wrapper:not(.expandable-mode) .player-container {
+  position: relative;
   display: flex;
   align-items: center;
   width: 100%;
@@ -502,12 +534,12 @@ button {
 }
 
 .loading {
-  /* Position relative to .player-content - centered over the player controls */
+  /* Positioned relative to .player-container - centered over the play/waveform row */
   position: absolute;
-  top: 67%;
+  top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 100; /* Above everything in player-content */
+  z-index: 20; /* Above waveform/hover/playhead layers within .player-container */
   pointer-events: none; /* Prevent interaction */
   transition: opacity 0.3s ease;
   /* Ensure the container has dimensions */
@@ -564,15 +596,91 @@ button {
 }
 
 /* ========================================
-   PLAYER CLOSED IDLE - BACKGROUND IMAGE CONTROL
+   PLAYER CLOSED IDLE - OVERLAY/BLUR EFFECT
    ======================================== */
-/* When player-closed-idle feature is enabled, automatically hide background images when collapsed */
-.player-wrapper.expandable-mode.player-closed-idle-enabled:not(.expanded) {
-  --background-opacity: 0;
+/* The idle video itself (a .background-video layer) already covers the track's
+   background image once active, via z-index stacking and its own opacity
+   transition - no separate background-hiding rule needed here.
+
+   .player-closed-idle-overlay is a dedicated <div> (see js/player.js
+   renderPlayer() and player.html renderPlayerHTML()) purely for the idle color
+   tint - deliberately not ::before/::after, which were both already spoken for
+   (base color overlay, and the main static background image respectively; a
+   pseudo-element can only render one box, so reusing one silently corrupts it).
+   It carries no blur of its own: the idle video's blur is applied directly to
+   the video element below (see .background-video override further down), since
+   layering a second backdrop-filter blur on top of an already-blurred video
+   would just double it up. */
+/* Transition duration deliberately reuses --video-fade-out-duration (the same
+   timing the idle video itself fades out on, via playVideo()/stopVideo() in
+   videoPlayback.js) rather than a separate --player-closed-idle-* duration, so
+   the tint can never drift out of sync with the video crossfade it's paired
+   with - it was previously on its own independent 0.3s timer while the video
+   faded over 1.2s, finishing 4x faster and just sitting static the rest of the
+   way. The active-state override below carries its own transition using
+   --video-fade-in-duration for the same reason, on the way in. */
+.player-closed-idle-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background-color: rgba(var(--player-closed-idle-overlay-base-color), 0);
+  pointer-events: none;
+  z-index: 6;
+  border-radius: 8px;
+  transition: background-color var(--video-fade-out-duration) ease-in-out;
 }
 
-/* When actively in player-closed-idle state, apply blur and overlay effects */
-.player-wrapper.expandable-mode.player-closed-idle-enabled.player-closed-idle:not(.expanded) {
-  --background-blur: var(--player-closed-idle-blur);
-  --overlay-opacity: var(--player-closed-idle-overlay-opacity);
+.player-wrapper.expandable-mode.player-closed-idle-enabled.player-closed-idle:not(.expanded) .player-closed-idle-overlay {
+  background-color: rgba(var(--player-closed-idle-overlay-base-color), var(--player-closed-idle-overlay-opacity));
+  transition: background-color var(--video-fade-in-duration) ease-in-out;
+}
+
+/* The active video is intrinsically blurred via .background-video's own `filter`
+   (set to --background-blur by default, above). The idle video overrides that to
+   its own blur value instead - independent of, and never touching, the background
+   image's own blur underneath. Because the blur lives on the video itself rather
+   than a shared overlay above everything, the (still fully blurred) background
+   image is free to keep showing through unaffected for the whole crossfade
+   duration, right up until the idle video is fully opaque on top of it.
+
+   Keyed off .player-closed-idle-video alone (a marker set directly on the element
+   in playerClosedIdle.js) - deliberately NOT also requiring .active. Two things
+   remove .active early, both of which broke an earlier version of this rule that
+   required it:
+   - exit() removes the wrapper's .player-closed-idle class synchronously, well
+     before the video has actually finished fading out.
+   - fadeOutVideo() (videoPlayback.js) itself removes .active SYNCHRONOUSLY at
+     the *start* of a fade-out, not at the end - that's what actually drives the
+     opacity transition (removing .active reverts opacity to the base rule's 0,
+     which is what animates). Requiring .active meant this override vanished the
+     instant the fade-out began, while the video was still fully visible.
+   The marker itself only gets cleared in cleanupVideo() (videoPlayback.js), once
+   this element's own fade has actually completed - so the override persists for
+   this element's entire lifecycle as "the idle video" regardless of .active or
+   wrapper-level state. */
+.background-video.player-closed-idle-video {
+  filter: blur(var(--player-closed-idle-blur)) brightness(var(--hover-darken-brightness, 1));
+  /* Re-overscan to match this larger blur radius (base rule above sizes for
+     --background-blur, which is typically much smaller). */
+  top: calc(-1 * var(--player-closed-idle-blur) * 3);
+  left: calc(-1 * var(--player-closed-idle-blur) * 3);
+  width: calc(100% + var(--player-closed-idle-blur) * 6);
+  height: calc(100% + var(--player-closed-idle-blur) * 6);
+}
+
+/* ========================================
+   HOVER DARKEN
+   ======================================== */
+/* Darkens whatever background is currently visible - image or video, idle or
+   not - on mouse hover. Applies via brightness() alongside each layer's own
+   blur (see .player-wrapper::after, .track-background-layer, .background-video,
+   and its idle override above) rather than a separate overlay, so it composes
+   cleanly with per-layer blur without adding another stacked element/z-index to
+   manage. --hover-darken-brightness only differs from its 1 (no-op) default
+   while both .hover-darken-enabled is present (reel setting) and the wrapper is
+   actually hovered - so disabling the feature, or not hovering, always no-ops. */
+.player-wrapper.hover-darken-enabled:hover {
+  --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
 }

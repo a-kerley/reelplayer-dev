@@ -85,12 +85,21 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
     }
 
+    let previewRefreshTimer = null;
+
+    function schedulePreviewRefresh() {
+      clearTimeout(previewRefreshTimer);
+      previewRefreshTimer = setTimeout(showPreview, 400);
+    }
+
     function updateCurrentReel() {
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
       // Don't re-render builder here - it destroys form elements and causes issues
-      // Preview updates are now manual via the refresh button only
+      // Preview refresh is debounced so rapid field commits (e.g. tabbing
+      // through several fields) don't rebuild the player on every blur.
+      schedulePreviewRefresh();
     }
 
     function render() {
@@ -333,8 +342,13 @@ document.addEventListener("keydown", (e) => {
     );
   if (!isTyping && (e.code === "Space" || e.key === " ")) {
     e.preventDefault();
+    // Route through the play/pause button's own click handler rather than
+    // calling wavesurfer.playPause() directly - the button handler is the
+    // only place that drives the audio fade in/out (see setupPlayPauseUI in
+    // player.js). Calling wavesurfer.playPause() here instead skipped fades
+    // entirely on every space-bar toggle.
     if (playerApp.wavesurfer && playerApp.isWaveformReady) {
-      playerApp.wavesurfer.playPause();
+      playerApp.elements.playPauseBtn?.click();
     }
   }
 });

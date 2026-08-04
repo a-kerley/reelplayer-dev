@@ -4,7 +4,13 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Reel Player</title>
-  
+
+  <!-- Warm the connection to R2 (media host) as early as possible, so the DNS
+       lookup + TLS handshake for the first video/audio request is already done
+       by the time js/config.js's R2_PUBLIC_URL is actually used - keep this in
+       sync with that value if it ever changes. -->
+  <link rel="preconnect" href="https://media.boxedape.com" crossorigin>
+
   <!-- ============================================
        CSS IMPORTS - Single Source of Truth
        All styles imported from actual CSS files
@@ -182,7 +188,28 @@
       if (settings.overlayColorEnabled && settings.overlayColor) {
         overlayColor = settings.overlayColor;
       }
-      
+
+      // Split into the RGB/alpha custom properties the ::before rule actually
+      // reads (css/player.css: background-color: rgba(var(--overlay-base-color), var(--overlay-opacity)))
+      // - matches PreviewManager.generateStyleConfig() exactly.
+      const overlayRGBAMatch = overlayColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      const overlayBaseColor = overlayRGBAMatch
+        ? `${overlayRGBAMatch[1]}, ${overlayRGBAMatch[2]}, ${overlayRGBAMatch[3]}`
+        : "255, 255, 255";
+      const overlayOpacity = overlayRGBAMatch && overlayRGBAMatch[4] !== undefined
+        ? parseFloat(overlayRGBAMatch[4])
+        : 0;
+
+      // Same split for the player-closed-idle overlay tint
+      const closedIdleOverlayColor = settings.playerClosedIdleOverlayColor || 'rgba(0, 0, 0, 0.7)';
+      const closedIdleOverlayRGBAMatch = closedIdleOverlayColor.match(/rgba?\((\d+),\s*(\d+),\s*(\d+)(?:,\s*([\d.]+))?\)/);
+      const closedIdleOverlayBaseColor = closedIdleOverlayRGBAMatch
+        ? `${closedIdleOverlayRGBAMatch[1]}, ${closedIdleOverlayRGBAMatch[2]}, ${closedIdleOverlayRGBAMatch[3]}`
+        : "0, 0, 0";
+      const closedIdleOverlayOpacity = closedIdleOverlayRGBAMatch && closedIdleOverlayRGBAMatch[4] !== undefined
+        ? parseFloat(closedIdleOverlayRGBAMatch[4])
+        : 0.7;
+
       const uiAccentColor = settings.varUiAccent || '#2a0026';
       
       // Calculate Lottie color filters for loading animation
@@ -211,6 +238,8 @@
       root.style.setProperty('--background-blur', (settings.backgroundBlur || '2') + 'px');
       root.style.setProperty('--background-zoom', settings.backgroundZoom || '1');
       root.style.setProperty('--overlay-color', overlayColor);
+      root.style.setProperty('--overlay-base-color', overlayBaseColor);
+      root.style.setProperty('--overlay-opacity', overlayOpacity);
 
       // Lottie animation color variables
       root.style.setProperty('--lottie-brightness', colorFilters.brightness);
@@ -224,7 +253,15 @@
       // Expandable mode height settings
       root.style.setProperty('--expandable-collapsed-height', `${settings.expandableCollapsedHeight || 120}px`);
       root.style.setProperty('--expandable-expanded-height', `${settings.expandableExpandedHeight || 500}px`);
-      
+
+      // Player closed idle variables
+      root.style.setProperty('--player-closed-idle-overlay-base-color', closedIdleOverlayBaseColor);
+      root.style.setProperty('--player-closed-idle-overlay-opacity', closedIdleOverlayOpacity);
+      root.style.setProperty('--player-closed-idle-blur', `${settings.playerClosedIdleBlur ?? 8}px`);
+
+      // Hover darken - see js/modules/previewManager.js for the same computation
+      root.style.setProperty('--hover-darken-target-brightness', 1 - (settings.hoverDarkenAmount ?? 15) / 100);
+
       // ============================================
       // Apply container styles
       // ============================================
@@ -272,6 +309,7 @@
       let wrapperClasses = 'player-wrapper';
       if (shouldHideTitle) wrapperClasses += ' no-title';
       if (mode === 'expandable') wrapperClasses += ' expandable-mode';
+      if (settings.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
       
       // Build project title overlay HTML for expandable mode
       let projectTitleOverlayHTML = '';
@@ -294,7 +332,8 @@
           <video class="background-video main-video-b" muted loop playsinline></video>
           <video class="background-video track-video-a" muted loop playsinline></video>
           <video class="background-video track-video-b" muted loop playsinline></video>
-          
+          <div class="player-closed-idle-overlay"></div>
+
           ${projectTitleOverlayHTML}
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
@@ -323,9 +362,9 @@
                   <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
                 </div>
               </div>
-            </div>
-            <div id="loading" class="loading">
-              <div class="spinner"></div>
+              <div id="loading" class="loading">
+                <div class="spinner"></div>
+              </div>
             </div>
           </div>
           <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
@@ -345,16 +384,26 @@
     function initializeEmbedPlayer(reelData) {
       console.log('🎵 Initializing embed player with reel:', reelData.id || 'unknown');
       
-      // Store reel reference with full reelData
+      // currentReelSettings must be a *flat* object - the builder's own preview
+      // (js/player.js renderPlayer()) hands playerApp the flat live-edit reel,
+      // and several modules (playerClosedIdle.js, videoLayerState.js,
+      // videoPlayback.js) read settings like enablePlayerClosedIdle,
+      // backgroundVideoEnabled, backgroundVideo straight off currentReelSettings
+      // rather than currentReelSettings.settings. Flatten here so a real
+      // published embed (whose data is nested under reelData.settings) behaves
+      // the same as the builder preview instead of silently no-op'ing those
+      // settings.
       playerApp.reel = reelData.settings || {};
-      playerApp.currentReelSettings = reelData;
+      playerApp.currentReelSettings = { ...reelData, ...(reelData.settings || {}) };
       
       // Configure expandable mode state (matches main player's renderPlayer method)
       const mode = reelData.mode || 'static';
       playerApp.expandable.enabled = (mode === 'expandable');
       playerApp.expandable.isExpanded = false;
       playerApp.expandable.isPlaying = false;
-      playerApp.expandable.settings = reelData; // Store full reelData for collapsePlayer access
+      // Same flat shape as currentReelSettings above - js/player.js reads
+      // this.expandable.settings?.showWaveformOnCollapse unnested.
+      playerApp.expandable.settings = { ...reelData, ...(reelData.settings || {}) };
       playerApp.expandable.showWaveformOnCollapse = reelData.settings?.showWaveformOnCollapse !== false;
       
       console.log(`✓ Mode: ${mode}${mode === 'expandable' ? ' (expandable)' : ' (static)'}`);

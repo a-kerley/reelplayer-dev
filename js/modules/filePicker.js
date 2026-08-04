@@ -21,6 +21,15 @@ const R2_PREFIX_MAP = {
   'assets/video': 'video/'
 };
 
+// User-facing names for each category, e.g. for button tooltips - the
+// R2_PREFIX_MAP keys above are internal folder paths, not something to show.
+const CATEGORY_LABELS = {
+  'assets/audio': 'audio library',
+  'assets/images/backgrounds': 'background image library',
+  'assets/images/project-titles': 'collapsed banner image library',
+  'assets/video': 'video library'
+};
+
 function createModalOverlay() {
   const modal = document.createElement("div");
   modal.className = "file-picker-modal";
@@ -86,6 +95,7 @@ export function openFilePicker(options) {
     mode: "select",
     extensions,
     startFolder: R2_PREFIX_MAP[directory] || "",
+    contextKey: directory,
     onSelect: (url) => {
       onSelect(url);
       closeModal();
@@ -104,8 +114,9 @@ export function createFilePickerButton(inputElement, pickerOptions) {
   btn.type = "button";
   btn.className = "file-picker-btn";
   btn.innerHTML = FOLDER_ICON;
-  btn.setAttribute("aria-label", `Browse ${pickerOptions.directory}`);
-  btn.title = `Browse files from ${pickerOptions.directory}`;
+  const categoryLabel = CATEGORY_LABELS[pickerOptions.directory] || "media library";
+  btn.setAttribute("aria-label", `Browse ${categoryLabel}`);
+  btn.title = `Browse ${categoryLabel}`;
 
   btn.addEventListener("click", () => {
     openFilePicker({

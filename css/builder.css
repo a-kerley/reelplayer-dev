@@ -58,11 +58,11 @@ body {
   background: var(--builder-accent);
   color: white;
   border-radius: 5px;
-  font-size: 1rem;
+  font-size: var(--builder-text-md);
   padding: 0.45rem 0;
   border: none;
   cursor: pointer;
-  font-weight: 700;
+  font-weight: var(--builder-weight-bold);
   letter-spacing: 0.01em;
 }
 
@@ -81,8 +81,8 @@ body {
   border: 1px solid var(--builder-border);
   border-radius: 5px;
   padding: 0.4rem 0.3rem;
-  font-size: 0.85rem;
-  font-weight: 600;
+  font-size: var(--builder-text-base);
+  font-weight: var(--builder-weight-semibold);
   cursor: pointer;
   color: var(--builder-accent);
 }
@@ -123,8 +123,8 @@ body {
   padding: 0.5rem 0.7rem;
   border-radius: 6px;
   cursor: pointer;
-  font-size: 1.05rem;
-  font-weight: 500;
+  font-size: var(--builder-text-md);
+  font-weight: var(--builder-weight-medium);
   color: #ccc;
   background: none;
   transition: background 0.18s, color 0.18s;
@@ -201,8 +201,8 @@ body {
 }
 
 #reelShowTitle {
-  font-size: 1.2rem;
-  font-weight: 500;
+  font-size: var(--builder-text-lg);
+  font-weight: var(--builder-weight-bold);
   color: var(--builder-accent);
   margin-bottom: 1.5rem;
 }
@@ -220,7 +220,7 @@ body {
   min-width: 14rem;
   width: 18rem;
   max-width: 100%;
-  font-size: 0.8rem;
+  font-size: var(--builder-text-sm);
 }
 
 .track-drag-handle {
@@ -325,7 +325,7 @@ body {
   border: none;
   border-radius: 5px;
   padding: 0.45rem 1.2rem;
-  font-weight: 700;
+  font-weight: var(--builder-weight-bold);
   cursor: pointer;
   margin-top: 1.2rem;
   transition: background 0.18s;
@@ -334,7 +334,7 @@ body {
 #addTrackBtn,
 #exportEmbedBtn,
 #manageEmbedsBtn {
-  font-size: 1rem;
+  font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
 }
@@ -356,6 +356,7 @@ body {
   gap: 0.4rem;
   margin-bottom: 0.2rem;
   user-select: none;
+  font-size: var(--builder-text-base);
 }
 
 .pickr-button,
@@ -483,8 +484,8 @@ button:disabled {
    ============================================== */
 .filename-display {
   font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: var(--builder-text-sm);
+  font-weight: var(--builder-weight-regular);
   color: #fff;
   padding: 0.35em 0.7em;
   background: #1e1e1e;
@@ -503,14 +504,30 @@ button:disabled {
 
 .filename-display.placeholder {
   color: #888888;
-  font-size: 0.7rem;
+  font-size: var(--builder-text-xs);
+  font-style: italic;
   padding: 0.7em 0.7em;
+}
+
+/* ==============================================
+   EMPTY STATE TEXT
+   Shared look for "nothing here yet" messages (no
+   presets, no published reels, no tracks, no files).
+   ============================================== */
+.builder-empty-state {
+  color: #888;
+  font-style: italic;
+}
+
+.builder-empty-state--block {
+  text-align: center;
+  padding: 1rem;
 }
 
 input.filename-display {
   font-family: inherit;
-  font-size: 0.8rem;
-  font-weight: 400;
+  font-size: var(--builder-text-sm);
+  font-weight: var(--builder-weight-regular);
   color: #fff;
   padding: 0.35em 0.7em;
   background: #1e1e1e;
@@ -596,7 +613,7 @@ input.filename-display:focus {
   padding-bottom: 0.2em;
 }
 .close-preset-modal {
-  font-size: 1.5rem;
+  font-size: var(--builder-text-xl);
   background: none;
   border: none;
   color: #888;
@@ -616,7 +633,7 @@ input.filename-display:focus {
 
 .preset-name,
 .preset-name-col input {
-  font-weight: 600;
+  font-weight: var(--builder-weight-semibold);
   width: 100%;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -696,7 +713,7 @@ input.filename-display:focus {
 
 .validation-feedback {
   color: #dc3545;
-  font-size: 0.875em;
+  font-size: var(--builder-text-base);
   margin-top: 0.25rem;
   display: block;
 }
@@ -778,4 +795,216 @@ input[type="range"]:focus {
 input[type="range"]:focus::-webkit-slider-thumb,
 input[type="range"]:focus::-moz-range-thumb {
   box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
+}
+
+/* ==============================================
+   VALUE CONTROL
+   Number spinner + slider that reveals on hover/focus.
+   See js/modules/valueControl.js.
+   ============================================== */
+.value-control {
+  display: flex;
+  align-items: center;
+  flex: 1;
+  min-width: 0;
+}
+
+.value-control-number {
+  display: flex;
+  align-items: stretch;
+  flex: 0 0 auto;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.value-control-number:focus-within {
+  border-color: var(--builder-accent);
+}
+
+.value-control-number:has(.value-control-input:disabled) {
+  opacity: 0.5;
+}
+
+.value-control-input {
+  flex: 0 0 auto;
+  padding: 0.35rem 0.4rem;
+  border: none;
+  background: transparent;
+  color: #fff;
+  font-size: var(--builder-text-base);
+  text-align: right;
+}
+
+/* Native spin buttons are tiny and inconsistent across browsers - replaced
+   with the larger custom pair in .value-control-spin below. */
+.value-control-input::-webkit-outer-spin-button,
+.value-control-input::-webkit-inner-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+
+.value-control-input[type="number"] {
+  -moz-appearance: textfield;
+  appearance: textfield;
+}
+
+.value-control-spin {
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+  border-left: 1px solid #444;
+}
+
+.value-control-spin-btn {
+  flex: 1 1 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  padding: 0;
+  border: none;
+  background: #2a2a2a;
+  color: #999;
+  cursor: pointer;
+  line-height: 0;
+  transition: background 0.15s ease, color 0.15s ease;
+}
+
+.value-control-spin-btn:first-child {
+  border-bottom: 1px solid #444;
+}
+
+.value-control-spin-btn:hover {
+  background: #333;
+  color: var(--builder-accent);
+}
+
+.value-control-spin-btn:active {
+  background: #3a3a3a;
+}
+
+.value-control-spin-btn svg {
+  width: 9px;
+  height: 9px;
+  pointer-events: none;
+}
+
+.value-control-unit {
+  flex: 0 0 auto;
+  color: #999;
+  font-size: var(--builder-text-sm);
+  margin-left: 0.4rem;
+}
+
+.value-control-slider-wrap {
+  /* Constant in both states - only "width" (which does transition, with
+     the right delay/duration below) should drive the width animation.
+     flex-grow was previously toggled 0<->1 alongside it, but "flex" isn't
+     animatable and was never in the transition list anyway, so it snapped
+     instantly regardless of any delay on the size property - the box
+     collapsed in one frame while the intended delay ticked down uselessly.
+     "width" (not max-width) is used deliberately: with flex-grow at 0, the
+     item's flex-basis is otherwise content-based ("auto"), which doesn't
+     reliably resolve to the full 260px - max-width only caps a smaller
+     content-based size instead of forcing it. An explicit width is
+     authoritative regardless of flex-basis. */
+  flex: 0 1 auto;
+  width: 0;
+  min-width: 0;
+  opacity: 0;
+  /* Mismatched overflow-x/overflow-y both resolve to "auto" per spec (a
+     visible axis can't coexist with a clipped one), and auto still clips -
+     it doesn't add scroll affordance for a non-scrollable box. So instead
+     of relying on an axis split, the revealed state below adds vertical
+     padding to fully contain the thumb (20px, ~22px scaled on hover, plus
+     its box-shadow) rather than clipping it - the thumb paints well
+     outside the range input's own shrunken 6px track box. That padding is
+     cancelled out with equal negative margins so it doesn't grow the row:
+     overflow:hidden still clips at the padding edge (nothing lost there),
+     but a flex row's height comes from items' margin-box size, and
+     -12px + 12px nets back to the row's original height.
+  */
+  overflow: hidden;
+  margin-left: 0;
+  margin-top: 0;
+  margin-bottom: 0;
+  padding: 0 10px;
+  box-sizing: border-box;
+  /* Collapse: the track waits for the thumb to finish fading out (0.08s,
+     see the thumb rules below) before it starts retracting - otherwise the
+     thumb is still visible while the track narrows around it, right back
+     into the squeezed/clipped look this was meant to avoid. Quick and
+     accelerating (Material's "exit" curve) once it does start. width/
+     margin/padding/opacity all share one curve+duration+delay exactly -
+     opacity used to fade independently and faster with no delay, which
+     made the wrap fully transparent well before the width had visibly
+     retracted, defeating the point of the delay: there was nothing left
+     to see narrowing. Now it fades out together with the retraction
+     instead of racing ahead of it. */
+  transition:
+    width 0.14s cubic-bezier(0.4, 0, 1, 1) 0.08s,
+    margin 0.14s cubic-bezier(0.4, 0, 1, 1) 0.08s,
+    padding 0.14s cubic-bezier(0.4, 0, 1, 1) 0.08s,
+    opacity 0.14s cubic-bezier(0.4, 0, 1, 1) 0.08s;
+}
+
+.value-control:hover .value-control-slider-wrap,
+.value-control:focus-within .value-control-slider-wrap,
+.value-control.value-control-active .value-control-slider-wrap {
+  width: 260px;
+  opacity: 1;
+  margin-left: 0.6rem;
+  margin-top: -12px;
+  margin-bottom: -12px;
+  padding: 12px 10px;
+  /* Reveal: smooth deceleration (Material's "enter" curve), slightly
+     longer - opacity finishes first so the slider is legible while it's
+     still growing into place, rather than materializing as a block. */
+  transition:
+    width 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    margin 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    padding 0.22s cubic-bezier(0.16, 1, 0.3, 1),
+    opacity 0.15s ease-out;
+}
+
+.value-control-slider-wrap input[type="range"] {
+  width: 100%;
+  display: block;
+}
+
+/* The thumb has its own opacity, independent of the wrap's - otherwise
+   it's visibly present (and looks squeezed/clipped) while the track is
+   still narrow and growing. Hidden while collapsed/idle, and while the
+   track is mid-grow; only fades in - quickly - once the track has
+   essentially finished, at its final resting position. Reverses on the
+   way out: fades out immediately, before the track starts shrinking. */
+.value-control-slider-wrap input[type="range"]::-webkit-slider-thumb {
+  opacity: 0;
+  transition: opacity 0.08s ease-in, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.value-control-slider-wrap input[type="range"]::-moz-range-thumb {
+  opacity: 0;
+  transition: opacity 0.08s ease-in, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.value-control:hover .value-control-slider-wrap input[type="range"]::-webkit-slider-thumb,
+.value-control:focus-within .value-control-slider-wrap input[type="range"]::-webkit-slider-thumb,
+.value-control.value-control-active .value-control-slider-wrap input[type="range"]::-webkit-slider-thumb {
+  opacity: 1;
+  transition: opacity 0.09s ease-out 0.16s, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.value-control:hover .value-control-slider-wrap input[type="range"]::-moz-range-thumb,
+.value-control:focus-within .value-control-slider-wrap input[type="range"]::-moz-range-thumb,
+.value-control.value-control-active .value-control-slider-wrap input[type="range"]::-moz-range-thumb {
+  opacity: 1;
+  transition: opacity 0.09s ease-out 0.16s, transform 0.1s ease, box-shadow 0.1s ease;
+}
+
+.value-control-input:disabled,
+.value-control-slider-wrap input[type="range"]:disabled {
+  cursor: not-allowed;
 }

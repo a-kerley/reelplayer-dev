@@ -21,7 +21,21 @@
   --builder-accent: #4a90e2;                      /* Accent color for builder UI */
   --builder-hover: #5aa0f2;                       /* Hover state color for builder buttons */
   --builder-delete-hover: #dc3545;                /* Hover color for delete buttons */
-  
+
+  /* Builder UI type scale (builder chrome text only - not reel/player text) */
+  --builder-text-xs: 0.7rem;                      /* Tiny meta/hint text (placeholders, counts) */
+  --builder-text-sm: 0.8rem;                      /* Secondary/dense UI text (buttons, table cells) */
+  --builder-text-base: 0.85rem;                   /* Default body text (inputs, list items, labels) */
+  --builder-text-md: 0.95rem;                     /* Emphasized text (nav items, primary buttons) */
+  --builder-text-lg: 1.2rem;                      /* Section headings, panel titles */
+  --builder-text-xl: 1.5rem;                      /* Modal close icon, large glyphs */
+
+  /* Builder UI weight scale (builder chrome text only - not reel/player text) */
+  --builder-weight-regular: 400;                  /* Body text, filenames, inputs */
+  --builder-weight-medium: 500;                   /* List items, secondary buttons */
+  --builder-weight-semibold: 600;                 /* Nav tabs, table headers, section legends */
+  --builder-weight-bold: 700;                     /* Primary buttons, page/modal titles */
+
   /* ========================================
      SHARED SPACING & LAYOUT
      Used across static and expandable modes
@@ -106,14 +120,15 @@
   --playback-idle-overlay-transition-in: 3s;    /* Duration of overlay opacity transition into idle state */
   --playback-idle-overlay-transition-out: 2s;   /* Duration of overlay opacity transition out of idle state */
   
-  /* Player-Closed-Idle State Transitions */
-  --player-closed-idle-fade-in-duration: 0.3s;      /* Duration of background video fade-in when entering player-closed-idle */
-  --player-closed-idle-fade-out-duration: 0.3s;     /* Duration of background video fade-out when exiting player-closed-idle */
-  
   /* Player-Closed-Idle State Visual Effects */
-  --player-closed-idle-blur: 8px;                 /* Blur amount when in player-closed-idle state */
-  --player-closed-idle-overlay-opacity: 0.7;      /* Overlay opacity when in player-closed-idle state */
-  
+  --player-closed-idle-blur: 8px;                       /* Blur amount when in player-closed-idle state */
+  --player-closed-idle-overlay-base-color: 0, 0, 0;     /* RGB values for the idle overlay tint (set by builder) */
+  --player-closed-idle-overlay-opacity: 0.7;            /* Overlay opacity when in player-closed-idle state (set by builder) */
+
+  /* Hover Darken */
+  --hover-darken-target-brightness: 0.85;   /* Brightness while hovered when enabled (set by builder, 1 = no darken) */
+  --hover-darken-transition-duration: 0.3s; /* Fade speed in/out of the hover darken effect */
+
   /* ========================================
      PLAYBACK-IDLE BACKGROUND ANIMATION
      Controlled by Web Animations API in JavaScript

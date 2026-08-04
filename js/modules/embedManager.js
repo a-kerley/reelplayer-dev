@@ -36,7 +36,7 @@ async function deleteReel(id, password) {
 
 function renderListHTML(entries) {
   if (!entries.length) {
-    return '<p style="color:#ccc;font-style:italic;">No published reels yet.</p>';
+    return '<p class="builder-empty-state">No published reels yet.</p>';
   }
 
   return `

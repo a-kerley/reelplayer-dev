@@ -160,6 +160,9 @@ export class EmbedExporter {
         overlayColorEnabled: reel.overlayColorEnabled,
         backgroundOpacity: reel.backgroundOpacity,
         backgroundBlur: reel.backgroundBlur,
+        backgroundZoom: reel.backgroundZoom,
+        hoverDarkenEnabled: reel.hoverDarkenEnabled === true,
+        hoverDarkenAmount: reel.hoverDarkenAmount ?? 15,
 
         // Title appearance
         titleAppearance: reel.titleAppearance || {},
@@ -170,7 +173,9 @@ export class EmbedExporter {
         projectTitleImage: reel.projectTitleImage || "",
         showWaveformOnCollapse: reel.showWaveformOnCollapse !== false, // Default to true
         enablePlayerClosedIdle: reel.enablePlayerClosedIdle === true,
-        playerClosedIdleVideo: reel.playerClosedIdleVideo || ""
+        playerClosedIdleVideo: reel.playerClosedIdleVideo || "",
+        playerClosedIdleOverlayColor: reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)",
+        playerClosedIdleBlur: reel.playerClosedIdleBlur ?? 8
       },
       created: new Date().toISOString()
     };
