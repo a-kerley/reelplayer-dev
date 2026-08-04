@@ -8,6 +8,11 @@
   "name": "reelplayer-app",
   "compatibility_date": "2024-11-01",
   "assets": {
-    "directory": "./"
+    "directory": "./",
+    // Disable the default clean-URL redirect (player.html -> /player, etc).
+    // embedExporter.js builds embed <iframe> src urls with the literal
+    // ".html" suffix (player.html?id=...) - leaving the redirect on would
+    // add an extra round-trip to every single embed load for no benefit.
+    "html_handling": "none"
   }
 }
