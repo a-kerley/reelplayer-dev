@@ -108,7 +108,17 @@ export const videoPlayback = {
       } else {
       }
 
-      await fadeInPromise;
+      const fadeInCompleted = await fadeInPromise;
+
+      // If the fade-in was interrupted (some other stopVideo()/playVideo()
+      // call took over this same element mid-fade), it never actually
+      // became the active layer - the interrupting call owns cleanup for it
+      // now. Claiming it as current here anyway would point currentTrackLayer/
+      // currentMainLayer at a layer that's actually being torn down, which
+      // stays wrong until another full cycle happens to correct it.
+      if (fadeInCompleted === false) {
+        return;
+      }
 
       // Switch to the new layer as current
       this.switchToNextLayer(activeVideo.type);
@@ -461,6 +471,24 @@ export const videoPlayback = {
         isAborted = true;
         clearTimeout(fadeTimeout);
         this.videoState.activeFades.delete(videoElement);
+        // Resolve (not leave hanging) even when interrupted, matching
+        // fadeOutVideo's abortFade. Without this, a fade-in interrupted
+        // mid-flight (e.g. idle exited while the idle video is still fading
+        // in) left this Promise permanently pending - `await`ing it in
+        // playVideo() suspended that call forever, so it never reached
+        // switchToNextLayer()/trackVideoPlaying=true, and anything chained
+        // off playVideo() (playerClosedIdle.js's enter() cleanup/staleness
+        // check) never ran either. That could leave currentTrackLayer
+        // pointing at the wrong layer indefinitely - closed-idle working
+        // once and silently never re-triggering correctly after.
+        //
+        // Resolves `false` (completed: false) rather than plain resolve() -
+        // an aborted fade-in didn't actually finish becoming the active
+        // layer (the interrupting fade-out owns this element now and will
+        // run its own cleanup), so playVideo() needs to know to skip
+        // switchToNextLayer()/trackVideoPlaying=true rather than claim this
+        // element as current based on a fade that never completed.
+        resolve(false);
       };
 
       this.videoState.activeFades.set(videoElement, { type: 'in', abort: abortFade });
@@ -472,7 +500,7 @@ export const videoPlayback = {
       fadeTimeout = setTimeout(() => {
         if (!isAborted) {
           this.videoState.activeFades.delete(videoElement);
-          resolve();
+          resolve(true);
         } else {
         }
       }, duration);
