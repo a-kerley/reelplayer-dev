@@ -45,6 +45,15 @@
   align-items: center;
   justify-content: center;
   height: 100%;
+  /* Match #playPause's rendered width (46px, from .heroicon) even though
+     #volumeToggle's own icon is deliberately smaller (32px, see
+     "#volumeToggle .heroicon" below) - #playPause and .volume-control flank
+     .waveform-and-volume as flex siblings in .player-container, so unequal
+     reserved widths here shifted the waveform ~7px off the player's true
+     horizontal center (confirmed via getBoundingClientRect() on a live
+     collapsed-while-playing embed). This keeps the icon's smaller visual
+     size but reserves equal layout width on both sides. */
+  width: 46px;
   backface-visibility: hidden;
   -webkit-backface-visibility: hidden;
 }
