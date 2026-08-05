@@ -140,6 +140,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
         dialog.createDialog({
           type: 'custom',
+          maxWidth: '600px',
           message: "Your embed code is ready!",
           content: `
             <div style="margin-bottom: 1.5rem;">

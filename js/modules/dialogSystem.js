@@ -98,7 +98,7 @@ export class DialogSystem {
       color: #ccc;
       border-radius: 12px;
       box-shadow: 0 10px 40px rgba(0, 0, 0, 0.4);
-      max-width: 400px;
+      max-width: ${config.maxWidth || '400px'};
       width: 90vw;
       max-height: 90vh;
       overflow: hidden;
@@ -149,6 +149,7 @@ export class DialogSystem {
       display: flex;
       gap: 12px;
       justify-content: center;
+      flex-wrap: wrap;
     `;
 
     config.buttons.forEach(buttonConfig => {
