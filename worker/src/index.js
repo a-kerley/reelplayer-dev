@@ -13,10 +13,24 @@
 //   POST   /reels/:id       - password-gated, stores the JSON body
 //   GET    /reels           - password-gated, lists {id, title, created} for every stored reel
 //   DELETE /reels/:id       - password-gated, removes the entry
+//   GET    /drafts/:id      - password-gated (NOT public, unlike /reels/:id - drafts have no
+//                             legitimate anonymous consumer), returns the stored draft JSON or 404
+//   POST   /drafts/:id      - password-gated, stores the JSON body (stamps updatedAt server-side)
+//   GET    /drafts          - password-gated, lists {id, title, createdAt, updatedAt} for every draft
+//   DELETE /drafts/:id      - password-gated, removes the entry
 //   POST   /media/upload    - password-gated, ?key=<key>, body = raw file bytes
 //   GET    /media/list      - password-gated, ?prefix=<prefix>, lists folders/files under it
 //   POST   /media/rename    - password-gated, body {from, to}
 //   DELETE /media/delete    - password-gated, ?key=<key>
+//
+// Drafts (in-progress builder reels, auto-saved as the user edits) use a
+// separate `draft_<id>` key prefix in the same REELS namespace as published
+// reels (`reel_<id>`) - same store, disjoint keys, different JSON shape (the
+// raw flat builder object, not the nested settings:{} export shape) and
+// different visibility (drafts are never public, since only the password-
+// gated builder itself ever needs to read them - unlike a published reel,
+// which anonymous visitors' browsers must be able to fetch anywhere it's
+// embedded).
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -163,6 +177,74 @@ export default {
         }
         await env.REELS.put(key, body);
         return jsonResponse({ ok: true });
+      }
+
+      if (request.method === "DELETE") {
+        if (!isAuthorized(request, env)) {
+          return jsonResponse({ error: "Unauthorized" }, 401);
+        }
+        await env.REELS.delete(key);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    // GET /drafts - list all drafts (builder sidebar), password-gated
+    if (pathname === "/drafts" && request.method === "GET") {
+      if (!isAuthorized(request, env)) {
+        return jsonResponse({ error: "Unauthorized" }, 401);
+      }
+
+      const list = await env.REELS.list({ prefix: "draft_" });
+      const entries = await Promise.all(
+        list.keys.map(async (key) => {
+          const value = await env.REELS.get(key.name);
+          if (!value) return null;
+          try {
+            const parsed = JSON.parse(value);
+            return { id: parsed.id, title: parsed.title, createdAt: parsed.createdAt, updatedAt: parsed.updatedAt };
+          } catch {
+            return null;
+          }
+        })
+      );
+      return jsonResponse(entries.filter(Boolean));
+    }
+
+    // /drafts/:id - unlike /reels/:id, every method here is password-gated:
+    // drafts have no legitimate anonymous consumer (only the builder itself
+    // ever reads them), so there's no reason for GET to be public here.
+    const draftMatch = pathname.match(/^\/drafts\/([a-zA-Z0-9_-]+)$/);
+    if (draftMatch) {
+      const key = `draft_${draftMatch[1]}`;
+
+      if (request.method === "GET") {
+        if (!isAuthorized(request, env)) {
+          return jsonResponse({ error: "Unauthorized" }, 401);
+        }
+        const value = await env.REELS.get(key);
+        if (!value) return jsonResponse({ error: "Not found" }, 404);
+        return new Response(value, {
+          status: 200,
+          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+        });
+      }
+
+      if (request.method === "POST") {
+        if (!isAuthorized(request, env)) {
+          return jsonResponse({ error: "Unauthorized" }, 401);
+        }
+        let body;
+        try {
+          body = JSON.parse(await request.text());
+        } catch {
+          return jsonResponse({ error: "Invalid JSON body" }, 400);
+        }
+        // Stamped server-side, not trusted from the client, so "most
+        // recently edited" sort order stays correct regardless of client
+        // clock skew.
+        body.updatedAt = Date.now();
+        await env.REELS.put(key, JSON.stringify(body));
+        return jsonResponse({ ok: true, updatedAt: body.updatedAt });
       }
 
       if (request.method === "DELETE") {

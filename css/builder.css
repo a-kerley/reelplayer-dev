@@ -67,6 +67,26 @@ body {
 }
 
 /* ==============================================
+   DRAFT AUTO-SAVE STATUS INDICATOR
+   ============================================== */
+.draft-save-status {
+  display: block;
+  min-height: 1.1em;
+  margin: -0.6rem 0 0.8rem 0;
+  font-size: var(--builder-text-sm);
+  color: #999;
+  transition: color 0.2s ease;
+}
+
+.draft-save-status[data-status="saved"] {
+  color: #4caf80;
+}
+
+.draft-save-status[data-status="error"] {
+  color: #dc3545;
+}
+
+/* ==============================================
    SIDEBAR TABS (Reels / Media Library)
    ============================================== */
 .sidebar-tabs {
@@ -172,6 +192,7 @@ body {
    ============================================== */
 
 .builder-main {
+  position: relative; /* anchors .builder-loading-overlay below */
   flex: 1 1 0;
   min-width: 0;
   display: flex;
@@ -180,6 +201,35 @@ body {
   padding-top: 2.2rem;
   padding-right: 2.5rem;
   padding-bottom: 500px;
+}
+
+/* Shown during initial draft bootstrap and while fetching a stub reel's
+   full body on select (js/main.js's showBuilderLoading()/hideBuilderLoading()) -
+   also reused (with different inner content) for the auth-required state
+   when the builder password prompt is cancelled. */
+.builder-loading-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(30, 30, 30, 0.85);
+  color: #ccc;
+  font-size: var(--builder-text-md);
+  text-align: center;
+  padding: 2rem;
+}
+
+.builder-loading-overlay button {
+  margin-top: 1rem;
+  background: var(--builder-accent);
+  color: white;
+  border: none;
+  border-radius: 5px;
+  padding: 0.5rem 1.2rem;
+  font-size: var(--builder-text-base);
+  cursor: pointer;
 }
 
 /* The 500px bottom padding above exists only for the reel form's scroll

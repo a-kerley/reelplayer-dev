@@ -4,34 +4,77 @@ import {
   loadPlaylistFromFile,
   convertDropboxLinkToDirect,
 } from "./playlist.js";
-import { renderSidebar, loadReels, saveReels } from "./sidebar.js";
+import { renderSidebar } from "./sidebar.js";
 import { renderBuilder, createEmptyReel } from "./builder.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
 import { setupMediaLibraryTab } from "./modules/mediaLibrary.js";
+import {
+  listDrafts,
+  loadDraft,
+  saveReels,
+  flushDraftSave,
+  deleteDraft,
+  onSaveStatusChange,
+} from "./modules/draftStore.js";
+import { maybeRunMigration } from "./modules/draftMigration.js";
+import { getBuilderPassword } from "./modules/builderAuth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
   const builderRoot = document.querySelector(".builder-app");
   if (builderRoot) {
     // --- Reel Builder SPA mode ---
-    let reels = loadReels();
-    
-    // Migrate existing reels to add backgroundColor if missing
-    reels = reels.map(reel => {
-      if (!reel.backgroundColor) {
-        reel.backgroundColor = "rgba(255, 255, 255, 1)";
-      }
-      return reel;
-    });
-    
-    let savedId = localStorage.getItem('currentReelId');
+    // Drafts (the reels shown in the sidebar and being actively edited) are
+    // server-backed via js/modules/draftStore.js, so they auto-save and are
+    // available from any browser reaching this (password-gated) page - see
+    // CLAUDE.md and worker/README.md's "Drafts" section for the design.
+    //
+    // Data model: `reels` holds one entry per draft, but only the currently
+    // open one is ever a full object - every other entry is a lightweight
+    // stub `{id,title,createdAt,updatedAt,_stub:true}` (all renderSidebar()
+    // ever needs). The full body is fetched on demand when selected.
+    let reels = [];
+    let currentId = null;
 
-    // Make reels and saveReels globally accessible for blend mode controls
-    window.reels = reels;
-    window.saveReels = saveReels;
+    const loadingOverlay = document.getElementById("builderLoadingOverlay");
+    const loadingContent = document.getElementById("builderLoadingContent");
+
+    function showBuilderLoading(html = "Loading…") {
+      if (!loadingOverlay || !loadingContent) return;
+      loadingContent.innerHTML = html;
+      loadingOverlay.hidden = false;
+    }
+
+    function hideBuilderLoading() {
+      if (loadingOverlay) loadingOverlay.hidden = true;
+    }
+
+    function showAuthRequiredState() {
+      showBuilderLoading(
+        `<div>
+          <p>A password is required to load your reels.</p>
+          <button type="button" id="authRetryBtn">Retry</button>
+        </div>`
+      );
+      const retryBtn = document.getElementById("authRetryBtn");
+      if (retryBtn) retryBtn.onclick = () => init();
+    }
+
+    function updateSaveStatusIndicator(status) {
+      const el = document.getElementById("draftSaveStatus");
+      if (!el) return;
+      const text = {
+        pending: "Unsaved changes…",
+        saving: "Saving…",
+        saved: "All changes saved",
+        error: "⚠ Save failed - will retry",
+      }[status] || "";
+      el.textContent = text;
+      el.dataset.status = status;
+    }
 
     // Initialize preview manager
     const previewManager = new PreviewManager();
@@ -40,49 +83,94 @@ document.addEventListener("DOMContentLoaded", async () => {
       return;
     }
 
-    let currentId = null;
-    if (savedId && reels.some(r => r.id === savedId)) {
-      currentId = savedId;
-    } else if (reels.length) {
-      currentId = reels[0].id;
+    async function init() {
+      showBuilderLoading();
+
+      const password = await getBuilderPassword();
+      if (!password) {
+        showAuthRequiredState();
+        return;
+      }
+
+      let listEntries;
+      try {
+        listEntries = await listDrafts();
+      } catch (e) {
+        console.error("Failed to list drafts:", e);
+        // Offline/Worker-down: fall back to an empty list so createNew()
+        // still works locally - its save naturally retries via the
+        // debounce once connectivity returns. Don't block the UI.
+        listEntries = [];
+      }
+
+      reels = listEntries.map((e) => ({ ...e, _stub: true }));
+
+      await maybeRunMigration(reels);
+
+      const savedId = localStorage.getItem("currentReelId");
+      if (savedId && reels.some((r) => r.id === savedId)) {
+        currentId = savedId;
+      } else if (reels.length) {
+        currentId = reels[0].id;
+      }
+
+      if (!reels.length) {
+        const first = createEmptyReel();
+        reels.push(first);
+        currentId = first.id;
+        flushDraftSave(first);
+      }
+
+      window.reels = reels;
+      window.saveReels = saveReels;
+
+      onSaveStatusChange((id, status) => {
+        if (id === currentId) updateSaveStatusIndicator(status);
+      });
+
+      await render();
     }
 
-    if (!reels.length) {
-      const first = createEmptyReel();
-      reels.push(first);
-      currentId = first.id;
-      saveReels(reels);
-    }
-
-    function setCurrent(id) {
+    async function setCurrent(id) {
       currentId = id;
       localStorage.setItem('currentReelId', currentId);
-      render();
+      await render();
     }
 
-    function createNew() {
+    async function createNew() {
       const newReel = createEmptyReel();
       reels.push(newReel);
       currentId = newReel.id;
-      saveReels(reels);
-      render();
+      flushDraftSave(newReel); // not awaited - one-shot, don't stall the UI
+      await render();
     }
 
-    function handleDelete(id) {
+    async function handleDelete(id) {
       if (reels.length === 1) {
         dialog.alert("At least one reel must remain.", "OK");
         return;
       }
       const idx = reels.findIndex((r) => r.id === id);
-      if (idx !== -1) {
-        reels.splice(idx, 1);
-        // If deleted reel was selected, select the next available one
-        if (currentId === id) {
-          currentId = reels.length ? reels[0].id : null;
-        }
-        saveReels(reels);
-        render();
+      if (idx === -1) return;
+
+      const [removed] = reels.splice(idx, 1); // optimistic
+      const wasCurrent = currentId === id;
+      if (wasCurrent) {
+        currentId = reels.length ? reels[0].id : null;
       }
+
+      try {
+        await deleteDraft(id);
+      } catch (e) {
+        // Roll back - local/server state must not silently drift.
+        reels.splice(idx, 0, removed);
+        if (wasCurrent) currentId = id;
+        dialog.alert(`Couldn't delete "${removed.title || "(untitled reel)"}" - ${e.message}`);
+        await render();
+        return;
+      }
+
+      await render();
     }
 
     let previewRefreshTimer = null;
@@ -102,9 +190,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       schedulePreviewRefresh();
     }
 
-    function render() {
+    async function render() {
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete);
-      const current = reels.find((r) => r.id === currentId);
+
+      const idx = reels.findIndex((r) => r.id === currentId);
+      let current = reels[idx];
+
+      if (current && current._stub) {
+        showBuilderLoading();
+        try {
+          const full = await loadDraft(current.id);
+          if (full) {
+            reels[idx] = full;
+            current = full;
+          } else {
+            // 404 - deleted server-side elsewhere; drop it, pick another.
+            reels.splice(idx, 1);
+            currentId = reels[0]?.id ?? null;
+            hideBuilderLoading();
+            return render();
+          }
+        } catch (e) {
+          hideBuilderLoading();
+          dialog.alert(`Couldn't load this reel (offline or server error): ${e.message}`);
+          return; // never renderBuilder() a stub - missing fields would
+                  // throw deep inside builder.js. The previously-rendered
+                  // form (if any) just stays on screen.
+        }
+        hideBuilderLoading();
+      }
+
       renderBuilder(current, updateCurrentReel);
       setupRefreshPreviewButton();
       setupExportEmbedButton();
@@ -236,7 +351,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       previewManager.showPreview(current, playerApp);
     }
 
-    render();
+    init();
   } else {
     // --- Classic playlist.txt mode ---
     // Load and render playlist

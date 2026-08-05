@@ -1,22 +1,10 @@
+// sidebar.js - Renders the builder's reel list sidebar.
+// Storage (load/save) now lives in js/modules/draftStore.js, backed by the
+// Worker/KV so drafts are available from any browser - see its header
+// comment and worker/README.md's "Drafts" section. renderSidebar() only
+// ever reads reel.id/reel.title/reel.createdAt, so it works unchanged
+// whether a reel entry is a full body or a lightweight stub (see js/main.js).
 import { dialog } from './modules/dialogSystem.js';
-
-export function loadReels() {
-  try {
-    const json = localStorage.getItem('reelList');
-    return json ? JSON.parse(json) : [];
-  } catch (e) {
-    console.error('Failed to load reels from localStorage:', e);
-    return [];
-  }
-}
-
-export function saveReels(reels) {
-  try {
-    localStorage.setItem('reelList', JSON.stringify(reels));
-  } catch (e) {
-    console.error('Failed to save reels to localStorage:', e);
-  }
-}
 
 export function renderSidebar(reels, currentId, onSelect, onNew, onDelete) {
   const list = document.getElementById('reelList');

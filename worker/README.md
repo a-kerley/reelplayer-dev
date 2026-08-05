@@ -69,6 +69,33 @@ curl http://localhost:8787/reels -H "Authorization: Bearer YOUR_PASSWORD"
 curl -X DELETE http://localhost:8787/reels/test123 -H "Authorization: Bearer YOUR_PASSWORD"
 ```
 
+## Drafts (auto-saved in-progress reels)
+
+Separate from published reels above - these back the builder's own
+auto-save, so the reel list is available from any browser that can reach
+the (password-gated) builder page. Same KV namespace, a different key
+prefix (`draft_<id>` vs `reel_<id>`), different JSON shape (the raw builder
+form data, not the published/export shape), and - unlike `/reels/:id` -
+**every** draft route requires the password, including GET, since drafts
+have no legitimate anonymous reader:
+
+```bash
+# Save/update a draft (password-gated) - updatedAt is stamped server-side
+curl -X POST http://localhost:8787/drafts/test123 \
+  -H "Authorization: Bearer YOUR_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"test123","title":"Test Draft"}'
+
+# Fetch it (password-gated - NOT public, unlike /reels/:id)
+curl http://localhost:8787/drafts/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+
+# List all drafts (password-gated)
+curl http://localhost:8787/drafts -H "Authorization: Bearer YOUR_PASSWORD"
+
+# Delete it (password-gated)
+curl -X DELETE http://localhost:8787/drafts/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+```
+
 ## Redeploying after changes
 
 Any time `worker/src/index.js` changes, run `npx wrangler deploy` again from this directory. The URL stays the same, so `js/config.js` doesn't need updating unless you tear down and recreate the Worker itself.
@@ -126,4 +153,4 @@ curl -X DELETE "http://localhost:8787/media/delete?key=audio/renamed.mp3" -H "Au
 
 This only stores reel *configuration* (track titles, URLs, colors, settings) as small JSON — a few KB per reel — in KV, and media *files* in R2. It does not do adaptive-bitrate video streaming/transcoding (that would be Cloudflare Stream, a different, paid product, not needed since the player just plays plain files).
 
-There's also no page-level password gate on the builder itself — anyone with the link can open the builder UI. The password here only protects write/list actions (publishing/managing reels, and uploading/browsing/renaming/deleting media), preventing random internet traffic from writing into or reading the list of published reels or media files.
+The builder's entry page itself is gated separately (HTTP Basic Auth via a `BUILDER_ACCESS_PASSWORD` secret on the static-assets Worker that serves the builder/player site - see the root `wrangler.jsonc`/`src/index.js`, not this one). That page gate is a different mechanism protecting a different origin - it does not cover this Worker's API routes, which is why drafts and publish/media actions all still require `BUILDER_PASSWORD` here on every request regardless of whether the caller already passed the page gate.

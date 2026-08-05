@@ -28,10 +28,14 @@
         </div>
         <div id="reelsPanel">
           <button id="newReelBtn">+ New Reel</button>
+          <span id="draftSaveStatus" class="draft-save-status"></span>
           <ul id="reelList"></ul>
         </div>
       </aside>
       <main class="builder-main">
+        <div id="builderLoadingOverlay" class="builder-loading-overlay" hidden>
+          <div id="builderLoadingContent">Loading…</div>
+        </div>
         <div id="reelBuilderView">
           <form id="reelForm" autocomplete="off">
             <label>
