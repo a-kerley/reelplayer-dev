@@ -11,6 +11,38 @@ dependencies to install for the app itself.
 - **`player.html` + `js/player.js`** — the actual embeddable player that runs
   on third-party sites once a reel is published.
 
+## `player.html`'s embed bootstrap duplicates `js/player.js`, and drifts
+
+`player.html`'s inline `<script type="module">` doesn't call `playerApp`'s
+own `renderPlayer()` for a real embed - it has its own hand-written
+`renderPlayerHTML()` (DOM markup) and `initializeEmbedPlayer()` (wiring:
+`cacheElements()`, mode setup, event listeners, etc.) that are meant to be
+equivalent to what `renderPlayer()` does for the builder's live preview, but
+are a **separate, manually-kept-in-sync copy**, not the same code path.
+
+This has already caused two real, hard-to-spot bugs (both worked perfectly
+in the builder preview, both silently broken only in a real embed):
+
+- `initializeEmbedPlayer()` never created `playerApp.closedIdleManager` -
+  every `closedIdleManager?.*` call elsewhere in `player.js` silently
+  no-op'd via optional chaining, so player-closed-idle never activated at
+  all in an embed.
+- `renderPlayerHTML()`'s video elements were missing the unsuffixed
+  `main-video`/`track-video` base class that `renderPlayer()` includes
+  alongside the `-a`/`-b` suffixed ones. `videoPlayback.js`'s
+  `fadeOutVideo()` reads exactly that class to route cleanup by type -
+  missing it silently misrouted every track-video cleanup as type `'main'`,
+  which compared against the wrong layer pointer and left
+  `videoState.trackVideoPlaying` stuck `true` forever after the first exit,
+  permanently blocking `checkConditions()` from ever re-entering idle.
+
+Neither failure threw an error or logged a warning - both were just quiet
+no-ops. When adding or changing anything in `renderPlayer()` (player.js) -
+new DOM structure, new classes, new setup calls, new state resets - check
+whether `player.html`'s `renderPlayerHTML()`/`initializeEmbedPlayer()` needs
+the equivalent change, and verify by testing an actual embed (see "Test
+Embed" button in the export dialog), not just the builder preview.
+
 **`css/layout.css` is loaded by both.** Anything in it must keep working with
 a reel's own per-reel light/dark appearance — never add builder-chrome-only
 styling there. Builder-only chrome styling belongs in `css/builder.css`,
@@ -85,7 +117,16 @@ KV (reel JSON) + R2 (media files) — see `worker/README.md` for setup.
   committing if you've touched worker/auth-related code.
 - Publish/manage/upload routes are gated by `Authorization: Bearer
   <BUILDER_PASSWORD>`, checked via `isAuthorized()` in `worker/src/index.js`.
-  Read-only media serving is public (via the R2 public dev URL).
+  Read-only media serving is public, via R2's custom domain
+  (`media.boxedape.com`, not the rate-limited `pub-*.r2.dev` dev URL) fronted
+  by a Cloudflare Cache Rule for edge caching.
+- The builder + player static site itself (`index.html`/`player.html`/`css`/
+  `js`) deploys via a root-level `wrangler.jsonc` as a Cloudflare Workers
+  static-assets project (`reelplayer-app`), auto-deploying on push to `main`.
+  `src/index.js` gates just the builder's entry page (`/` and `/index.html`)
+  behind a shared password (`BUILDER_ACCESS_PASSWORD` secret, separate from
+  `BUILDER_PASSWORD`) - `/player` and every asset it needs stay fully public,
+  since anonymous visitors load those wherever a reel is embedded.
 
 ## Verification workflow
 
