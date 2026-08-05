@@ -28,6 +28,21 @@ function getCookie(request, name) {
   return match ? match[1] : null;
 }
 
+// Basic Auth always carries a "username:password" pair even though this gate
+// only has one shared password and no concept of a username - decode it and
+// check just the password half, so whatever's typed into the username field
+// (blank, a name, anything) is accepted.
+function extractPassword(authHeader) {
+  if (!authHeader.startsWith("Basic ")) return null;
+  try {
+    const decoded = atob(authHeader.slice("Basic ".length));
+    const colonIndex = decoded.indexOf(":");
+    return colonIndex === -1 ? decoded : decoded.slice(colonIndex + 1);
+  } catch {
+    return null;
+  }
+}
+
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
@@ -42,10 +57,9 @@ export default {
       return env.ASSETS.fetch(request);
     }
 
-    const auth = request.headers.get("Authorization") || "";
-    const expectedAuth = `Basic ${btoa(`builder:${env.BUILDER_ACCESS_PASSWORD}`)}`;
+    const suppliedPassword = extractPassword(request.headers.get("Authorization") || "");
 
-    if (auth !== expectedAuth) {
+    if (suppliedPassword !== env.BUILDER_ACCESS_PASSWORD) {
       return new Response("Authentication required", {
         status: 401,
         headers: { "WWW-Authenticate": 'Basic realm="ReelPlayer Builder"' },
