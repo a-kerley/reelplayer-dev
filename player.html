@@ -82,6 +82,7 @@
     import { playerApp } from './js/player.js';
     import { getColorFilters } from './js/modules/colorUtils.js';
     import { WORKER_BASE_URL } from './js/config.js';
+    import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     
     // ============================================
     // INITIALIZATION
@@ -413,7 +414,23 @@
       // ============================================
       playerApp.elements = {};
       playerApp.cacheElements();
-      
+
+      // ============================================
+      // Player-closed-idle manager
+      // js/player.js's own renderPlayer() (used by the builder preview)
+      // creates this every render - initializeEmbedPlayer() is a separate,
+      // hand-duplicated equivalent of that method and was missing this
+      // entirely, which silently no-op'd every closedIdleManager?.* call
+      // throughout player.js (checkConditions/preloadIdleVideo/exit) in the
+      // embedded player specifically, since optional chaining swallows a
+      // missing object with no error - closed-idle worked in the builder
+      // preview and never in a real embed.
+      // ============================================
+      if (!playerApp.closedIdleManager) {
+        playerApp.closedIdleManager = createPlayerClosedIdleManager(playerApp);
+      }
+      playerApp.closedIdleManager.initialize();
+
       // ============================================
       // Setup expandable mode if enabled
       // ============================================
