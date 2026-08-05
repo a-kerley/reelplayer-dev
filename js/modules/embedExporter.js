@@ -67,7 +67,11 @@ export class EmbedExporter {
   });
 </script>` : '';
     
-    return `<iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player.html?id=${reelId}" 
+    // Extensionless "player" (not "player.html") - matches the canonical
+    // clean-URL form the static-assets Worker's default html_handling
+    // serves directly, so embeds never take the .html -> extensionless
+    // redirect hop that requesting "player.html" literally would trigger.
+    return `<iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player?id=${reelId}"
            width="100%" height="${height}px" frameborder="0" 
            style="border-radius: 8px; border: none; min-height: ${height}px; transition: height 0.3s ease;">
           </iframe>${resizeScript}`;

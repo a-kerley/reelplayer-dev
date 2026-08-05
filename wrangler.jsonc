@@ -8,11 +8,12 @@
   "name": "reelplayer-app",
   "compatibility_date": "2024-11-01",
   "assets": {
-    "directory": "./",
-    // Disable the default clean-URL redirect (player.html -> /player, etc).
-    // embedExporter.js builds embed <iframe> src urls with the literal
-    // ".html" suffix (player.html?id=...) - leaving the redirect on would
-    // add an extra round-trip to every single embed load for no benefit.
-    "html_handling": "none"
+    "directory": "./"
+    // Deliberately left at the default html_handling ("auto-trailing-slash")
+    // rather than "none" - "none" also disables the automatic "/" ->
+    // "/index.html" resolution, which 404'd the bare domain entirely. The
+    // default's clean-URL redirect (player.html -> /player) is instead
+    // avoided by having embedExporter.js generate the canonical extensionless
+    // url directly, so embeds never hit the redirect either.
   }
 }
