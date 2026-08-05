@@ -1371,6 +1371,9 @@ const playerAppCore = {
               <div class="hover-time">0:00</div>
               <div class="playhead-time">0:00</div>
               <div id="total-time" class="total-time">0:00</div>
+              <div id="loading" class="loading">
+                <div class="spinner"></div>
+              </div>
             </div>
             <div class="volume-control hidden">
               <button id="volumeToggle" class="icon-button">
@@ -1381,9 +1384,6 @@ const playerAppCore = {
               </button>
               <input type="range" id="volumeSlider" min="0" max="1" step="0.01" value="1"/>
             </div>
-          </div>
-          <div id="loading" class="loading">
-            <div class="spinner"></div>
           </div>
         </div>
       </div>

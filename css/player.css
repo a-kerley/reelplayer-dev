@@ -534,12 +534,20 @@ button {
 }
 
 .loading {
-  /* Positioned relative to .player-container - centered over the play/waveform row */
+  /* Now a child of #waveform (which already has position:relative and an
+     explicit height/min-height via --expandable-waveform-height) so this
+     centers precisely on the waveform itself. It used to be a sibling under
+     .player-container, centered on that whole flex row instead - which also
+     contains the play button and volume control on either side. Those two
+     have unequal widths (asymmetric horizontal offset) and .player-container
+     measured taller than the waveform row itself (vertical offset), so the
+     spinner sat ~7px left and ~10px above the waveform's true center rather
+     than on it. */
   position: absolute;
   top: 50%;
   left: 50%;
   transform: translate(-50%, -50%);
-  z-index: 20; /* Above waveform/hover/playhead layers within .player-container */
+  z-index: 20; /* Above #waveform's own hover/playhead/total-time layers (highest at 11) */
   pointer-events: none; /* Prevent interaction */
   transition: opacity 0.3s ease;
   /* Ensure the container has dimensions */
