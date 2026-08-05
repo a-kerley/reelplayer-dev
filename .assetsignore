@@ -1,0 +1,9 @@
+# Excludes files from the static-assets Worker upload (wrangler.jsonc's
+# assets.directory is the whole repo root, since index.html/player.html live
+# there with no build step). Without this, wrangler scans .git's internal
+# object store too - which has hit Cloudflare's 25MiB per-asset limit on old
+# large blobs from before media moved to R2.
+.git
+worker
+.wrangler
+node_modules
