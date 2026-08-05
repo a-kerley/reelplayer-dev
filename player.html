@@ -328,11 +328,19 @@
           <div class="track-background-layer track-bg-layer-a"></div>
           <div class="track-background-layer track-bg-layer-b"></div>
           
-          <!-- Video background layers (dual-buffer for crossfade) -->
-          <video class="background-video main-video-a" muted loop playsinline></video>
-          <video class="background-video main-video-b" muted loop playsinline></video>
-          <video class="background-video track-video-a" muted loop playsinline></video>
-          <video class="background-video track-video-b" muted loop playsinline></video>
+          <!-- Video background layers (dual-buffer for crossfade). Class lists must
+               match js/player.js's renderPlayer() exactly, including the unsuffixed
+               "main-video"/"track-video" base class - videoPlayback.js's fadeOutVideo()
+               reads that exact class (not the -a/-b suffixed one) to determine which
+               type to pass to cleanupVideo(). Missing it here silently misrouted every
+               track video cleanup as type 'main', which compares against the wrong
+               layer pointer and left trackVideoPlaying stuck true forever - closed-idle
+               entering once successfully and then never being able to re-enter, since
+               checkConditions() perpetually believed a video was still active. -->
+          <video class="background-video main-video main-video-a" preload="auto" muted loop playsinline></video>
+          <video class="background-video main-video main-video-b" preload="auto" muted loop playsinline></video>
+          <video class="background-video track-video track-video-a" preload="auto" muted loop playsinline></video>
+          <video class="background-video track-video track-video-b" preload="auto" muted loop playsinline></video>
           <div class="player-closed-idle-overlay"></div>
 
           ${projectTitleOverlayHTML}
