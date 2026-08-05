@@ -199,6 +199,23 @@ document.addEventListener("DOMContentLoaded", async () => {
               }
             },
             {
+              // Dev-only convenience - opens the GitHub Pages embed-testing
+              // harness (testHTMLpages/embed-test-live.html) and copies the
+              // code to the clipboard first, so the flow is just "paste".
+              // Update this URL if that test page ever moves.
+              text: "Test Embed ↗",
+              type: "secondary",
+              onClick: () => {
+                const textarea = document.getElementById('embedCodeArea');
+                const currentCode = textarea.value;
+                navigator.clipboard.writeText(currentCode).catch(() => {
+                  // Clipboard write failing isn't fatal - the code is still
+                  // visible/selectable in the textarea for a manual copy.
+                });
+                window.open('https://a-kerley.github.io/reelplayer-dev/testHTMLpages/embed-test-live.html', '_blank');
+              }
+            },
+            {
               text: "Close",
               type: "secondary",
               onClick: () => {
