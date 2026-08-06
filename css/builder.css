@@ -265,6 +265,20 @@ body {
   margin-bottom: 1.5rem;
 }
 
+/* Browsers give <fieldset> a UA-default min-width of min-content (a
+   long-standing legacy quirk), which refuses to shrink the fieldset - and
+   everything inside it - below its content's natural width, regardless of
+   how narrow its actual containing block is. Every builder section
+   (js/builder.js's createFieldset()) is a <fieldset>, so without this
+   override, narrowing the browser window did nothing at all below that
+   floor: the tracks editor row's own width stayed pinned to its full
+   natural size (confirmed via getBoundingClientRect() across viewports),
+   which is why nothing inside it - the title input, the filename display -
+   ever got small enough to actually truncate. */
+.builder-app fieldset {
+  min-width: 0;
+}
+
 #reelPlayerPreview {
   margin-top: 4rem;
   margin-bottom: 4rem;
@@ -279,6 +293,10 @@ body {
   width: 18rem;
   max-width: 100%;
   font-size: var(--builder-text-sm);
+  box-sizing: border-box;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
 }
 
 .track-drag-handle {

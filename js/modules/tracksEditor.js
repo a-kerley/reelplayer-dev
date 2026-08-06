@@ -89,8 +89,14 @@ function createTitleField(track, onChange) {
   titleField.setAttribute("autocomplete", "off");
   titleField.placeholder = "Track Title (optional, overrides file name)";
   titleField.value = track.title;
-  titleField.size = 32;
-  
+  // Deliberately NOT titleField.size = 32 - the size attribute establishes
+  // an intrinsic content-based width that flexbox treats as this item's
+  // "automatic minimum size" for shrinking purposes, so the row could never
+  // actually shrink below it regardless of flex-shrink or viewport width
+  // (the row just overflowed horizontally instead of truncating - sizing
+  // and truncation for text inputs here comes from the
+  // "#tracksEditor input[type='text']" rule in css/builder.css).
+
   titleField.oninput = (e) => {
     track.title = e.target.value;
   };
