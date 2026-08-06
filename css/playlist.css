@@ -108,8 +108,10 @@
   min-height: 30px;
 }
 
-.custom-scrollbar-thumb:hover {
-  background: rgba(0, 0, 0, 0.5);
+@media (hover: hover) and (pointer: fine) {
+  .custom-scrollbar-thumb:hover {
+    background: rgba(0, 0, 0, 0.5);
+  }
 }
 
 .custom-scrollbar-thumb:active {
@@ -146,10 +148,16 @@
   margin-top: 4px;
 }
 
-.playlist-item:hover {
-  transform: scale(0.98);
-  opacity: 0.85;
-  background-color: rgba(255, 255, 255, 0.1);
+/* Scoped to real hover/pointer devices only - on touch, mobile browsers apply
+   a simulated :hover to whatever item is currently under the finger during a
+   scroll drag, so unscoped this flickers "hovered" across items as the list
+   scrolls past them, rather than only reflecting an actual pointer hover. */
+@media (hover: hover) and (pointer: fine) {
+  .playlist-item:hover {
+    transform: scale(0.98);
+    opacity: 0.85;
+    background-color: rgba(255, 255, 255, 0.1);
+  }
 }
 
 .playlist-item.active {

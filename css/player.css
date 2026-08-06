@@ -29,8 +29,10 @@
   opacity: 0;
 }
 
-#playPause:hover {
-  transform: scale(1.1);
+@media (hover: hover) and (pointer: fine) {
+  #playPause:hover {
+    transform: scale(1.1);
+  }
 }
 
 /* ========================================
@@ -140,12 +142,35 @@
   height: var(--expandable-waveform-height); /* Use same height variable */
   min-height: var(--expandable-waveform-height);
   flex-shrink: 0;
+  /* Flex items default to min-width: auto, which refuses to shrink below the
+     content's own intrinsic size - here that's WaveSurfer's canvas, whose
+     rendered pixel width WaveSurfer itself recalculates by measuring this
+     same container. Uncapped, that's circular: canvas asserts a size ->
+     becomes this item's floor -> WaveSurfer's ResizeObserver reads a
+     wobbling width -> redraws -> repeat, worse the narrower (and the less
+     slack) the layout is. min-width: 0 removes the implicit floor so flex:1
+     can actually shrink it as intended. */
+  min-width: 0;
+  /* flex: 1 shorthand implies flex-basis: 0% - percentage bases can round
+     fractional leftover space slightly differently than a pixel basis across
+     successive layout passes in some engines, especially nested inside
+     .waveform-and-volume's own flex:1 (two levels of fractional distribution
+     stacked). Explicit 0px basis, plus contain: layout to keep this
+     subtree's layout math from repeatedly interacting with ancestor reflow,
+     are both experiments toward the same residual sub-pixel-jitter
+     hypothesis - not contain: paint, which would clip .hover-time/
+     .playhead-time (both intentionally render outside this box via
+     overflow: visible above). */
+  flex-basis: 0px;
+  contain: layout;
 }
 .waveform-and-volume {
   display: flex;
   align-items: center;
   gap: var(--expandable-player-gap); /* Use same gap as expandable mode */
   flex: 1;
+  flex-basis: 0px;
+  min-width: 0; /* Same reasoning as #waveform above - this wraps it */
   min-height: var(--expandable-waveform-height); /* Use same height variable as expandable mode */
   margin-top: var(--expandable-waveform-margin-top);
   margin-bottom: var(--expandable-waveform-margin-bottom);
@@ -439,7 +464,7 @@ button {
 }
 
 /* Exclude background layers and videos from automatic z-index */
-.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay):not(.player-closed-idle-overlay) {
+.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay):not(.player-closed-idle-overlay):not(.expandable-tap-bar) {
   position: relative;
   z-index: 7;
 }
@@ -523,6 +548,15 @@ button {
 .player-wrapper:not(.expandable-mode).playback-idle #total-time {
   opacity: var(--playback-idle-opacity) !important;
   transition: opacity var(--playback-idle-transition-in) ease-out;
+}
+
+/* Same reasoning as the equivalent override in expandable.css - no spacebar
+   fallback on touch, so play/volume shouldn't dim to near-invisibility. */
+@media (hover: none) and (pointer: coarse) {
+  .player-wrapper:not(.expandable-mode).playback-idle #playPause,
+  .player-wrapper:not(.expandable-mode).playback-idle .volume-control {
+    opacity: 1 !important;
+  }
 }
 
 /* Background overlay transitions for static mode */
@@ -698,6 +732,22 @@ button {
    manage. --hover-darken-brightness only differs from its 1 (no-op) default
    while both .hover-darken-enabled is present (reel setting) and the wrapper is
    actually hovered - so disabling the feature, or not hovering, always no-ops. */
-.player-wrapper.hover-darken-enabled:hover {
+/* Scoped to real hover/pointer devices only - on touch this rule would still
+   match via the browser's own simulated/sticky :hover-on-tap, fighting the
+   .touch-darkened class below (JS clears that on its own idle timer, but the
+   native sticky :hover can stay latched on regardless, keeping the darken
+   stuck permanently instead of just poor timing). */
+@media (hover: hover) and (pointer: fine) {
+  .player-wrapper.hover-darken-enabled:hover {
+    --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
+  }
+}
+
+/* Touch equivalent of the :hover rule above - there's no real hover on touch, and
+   some mobile browsers fake a sticky :hover on tap that never clears until tapping
+   elsewhere, which would be worse than nothing here (a permanently-stuck-dark
+   background). js/player.js's setupHoverDarkenTouchInteractions() toggles this
+   class on touch activity instead, with its own idle timeout to undarken again. */
+.player-wrapper.hover-darken-enabled.touch-darkened {
   --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
 }

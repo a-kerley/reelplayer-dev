@@ -157,3 +157,23 @@
      ======================================== */
   --expandable-scrollbar-width: 30px;             /* Width reserved for hiding native scrollbar */
 }
+
+/* ========================================
+   NARROW VIEWPORT OVERRIDES
+   Both static and expandable modes read --player-padding and
+   --expandable-playlist-inset (see player.css/expandable.css) - at 2rem each
+   side, that's 64px lost from a 320-375px phone width before any actual
+   content (waveform, controls, playlist rows) even starts. Overriding the
+   variables here, rather than touching every rule that reads them, is why
+   this is a one-block change instead of a scattered one - the shared-var
+   architecture in the rest of this file exists for exactly this. Deliberately
+   NOT touching icon/button sizes (.heroicon is already 46px, close to the
+   ~44px minimum touch-target recommendation) or --expandable-track-info-left
+   (tied to the play button's width, not wasted space).
+   ======================================== */
+@media (max-width: 480px) {
+  :root {
+    --player-padding: 1rem;
+    --expandable-playlist-inset: 1rem;
+  }
+}

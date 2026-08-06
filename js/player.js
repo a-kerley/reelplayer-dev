@@ -99,6 +99,107 @@ const playerAppCore = {
     maxCacheSize: 10            // Maximum number of images to keep in cache
   },
 
+  // Primary input has no hover and a coarse pointer - the correct signal for
+  // "should this use tap/scroll-driven interactions instead of hover", as
+  // opposed to merely checking for touch support (which would also flag
+  // touchscreen laptops that are still mouse-primary).
+  isTouchDevice() {
+    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+  },
+
+  // #waveform is flex:1 in the stylesheet (see the CSS comments on that rule
+  // for the fuller theory), but nested flex:1 items resolving fractional
+  // leftover space can round slightly differently across successive layout
+  // passes in some engines - on a narrow, tightly-packed mobile layout, that
+  // shows up as WaveSurfer's own ResizeObserver seeing a genuinely different
+  // measured width from one frame to the next and redrawing the bars each
+  // time, tied to whatever's forcing repeated layout passes during playback
+  // (the playhead-time label's per-tick text/position updates). Freezing the
+  // width as an explicit, rounded, whole-pixel inline style removes it from
+  // flex's fractional distribution entirely, so it can no longer wobble
+  // between frames - only updateWaveformWidth() itself changes it, and only
+  // in response to an actual resize or expand/collapse transition, never a
+  // playback tick.
+  updateWaveformWidth() {
+    const waveformEl = this.elements.waveform;
+    if (!waveformEl) return;
+
+    // Clear any previously frozen width so the stylesheet's flex: 1 computes
+    // a fresh, current share of the available space to measure.
+    waveformEl.style.width = '';
+    waveformEl.style.flex = '';
+
+    const measuredWidth = waveformEl.getBoundingClientRect().width;
+    if (!measuredWidth) return;
+
+    waveformEl.style.flex = '0 0 auto';
+    waveformEl.style.width = `${Math.round(measuredWidth)}px`;
+  },
+
+  cleanupWaveformWidthTracking() {
+    if (this.waveformWidthTracking) {
+      window.removeEventListener('resize', this.waveformWidthTracking.handler);
+      clearTimeout(this.waveformWidthTracking.debounceTimeout);
+      this.waveformWidthTracking = null;
+    }
+  },
+
+  // Debounced (150ms) so a continuous resize/orientation-change gesture only
+  // triggers one re-freeze at the end, not one per intermediate frame -
+  // exactly the kind of per-frame churn updateWaveformWidth() exists to
+  // avoid in the first place.
+  setupWaveformWidthTracking() {
+    this.cleanupWaveformWidthTracking();
+
+    this.waveformWidthTracking = { handler: null, debounceTimeout: null };
+    const handler = () => {
+      clearTimeout(this.waveformWidthTracking.debounceTimeout);
+      this.waveformWidthTracking.debounceTimeout = setTimeout(() => {
+        this.updateWaveformWidth();
+      }, 150);
+    };
+    this.waveformWidthTracking.handler = handler;
+    window.addEventListener('resize', handler);
+  },
+
+  // Called on THIS instance, right after its own playback starts, to stop any
+  // other reelplayer embed already playing elsewhere on the same host page.
+  // Sibling <iframe>s are same-origin to each other (all served from this
+  // same player domain) regardless of what origin the actual host page is,
+  // so direct property access across them is allowed by the same-origin
+  // policy - no postMessage relay through the host page needed. window.top
+  // itself, or any individual frame in it, can still throw (unusual sandbox
+  // attributes, or a frame that's genuinely cross-origin to us because it's
+  // not a reelplayer embed at all) - both are caught and simply skipped
+  // rather than treated as an error.
+  pauseOtherPlayers() {
+    let frames;
+    try {
+      frames = window.top.frames;
+    } catch (e) {
+      return;
+    }
+    for (let i = 0; i < frames.length; i++) {
+      const frame = frames[i];
+      if (frame === window) continue;
+      try {
+        frame.playerApp?.pauseForOtherPlayer?.();
+      } catch (e) {
+        // Not a same-origin reelplayer embed - ignore.
+      }
+    }
+  },
+
+  // Called on the OTHER instance (via pauseOtherPlayers() above) to stop it
+  // in favor of whichever player just started. Reuses the same fade-out
+  // pause the play/pause button itself uses, rather than a hard stop, so it
+  // doesn't sound like anything broke.
+  pauseForOtherPlayer() {
+    if (this.wavesurfer?.isPlaying()) {
+      this.applyAudioFadeOut(true);
+    }
+  },
+
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
     this.elements.playPauseBtn = document.getElementById("playPause");
@@ -165,21 +266,32 @@ const playerAppCore = {
       .replace("&dl=0", "&dl=1");
   },
 
-  async initializePlayer(audioURL, title, index) {
-    
+  // userSelected: true only when a user explicitly picked this track from the
+  // playlist (see playlistScroll.js's click handler) - that should always
+  // start playback once the track is ready, whether something else was
+  // already playing (stopped/crossfaded below, same as before) or the player
+  // was sitting paused/idle (previously stayed paused - the actual behavior
+  // change this flag exists for). The very first, unrequested load (initial
+  // track-0 render in renderPlayer()/initializeEmbedPlayer()) never passes
+  // this, so it's unaffected - it should still wait for an explicit
+  // play/spacebar press.
+  async initializePlayer(audioURL, title, index, userSelected = false) {
+
     this.showLoading(true);
-    
+
     // Initialize main background animation on first load
     if (!this.backgroundAnimations.main) {
       this.initMainBackgroundAnimation();
     }
-    
+
     // Check if playback is active
     const isPlaybackActive = this.wavesurfer?.isPlaying() || false;
 
     // Store state for auto-resume with fade-in after load
-    // Don't overwrite if already set (e.g., by auto-play from finish event)
-    if (!this.wasPlayingBeforeTrackSwitch) {
+    if (userSelected) {
+      this.wasPlayingBeforeTrackSwitch = true;
+    } else if (!this.wasPlayingBeforeTrackSwitch) {
+      // Don't overwrite if already set (e.g., by auto-play from finish event)
       this.wasPlayingBeforeTrackSwitch = isPlaybackActive;
     }
 
@@ -525,53 +637,106 @@ const playerAppCore = {
       document.addEventListener("mouseup", () => {
         playerApp.isDraggingSlider = false;
       });
-      volumeControl.addEventListener("mouseenter", () => {
-        clearTimeout(hideSliderTimeout);
-        volumeControl.classList.add("show-slider");
-      });
-      volumeControl.addEventListener("mouseleave", () => {
-        hideSliderTimeout = setTimeout(() => {
-          if (
-            !playerApp.isDraggingSlider &&
-            !playerApp.isHoveringSlider &&
-            !playerApp.isHoveringIcon
-          ) {
+
+      if (this.isTouchDevice()) {
+        // No hover on touch, so reveal is tap-driven instead: the first tap
+        // on the icon just reveals the slider (captured ahead of the
+        // mute-toggle click handler above, and swallowed so that tap doesn't
+        // also mute); a second tap, with the slider already visible, falls
+        // through to that mute-toggle handler normally. Dragging the
+        // revealed <input type="range"> itself needs no extra wiring - touch
+        // dragging is native range-input behavior. Hiding on tap-outside
+        // reuses the same hideSliderTimeout/300ms delay as the desktop
+        // mouseleave bookend below, instead of hiding instantly, so the
+        // close feels the same on both. There's also a longer auto-hide
+        // backstop (~2.5s) in case the user reveals it and never taps
+        // anywhere else at all - without one, a revealed slider would stay
+        // open indefinitely with nothing to dismiss it.
+        const scheduleAutoHide = () => {
+          clearTimeout(hideSliderTimeout);
+          hideSliderTimeout = setTimeout(() => {
             volumeControl.classList.remove("show-slider");
+          }, 2500);
+        };
+
+        volumeToggle.addEventListener("click", (e) => {
+          if (!volumeControl.classList.contains("show-slider")) {
+            volumeControl.classList.add("show-slider");
+            e.stopImmediatePropagation();
+            e.preventDefault();
+            scheduleAutoHide();
           }
-        }, 300);
-      });
-      volumeSlider.addEventListener("mouseenter", () => {
-        playerApp.isHoveringSlider = true;
-        clearTimeout(hideSliderTimeout);
-      });
-      volumeSlider.addEventListener("mouseleave", () => {
-        playerApp.isHoveringSlider = false;
-        hideSliderTimeout = setTimeout(() => {
-          if (
-            !playerApp.isDraggingSlider &&
-            !playerApp.isHoveringSlider &&
-            !playerApp.isHoveringIcon
-          ) {
+        }, true);
+
+        // Dragging resets the auto-hide countdown so it can't fire mid-drag.
+        volumeSlider.addEventListener("input", () => {
+          if (volumeControl.classList.contains("show-slider")) {
+            scheduleAutoHide();
+          }
+        });
+
+        document.addEventListener("touchstart", (e) => {
+          if (volumeControl.contains(e.target)) {
+            // Touching the control itself (icon or slider) resets the
+            // countdown rather than cancelling it outright, so the slider
+            // still eventually hides even if the user just keeps tapping
+            // the icon to mute/unmute without ever tapping away.
+            scheduleAutoHide();
+            return;
+          }
+          hideSliderTimeout = setTimeout(() => {
             volumeControl.classList.remove("show-slider");
-          }
-        }, 300);
-      });
-      volumeToggle.addEventListener("mouseenter", () => {
-        playerApp.isHoveringIcon = true;
-        clearTimeout(hideSliderTimeout);
-      });
-      volumeToggle.addEventListener("mouseleave", () => {
-        playerApp.isHoveringIcon = false;
-        hideSliderTimeout = setTimeout(() => {
-          if (
-            !playerApp.isDraggingSlider &&
-            !playerApp.isHoveringSlider &&
-            !playerApp.isHoveringIcon
-          ) {
-            volumeControl.classList.remove("show-slider");
-          }
-        }, 300);
-      });
+          }, 300);
+        }, { passive: true });
+      } else {
+        volumeControl.addEventListener("mouseenter", () => {
+          clearTimeout(hideSliderTimeout);
+          volumeControl.classList.add("show-slider");
+        });
+        volumeControl.addEventListener("mouseleave", () => {
+          hideSliderTimeout = setTimeout(() => {
+            if (
+              !playerApp.isDraggingSlider &&
+              !playerApp.isHoveringSlider &&
+              !playerApp.isHoveringIcon
+            ) {
+              volumeControl.classList.remove("show-slider");
+            }
+          }, 300);
+        });
+        volumeSlider.addEventListener("mouseenter", () => {
+          playerApp.isHoveringSlider = true;
+          clearTimeout(hideSliderTimeout);
+        });
+        volumeSlider.addEventListener("mouseleave", () => {
+          playerApp.isHoveringSlider = false;
+          hideSliderTimeout = setTimeout(() => {
+            if (
+              !playerApp.isDraggingSlider &&
+              !playerApp.isHoveringSlider &&
+              !playerApp.isHoveringIcon
+            ) {
+              volumeControl.classList.remove("show-slider");
+            }
+          }, 300);
+        });
+        volumeToggle.addEventListener("mouseenter", () => {
+          playerApp.isHoveringIcon = true;
+          clearTimeout(hideSliderTimeout);
+        });
+        volumeToggle.addEventListener("mouseleave", () => {
+          playerApp.isHoveringIcon = false;
+          hideSliderTimeout = setTimeout(() => {
+            if (
+              !playerApp.isDraggingSlider &&
+              !playerApp.isHoveringSlider &&
+              !playerApp.isHoveringIcon
+            ) {
+              volumeControl.classList.remove("show-slider");
+            }
+          }, 300);
+        });
+      }
     }
   },
 
@@ -592,10 +757,10 @@ const playerAppCore = {
     // one session, each mousemove over the waveform (a continuous, high-frequency
     // event) fired every accumulated duplicate, saturating the main thread enough
     // to visibly degrade audio timing and eventually make playback stop working.
-    waveformEl.addEventListener("mousemove", (e) => {
+    const updateScrubPreview = (clientX) => {
       const rect = waveformEl.getBoundingClientRect();
       const percent = Math.min(
-        Math.max((e.clientX - rect.left) / rect.width, 0),
+        Math.max((clientX - rect.left) / rect.width, 0),
         1
       );
       const duration = this.wavesurfer.getDuration();
@@ -603,19 +768,35 @@ const playerAppCore = {
       hoverOverlay.style.width = `${percent * 100}%`;
       hoverTime.textContent = this.formatTime(time);
       hoverTime.style.opacity = "1";
-      const pixelX = e.clientX - rect.left;
+      const pixelX = clientX - rect.left;
       hoverTime.style.left = `${Math.max(
         Math.min(pixelX, rect.width - 40),
         30
       )}px`;
-    });
-    waveformEl.addEventListener("mouseleave", () => {
+    };
+    const hideScrubPreview = () => {
       hoverOverlay.style.width = `0%`;
       hoverTime.style.opacity = "0";
-    });
+    };
+
+    waveformEl.addEventListener("mousemove", (e) => updateScrubPreview(e.clientX));
+    waveformEl.addEventListener("mouseleave", hideScrubPreview);
+
+    // Touch equivalent of the hover preview above - WaveSurfer's own tap-to-seek
+    // (interact: true) already handles the actual seek natively via touch, this
+    // just drives the same scrub-preview overlay/time label while the finger
+    // is down, since touch has no hover to trigger it otherwise.
+    waveformEl.addEventListener("touchstart", (e) => updateScrubPreview(e.touches[0].clientX), { passive: true });
+    waveformEl.addEventListener("touchmove", (e) => updateScrubPreview(e.touches[0].clientX), { passive: true });
+    waveformEl.addEventListener("touchend", hideScrubPreview);
 
     this.wavesurfer.on("ready", () => {
       this.isWaveformReady = true;
+      // Freeze #waveform's width as an explicit pixel value now that the DOM
+      // has settled for this track - see updateWaveformWidth()'s own comment
+      // for why. Re-measuring here means every track switch re-freezes to
+      // whatever's current, which is correct/idempotent either way.
+      this.updateWaveformWidth();
       this.showLoading(false);
       playPauseBtn.style.display = "inline-block";
       if (volumeControl) volumeControl.classList.remove("hidden");
@@ -744,7 +925,11 @@ const playerAppCore = {
       this.wavesurfer.setOptions({ cursorColor: accentColor });
       this.elements.waveform.classList.add('playing');
       this.updatePlayingState(true);
-      
+
+      // Stop any other reelplayer embed already playing elsewhere on the
+      // same host page - see pauseOtherPlayers()'s own comment for how.
+      this.pauseOtherPlayers();
+
       // Start video playback
       // Note: playVideo() has built-in interruption handling via activeFades Map
       // It will gracefully cancel any in-flight video fade-outs and start fresh
@@ -985,6 +1170,11 @@ const playerAppCore = {
     // Clean up old listeners if they exist
     this.cleanupExpandableModeListeners();
 
+    if (this.isTouchDevice()) {
+      this.setupExpandableModeTouchInteractions(wrapper);
+      return;
+    }
+
     // Create new listener functions and store references for cleanup
     const handleMouseEnter = () => {
       if (!this.expandable.isExpanded) {
@@ -1023,17 +1213,92 @@ const playerAppCore = {
     wrapper.addEventListener('mousemove', handleMouseMove);
   },
 
+  // Mobile has no hover, so expandable mode instead expands/collapses based on
+  // overlap with the middle third of the viewport (rootMargin of -33% top/bottom
+  // shrinks the observer's root down to that middle-third band). With
+  // threshold: 0, isIntersecting is already exactly "any overlap at all" vs
+  // "zero overlap" - so this single boolean naturally gives the asymmetric
+  // behavior wanted: the player expands (or stays expanded) as soon as any
+  // part of it touches the band, and only collapses once it has completely
+  // left the band on either side, rather than triggering off a single crossing
+  // line. A tap on the bottom handle bar (or the reel heading, once visible)
+  // can override this at any time; the override is released once scroll
+  // position naturally agrees with it again, so it doesn't permanently
+  // disable the scroll trigger for the rest of the session.
+  setupExpandableModeTouchInteractions(wrapper) {
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (this.expandable.mobileManualOverride) {
+          if (entry.isIntersecting === this.expandable.isExpanded) {
+            this.expandable.mobileManualOverride = false;
+          } else {
+            return;
+          }
+        }
+        if (entry.isIntersecting) {
+          if (!this.expandable.isExpanded) this.expandPlayer();
+          this.exitPlaybackIdle();
+          this.exitCollapsedIdle();
+        } else if (this.expandable.isExpanded) {
+          // immediate - by the time the default ~1.2s pre-collapsing/fade
+          // dead-time (built for an incidental desktop mouseleave) elapsed,
+          // a scrolling user could easily have moved well past where the
+          // collapse was actually triggered, making the scroll-compensated
+          // shrink (see compensateScrollDuringCollapse()) fire somewhere off
+          // their current screen instead of where they left it.
+          this.collapsePlayer(true);
+        }
+      });
+    }, { threshold: 0, rootMargin: '-33% 0px -33% 0px' });
+
+    observer.observe(wrapper);
+
+    const handleTap = () => {
+      this.expandable.mobileManualOverride = true;
+      if (this.expandable.isExpanded) {
+        this.collapsePlayer(true); // immediate - explicit tap, not incidental hover-leave
+      } else {
+        this.expandPlayer();
+      }
+      this.exitPlaybackIdle();
+      this.exitCollapsedIdle();
+    };
+
+    // Primary tap target: the bottom handle bar, present regardless of
+    // collapse state or whether the reel even has a title. The reel heading
+    // is wired as a secondary target when present, but it can only ever
+    // fire once already expanded - expandable.css hides it entirely
+    // (opacity 0, max-height 0, pointer-events none) while collapsed, so
+    // it has no hit area to tap until after expansion already happened.
+    const tapBar = wrapper.querySelector('.expandable-tap-bar');
+    const heading = wrapper.querySelector('.reel-title');
+    if (tapBar) tapBar.addEventListener('click', handleTap);
+    if (heading) heading.addEventListener('click', handleTap);
+
+    const handleTouchMove = () => this.resetPlaybackIdleTimer();
+    wrapper.addEventListener('touchmove', handleTouchMove, { passive: true });
+
+    this.expandable.listeners = { wrapper, observer, tap: handleTap, tapBar, heading, touchMove: handleTouchMove };
+  },
+
   cleanupExpandableModeListeners() {
     if (this.expandable.listeners) {
-      const { wrapper, mouseEnter, mouseLeave, mouseMove } = this.expandable.listeners;
+      const { wrapper, mouseEnter, mouseLeave, mouseMove, observer, tap, tapBar, heading, touchMove } = this.expandable.listeners;
       if (wrapper) {
-        wrapper.removeEventListener('mouseenter', mouseEnter);
-        wrapper.removeEventListener('mouseleave', mouseLeave);
-        wrapper.removeEventListener('mousemove', mouseMove);
+        if (mouseEnter) wrapper.removeEventListener('mouseenter', mouseEnter);
+        if (mouseLeave) wrapper.removeEventListener('mouseleave', mouseLeave);
+        if (mouseMove) wrapper.removeEventListener('mousemove', mouseMove);
+        if (touchMove) wrapper.removeEventListener('touchmove', touchMove);
       }
+      if (tap) {
+        if (tapBar) tapBar.removeEventListener('click', tap);
+        if (heading) heading.removeEventListener('click', tap);
+      }
+      if (observer) observer.disconnect();
       this.expandable.listeners = null;
     }
-    
+    this.expandable.mobileManualOverride = false;
+
     // Clear all idle-related timeouts
     this.clearAllIdleTimeouts();
   },
@@ -1062,27 +1327,40 @@ const playerAppCore = {
       this.resetPlaybackIdleTimer();
     };
 
+    // Touch has no hover, so there's no equivalent of "mouse entered/left the
+    // wrapper" - instead, any touch just exits idle and resets the same
+    // activity timer mouseenter/mousemove drive. Attached unconditionally
+    // (not gated behind isTouchDevice()) since touch events simply never
+    // fire on a mouse-only device, so this is a no-op there.
+    const handleTouchStart = () => {
+      this.exitPlaybackIdle();
+      this.resetPlaybackIdleTimer();
+    };
+
     // Store listener references for cleanup
     this.static.listeners = {
       wrapper,
       mouseEnter: handleMouseEnter,
       mouseLeave: handleMouseLeave,
-      mouseMove: handleMouseMove
+      mouseMove: handleMouseMove,
+      touchStart: handleTouchStart
     };
 
     // Attach event listeners
     wrapper.addEventListener('mouseenter', handleMouseEnter);
     wrapper.addEventListener('mouseleave', handleMouseLeave);
     wrapper.addEventListener('mousemove', handleMouseMove);
+    wrapper.addEventListener('touchstart', handleTouchStart, { passive: true });
   },
 
   cleanupStaticModeListeners() {
     if (this.static.listeners) {
-      const { wrapper, mouseEnter, mouseLeave, mouseMove } = this.static.listeners;
+      const { wrapper, mouseEnter, mouseLeave, mouseMove, touchStart } = this.static.listeners;
       if (wrapper) {
         wrapper.removeEventListener('mouseenter', mouseEnter);
         wrapper.removeEventListener('mouseleave', mouseLeave);
         wrapper.removeEventListener('mousemove', mouseMove);
+        wrapper.removeEventListener('touchstart', touchStart);
       }
       this.static.listeners = null;
     }
@@ -1092,6 +1370,54 @@ const playerAppCore = {
       clearTimeout(this.static.playbackIdleTimeout);
       this.static.playbackIdleTimeout = null;
     }
+  },
+
+  cleanupHoverDarkenTouchListeners() {
+    if (this.hoverDarkenTouch) {
+      const { wrapper, handler, timeoutId } = this.hoverDarkenTouch;
+      if (wrapper) {
+        wrapper.removeEventListener('touchstart', handler);
+      }
+      clearTimeout(timeoutId);
+      this.hoverDarkenTouch = null;
+    }
+  },
+
+  // Independent of expandable/static mode - hoverDarkenEnabled is a standalone
+  // reel setting either mode can turn on, so this is wired separately from
+  // both of setupExpandableModeInteractions()/setupStaticModeInteractions()
+  // rather than folded into either. Touch has no real hover, and some mobile
+  // browsers fake a sticky :hover on tap that never clears until tapping
+  // elsewhere - worse than nothing for a background darken effect (a
+  // permanently-stuck-dark background). Instead: darken on touch activity,
+  // then undarken again after a few seconds of no further activity, mirroring
+  // the idle-timer pattern used elsewhere (resetPlaybackIdleTimer) rather than
+  // a sustained press-and-hold or a state tied to expand/collapse.
+  setupHoverDarkenTouchInteractions() {
+    this.cleanupHoverDarkenTouchListeners();
+
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains('hover-darken-enabled')) {
+      return;
+    }
+
+    this.hoverDarkenTouch = { wrapper, handler: null, timeoutId: null };
+
+    const handler = () => {
+      wrapper.classList.add('touch-darkened');
+      clearTimeout(this.hoverDarkenTouch.timeoutId);
+      this.hoverDarkenTouch.timeoutId = setTimeout(() => {
+        wrapper.classList.remove('touch-darkened');
+      }, 3000);
+    };
+    this.hoverDarkenTouch.handler = handler;
+
+    // touchstart only, deliberately not touchmove - touchmove fires
+    // continuously for the whole duration of any scroll gesture that started
+    // on the player, which would keep resetting the undarken timer for as
+    // long as the user is scrolling past it (e.g. carrying it through the
+    // expandable scroll-trigger), never letting it lighten during that time.
+    wrapper.addEventListener('touchstart', handler, { passive: true });
   },
 
   validateProjectTitleImage() {
@@ -1199,9 +1525,73 @@ const playerAppCore = {
       const expandedHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--expandable-expanded-height')) || 500;
       window.parent.postMessage({ type: 'reelplayer:resize', height: expandedHeight }, '*');
     }
+
+    // .player-content's horizontal padding animates in on expand (see
+    // expandable.css), which changes the waveform's available width - the
+    // frozen width from updateWaveformWidth() needs refreshing once that
+    // settles, not before, so this waits out the same transition duration.
+    const transitionDuration = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
+    setTimeout(() => this.updateWaveformWidth(), transitionDuration + 50);
   },
 
-  collapsePlayer() {
+  // Shrinking the wrapper's height (about to be triggered by the caller removing
+  // 'expanded' right after this runs) retracts space from the page below it -
+  // uncompensated, whatever's below just visibly jumps upward as that space
+  // disappears. Reads the wrapper's *actual* rendered height every frame (rather
+  // than assuming the CSS transition's own easing curve) and scrolls by the same
+  // delta each frame, so content below stays visually anchored throughout the
+  // shrink regardless of curve. In a real embed the player runs inside a
+  // same-origin-or-not <iframe>, so it can't call the host page's scrollBy()
+  // directly - it asks via postMessage instead, same pattern as the existing
+  // resize handshake below.
+  compensateScrollDuringCollapse(wrapper) {
+    const inIframe = window.self !== window.top;
+    let previousHeight = wrapper.getBoundingClientRect().height;
+    let rafId;
+
+    const applyDelta = (delta) => {
+      if (delta === 0) return;
+      if (inIframe) {
+        window.parent.postMessage({ type: 'reelplayer:scrollCompensate', delta: -delta }, '*');
+      } else {
+        window.scrollBy(0, -delta);
+      }
+    };
+
+    const step = () => {
+      const currentHeight = wrapper.getBoundingClientRect().height;
+      applyDelta(previousHeight - currentHeight);
+      previousHeight = currentHeight;
+      rafId = requestAnimationFrame(step);
+    };
+
+    const stop = () => {
+      cancelAnimationFrame(rafId);
+      wrapper.removeEventListener('transitionend', onTransitionEnd);
+    };
+
+    const onTransitionEnd = (e) => {
+      if (e.target === wrapper && (e.propertyName === 'height' || e.propertyName === 'max-height')) {
+        stop();
+      }
+    };
+    wrapper.addEventListener('transitionend', onTransitionEnd);
+    rafId = requestAnimationFrame(step);
+
+    // Fallback in case transitionend never fires (e.g. an interrupted
+    // transition, or a browser/OS reduced-motion setting that removes the
+    // transition entirely) - stop regardless shortly after the CSS
+    // transition's own configured duration.
+    const fallbackDuration = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--expandable-transition-duration')) || 0.4) * 1000;
+    setTimeout(stop, fallbackDuration + 150);
+  },
+
+  // immediate skips the pre-collapsing dead-time below (--expandable-collapse-delay,
+  // ~1s by default) - that delay exists so an incidental mouseleave doesn't snap the
+  // player shut instantly, but a deliberate tap-to-close is already an explicit
+  // signal and shouldn't sit unresponsive for a second-plus before anything visible
+  // happens.
+  collapsePlayer(immediate = false) {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
@@ -1222,35 +1612,39 @@ const playerAppCore = {
       wrapper.classList.remove('playing-collapsed');
     }
     
-    // Add pre-collapsing class for initial opacity reduction
-    wrapper.classList.add('pre-collapsing');
-    
     // Get timing values from CSS variables
     const styles = getComputedStyle(document.documentElement);
-    const collapseDelay = parseInt(styles.getPropertyValue('--expandable-collapse-delay')) || 1000;
     const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
     const collapsedIdleDelay = parseInt(styles.getPropertyValue('--playback-idle-collapsed-delay')) || 1000;
-    
-    // Wait for delay, then trigger fade-out
-    this.expandable.collapseDelayTimeout = setTimeout(() => {
+
+    const startFadeOut = () => {
       wrapper.classList.remove('pre-collapsing');
       wrapper.classList.add('collapsing');
-      
+
       // Wait for fade-out to complete, then collapse height
       this.expandable.collapseFadeTimeout = setTimeout(() => {
+        // Start compensating BEFORE removing 'expanded' - that removal is what
+        // triggers the CSS height transition, so the rAF loop needs to already
+        // be watching in order to catch the very first frame of the shrink.
+        this.compensateScrollDuringCollapse(wrapper);
         wrapper.classList.remove('expanded');
         wrapper.classList.remove('collapsing');
+
+        // Same reasoning as the equivalent call in expandPlayer() - waits out
+        // .player-content's padding transition before re-measuring.
+        const transitionDuration = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
+        setTimeout(() => this.updateWaveformWidth(), transitionDuration + 50);
 
         // Clear timeout references
         this.expandable.collapseDelayTimeout = null;
         this.expandable.collapseFadeTimeout = null;
-        
+
         // Notify parent window if in iframe (for iframe height adjustment)
         if (window.self !== window.top) {
           const collapsedHeight = parseInt(getComputedStyle(document.documentElement).getPropertyValue('--expandable-collapsed-height')) || 120;
           window.parent.postMessage({ type: 'reelplayer:resize', height: collapsedHeight }, '*');
         }
-        
+
         // Re-enter idle state after collapse if still playing, or player-closed-idle if not playing
         this.expandable.collapsedIdleTimeout = setTimeout(() => {
           const isPlaying = this.wavesurfer?.isPlaying();
@@ -1264,7 +1658,26 @@ const playerAppCore = {
           }
         }, collapsedIdleDelay);
       }, fadeDuration);
-    }, collapseDelay);
+    };
+
+    if (immediate) {
+      // Skip the pre-collapsing dead-time entirely rather than collapsing it to a
+      // 0ms timeout - swapping pre-collapsing straight to collapsing within the
+      // same tick risks the browser coalescing both class mutations into a single
+      // style recalc, silently dropping the pre-collapsing opacity transition
+      // instead of actually rendering it for a frame (which read as the whole
+      // player snapping shut with no animation at all, rather than just losing
+      // the lead-in dim). Going straight into the real collapsing fade (opacity
+      // 1 -> 0 over fadeDuration, a transition that's guaranteed to have a real
+      // starting frame since it's applied synchronously here, not inside another
+      // pending timeout) sidesteps that risk entirely.
+      startFadeOut();
+    } else {
+      // Add pre-collapsing class for initial opacity reduction
+      wrapper.classList.add('pre-collapsing');
+      const collapseDelay = parseInt(styles.getPropertyValue('--expandable-collapse-delay')) || 1000;
+      this.expandable.collapseDelayTimeout = setTimeout(startFadeOut, collapseDelay);
+    }
   },
 
   updatePlayingState(playing) {
@@ -1312,7 +1725,9 @@ const playerAppCore = {
     // Clean up old event listeners before re-rendering
     this.cleanupExpandableModeListeners();
     this.cleanupStaticModeListeners();
-    
+    this.cleanupHoverDarkenTouchListeners();
+    this.cleanupWaveformWidthTracking();
+
     // Set expandable mode state - consolidated
     this.expandable.enabled = reel?.mode === 'expandable';
     this.expandable.isExpanded = false;
@@ -1388,6 +1803,7 @@ const playerAppCore = {
         </div>
       </div>
       <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
+      ${this.expandable.enabled ? '<div class="expandable-tap-bar"></div>' : ''}
     </div>
   `;
     this.elements = {};
@@ -1429,7 +1845,9 @@ const playerAppCore = {
       // Set up static mode interactions for idle state
       this.setupStaticModeInteractions();
     }
-    
+    this.setupHoverDarkenTouchInteractions();
+    this.setupWaveformWidthTracking();
+
     this.setupWaveSurfer();
     this.setupWaveformEvents();
     this.setupPlayPauseUI();

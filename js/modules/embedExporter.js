@@ -56,13 +56,19 @@ export class EmbedExporter {
     // For expandable mode, include resize script
     const resizeScript = isExpandable ? `
 <script>
-  // Listen for resize messages from the iframe
+  // Listen for resize/scroll-compensation messages from the iframe
   window.addEventListener('message', function(event) {
-    if (event.data && event.data.type === 'reelplayer:resize') {
-      const iframe = document.getElementById('${iframeId}');
-      if (iframe && event.source === iframe.contentWindow) {
-        iframe.style.height = event.data.height + 'px';
-      }
+    const iframe = document.getElementById('${iframeId}');
+    if (!iframe || event.source !== iframe.contentWindow || !event.data) return;
+    if (event.data.type === 'reelplayer:resize') {
+      iframe.style.height = event.data.height + 'px';
+    } else if (event.data.type === 'reelplayer:scrollCompensate') {
+      // The iframe's own collapse-height shrink retracts space from this
+      // host page below it - without this, the page would visibly jump as
+      // that space disappears. The iframe can't call this page's scrollBy()
+      // directly (cross-origin), so it asks via postMessage instead, same as
+      // the resize message above.
+      window.scrollBy(0, event.data.delta);
     }
   });
 </script>` : '';

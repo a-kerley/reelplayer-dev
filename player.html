@@ -83,7 +83,14 @@
     import { getColorFilters } from './js/modules/colorUtils.js';
     import { WORKER_BASE_URL } from './js/config.js';
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
-    
+
+    // Exposed so sibling reelplayer <iframe>s on the same host page (any
+    // number of separate embeds, each same-origin to this one regardless of
+    // what origin the host page itself is) can reach in directly via
+    // window.top.frames and call pauseForOtherPlayer() - see
+    // playerApp.pauseOtherPlayers() in js/player.js for the calling side.
+    window.playerApp = playerApp;
+
     // ============================================
     // INITIALIZATION
     // ============================================
@@ -103,7 +110,7 @@
        ============================================ */
     async function loadAndRenderReel(reelId) {
       try {
-        // Retrieve reel data from localStorage
+        // Fetch reel data from the Worker (see loadReelData below)
         const reelData = await loadReelData(reelId);
         
         if (!reelData) {
@@ -377,6 +384,7 @@
             </div>
           </div>
           <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
+          ${mode === 'expandable' ? '<div class="expandable-tap-bar"></div>' : ''}
         </div>
       `;
       
@@ -447,6 +455,13 @@
         playerApp.validateProjectTitleImage();
         console.log('✓ Expandable mode interactions enabled');
       }
+
+      // hoverDarkenEnabled is independent of expandable/static mode, so this
+      // is wired separately from the block above - see the method's own
+      // comment in js/player.js for why touch needs a different trigger than
+      // the desktop :hover CSS rule.
+      playerApp.setupHoverDarkenTouchInteractions();
+      playerApp.setupWaveformWidthTracking();
 
       // ============================================
       // Setup player components

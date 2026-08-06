@@ -215,6 +215,18 @@
   transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
+/* Dimming play/volume during idle is fine on desktop specifically because
+   spacebar still works even when the button itself is nearly invisible -
+   touch has no equivalent fallback, so a barely-visible tap target there is
+   just confusing. Keep those two undimmed on touch; everything else above
+   still dims normally for the same idle/cinematic effect. */
+@media (hover: none) and (pointer: coarse) {
+  .player-wrapper.expandable-mode.playback-idle #playPause,
+  .player-wrapper.expandable-mode.playback-idle .volume-control {
+    opacity: 1 !important;
+  }
+}
+
 /* Background overlay transitions (shared between both idle states) */
 .player-wrapper.expandable-mode::before {
   transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
@@ -276,6 +288,8 @@
 
 .player-wrapper.expandable-mode .waveform-and-volume {
   flex: 1;
+  flex-basis: 0px;
+  min-width: 0; /* See #waveform below - same canvas-content-as-implicit-floor issue */
   display: flex;
   align-items: center;
   gap: 0.5rem;
@@ -299,6 +313,13 @@
   position: relative;
   width: auto;
   max-width: none;
+  /* Removes the implicit content-size floor (WaveSurfer's canvas, which
+     WaveSurfer itself resizes based on measuring this same container) that
+     was fighting flex:1's ability to actually shrink this - see the fuller
+     explanation on the base (non-expandable) #waveform rule in player.css. */
+  min-width: 0;
+  flex-basis: 0px;
+  contain: layout;
 }
 
 .player-wrapper.expandable-mode #waveform > canvas {
@@ -332,9 +353,16 @@
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 
-/* Show times when expanded */
+/* Show times when expanded - deliberately NOT .hover-time here, unlike the
+   hide rule above: playhead-time/total-time should always show current/total
+   progress while expanded, but hover-time is the scrub-preview tooltip,
+   meant to appear only during active hover/touch-drag (driven entirely by
+   JS setting .style.opacity in setupWaveformEvents()). Including it here
+   forced it to opacity:1 the instant the player expanded, even with no
+   interaction at all, since this selector's specificity beats the base
+   ".hover-time { opacity: 0 }" rule in player.css whenever no inline style
+   has been set yet (i.e. right after page load, before any hover/touch). */
 .player-wrapper.expandable-mode.expanded .playhead-time,
-.player-wrapper.expandable-mode.expanded .hover-time,
 .player-wrapper.expandable-mode.expanded #total-time {
   opacity: 1;
   pointer-events: auto;
@@ -449,5 +477,52 @@
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing),
               max-height var(--expandable-transition-duration) var(--expandable-transition-easing),
               margin var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* ========================================
+   8. MOBILE TAP BAR (touch only)
+   ======================================== */
+/* iOS-sheet-style grabber, always present at the very bottom of the wrapper
+   regardless of collapsed/expanded state and independent of whether the
+   reel has a title - unlike .reel-title (see above), which is deliberately
+   invisible and non-interactive while collapsed. This is the primary tap
+   target for js/player.js's setupExpandableModeTouchInteractions(); the
+   heading is wired as a secondary target only, since it can never fire the
+   initial expand on its own. */
+.expandable-tap-bar {
+  position: absolute;
+  bottom: 0;
+  left: 0;
+  right: 0;
+  height: 28px;
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+  padding-bottom: 6px;
+  z-index: 15;
+  cursor: pointer;
+  -webkit-tap-highlight-color: transparent;
+  box-sizing: border-box;
+}
+
+.expandable-tap-bar::before {
+  content: '';
+  width: 36px;
+  height: 4px;
+  border-radius: 2px;
+  background: var(--ui-accent);
+  opacity: 0.45;
+  transition: opacity 0.2s ease;
+}
+
+.expandable-tap-bar:active::before {
+  opacity: 0.8;
+}
+
+/* Hover-capable devices use mouse enter/leave instead - hide the bar there. */
+@media (hover: hover) and (pointer: fine) {
+  .expandable-tap-bar {
+    display: none;
+  }
 }
 

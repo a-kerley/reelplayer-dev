@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Scroll Test</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #eee;
+    }
+    .filler {
+      height: 150vh;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #999;
+      font-size: 1.2rem;
+      box-sizing: border-box;
+      padding: 2rem;
+      text-align: center;
+    }
+    .filler:nth-child(odd) { background: #e2e2e2; }
+    .filler.bookend { height: 100vh; }
+    iframe {
+      display: block;
+      width: 100%;
+      border: none;
+      /* Matches the transition embedExporter.js's generateIframeEmbed() puts
+         inline on the real published embed's iframe - without it, the resize
+         postMessage below snaps the outer frame to its new height instantly,
+         clipping whatever smooth collapse animation is still running inside. */
+      transition: height 0.3s ease;
+    }
+    .note {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #222;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      z-index: 1000;
+      font-family: monospace;
+    }
+  </style>
+</head>
+<body>
+  <div class="note">Scroll to carry each player through screen-center · reel ids from ?id= and (optionally) ?id2= query params</div>
+  <div class="filler bookend">Start here<br>↓ scroll down ↓</div>
+  <div class="filler">Player 1 ↓<br>(should auto-expand as it crosses the center of the screen)</div>
+  <iframe id="playerFrame1" height="500" title="Reel player embed 1 under test"></iframe>
+  <div class="filler">Between players<br>(if testing 2 players: start playback in player 1 above, keep scrolling to player 2 below, start playback there too - player 1 should fade out and pause on its own)</div>
+  <iframe id="playerFrame2" height="500" title="Reel player embed 2 under test"></iframe>
+  <div class="filler">Scroll back up ↑<br>(each should auto-collapse once it fully leaves the middle third)</div>
+  <div class="filler bookend">End of page</div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+
+    function setupFrame(frameId, reelId) {
+      const frame = document.getElementById(frameId);
+      if (!reelId) {
+        frame.remove();
+        return;
+      }
+      frame.src = `../player.html?id=${encodeURIComponent(reelId)}`;
+      window.addEventListener('message', (event) => {
+        if (!event.data || event.source !== frame.contentWindow) return;
+        if (event.data.type === 'reelplayer:resize') {
+          frame.style.height = event.data.height + 'px';
+        } else if (event.data.type === 'reelplayer:scrollCompensate') {
+          window.scrollBy(0, event.data.delta);
+        }
+      });
+    }
+
+    const id1 = params.get('id');
+    const id2 = params.get('id2');
+    setupFrame('playerFrame1', id1);
+    setupFrame('playerFrame2', id2);
+
+    if (!id1 && !id2) {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<p style="padding:1rem;color:red;">Add ?id=&lt;reelId&gt; (and optionally &amp;id2=&lt;reelId2&gt; for a second player) to the URL.</p>');
+    }
+  </script>
+</body>
+</html>

@@ -31,7 +31,7 @@ export const playlistScroll = {
 
       trackEl.addEventListener("click", () => {
         const url = this.convertDropboxLinkToDirect(track.url);
-        this.initializePlayer(url, track.title, index);
+        this.initializePlayer(url, track.title, index, true); // userSelected - always starts playback once ready
       });
 
       playlistEl.appendChild(trackEl);
@@ -195,31 +195,17 @@ export const playlistScroll = {
     let startY = 0;
     let startThumbTop = 0;
 
-    scrollbarThumb.addEventListener('mousedown', (e) => {
+    const startDrag = (clientY) => {
       isDragging = true;
-      startY = e.clientY;
+      startY = clientY;
       startThumbTop = parseInt(scrollbarThumb.style.top) || 0;
       scrollbarThumb.style.background = colorToRgba(accentColor, 0.5);
-      e.preventDefault();
-      e.stopPropagation();
-    });
+    };
 
-    scrollbarThumb.addEventListener('mouseenter', () => {
-      if (!isDragging) {
-        scrollbarThumb.style.background = colorToRgba(accentColor, 0.4);
-      }
-    });
-
-    scrollbarThumb.addEventListener('mouseleave', () => {
-      if (!isDragging) {
-        scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
-      }
-    });
-
-    document.addEventListener('mousemove', (e) => {
+    const moveDrag = (clientY) => {
       if (!isDragging) return;
 
-      const deltaY = e.clientY - startY;
+      const deltaY = clientY - startY;
       const scrollHeight = playlistEl.scrollHeight;
       const clientHeight = playlistEl.clientHeight;
       const thumbHeight = parseInt(scrollbarThumb.style.height);
@@ -236,16 +222,53 @@ export const playlistScroll = {
       // Update scroll position based on thumb position
       const scrollPercentage = newThumbTop / maxThumbTop;
       playlistEl.scrollTop = scrollPercentage * scrollRange;
+    };
 
-      e.preventDefault();
-    });
-
-    document.addEventListener('mouseup', () => {
+    const endDrag = () => {
       if (isDragging) {
         isDragging = false;
         scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
       }
+    };
+
+    scrollbarThumb.addEventListener('mousedown', (e) => {
+      startDrag(e.clientY);
+      e.preventDefault();
+      e.stopPropagation();
     });
+    scrollbarThumb.addEventListener('touchstart', (e) => {
+      startDrag(e.touches[0].clientY);
+      e.stopPropagation();
+    }, { passive: true });
+
+    scrollbarThumb.addEventListener('mouseenter', () => {
+      if (!isDragging) {
+        scrollbarThumb.style.background = colorToRgba(accentColor, 0.4);
+      }
+    });
+
+    scrollbarThumb.addEventListener('mouseleave', () => {
+      if (!isDragging) {
+        scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
+      }
+    });
+
+    document.addEventListener('mousemove', (e) => {
+      if (!isDragging) return;
+      moveDrag(e.clientY);
+      e.preventDefault();
+    });
+    // Not passive - dragging the thumb must be able to suppress the page's
+    // own touch-scroll, otherwise the drag and a background scroll fight
+    // over the same gesture.
+    document.addEventListener('touchmove', (e) => {
+      if (!isDragging) return;
+      moveDrag(e.touches[0].clientY);
+      e.preventDefault();
+    }, { passive: false });
+
+    document.addEventListener('mouseup', endDrag);
+    document.addEventListener('touchend', endDrag);
 
     // Initial update immediately
     updateScrollbar();
