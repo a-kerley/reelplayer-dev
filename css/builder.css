@@ -221,6 +221,14 @@ body {
   padding: 2rem;
 }
 
+/* Same specificity as the browser's default [hidden] { display: none }
+   rule, and this comes later in the cascade - without this override,
+   `display: flex` above wins even when JS sets the hidden attribute, so
+   the overlay never actually disappears. */
+.builder-loading-overlay[hidden] {
+  display: none;
+}
+
 .builder-loading-overlay button {
   margin-top: 1rem;
   background: var(--builder-accent);
