@@ -1222,18 +1222,60 @@ const playerAppCore = {
   // part of it touches the band, and only collapses once it has completely
   // left the band on either side, rather than triggering off a single crossing
   // line. A tap on the bottom handle bar (or the reel heading, once visible)
-  // can override this at any time; the override is released once scroll
-  // position naturally agrees with it again, so it doesn't permanently
-  // disable the scroll trigger for the rest of the session.
+  // can override this at any time.
+  //
+  // The override used to release itself once intersection state "agreed"
+  // with the manually-set expand/collapse state again
+  // (entry.isIntersecting === this.expandable.isExpanded) - but the observer
+  // doesn't only fire on genuine scrolling, it also fires repeatedly during
+  // the collapse/expand animation itself, since the box's geometry keeps
+  // changing as it grows/shrinks. A tap-to-collapse could hit a transient
+  // intermediate frame where the shrinking box briefly read as
+  // non-intersecting, which matched isExpanded:false and released the
+  // override early - then, once the shrink settled and the small collapsed
+  // banner turned out to still overlap the band, the *next* firing reported
+  // isIntersecting:true with the override already (wrongly) gone, silently
+  // re-triggering expandPlayer() and undoing the tap. Trying to infer "has
+  // the animation finished" from intersection state is exactly what was
+  // unreliable - a flat time-based cooldown sidesteps it entirely: every
+  // firing within TAP_COOLDOWN_MS of a manual tap is ignored outright,
+  // regardless of what it reports, and normal scroll-driven behavior only
+  // resumes once that's elapsed.
   setupExpandableModeTouchInteractions(wrapper) {
+    const styles = getComputedStyle(document.documentElement);
+    const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
+    const transitionDuration = (parseFloat(styles.getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
+    // Covers the immediate-collapse fade + the height transition it's
+    // followed by (the longer of the two animations this can trigger), plus
+    // a small buffer.
+    const TAP_COOLDOWN_MS = fadeDuration + transitionDuration + 150;
+
+    // Tracks whether the wrapper currently overlaps the top half of the
+    // viewport - used below to decide whether a collapse exited off the top
+    // or bottom of the screen. Deliberately NOT using
+    // entry.boundingClientRect/entry.rootBounds for this (an earlier attempt
+    // did, and it was broken): confirmed via direct testing that inside an
+    // embedded iframe, boundingClientRect is reported relative to the
+    // iframe's OWN local viewport (e.g. top:0/bottom:500 - exactly the
+    // iframe's own content height), while rootBounds is correctly
+    // top-level-page-relative - two different, incompatible coordinate
+    // systems on the same entry, silently making any direct comparison
+    // between them meaningless. isIntersecting, on the other hand, IS
+    // reliably correct cross-frame (that's what the whole scroll-trigger
+    // feature already depends on) - so this uses a second observer and only
+    // ever reads its isIntersecting boolean, never its rect numbers.
+    let isInTopHalf = true; // default true - err on the side of compensating until a real reading arrives
+    const topHalfObserver = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        isInTopHalf = entry.isIntersecting;
+      });
+    }, { threshold: 0, rootMargin: '0px 0px -50% 0px' });
+    topHalfObserver.observe(wrapper);
+
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
-        if (this.expandable.mobileManualOverride) {
-          if (entry.isIntersecting === this.expandable.isExpanded) {
-            this.expandable.mobileManualOverride = false;
-          } else {
-            return;
-          }
+        if (Date.now() < (this.expandable.mobileManualOverrideUntil || 0)) {
+          return;
         }
         if (entry.isIntersecting) {
           if (!this.expandable.isExpanded) this.expandPlayer();
@@ -1246,7 +1288,14 @@ const playerAppCore = {
           // collapse was actually triggered, making the scroll-compensated
           // shrink (see compensateScrollDuringCollapse()) fire somewhere off
           // their current screen instead of where they left it.
-          this.collapsePlayer(true);
+          //
+          // Only actually worth compensating if it exited off the TOP of the
+          // screen - that's the only direction where there's meaningful
+          // visible viewport space below the player for the shrink to
+          // visibly pull upward. Exiting off the bottom means the player was
+          // already down near the edge of the screen with little to no
+          // visible space below it, so nothing perceptible needs anchoring.
+          this.collapsePlayer(true, isInTopHalf);
         }
       });
     }, { threshold: 0, rootMargin: '-33% 0px -33% 0px' });
@@ -1254,7 +1303,7 @@ const playerAppCore = {
     observer.observe(wrapper);
 
     const handleTap = () => {
-      this.expandable.mobileManualOverride = true;
+      this.expandable.mobileManualOverrideUntil = Date.now() + TAP_COOLDOWN_MS;
       if (this.expandable.isExpanded) {
         this.collapsePlayer(true); // immediate - explicit tap, not incidental hover-leave
       } else {
@@ -1278,12 +1327,12 @@ const playerAppCore = {
     const handleTouchMove = () => this.resetPlaybackIdleTimer();
     wrapper.addEventListener('touchmove', handleTouchMove, { passive: true });
 
-    this.expandable.listeners = { wrapper, observer, tap: handleTap, tapBar, heading, touchMove: handleTouchMove };
+    this.expandable.listeners = { wrapper, observer, topHalfObserver, tap: handleTap, tapBar, heading, touchMove: handleTouchMove };
   },
 
   cleanupExpandableModeListeners() {
     if (this.expandable.listeners) {
-      const { wrapper, mouseEnter, mouseLeave, mouseMove, observer, tap, tapBar, heading, touchMove } = this.expandable.listeners;
+      const { wrapper, mouseEnter, mouseLeave, mouseMove, observer, topHalfObserver, tap, tapBar, heading, touchMove } = this.expandable.listeners;
       if (wrapper) {
         if (mouseEnter) wrapper.removeEventListener('mouseenter', mouseEnter);
         if (mouseLeave) wrapper.removeEventListener('mouseleave', mouseLeave);
@@ -1295,9 +1344,10 @@ const playerAppCore = {
         if (heading) heading.removeEventListener('click', tap);
       }
       if (observer) observer.disconnect();
+      if (topHalfObserver) topHalfObserver.disconnect();
       this.expandable.listeners = null;
     }
-    this.expandable.mobileManualOverride = false;
+    this.expandable.mobileManualOverrideUntil = 0;
 
     // Clear all idle-related timeouts
     this.clearAllIdleTimeouts();
@@ -1590,8 +1640,11 @@ const playerAppCore = {
   // ~1s by default) - that delay exists so an incidental mouseleave doesn't snap the
   // player shut instantly, but a deliberate tap-to-close is already an explicit
   // signal and shouldn't sit unresponsive for a second-plus before anything visible
-  // happens.
-  collapsePlayer(immediate = false) {
+  // happens. compensateScroll defaults to true (desktop, and a tap-to-close, both
+  // just always compensate) - only the scroll-triggered auto-collapse passes false
+  // when it detects the player exited off the bottom of the screen, see the
+  // observer callback in setupExpandableModeTouchInteractions() for why.
+  collapsePlayer(immediate = false, compensateScroll = true) {
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
@@ -1626,7 +1679,9 @@ const playerAppCore = {
         // Start compensating BEFORE removing 'expanded' - that removal is what
         // triggers the CSS height transition, so the rAF loop needs to already
         // be watching in order to catch the very first frame of the shrink.
-        this.compensateScrollDuringCollapse(wrapper);
+        if (compensateScroll) {
+          this.compensateScrollDuringCollapse(wrapper);
+        }
         wrapper.classList.remove('expanded');
         wrapper.classList.remove('collapsing');
 
