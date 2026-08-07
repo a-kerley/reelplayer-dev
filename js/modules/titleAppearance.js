@@ -2,6 +2,7 @@
 
 import { ValidationUtils } from './validation.js';
 import { createValueControl } from './valueControl.js';
+import { createToggleSwitch } from './domUtils.js';
 
 export function createTitleAppearanceSection(reel, onChange) {
   // Remove old section if present
@@ -25,10 +26,10 @@ export function createTitleAppearanceSection(reel, onChange) {
   
   titleAppearanceSection.innerHTML = `
     <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Reel Title Appearance</legend>
-    <label style="margin-bottom: 1rem; display: block">
-      <input type="checkbox" id="reelShowTitle" />
-      Display Reel Title in Player
-    </label>
+    <div class="color-row" style="margin-bottom: 1rem;">
+      <label for="reelShowTitle" style="cursor:pointer;">Display Reel Title in Player</label>
+      <span id="reelShowTitleToggleSlot"></span>
+    </div>
     <div style="display:flex;flex-wrap:wrap;gap:1.1rem 2.2rem;">
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Font Size:
@@ -58,6 +59,9 @@ export function createTitleAppearanceSection(reel, onChange) {
       </label>
     </div>
   `;
+
+  const showTitleToggle = createToggleSwitch({ id: 'reelShowTitle', checked: false });
+  titleAppearanceSection.querySelector('#reelShowTitleToggleSlot').replaceWith(showTitleToggle);
 
   const fontSizeControl = createValueControl({
     id: 'reelTitleFontSizePt',

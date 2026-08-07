@@ -103,7 +103,7 @@ export function createFilePickerButton({ id, ariaLabel, title, disabled = false 
   if (id) button.id = id;
   button.className = "file-picker-btn";
   button.setAttribute("aria-label", ariaLabel);
-  button.title = title;
+  button.dataset.tooltip = title;
   button.disabled = disabled;
   
   button.innerHTML = `
@@ -154,7 +154,7 @@ export function createCropPreviewButton({ id, disabled = false }) {
   button.id = id;
   button.className = "crop-preview-btn";
   button.setAttribute("aria-label", "Preview & Crop");
-  button.title = "Preview & Crop";
+  button.dataset.tooltip = "Preview & Crop";
   button.disabled = disabled;
   
   button.innerHTML = `
@@ -190,7 +190,7 @@ export function createClearButton({ onClick }) {
   const button = document.createElement("button");
   button.type = "button";
   button.innerHTML = "✕";
-  button.title = "Clear";
+  button.dataset.tooltip = "Clear";
   
   button.style.cssText = "background:transparent;border:none;color:#ccc;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;";
 
@@ -225,7 +225,7 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   const labelSpan = document.createElement("span");
   labelSpan.textContent = label;
   if (tooltip) {
-    labelSpan.title = tooltip;
+    labelSpan.dataset.tooltip = tooltip;
   }
 
   const input = document.createElement("input");

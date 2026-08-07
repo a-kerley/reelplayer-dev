@@ -478,7 +478,7 @@ function createColorPickerRow(label, buttonId, tooltip) {
   const labelEl = document.createElement('span');
   labelEl.textContent = label;
   if (tooltip) {
-    labelEl.title = tooltip;
+    labelEl.dataset.tooltip = tooltip;
   }
 
   const button = document.createElement('button');
@@ -512,7 +512,7 @@ function createToggleRow(label, id, checked, tooltip, { heading = false } = {}) 
     labelEl.style.fontWeight = 'var(--builder-weight-bold)';
   }
   if (tooltip) {
-    labelEl.title = tooltip;
+    labelEl.dataset.tooltip = tooltip;
   }
 
   const toggle = createToggleSwitch({ id, checked });

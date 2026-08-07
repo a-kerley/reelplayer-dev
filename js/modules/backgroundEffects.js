@@ -254,7 +254,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     trackLabel.style.cssText = "width:180px;font-size:0.75rem;font-weight:500;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;";
     const trackTitle = track.title || `Track ${index + 1}`;
     trackLabel.textContent = trackTitle;
-    trackLabel.title = trackTitle;
+    trackLabel.dataset.tooltip = trackTitle;
     
     // Image controls
     const imageFilenameDisplay = createFilenameDisplay({

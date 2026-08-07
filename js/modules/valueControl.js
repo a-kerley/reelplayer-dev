@@ -248,7 +248,7 @@ export function wireValueControl(control) {
  */
 export function createValueControl(options) {
   const { row, control, input, slider, labelEl } = buildValueControl(options);
-  if (options.tooltip) labelEl.title = options.tooltip;
+  if (options.tooltip) labelEl.dataset.tooltip = options.tooltip;
   wireValueControl(control);
   return { row, control, input, slider };
 }
