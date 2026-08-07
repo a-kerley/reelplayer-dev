@@ -193,6 +193,20 @@
   transition: opacity var(--expandable-collapse-fade-duration) ease-out;
 }
 
+/* #total-time stays fully visible through every one of the fade/dim states
+   above (pre-collapsing, collapsing, and further below: playback-idle,
+   collapsed-idle) - unlike the rest of the UI, which intentionally dims to
+   stay unobtrusive, the waveform mask hole (css/player.css) already keeps it
+   legible against whatever's behind it regardless of state, so dimming it
+   too just makes it harder to read for no benefit. Higher specificity
+   (extra .visible class) than each rule above, so this wins without needing
+   source-order tricks. */
+.player-wrapper.expandable-mode.pre-collapsing #total-time.visible,
+.player-wrapper.expandable-mode.collapsing #total-time.visible {
+  opacity: 1 !important;
+  transition: opacity var(--expandable-pre-collapse-duration) ease-out;
+}
+
 /* ========================================
    IDLE STATES
    Two types: playback-idle (expanded) and collapsed-idle (collapsed)
@@ -248,6 +262,16 @@
   transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
               -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
               opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
+}
+
+/* #total-time stays fully visible through both the playback-idle rule above
+   and the collapsed-idle rule below - see the fuller reasoning on the
+   equivalent override after the pre-collapsing/collapsing rules earlier in
+   this file. */
+.player-wrapper.expandable-mode.playback-idle #total-time.visible,
+.player-wrapper.expandable-mode.collapsed-idle #total-time.visible {
+  opacity: 1 !important;
+  transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
 /* COLLAPSED IDLE STATE */
@@ -396,6 +420,21 @@
 .player-wrapper.expandable-mode:not(.expanded) #total-time {
   opacity: 0 !important;
   pointer-events: none;
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
+}
+
+/* ...except #total-time while playing-collapsed, matching #waveform's own
+   "show when playing-collapsed" rule above (it has no equivalent exception
+   otherwise, so without this it'd be invisible for the whole
+   collapsed-and-playing window - not just once idle, which the "stays
+   visible, doesn't dim" collapsed-idle override further below would
+   otherwise have made backwards: hidden while actively playing-collapsed,
+   then appearing only once idle). Same specificity as the hide rule above
+   (both 1 ID + 3 classes) - !important on both, so source order (this one
+   comes after) is what actually decides the tie. */
+.player-wrapper.expandable-mode.playing-collapsed #total-time {
+  opacity: 1 !important;
+  pointer-events: auto;
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing);
 }
 

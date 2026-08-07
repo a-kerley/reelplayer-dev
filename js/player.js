@@ -134,6 +134,48 @@ const playerAppCore = {
 
     waveformEl.style.flex = '0 0 auto';
     waveformEl.style.width = `${Math.round(measuredWidth)}px`;
+
+    // #total-time's position is anchored to #waveform's own right edge
+    // (right: 0.1rem), so a width change here shifts where it actually
+    // lands - keep the mask hole (css/player.css's #waveform > div:last-child
+    // rule) in sync with it.
+    this.updateTotalTimeMaskHole();
+  },
+
+  // Keeps the squared hole punched through the rendered waveform (see
+  // #waveform > div:last-child in css/player.css) aligned with #total-time's
+  // actual rendered box, so a loud passage near the end of the track can
+  // never obscure the digits - re-measures on every call rather than
+  // assuming a fixed size, since duration text width varies ("0:42" vs
+  // "12:34" vs "1:23:45"). Sets custom properties on #waveform (this
+  // element's parent in the DOM, not the masked element itself) so they
+  // reach the mask rule via normal CSS inheritance.
+  updateTotalTimeMaskHole() {
+    const waveformEl = this.elements.waveform;
+    const totalTimeEl = this.elements.totalTime;
+    if (!waveformEl || !totalTimeEl) return;
+
+    // Expandable-and-collapsed gets no hole - #total-time no longer dims
+    // there either (see css/expandable.css), so it stays legible on its own
+    // in that smaller, glanceable banner view without needing the waveform
+    // punched through underneath it. Static mode has no collapsed state, so
+    // always gets the hole. Re-evaluated on every call (this runs again
+    // whenever expand/collapse settles, via updateWaveformWidth()) rather
+    // than cached, so it flips correctly in both directions.
+    if (this.expandable.enabled && !this.expandable.isExpanded) {
+      waveformEl.style.setProperty('--total-time-hole-width', '0px');
+      waveformEl.style.setProperty('--total-time-hole-height', '0px');
+      return;
+    }
+
+    const waveformRect = waveformEl.getBoundingClientRect();
+    const labelRect = totalTimeEl.getBoundingClientRect();
+    if (!waveformRect.width || !labelRect.width) return;
+
+    waveformEl.style.setProperty('--total-time-hole-x', `${labelRect.left - waveformRect.left}px`);
+    waveformEl.style.setProperty('--total-time-hole-y', `${labelRect.top - waveformRect.top}px`);
+    waveformEl.style.setProperty('--total-time-hole-width', `${labelRect.width}px`);
+    waveformEl.style.setProperty('--total-time-hole-height', `${labelRect.height}px`);
   },
 
   cleanupWaveformWidthTracking() {
@@ -894,6 +936,10 @@ const playerAppCore = {
           if (totalTime) {
             totalTime.textContent = this.formatTime(duration);
             totalTime.classList.add("visible");
+            // Text width varies by duration ("0:42" vs "12:34") - resync the
+            // waveform mask hole (see updateTotalTimeMaskHole()) to the
+            // label's actual new box now that it's set.
+            this.updateTotalTimeMaskHole();
           }
         }
       };
