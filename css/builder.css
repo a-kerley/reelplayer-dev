@@ -18,6 +18,12 @@ body {
   flex-direction: row;
   min-height: 100vh;
   height: 100vh;
+  /* Below this, .builder-sidebar's own 220px min-width leaves so little
+     room for .builder-main that form rows and buttons wrap and overlap
+     into an unusable mess - a page-level horizontal scrollbar (the
+     default overflow-x behavior, nothing extra needed) is a better
+     failure mode than that. */
+  min-width: 1000px;
   gap: 2.5rem;
   align-items: stretch;
   background: #1e1e1e;
