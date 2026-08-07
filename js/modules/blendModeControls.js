@@ -302,40 +302,41 @@ export function setupHoverDarkenControls(reel, onChange) {
 }
 
 /**
- * Sets up hover-unblur toggle and amount slider - mirrors
- * setupHoverDarkenControls() above exactly, opposite effect.
+ * Sets up idle-unblur toggle and amount slider - mirrors
+ * setupHoverDarkenControls() above structurally, but the effect itself
+ * triggers off playback-idle/collapsed-idle (see css/player.css), not hover.
  * @param {Object} reel - Reel configuration
  * @param {Function} onChange - Change callback
  */
-export function setupHoverUnblurControls(reel, onChange) {
-  const hoverUnblurEnabled = document.getElementById("hoverUnblurEnabled");
-  const hoverUnblurAmount = document.getElementById("hoverUnblurAmount");
-  const hoverUnblurAmountSlider = document.getElementById("hoverUnblurAmountSlider");
+export function setupIdleUnblurControls(reel, onChange) {
+  const idleUnblurEnabled = document.getElementById("idleUnblurEnabled");
+  const idleUnblurAmount = document.getElementById("idleUnblurAmount");
+  const idleUnblurAmountSlider = document.getElementById("idleUnblurAmountSlider");
 
-  if (!hoverUnblurEnabled || !hoverUnblurAmount) return;
+  if (!idleUnblurEnabled || !idleUnblurAmount) return;
 
-  hoverUnblurEnabled.checked = reel.hoverUnblurEnabled || false;
-  hoverUnblurAmount.value = reel.hoverUnblurAmount ?? 50;
-  if (hoverUnblurAmountSlider) hoverUnblurAmountSlider.value = hoverUnblurAmount.value;
+  idleUnblurEnabled.checked = reel.idleUnblurEnabled || false;
+  idleUnblurAmount.value = reel.idleUnblurAmount ?? 50;
+  if (idleUnblurAmountSlider) idleUnblurAmountSlider.value = idleUnblurAmount.value;
 
   const updateEnabledState = () => {
-    const isEnabled = hoverUnblurEnabled.checked;
-    hoverUnblurAmount.disabled = !isEnabled;
-    if (hoverUnblurAmountSlider) hoverUnblurAmountSlider.disabled = !isEnabled;
-    reel.hoverUnblurEnabled = isEnabled;
+    const isEnabled = idleUnblurEnabled.checked;
+    idleUnblurAmount.disabled = !isEnabled;
+    if (idleUnblurAmountSlider) idleUnblurAmountSlider.disabled = !isEnabled;
+    reel.idleUnblurEnabled = isEnabled;
   };
   updateEnabledState();
 
-  hoverUnblurEnabled.addEventListener("change", () => {
+  idleUnblurEnabled.addEventListener("change", () => {
     updateEnabledState();
     onChange();
   });
 
-  hoverUnblurAmount.addEventListener("input", () => {
-    reel.hoverUnblurAmount = parseInt(hoverUnblurAmount.value);
+  idleUnblurAmount.addEventListener("input", () => {
+    reel.idleUnblurAmount = parseInt(idleUnblurAmount.value);
   });
 
-  hoverUnblurAmount.addEventListener("change", () => {
+  idleUnblurAmount.addEventListener("change", () => {
     if (window.saveReels && window.reels) {
       window.saveReels(window.reels);
     }

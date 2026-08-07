@@ -1422,63 +1422,57 @@ const playerAppCore = {
     }
   },
 
-  cleanupTouchHoverEffect(stateKey) {
-    const state = this[stateKey];
-    if (state) {
-      const { wrapper, handler, timeoutId } = state;
+  cleanupHoverDarkenTouchListeners() {
+    if (this.hoverDarkenTouch) {
+      const { wrapper, handler, timeoutId } = this.hoverDarkenTouch;
       if (wrapper) {
         wrapper.removeEventListener('touchstart', handler);
       }
       clearTimeout(timeoutId);
-      this[stateKey] = null;
+      this.hoverDarkenTouch = null;
     }
   },
 
-  // Shared by hover-darken and hover-unblur - both are standalone reel
-  // settings either mode can turn on, wired separately from both of
-  // setupExpandableModeInteractions()/setupStaticModeInteractions() rather
-  // than folded into either. Touch has no real hover, and some mobile
+  // Independent of expandable/static mode - hoverDarkenEnabled is a standalone
+  // reel setting either mode can turn on, so this is wired separately from
+  // both of setupExpandableModeInteractions()/setupStaticModeInteractions()
+  // rather than folded into either. Touch has no real hover, and some mobile
   // browsers fake a sticky :hover on tap that never clears until tapping
-  // elsewhere - worse than nothing for either effect (a permanently
-  // darkened/unblurred background). Instead: activate on touch activity,
-  // then revert again after a few seconds of no further activity, mirroring
+  // elsewhere - worse than nothing for a background darken effect (a
+  // permanently-stuck-dark background). Instead: darken on touch activity,
+  // then undarken again after a few seconds of no further activity, mirroring
   // the idle-timer pattern used elsewhere (resetPlaybackIdleTimer) rather than
   // a sustained press-and-hold or a state tied to expand/collapse.
-  setupTouchHoverEffect(stateKey, enabledClass, activeClass, cooldownMs = 3000) {
-    this.cleanupTouchHoverEffect(stateKey);
+  //
+  // idle-unblur (see css/player.css) deliberately does NOT need an equivalent
+  // touch handler here - unlike hover, it keys off .playback-idle/
+  // .collapsed-idle, which resetPlaybackIdleTimer()/exitPlaybackIdle() (see
+  // idleState.js) already drive identically for mouse and touch input.
+  setupHoverDarkenTouchInteractions() {
+    this.cleanupHoverDarkenTouchListeners();
 
     const wrapper = this.elements.playerWrapper;
-    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains(enabledClass)) {
+    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains('hover-darken-enabled')) {
       return;
     }
 
-    this[stateKey] = { wrapper, handler: null, timeoutId: null };
+    this.hoverDarkenTouch = { wrapper, handler: null, timeoutId: null };
 
     const handler = () => {
-      wrapper.classList.add(activeClass);
-      clearTimeout(this[stateKey].timeoutId);
-      this[stateKey].timeoutId = setTimeout(() => {
-        wrapper.classList.remove(activeClass);
-      }, cooldownMs);
+      wrapper.classList.add('touch-darkened');
+      clearTimeout(this.hoverDarkenTouch.timeoutId);
+      this.hoverDarkenTouch.timeoutId = setTimeout(() => {
+        wrapper.classList.remove('touch-darkened');
+      }, 3000);
     };
-    this[stateKey].handler = handler;
+    this.hoverDarkenTouch.handler = handler;
 
     // touchstart only, deliberately not touchmove - touchmove fires
     // continuously for the whole duration of any scroll gesture that started
-    // on the player, which would keep resetting the revert timer for as long
-    // as the user is scrolling past it (e.g. carrying it through the
-    // expandable scroll-trigger), never letting it revert during that time.
+    // on the player, which would keep resetting the undarken timer for as
+    // long as the user is scrolling past it (e.g. carrying it through the
+    // expandable scroll-trigger), never letting it lighten during that time.
     wrapper.addEventListener('touchstart', handler, { passive: true });
-  },
-
-  cleanupHoverDarkenTouchListeners() {
-    this.cleanupTouchHoverEffect('hoverDarkenTouch');
-    this.cleanupTouchHoverEffect('hoverUnblurTouch');
-  },
-
-  setupHoverDarkenTouchInteractions() {
-    this.setupTouchHoverEffect('hoverDarkenTouch', 'hover-darken-enabled', 'touch-darkened');
-    this.setupTouchHoverEffect('hoverUnblurTouch', 'hover-unblur-enabled', 'touch-unblurred');
   },
 
   validateProjectTitleImage() {
@@ -1831,7 +1825,7 @@ const playerAppCore = {
     if (shouldHideTitle) wrapperClasses += ' no-title';
     if (this.expandable.enabled) wrapperClasses += ' expandable-mode';
     if (reel?.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
-    if (reel?.hoverUnblurEnabled) wrapperClasses += ' hover-unblur-enabled';
+    if (reel?.idleUnblurEnabled) wrapperClasses += ' idle-unblur-enabled';
 
     // Build project title overlay HTML for expandable mode
     let projectTitleOverlayHTML = '';

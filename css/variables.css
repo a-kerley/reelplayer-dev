@@ -127,10 +127,10 @@
 
   /* Hover Darken */
   --hover-darken-target-brightness: 0.85;   /* Brightness while hovered when enabled (set by builder, 1 = no darken) */
-  --hover-darken-transition-duration: 0.3s; /* Fade speed in/out of the hover darken effect - also times hover unblur below, since both animate via the same shared `filter` property */
+  --hover-darken-transition-duration: 0.3s; /* Fade speed in/out of the hover darken effect - also times idle unblur below, since both animate via the same shared `filter` property */
 
-  /* Hover Unblur */
-  --hover-unblur-target-reduction: 0.5;     /* Fraction of --background-blur removed while hovered/interacted when enabled (set by builder, 0 = no change, 1 = fully sharp) */
+  /* Idle Unblur */
+  --idle-unblur-target-reduction: 0.5;      /* Fraction of --background-blur removed once playback-idle/collapsed-idle when enabled (set by builder, 0 = no change, 1 = fully sharp) */
 
   /* ========================================
      PLAYBACK-IDLE BACKGROUND ANIMATION

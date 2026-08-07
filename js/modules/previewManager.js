@@ -157,10 +157,11 @@ export class PreviewManager {
       // 1 (no change) down to 0 (black), so it's inverted here.
       "--hover-darken-target-brightness": 1 - (reel.hoverDarkenAmount ?? 15) / 100,
 
-      // Hover unblur - amount is a 0-100 "how much of the background blur to
-      // remove" percentage, used directly as a reduction fraction against
-      // --background-blur in css/player.css (100 = fully sharp, 0 = no change).
-      "--hover-unblur-target-reduction": (reel.hoverUnblurAmount ?? 50) / 100,
+      // Idle unblur - amount is a 0-100 "how much of the background blur to
+      // remove once playback-idle/collapsed-idle" percentage, used directly
+      // as a reduction fraction against --background-blur in css/player.css
+      // (100 = fully sharp, 0 = no change).
+      "--idle-unblur-target-reduction": (reel.idleUnblurAmount ?? 50) / 100,
 
       // Lottie animation color variables
       "--lottie-brightness": colorFilters.brightness,

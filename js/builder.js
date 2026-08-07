@@ -46,8 +46,8 @@ export function createEmptyReel() {
     overlayColorEnabled: false,
     hoverDarkenEnabled: false,
     hoverDarkenAmount: 15,
-    hoverUnblurEnabled: false,
-    hoverUnblurAmount: 50,
+    idleUnblurEnabled: false,
+    idleUnblurAmount: 50,
     // Player configuration
     playerHeight: 500,
     mode: "static",
@@ -225,8 +225,8 @@ function createColorPickersSection() {
   hoverDarkenAmountBuilt.slider.disabled = true;
   const hoverDarkenAmountRow = hoverDarkenAmountBuilt.control.outerHTML;
 
-  const hoverUnblurAmountBuilt = buildValueControl({
-    id: 'hoverUnblurAmount',
+  const idleUnblurAmountBuilt = buildValueControl({
+    id: 'idleUnblurAmount',
     label: '',
     value: 50,
     min: 0,
@@ -234,9 +234,9 @@ function createColorPickersSection() {
     step: 5,
     unit: '%'
   });
-  hoverUnblurAmountBuilt.input.disabled = true;
-  hoverUnblurAmountBuilt.slider.disabled = true;
-  const hoverUnblurAmountRow = hoverUnblurAmountBuilt.control.outerHTML;
+  idleUnblurAmountBuilt.input.disabled = true;
+  idleUnblurAmountBuilt.slider.disabled = true;
+  const idleUnblurAmountRow = idleUnblurAmountBuilt.control.outerHTML;
 
   const content = `
     <div class="color-row">
@@ -328,12 +328,12 @@ function createColorPickersSection() {
         ${hoverDarkenAmountRow}
       </div>
       <div class="color-row">
-        <span>Unblur on Hover:</span>
+        <span>Unblur on Idle:</span>
         <label class="toggle-switch" style="margin-right:0.5rem;">
-          <input type="checkbox" id="hoverUnblurEnabled" />
+          <input type="checkbox" id="idleUnblurEnabled" />
           <span class="toggle-slider"></span>
         </label>
-        ${hoverUnblurAmountRow}
+        ${idleUnblurAmountRow}
       </div>
     </div>
   `;
@@ -415,7 +415,7 @@ async function setupBlendModeControls(reel, onChange) {
     setupOverlayColorControls,
     setupOpacityAndBlurControls,
     setupHoverDarkenControls,
-    setupHoverUnblurControls
+    setupIdleUnblurControls
   } = await import("./modules/blendModeControls.js");
 
   setTimeout(async () => {
@@ -430,7 +430,7 @@ async function setupBlendModeControls(reel, onChange) {
     setupOverlayColorControls(reel, onChange);
     setupOpacityAndBlurControls(reel);
     setupHoverDarkenControls(reel, onChange);
-    setupHoverUnblurControls(reel, onChange);
+    setupIdleUnblurControls(reel, onChange);
 
     // Render per-track backgrounds UI
     renderPerTrackBackgrounds(reel, onChange);

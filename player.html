@@ -269,7 +269,7 @@
 
       // Hover darken - see js/modules/previewManager.js for the same computation
       root.style.setProperty('--hover-darken-target-brightness', 1 - (settings.hoverDarkenAmount ?? 15) / 100);
-      root.style.setProperty('--hover-unblur-target-reduction', (settings.hoverUnblurAmount ?? 50) / 100);
+      root.style.setProperty('--idle-unblur-target-reduction', (settings.idleUnblurAmount ?? 50) / 100);
 
       // ============================================
       // Apply container styles
@@ -333,7 +333,7 @@
       if (shouldHideTitle) wrapperClasses += ' no-title';
       if (mode === 'expandable') wrapperClasses += ' expandable-mode';
       if (settings.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
-      if (settings.hoverUnblurEnabled) wrapperClasses += ' hover-unblur-enabled';
+      if (settings.idleUnblurEnabled) wrapperClasses += ' idle-unblur-enabled';
 
       // Build project title overlay HTML for expandable mode
       let projectTitleOverlayHTML = '';

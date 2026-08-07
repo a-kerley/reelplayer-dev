@@ -185,8 +185,8 @@ export class EmbedExporter {
         backgroundZoom: reel.backgroundZoom,
         hoverDarkenEnabled: reel.hoverDarkenEnabled === true,
         hoverDarkenAmount: reel.hoverDarkenAmount ?? 15,
-        hoverUnblurEnabled: reel.hoverUnblurEnabled === true,
-        hoverUnblurAmount: reel.hoverUnblurAmount ?? 50,
+        idleUnblurEnabled: reel.idleUnblurEnabled === true,
+        idleUnblurAmount: reel.idleUnblurAmount ?? 50,
 
         // Title appearance
         titleAppearance: reel.titleAppearance || {},
