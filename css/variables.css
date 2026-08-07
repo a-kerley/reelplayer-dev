@@ -130,7 +130,7 @@
   --hover-darken-transition-duration: 0.3s; /* Fade speed in/out of the hover darken effect - also times idle unblur below, since both animate via the same shared `filter` property */
 
   /* Idle Unblur */
-  --idle-unblur-target-reduction: 0.5;      /* Fraction of --background-blur removed once playback-idle/collapsed-idle when enabled (set by builder, 0 = no change, 1 = fully sharp) */
+  --idle-unblur-target-reduction: 0.5;      /* Fraction of --background-blur removed while playing and settled (see css/player.css's IDLE UNBLUR block for the exact per-mode/per-input trigger) when enabled (set by builder, 0 = no change, 1 = fully sharp) */
 
   /* ========================================
      PLAYBACK-IDLE BACKGROUND ANIMATION

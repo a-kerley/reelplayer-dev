@@ -1443,11 +1443,6 @@ const playerAppCore = {
   // then undarken again after a few seconds of no further activity, mirroring
   // the idle-timer pattern used elsewhere (resetPlaybackIdleTimer) rather than
   // a sustained press-and-hold or a state tied to expand/collapse.
-  //
-  // idle-unblur (see css/player.css) deliberately does NOT need an equivalent
-  // touch handler here - unlike hover, it keys off .playback-idle/
-  // .collapsed-idle, which resetPlaybackIdleTimer()/exitPlaybackIdle() (see
-  // idleState.js) already drive identically for mouse and touch input.
   setupHoverDarkenTouchInteractions() {
     this.cleanupHoverDarkenTouchListeners();
 
@@ -1473,6 +1468,59 @@ const playerAppCore = {
     // long as the user is scrolling past it (e.g. carrying it through the
     // expandable scroll-trigger), never letting it lighten during that time.
     wrapper.addEventListener('touchstart', handler, { passive: true });
+  },
+
+  cleanupIdleUnblurTouchListeners() {
+    if (this.idleUnblurTouch) {
+      const { wrapper, handler, timeoutId } = this.idleUnblurTouch;
+      if (wrapper) {
+        wrapper.removeEventListener('touchstart', handler);
+        wrapper.classList.remove('touch-settled');
+      }
+      clearTimeout(timeoutId);
+      this.idleUnblurTouch = null;
+    }
+  },
+
+  // Touch equivalent of idle-unblur's desktop :not(:hover)/:not(.expanded)
+  // CSS rules (see css/player.css) - touch has no hover to react to, so
+  // "settled" here means "no touch activity for a few seconds" instead.
+  // Deliberately the inverse timing of setupHoverDarkenTouchInteractions()
+  // above: that one ADDS its class on touch and removes it after the
+  // cooldown; this one REMOVES .touch-settled immediately on touch and only
+  // adds it back once the cooldown elapses without further touches, since
+  // the desired end state here is unblurred-when-untouched rather than
+  // darkened-when-touched. Independent of expandable/static mode - both
+  // read .touch-settled in css/player.css, combined with :not(.expanded)
+  // there for the expandable-specific "and actually contracted" requirement.
+  setupIdleUnblurTouchInteractions() {
+    this.cleanupIdleUnblurTouchListeners();
+
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains('idle-unblur-enabled')) {
+      return;
+    }
+
+    this.idleUnblurTouch = { wrapper, handler: null, timeoutId: null };
+
+    const scheduleSettle = () => {
+      clearTimeout(this.idleUnblurTouch.timeoutId);
+      this.idleUnblurTouch.timeoutId = setTimeout(() => {
+        wrapper.classList.add('touch-settled');
+      }, 3000);
+    };
+
+    const handler = () => {
+      wrapper.classList.remove('touch-settled');
+      scheduleSettle();
+    };
+    this.idleUnblurTouch.handler = handler;
+
+    wrapper.addEventListener('touchstart', handler, { passive: true });
+    // Arm the initial timer too, so a touch device that loads with playback
+    // already underway (rather than the play tap itself firing touchstart)
+    // still eventually settles.
+    scheduleSettle();
   },
 
   validateProjectTitleImage() {
@@ -1763,7 +1811,14 @@ const playerAppCore = {
   updatePlayingState(playing) {
     this.expandable.isPlaying = playing;
     const wrapper = this.elements.playerWrapper;
-    
+
+    // Generic play-state marker, independent of mode - gates idle-unblur
+    // (css/player.css) so it never activates while nothing is playing,
+    // regardless of hover/touch/expanded state.
+    if (wrapper) {
+      wrapper.classList.toggle('is-playing', playing);
+    }
+
     if (wrapper && this.expandable.enabled) {
       // Update collapsed state based on playing status (only when not expanded)
       const shouldShowWaveform = playing && this.expandable.settings?.showWaveformOnCollapse !== false;
@@ -1806,6 +1861,7 @@ const playerAppCore = {
     this.cleanupExpandableModeListeners();
     this.cleanupStaticModeListeners();
     this.cleanupHoverDarkenTouchListeners();
+    this.cleanupIdleUnblurTouchListeners();
     this.cleanupWaveformWidthTracking();
 
     // Set expandable mode state - consolidated
@@ -1927,6 +1983,7 @@ const playerAppCore = {
       this.setupStaticModeInteractions();
     }
     this.setupHoverDarkenTouchInteractions();
+    this.setupIdleUnblurTouchInteractions();
     this.setupWaveformWidthTracking();
 
     this.setupWaveSurfer();

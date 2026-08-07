@@ -774,23 +774,55 @@ button {
    IDLE UNBLUR
    ======================================== */
 /* Reduces whatever background blur is currently in effect - image or video -
-   once the player has settled into playback-idle (expanded/static) or
-   collapsed-idle (expandable, collapsed), by overriding --idle-unblur-blur
-   (read by each layer's own filter rule, see .player-wrapper::after/
-   .track-background-layer/.background-video) with a fraction of
-   --background-blur. Stays a no-op (falls through to --background-blur
-   unchanged) unless both .idle-unblur-enabled is present (reel setting) and
-   one of those idle classes is on the wrapper.
+   once the player is settled and not actively being engaged with, but ONLY
+   while actually playing (.is-playing, toggled in updatePlayingState() -
+   js/player.js). Overrides --idle-unblur-blur, read by each layer's own
+   filter rule (see .player-wrapper::after/.track-background-layer/
+   .background-video), with a fraction of --background-blur.
 
-   Deliberately keyed to the SAME classes js/modules/idleState.js already
-   toggles for the opacity-dimming/zoom-speedup idle effects, rather than
-   hover-darken's :hover/.touch-* pattern above - both idle states are
-   already gated on isPlaying() there and already driven identically by mouse
-   and touch input (resetPlaybackIdleTimer()/exitPlaybackIdle(), wired into
-   both setupExpandableModeInteractions() and setupStaticModeInteractions()),
-   so no separate touch handler is needed here the way hover-darken needs
-   one. */
-.player-wrapper.idle-unblur-enabled.playback-idle,
-.player-wrapper.idle-unblur-enabled.collapsed-idle {
+   NOT keyed to .playback-idle/.collapsed-idle (js/modules/idleState.js) -
+   those are driven by a "no mouse movement for N ms while still hovering"
+   timer whose mouseleave handler only clears the pending timer rather than
+   entering idle, so it never actually fires on "the mouse left the player",
+   which is what this feature wants. Four separate rules below instead cover
+   static vs expandable mode, and desktop-hover vs mobile-touch input, since
+   "settled" means something different in each combination. */
+
+/* Static, desktop: settled the instant the mouse actually leaves the player -
+   no separate cooldown, mirrors hover-darken's immediate :hover reaction
+   above, just inverted (blur reduces OFF hover instead of ON it). Scoped to
+   real hover/pointer devices only, same reasoning as hover-darken's :hover
+   rule - :not(:hover) on a touch device would otherwise depend on the
+   browser's own simulated/sticky hover-on-tap rather than the dedicated
+   .touch-settled handling below. */
+@media (hover: hover) and (pointer: fine) {
+  .player-wrapper.idle-unblur-enabled:not(.expandable-mode).is-playing:not(:hover) {
+    --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
+  }
+}
+
+/* Static, mobile: no hover to react to, so "settled" instead means "no touch
+   activity for a few seconds" - js/player.js's
+   setupIdleUnblurTouchInteractions() toggles .touch-settled accordingly. */
+.player-wrapper.idle-unblur-enabled:not(.expandable-mode).is-playing.touch-settled {
+  --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
+}
+
+/* Expandable, desktop: settled the instant the player is actually contracted
+   - by the time .expanded is removed, the existing hover-driven collapse
+   delay/fade (expandable.css) has already played out, so no extra cooldown
+   is needed on top of that. Also naturally true before the very first hover
+   (nothing has been touched yet), which is the correct starting state. */
+@media (hover: hover) and (pointer: fine) {
+  .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing:not(.expanded) {
+    --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
+  }
+}
+
+/* Expandable, mobile: contracted alone isn't enough here - the scroll-driven
+   auto-expand/collapse means the player can sit contracted for reasons
+   unrelated to the listener being "done" with it, so this additionally waits
+   for the same .touch-settled cooldown as the static-mobile rule above. */
+.player-wrapper.idle-unblur-enabled.expandable-mode.is-playing:not(.expanded).touch-settled {
   --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
 }
