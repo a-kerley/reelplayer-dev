@@ -23,14 +23,23 @@
     }
     .filler:nth-child(odd) { background: #e2e2e2; }
     .filler.bookend { height: 100vh; }
+    /* border-radius lives on this wrapper, not the iframe itself - matches
+       the fix in embedExporter.js's generateIframeEmbed(): border-radius
+       applied directly to an iframe isn't reliably clipped by every browser
+       (confirmed on mobile Safari specifically rendering square corners
+       regardless), so a wrapping div using ordinary overflow:hidden +
+       border-radius clipping is the standard, cross-browser-reliable fix. */
+    .iframe-wrapper {
+      border-radius: 8px;
+      overflow: hidden;
+    }
     iframe {
       display: block;
       width: 100%;
       border: none;
-      /* Matches the transition embedExporter.js's generateIframeEmbed() puts
-         inline on the real published embed's iframe - without it, the resize
-         postMessage below snaps the outer frame to its new height instantly,
-         clipping whatever smooth collapse animation is still running inside. */
+      /* Matches embedExporter.js's generateIframeEmbed() - without this, the
+         resize postMessage below snaps the height instantly, clipping
+         whatever collapse animation is still running inside. */
       transition: height 0.3s ease;
     }
     .note {
@@ -51,9 +60,9 @@
   <div class="note">Scroll to carry each player through screen-center · reel ids from ?id= and (optionally) ?id2= query params</div>
   <div class="filler bookend">Start here<br>↓ scroll down ↓</div>
   <div class="filler">Player 1 ↓<br>(should auto-expand as it crosses the center of the screen)</div>
-  <iframe id="playerFrame1" height="500" title="Reel player embed 1 under test"></iframe>
+  <div class="iframe-wrapper"><iframe id="playerFrame1" height="120" title="Reel player embed 1 under test"></iframe></div>
   <div class="filler">Between players<br>(if testing 2 players: start playback in player 1 above, keep scrolling to player 2 below, start playback there too - player 1 should fade out and pause on its own)</div>
-  <iframe id="playerFrame2" height="500" title="Reel player embed 2 under test"></iframe>
+  <div class="iframe-wrapper"><iframe id="playerFrame2" height="120" title="Reel player embed 2 under test"></iframe></div>
   <div class="filler">Scroll back up ↑<br>(each should auto-collapse once it fully leaves the middle third)</div>
   <div class="filler bookend">End of page</div>
 
@@ -63,14 +72,26 @@
     function setupFrame(frameId, reelId) {
       const frame = document.getElementById(frameId);
       if (!reelId) {
-        frame.remove();
+        frame.closest('.iframe-wrapper')?.remove();
         return;
       }
       frame.src = `../player.html?id=${encodeURIComponent(reelId)}`;
       window.addEventListener('message', (event) => {
         if (!event.data || event.source !== frame.contentWindow) return;
         if (event.data.type === 'reelplayer:resize') {
-          frame.style.height = event.data.height + 'px';
+          if (event.data.initial) {
+            // The player's very first size report (both modes) shouldn't
+            // animate through the iframe's height transition below - that
+            // transition exists for expand/collapse, and animating the
+            // initial settle-to-real-height looks like an expand playing on
+            // load, wrong for static mode and an odd flourish for expandable.
+            frame.style.transition = 'none';
+            frame.style.height = event.data.height + 'px';
+            void frame.offsetHeight; // flush before re-enabling the transition
+            frame.style.transition = '';
+          } else {
+            frame.style.height = event.data.height + 'px';
+          }
         } else if (event.data.type === 'reelplayer:scrollCompensate') {
           window.scrollBy(0, event.data.delta);
         }

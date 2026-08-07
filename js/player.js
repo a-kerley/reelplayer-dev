@@ -1422,52 +1422,63 @@ const playerAppCore = {
     }
   },
 
-  cleanupHoverDarkenTouchListeners() {
-    if (this.hoverDarkenTouch) {
-      const { wrapper, handler, timeoutId } = this.hoverDarkenTouch;
+  cleanupTouchHoverEffect(stateKey) {
+    const state = this[stateKey];
+    if (state) {
+      const { wrapper, handler, timeoutId } = state;
       if (wrapper) {
         wrapper.removeEventListener('touchstart', handler);
       }
       clearTimeout(timeoutId);
-      this.hoverDarkenTouch = null;
+      this[stateKey] = null;
     }
   },
 
-  // Independent of expandable/static mode - hoverDarkenEnabled is a standalone
-  // reel setting either mode can turn on, so this is wired separately from
-  // both of setupExpandableModeInteractions()/setupStaticModeInteractions()
-  // rather than folded into either. Touch has no real hover, and some mobile
+  // Shared by hover-darken and hover-unblur - both are standalone reel
+  // settings either mode can turn on, wired separately from both of
+  // setupExpandableModeInteractions()/setupStaticModeInteractions() rather
+  // than folded into either. Touch has no real hover, and some mobile
   // browsers fake a sticky :hover on tap that never clears until tapping
-  // elsewhere - worse than nothing for a background darken effect (a
-  // permanently-stuck-dark background). Instead: darken on touch activity,
-  // then undarken again after a few seconds of no further activity, mirroring
+  // elsewhere - worse than nothing for either effect (a permanently
+  // darkened/unblurred background). Instead: activate on touch activity,
+  // then revert again after a few seconds of no further activity, mirroring
   // the idle-timer pattern used elsewhere (resetPlaybackIdleTimer) rather than
   // a sustained press-and-hold or a state tied to expand/collapse.
-  setupHoverDarkenTouchInteractions() {
-    this.cleanupHoverDarkenTouchListeners();
+  setupTouchHoverEffect(stateKey, enabledClass, activeClass, cooldownMs = 3000) {
+    this.cleanupTouchHoverEffect(stateKey);
 
     const wrapper = this.elements.playerWrapper;
-    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains('hover-darken-enabled')) {
+    if (!wrapper || !this.isTouchDevice() || !wrapper.classList.contains(enabledClass)) {
       return;
     }
 
-    this.hoverDarkenTouch = { wrapper, handler: null, timeoutId: null };
+    this[stateKey] = { wrapper, handler: null, timeoutId: null };
 
     const handler = () => {
-      wrapper.classList.add('touch-darkened');
-      clearTimeout(this.hoverDarkenTouch.timeoutId);
-      this.hoverDarkenTouch.timeoutId = setTimeout(() => {
-        wrapper.classList.remove('touch-darkened');
-      }, 3000);
+      wrapper.classList.add(activeClass);
+      clearTimeout(this[stateKey].timeoutId);
+      this[stateKey].timeoutId = setTimeout(() => {
+        wrapper.classList.remove(activeClass);
+      }, cooldownMs);
     };
-    this.hoverDarkenTouch.handler = handler;
+    this[stateKey].handler = handler;
 
     // touchstart only, deliberately not touchmove - touchmove fires
     // continuously for the whole duration of any scroll gesture that started
-    // on the player, which would keep resetting the undarken timer for as
-    // long as the user is scrolling past it (e.g. carrying it through the
-    // expandable scroll-trigger), never letting it lighten during that time.
+    // on the player, which would keep resetting the revert timer for as long
+    // as the user is scrolling past it (e.g. carrying it through the
+    // expandable scroll-trigger), never letting it revert during that time.
     wrapper.addEventListener('touchstart', handler, { passive: true });
+  },
+
+  cleanupHoverDarkenTouchListeners() {
+    this.cleanupTouchHoverEffect('hoverDarkenTouch');
+    this.cleanupTouchHoverEffect('hoverUnblurTouch');
+  },
+
+  setupHoverDarkenTouchInteractions() {
+    this.setupTouchHoverEffect('hoverDarkenTouch', 'hover-darken-enabled', 'touch-darkened');
+    this.setupTouchHoverEffect('hoverUnblurTouch', 'hover-unblur-enabled', 'touch-unblurred');
   },
 
   validateProjectTitleImage() {
@@ -1557,6 +1568,11 @@ const playerAppCore = {
     wrapper.classList.remove('pre-collapsing');
     wrapper.classList.remove('collapsing');
     this.expandable.isExpanded = true;
+    // Hint before the height transition starts, cleared once it settles
+    // (below) rather than left on permanently - will-change keeps a
+    // dedicated compositing layer around for as long as it's set, which
+    // costs memory for no benefit outside of an actual transition.
+    wrapper.style.willChange = 'height';
     wrapper.classList.add('expanded');
 
     // If we were in collapsed idle with video, transition to playback idle
@@ -1581,23 +1597,30 @@ const playerAppCore = {
     // frozen width from updateWaveformWidth() needs refreshing once that
     // settles, not before, so this waits out the same transition duration.
     const transitionDuration = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
-    setTimeout(() => this.updateWaveformWidth(), transitionDuration + 50);
+    setTimeout(() => {
+      this.updateWaveformWidth();
+      wrapper.style.willChange = '';
+    }, transitionDuration + 50);
   },
 
   // Shrinking the wrapper's height (about to be triggered by the caller removing
   // 'expanded' right after this runs) retracts space from the page below it -
   // uncompensated, whatever's below just visibly jumps upward as that space
-  // disappears. Reads the wrapper's *actual* rendered height every frame (rather
-  // than assuming the CSS transition's own easing curve) and scrolls by the same
-  // delta each frame, so content below stays visually anchored throughout the
-  // shrink regardless of curve. In a real embed the player runs inside a
-  // same-origin-or-not <iframe>, so it can't call the host page's scrollBy()
-  // directly - it asks via postMessage instead, same pattern as the existing
-  // resize handshake below.
+  // disappears. Watches the wrapper's *actual* rendered height via
+  // ResizeObserver (rather than assuming the CSS transition's own easing
+  // curve) and scrolls by the same delta on each reported change, so content
+  // below stays visually anchored throughout the shrink regardless of curve.
+  // Deliberately not a rAF + getBoundingClientRect() polling loop - that reads
+  // layout on every single frame, forcing a synchronous layout flush right in
+  // the middle of the browser's own transition work each frame. ResizeObserver
+  // instead gets the post-layout size for free, after the browser has already
+  // computed it. In a real embed the player runs inside a same-origin-or-not
+  // <iframe>, so it can't call the host page's scrollBy() directly - it asks
+  // via postMessage instead, same pattern as the existing resize handshake
+  // below.
   compensateScrollDuringCollapse(wrapper) {
     const inIframe = window.self !== window.top;
     let previousHeight = wrapper.getBoundingClientRect().height;
-    let rafId;
 
     const applyDelta = (delta) => {
       if (delta === 0) return;
@@ -1608,15 +1631,17 @@ const playerAppCore = {
       }
     };
 
-    const step = () => {
-      const currentHeight = wrapper.getBoundingClientRect().height;
+    const resizeObserver = new ResizeObserver((entries) => {
+      // wrapper has no padding/border (see expandable.css), so contentRect's
+      // height is equivalent to the border-box height getBoundingClientRect()
+      // would give - using it directly avoids an extra forced layout read.
+      const currentHeight = entries[entries.length - 1].contentRect.height;
       applyDelta(previousHeight - currentHeight);
       previousHeight = currentHeight;
-      rafId = requestAnimationFrame(step);
-    };
+    });
 
     const stop = () => {
-      cancelAnimationFrame(rafId);
+      resizeObserver.disconnect();
       wrapper.removeEventListener('transitionend', onTransitionEnd);
     };
 
@@ -1626,7 +1651,7 @@ const playerAppCore = {
       }
     };
     wrapper.addEventListener('transitionend', onTransitionEnd);
-    rafId = requestAnimationFrame(step);
+    resizeObserver.observe(wrapper);
 
     // Fallback in case transitionend never fires (e.g. an interrupted
     // transition, or a browser/OS reduced-motion setting that removes the
@@ -1682,13 +1707,19 @@ const playerAppCore = {
         if (compensateScroll) {
           this.compensateScrollDuringCollapse(wrapper);
         }
+        // Same will-change reasoning as expandPlayer() - set right before the
+        // transition starts, cleared once it settles below.
+        wrapper.style.willChange = 'height';
         wrapper.classList.remove('expanded');
         wrapper.classList.remove('collapsing');
 
         // Same reasoning as the equivalent call in expandPlayer() - waits out
         // .player-content's padding transition before re-measuring.
         const transitionDuration = (parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
-        setTimeout(() => this.updateWaveformWidth(), transitionDuration + 50);
+        setTimeout(() => {
+          this.updateWaveformWidth();
+          wrapper.style.willChange = '';
+        }, transitionDuration + 50);
 
         // Clear timeout references
         this.expandable.collapseDelayTimeout = null;
@@ -1800,7 +1831,8 @@ const playerAppCore = {
     if (shouldHideTitle) wrapperClasses += ' no-title';
     if (this.expandable.enabled) wrapperClasses += ' expandable-mode';
     if (reel?.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
-    
+    if (reel?.hoverUnblurEnabled) wrapperClasses += ' hover-unblur-enabled';
+
     // Build project title overlay HTML for expandable mode
     let projectTitleOverlayHTML = '';
     if (this.expandable.enabled && reel.projectTitleImage) {

@@ -269,6 +269,7 @@
 
       // Hover darken - see js/modules/previewManager.js for the same computation
       root.style.setProperty('--hover-darken-target-brightness', 1 - (settings.hoverDarkenAmount ?? 15) / 100);
+      root.style.setProperty('--hover-unblur-target-reduction', (settings.hoverUnblurAmount ?? 50) / 100);
 
       // ============================================
       // Apply container styles
@@ -277,12 +278,26 @@
       const mode = reelData.mode || 'static';
       
       // Set minimum height based on mode
-      if (mode === 'expandable') {
-        container.style.minHeight = `${settings.expandableCollapsedHeight || 120}px`;
-      } else {
-        container.style.minHeight = `${playerHeight}px`;
+      const initialHeight = mode === 'expandable'
+        ? (settings.expandableCollapsedHeight || 120)
+        : playerHeight;
+      container.style.minHeight = `${initialHeight}px`;
+
+      // Notify parent window if in iframe (for iframe height adjustment).
+      // expandable.js's own expandPlayer()/collapsePlayer() send this same
+      // message, but only on the first expand/collapse interaction - a host
+      // page that sizes its iframe off this message (rather than a hardcoded
+      // fixed height, e.g. a page built around a different reel's mode) never
+      // gets told the correct height at all for static mode, or before the
+      // first interaction in expandable mode. Flagged `initial: true` so a
+      // listener can size the iframe instantly instead of animating into it -
+      // an animated *first* resize looks exactly like an expand animation
+      // playing on load, which is wrong for static mode and just an odd
+      // flourish for expandable mode's own idle-collapsed starting height.
+      if (window.self !== window.top) {
+        window.parent.postMessage({ type: 'reelplayer:resize', height: initialHeight, initial: true }, '*');
       }
-      
+
       // Apply base background color (always applied)
       container.style.backgroundColor = backgroundColor;
       
@@ -318,7 +333,8 @@
       if (shouldHideTitle) wrapperClasses += ' no-title';
       if (mode === 'expandable') wrapperClasses += ' expandable-mode';
       if (settings.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
-      
+      if (settings.hoverUnblurEnabled) wrapperClasses += ' hover-unblur-enabled';
+
       // Build project title overlay HTML for expandable mode
       let projectTitleOverlayHTML = '';
       if (mode === 'expandable' && settings.projectTitleImage) {
@@ -448,12 +464,21 @@
       playerApp.closedIdleManager.initialize();
 
       // ============================================
-      // Setup expandable mode if enabled
+      // Setup mode-specific interactions
+      // Matches js/player.js's own renderPlayer() (used by the builder
+      // preview) - that one calls setupStaticModeInteractions() in the else
+      // branch here, which this hand-duplicated copy was missing entirely.
+      // That silently dropped static mode's idle-timer/touchstart listeners
+      // in every real embed - playback-idle exit-on-touch only ever worked
+      // in the builder preview, never in a published static-mode embed.
       // ============================================
       if (playerApp.expandable.enabled) {
         playerApp.setupExpandableModeInteractions();
         playerApp.validateProjectTitleImage();
         console.log('✓ Expandable mode interactions enabled');
+      } else {
+        playerApp.setupStaticModeInteractions();
+        console.log('✓ Static mode interactions enabled');
       }
 
       // hoverDarkenEnabled is independent of expandable/static mode, so this

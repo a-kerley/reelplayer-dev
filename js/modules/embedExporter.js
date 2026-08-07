@@ -77,10 +77,22 @@ export class EmbedExporter {
     // clean-URL form the static-assets Worker's default html_handling
     // serves directly, so embeds never take the .html -> extensionless
     // redirect hop that requesting "player.html" literally would trigger.
-    return `<iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player?id=${reelId}"
-           width="100%" height="${height}px" frameborder="0" 
-           style="border-radius: 8px; border: none; min-height: ${height}px; transition: height 0.3s ease;">
-          </iframe>${resizeScript}`;
+    //
+    // border-radius lives on the wrapping <div>, not the <iframe> itself -
+    // border-radius applied directly to an iframe (a "replaced element")
+    // isn't reliably clipped by every browser, older mobile Safari
+    // especially confirmed to just ignore it and render square corners
+    // regardless. A <div> clipping via the ordinary overflow:hidden +
+    // border-radius combo is the standard, cross-browser-reliable way to
+    // round an iframe's corners. The div needs no explicit height of its
+    // own - it's a block-level parent, so it naturally sizes to fit the
+    // iframe (its only child) at whatever height the iframe currently has,
+    // frame by frame, as the iframe's own JS-driven height transition
+    // below plays out - no separate transition needed on the div itself.
+    return `<div style="border-radius: 8px; overflow: hidden;"><iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player?id=${reelId}"
+           width="100%" height="${height}px" frameborder="0"
+           style="display: block; border: none; min-height: ${height}px; transition: height 0.3s ease;">
+          </iframe></div>${resizeScript}`;
   }
 
   calculateEmbedHeight(reel) {
@@ -173,6 +185,8 @@ export class EmbedExporter {
         backgroundZoom: reel.backgroundZoom,
         hoverDarkenEnabled: reel.hoverDarkenEnabled === true,
         hoverDarkenAmount: reel.hoverDarkenAmount ?? 15,
+        hoverUnblurEnabled: reel.hoverUnblurEnabled === true,
+        hoverUnblurAmount: reel.hoverUnblurAmount ?? 50,
 
         // Title appearance
         titleAppearance: reel.titleAppearance || {},

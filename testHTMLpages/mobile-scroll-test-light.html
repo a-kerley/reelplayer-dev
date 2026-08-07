@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Mobile Scroll Test (light page)</title>
+  <style>
+    body {
+      margin: 0;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+      background: #fff;
+      color: #333;
+      line-height: 1.6;
+    }
+    .content {
+      max-width: 640px;
+      margin: 0 auto;
+      padding: 1.5rem;
+    }
+    h1 {
+      font-size: 1.4rem;
+    }
+    p {
+      margin: 1rem 0;
+    }
+    /* border-radius lives on this wrapper, not the iframe itself - border-radius
+       applied directly to an iframe isn't reliably clipped by every browser
+       (confirmed on mobile Safari specifically), so a wrapping div using
+       ordinary overflow:hidden + border-radius clipping is the standard,
+       cross-browser-reliable fix - matches embedExporter.js's generateIframeEmbed(). */
+    .iframe-wrapper {
+      border-radius: 8px;
+      overflow: hidden;
+      margin: 1.5rem 0;
+    }
+    iframe {
+      display: block;
+      width: 100%;
+      border: none;
+      /* Matches embedExporter.js's generateIframeEmbed(). */
+      transition: height 0.3s ease;
+    }
+    .note {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      background: #222;
+      color: #fff;
+      font-size: 0.8rem;
+      padding: 6px 10px;
+      z-index: 1000;
+      font-family: monospace;
+    }
+    .spacer {
+      height: 100vh;
+    }
+  </style>
+</head>
+<body>
+  <div class="note">Light version - short paragraphs instead of full-viewport filler, to check whether the heavy test page itself was inflating animation jank vs. a normal blog/landing-page layout</div>
+  <div class="content">
+    <div class="spacer"></div>
+    <h1>A normal-weight page around the player</h1>
+    <p>This paragraph and the next couple are just standing in for typical
+      body copy - short blocks of text rather than empty full-viewport-height
+      filler blocks, so the page reflows roughly the way a real blog post or
+      landing page would when the player above or below expands/collapses.</p>
+    <p>Scroll down so the player crosses the middle third of the screen -
+      it should auto-expand. Keep scrolling past it and it should
+      auto-collapse once fully clear.</p>
+    <div class="iframe-wrapper"><iframe id="playerFrame1" height="120" title="Reel player embed under test"></iframe></div>
+    <p>A short paragraph after the player, again standing in for normal
+      surrounding content rather than a wall of blank space.</p>
+    <p>Scroll back up through the player again to test the collapse
+      direction the other way.</p>
+    <div class="spacer"></div>
+  </div>
+
+  <script>
+    const params = new URLSearchParams(window.location.search);
+    const reelId = params.get('id');
+    const frame = document.getElementById('playerFrame1');
+    if (reelId) {
+      frame.src = `../player.html?id=${encodeURIComponent(reelId)}`;
+    } else {
+      document.body.insertAdjacentHTML('afterbegin',
+        '<p style="padding:1rem;color:red;">Add ?id=&lt;reelId&gt; to the URL to load a reel.</p>');
+    }
+    window.addEventListener('message', (event) => {
+      if (!event.data || event.source !== frame.contentWindow) return;
+      if (event.data.type === 'reelplayer:resize') {
+        if (event.data.initial) {
+          // See mobile-scroll-test.html's identical handling - the player's
+          // first size report shouldn't animate through the height
+          // transition below, or it looks like an expand playing on load.
+          frame.style.transition = 'none';
+          frame.style.height = event.data.height + 'px';
+          void frame.offsetHeight; // flush before re-enabling the transition
+          frame.style.transition = '';
+        } else {
+          frame.style.height = event.data.height + 'px';
+        }
+      } else if (event.data.type === 'reelplayer:scrollCompensate') {
+        window.scrollBy(0, event.data.delta);
+      }
+    });
+  </script>
+</body>
+</html>

@@ -300,3 +300,44 @@ export function setupHoverDarkenControls(reel, onChange) {
     }
   });
 }
+
+/**
+ * Sets up hover-unblur toggle and amount slider - mirrors
+ * setupHoverDarkenControls() above exactly, opposite effect.
+ * @param {Object} reel - Reel configuration
+ * @param {Function} onChange - Change callback
+ */
+export function setupHoverUnblurControls(reel, onChange) {
+  const hoverUnblurEnabled = document.getElementById("hoverUnblurEnabled");
+  const hoverUnblurAmount = document.getElementById("hoverUnblurAmount");
+  const hoverUnblurAmountSlider = document.getElementById("hoverUnblurAmountSlider");
+
+  if (!hoverUnblurEnabled || !hoverUnblurAmount) return;
+
+  hoverUnblurEnabled.checked = reel.hoverUnblurEnabled || false;
+  hoverUnblurAmount.value = reel.hoverUnblurAmount ?? 50;
+  if (hoverUnblurAmountSlider) hoverUnblurAmountSlider.value = hoverUnblurAmount.value;
+
+  const updateEnabledState = () => {
+    const isEnabled = hoverUnblurEnabled.checked;
+    hoverUnblurAmount.disabled = !isEnabled;
+    if (hoverUnblurAmountSlider) hoverUnblurAmountSlider.disabled = !isEnabled;
+    reel.hoverUnblurEnabled = isEnabled;
+  };
+  updateEnabledState();
+
+  hoverUnblurEnabled.addEventListener("change", () => {
+    updateEnabledState();
+    onChange();
+  });
+
+  hoverUnblurAmount.addEventListener("input", () => {
+    reel.hoverUnblurAmount = parseInt(hoverUnblurAmount.value);
+  });
+
+  hoverUnblurAmount.addEventListener("change", () => {
+    if (window.saveReels && window.reels) {
+      window.saveReels(window.reels);
+    }
+  });
+}

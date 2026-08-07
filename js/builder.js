@@ -46,6 +46,8 @@ export function createEmptyReel() {
     overlayColorEnabled: false,
     hoverDarkenEnabled: false,
     hoverDarkenAmount: 15,
+    hoverUnblurEnabled: false,
+    hoverUnblurAmount: 50,
     // Player configuration
     playerHeight: 500,
     mode: "static",
@@ -223,6 +225,19 @@ function createColorPickersSection() {
   hoverDarkenAmountBuilt.slider.disabled = true;
   const hoverDarkenAmountRow = hoverDarkenAmountBuilt.control.outerHTML;
 
+  const hoverUnblurAmountBuilt = buildValueControl({
+    id: 'hoverUnblurAmount',
+    label: '',
+    value: 50,
+    min: 0,
+    max: 100,
+    step: 5,
+    unit: '%'
+  });
+  hoverUnblurAmountBuilt.input.disabled = true;
+  hoverUnblurAmountBuilt.slider.disabled = true;
+  const hoverUnblurAmountRow = hoverUnblurAmountBuilt.control.outerHTML;
+
   const content = `
     <div class="color-row">
       <span>UI Accent Colour:</span>
@@ -312,6 +327,14 @@ function createColorPickersSection() {
         </label>
         ${hoverDarkenAmountRow}
       </div>
+      <div class="color-row">
+        <span>Unblur on Hover:</span>
+        <label class="toggle-switch" style="margin-right:0.5rem;">
+          <input type="checkbox" id="hoverUnblurEnabled" />
+          <span class="toggle-slider"></span>
+        </label>
+        ${hoverUnblurAmountRow}
+      </div>
     </div>
   `;
   
@@ -391,7 +414,8 @@ async function setupBlendModeControls(reel, onChange) {
     setupBackgroundVideoFilePicker,
     setupOverlayColorControls,
     setupOpacityAndBlurControls,
-    setupHoverDarkenControls
+    setupHoverDarkenControls,
+    setupHoverUnblurControls
   } = await import("./modules/blendModeControls.js");
 
   setTimeout(async () => {
@@ -406,6 +430,7 @@ async function setupBlendModeControls(reel, onChange) {
     setupOverlayColorControls(reel, onChange);
     setupOpacityAndBlurControls(reel);
     setupHoverDarkenControls(reel, onChange);
+    setupHoverUnblurControls(reel, onChange);
 
     // Render per-track backgrounds UI
     renderPerTrackBackgrounds(reel, onChange);

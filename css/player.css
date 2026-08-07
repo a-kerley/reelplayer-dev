@@ -298,6 +298,13 @@ button {
   border-radius: 8px;
   overflow: hidden;
   padding: 0;
+  /* Layout containment performance hint for the expand/collapse height
+     transition (expandable.css) - lets the browser skip checking this
+     wrapper's descendants when computing ancestor layout, and vice versa,
+     rather than needing to re-verify the whole subtree on every animated
+     frame. Doesn't change anything visually - overflow: hidden above
+     already clips to this box's own bounds either way. */
+  contain: layout;
 }
 
 /* Static mode specific height - don't apply to expandable mode */
@@ -341,9 +348,10 @@ button {
   /* Blur lives on the layer itself (not a shared backdrop-filter overlay above
      everything) so it's intrinsic to this image and can never bleed onto - or be
      bled onto by - whatever else is stacked above it (videos, the idle overlay).
-     Hover-darken (brightness) lives here too, for the same reason - and stays
-     1 (a no-op) unless .hover-darken-enabled is on the wrapper and it's hovered. */
-  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
+     Hover-darken (brightness) and hover-unblur (the blur term itself) live here
+     too, for the same reason - each stays a no-op (brightness 1, blur unchanged)
+     unless its own .hover-*-enabled class is on the wrapper and it's hovered. */
+  filter: blur(var(--hover-unblur-blur, var(--background-blur))) brightness(var(--hover-darken-brightness, 1));
   transition: filter var(--hover-darken-transition-duration) ease-in-out;
   z-index: 0;
   border-radius: 8px;
@@ -364,8 +372,8 @@ button {
   background-position: center;
   background-repeat: no-repeat;
   opacity: 0;
-  /* Same reasoning as .player-wrapper::after - intrinsic per-layer blur and hover-darken. */
-  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
+  /* Same reasoning as .player-wrapper::after - intrinsic per-layer blur, hover-darken, and hover-unblur. */
+  filter: blur(var(--hover-unblur-blur, var(--background-blur))) brightness(var(--hover-darken-brightness, 1));
   z-index: 1;
   border-radius: 8px;
   transition: opacity 0.8s ease-in-out, filter var(--hover-darken-transition-duration) ease-in-out;
@@ -403,9 +411,10 @@ button {
   /* Base background blur applies here too by default (matches a video crossfading
      as a track/main background outside of idle) - overridden below specifically
      for the idle video while player-closed-idle is active (which preserves the
-     brightness() term too, so hover-darken keeps working during idle). Intrinsic
-     to this element, so it never depends on what's stacked above or below it. */
-  filter: blur(var(--background-blur)) brightness(var(--hover-darken-brightness, 1));
+     brightness() term too, so hover-darken keeps working during idle; hover-unblur
+     is deliberately NOT preserved there - see the override rule's own comment).
+     Intrinsic to this element, so it never depends on what's stacked above or below it. */
+  filter: blur(var(--hover-unblur-blur, var(--background-blur))) brightness(var(--hover-darken-brightness, 1));
   z-index: 2;
   border-radius: 8px;
   transition: opacity var(--video-fade-out-duration) ease-in-out, filter var(--hover-darken-transition-duration) ease-in-out;
@@ -710,7 +719,12 @@ button {
    The marker itself only gets cleared in cleanupVideo() (videoPlayback.js), once
    this element's own fade has actually completed - so the override persists for
    this element's entire lifecycle as "the idle video" regardless of .active or
-   wrapper-level state. */
+   wrapper-level state.
+
+   Deliberately still keyed to --player-closed-idle-blur, not the hover-unblur
+   variable used by the other blur rules above - player-closed-idle is a
+   "nothing is playing yet" state, outside the "unblur during playback" feature's
+   scope, and hovering this cinematic idle video isn't meant to sharpen it. */
 .background-video.player-closed-idle-video {
   filter: blur(var(--player-closed-idle-blur)) brightness(var(--hover-darken-brightness, 1));
   /* Re-overscan to match this larger blur radius (base rule above sizes for
@@ -750,4 +764,28 @@ button {
    class on touch activity instead, with its own idle timeout to undarken again. */
 .player-wrapper.hover-darken-enabled.touch-darkened {
   --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
+}
+
+/* ========================================
+   HOVER UNBLUR
+   ======================================== */
+/* The exact inverse of hover-darken above, same mechanism: reduces whatever
+   background blur is currently in effect - image or video, idle or not - on
+   hover, by overriding --hover-unblur-blur (read by each layer's own filter
+   rule, see .player-wrapper::after/.track-background-layer/.background-video)
+   with a fraction of --background-blur. Stays a no-op (falls through to
+   --background-blur unchanged) unless both .hover-unblur-enabled is present
+   (reel setting) and the wrapper is actually hovered/touch-active. */
+@media (hover: hover) and (pointer: fine) {
+  .player-wrapper.hover-unblur-enabled:hover {
+    --hover-unblur-blur: calc(var(--background-blur) * (1 - var(--hover-unblur-target-reduction, 0.5)));
+  }
+}
+
+/* Touch equivalent of the :hover rule above - same reasoning as
+   .touch-darkened. js/player.js's setupHoverDarkenTouchInteractions() (shared
+   with hover-darken via setupTouchHoverEffect()) toggles this class on touch
+   activity, with its own idle timeout to re-blur again. */
+.player-wrapper.hover-unblur-enabled.touch-unblurred {
+  --hover-unblur-blur: calc(var(--background-blur) * (1 - var(--hover-unblur-target-reduction, 0.5)));
 }

@@ -11,6 +11,12 @@
 .player-wrapper.expandable-mode {
   position: relative;
   overflow: hidden;
+  /* Scopes layout/paint invalidation to this box during the height transition -
+     without it, iOS Safari treats every frame of the resize as a reason to
+     reconsider paint outside the wrapper too, which is expensive. Safe here
+     since overflow:hidden already clips content and position:relative already
+     makes this the containing block for its absolute-positioned children. */
+  contain: layout paint;
   transition: height var(--expandable-transition-duration) var(--expandable-transition-easing),
               max-height var(--expandable-transition-duration) var(--expandable-transition-easing);
   height: var(--expandable-collapsed-height, 120px);
