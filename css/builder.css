@@ -558,7 +558,8 @@ button:disabled {
 /* ==============================================
    FILENAME DISPLAY & INPUT
    ============================================== */
-.filename-display {
+.filename-display,
+input.filename-display {
   font-family: inherit;
   font-size: var(--builder-text-sm);
   font-weight: var(--builder-weight-regular);
@@ -570,9 +571,12 @@ button:disabled {
   line-height: 1.5;
   cursor: text;
   user-select: text;
-  display: inline-block;
   min-width: 14rem;
   max-width: 100%;
+}
+
+.filename-display {
+  display: inline-block;
   overflow: hidden;
   text-overflow: ellipsis;
   white-space: nowrap;
@@ -601,19 +605,6 @@ button:disabled {
 }
 
 input.filename-display {
-  font-family: inherit;
-  font-size: var(--builder-text-sm);
-  font-weight: var(--builder-weight-regular);
-  color: #fff;
-  padding: 0.35em 0.7em;
-  background: #1e1e1e;
-  border: 1px solid #444;
-  border-radius: 3px;
-  line-height: 1.5;
-  cursor: text;
-  user-select: text;
-  min-width: 14rem;
-  max-width: 100%;
   box-sizing: border-box;
 }
 

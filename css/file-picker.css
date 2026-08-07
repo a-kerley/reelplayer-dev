@@ -85,40 +85,10 @@
   background-color: #666;
 }
 
-/* File Picker Button (attached to inputs, in the builder form) */
-.file-picker-btn {
-  background: transparent;
-  color: #ccc;
-  border: none;
-  border-radius: 4px;
-  padding: 0.35em 0.5em;
-  cursor: pointer;
-  display: flex;
-  align-items: center;
-  justify-content: center;
-  transition: all 0.2s ease;
-}
-
-.file-picker-btn svg {
-  width: 20px;
-  height: 20px;
-  color: #ccc;
-  transition: color 0.2s;
-}
-
-.file-picker-btn:hover svg {
-  color: #4a90e2;
-}
-
-.file-picker-btn:disabled {
-  cursor: not-allowed;
-}
-
-.file-picker-btn:disabled:hover svg {
-  color: #ccc;
-}
-
-/* Crop/Preview toggle button (attached to background image inputs) */
+/* File Picker Button (attached to inputs, in the builder form) and
+   Crop/Preview toggle button (attached to background image inputs) - same
+   button chrome, different click behavior wired in JS. */
+.file-picker-btn,
 .crop-preview-btn {
   background: transparent;
   color: #ccc;
@@ -132,6 +102,7 @@
   transition: all 0.2s ease;
 }
 
+.file-picker-btn svg,
 .crop-preview-btn svg {
   width: 20px;
   height: 20px;
@@ -139,14 +110,17 @@
   transition: color 0.2s;
 }
 
+.file-picker-btn:hover svg,
 .crop-preview-btn:hover svg {
   color: #4a90e2;
 }
 
+.file-picker-btn:disabled,
 .crop-preview-btn:disabled {
   cursor: not-allowed;
 }
 
+.file-picker-btn:disabled:hover svg,
 .crop-preview-btn:disabled:hover svg {
   color: #ccc;
 }

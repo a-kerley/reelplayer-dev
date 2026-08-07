@@ -23,12 +23,6 @@ export class EmbedExporter {
     };
   }
 
-  // Generate embed code (for backward compatibility)
-  async generateEmbedCode(reel) {
-    const options = await this.generateEmbedOptions(reel);
-    return options.iframe;
-  }
-
   async generateIframeEmbed(reel) {
     const reelId = this.generateReelId(reel);
     await this.storeReelData(reelId, reel);
@@ -45,7 +39,7 @@ export class EmbedExporter {
       height = reel.playerHeight || 500;
     }
     
-    // If height is a string (from calculateEmbedHeight), parse it
+    // reel.playerHeight/expandableCollapsedHeight may come through as a string
     if (typeof height === 'string') {
       height = parseInt(height);
     }
@@ -93,26 +87,6 @@ export class EmbedExporter {
            width="100%" height="${height}px" frameborder="0"
            style="display: block; border: none; min-height: ${height}px; transition: height 0.3s ease;">
           </iframe></div>${resizeScript}`;
-  }
-
-  calculateEmbedHeight(reel) {
-    // Base heights
-    const titleHeight = (reel.showTitle && reel.title) ? 60 : 0;
-    const playerControlsHeight = 180; // Waveform + controls
-    const playlistItemHeight = 50;
-    
-    // Calculate playlist height
-    const validTracks = (reel.playlist || []).filter(
-      track => track.url && track.url.trim() !== ""
-    ).length;
-    
-    const playlistHeight = validTracks * playlistItemHeight;
-    
-    // Total with padding
-    const totalHeight = titleHeight + playerControlsHeight + playlistHeight + 80;
-    
-    // Clamp between reasonable min/max and return as number
-    return Math.min(Math.max(totalHeight, 300), 800);
   }
 
   generateReelId(reel) {
@@ -233,15 +207,6 @@ export class EmbedExporter {
   // Note: generateStandaloneHTML() has been removed to eliminate code duplication.
   // All embeds now use the iframe approach with player.html as the single source of truth.
   // This ensures player fixes automatically apply to embeds without manual synchronization.
-
-  generatePlaylistHTML(playlist) {
-    return playlist.map((track, index) => `
-      <div class="playlist-item${index === 0 ? ' active' : ''}" data-index="${index}">
-        <span>${track.title || 'Untitled Track'}</span>
-        <span class="playlist-duration">--:--</span>
-      </div>
-    `).join('');
-  }
 }
 
 export const embedExporter = new EmbedExporter();

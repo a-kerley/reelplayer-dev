@@ -1,15 +1,15 @@
 .playlist {
   margin-top: 1rem; /* Space between waveform player and playlist - adjust this value to change gap */
-  max-width: calc(100% + 30px); /* Extend beyond container to hide scrollbar */
-  width: calc(100% + 30px);
+  max-width: calc(100% + var(--expandable-scrollbar-width)); /* Extend beyond container to hide scrollbar */
+  width: calc(100% + var(--expandable-scrollbar-width));
   text-align: left;
   overflow-y: scroll;
   overflow-x: hidden;
   flex: 1;
   min-height: 0;
   position: relative;
-  padding-right: 30px; /* Push content back and push scrollbar out of view */
-  margin-right: -30px; /* Pull back to align content */
+  padding-right: var(--expandable-scrollbar-width); /* Push content back and push scrollbar out of view */
+  margin-right: calc(-1 * var(--expandable-scrollbar-width)); /* Pull back to align content */
   scroll-behavior: smooth; /* Smooth scrolling with inertia */
   -ms-overflow-style: none !important; /* IE/Edge: hide native scrollbar */
   scrollbar-width: thin !important; /* Firefox: minimal overlay style */
@@ -136,7 +136,7 @@
   border-bottom: 0px solid rgba(221, 221, 221, 0.6);
   user-select: none;
   color: var(--ui-accent);
-  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), background-color 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: transform var(--expandable-transition-duration) var(--expandable-transition-easing), opacity var(--expandable-transition-duration) var(--expandable-transition-easing), background-color var(--expandable-transition-duration) var(--expandable-transition-easing), box-shadow var(--expandable-transition-duration) var(--expandable-transition-easing);
   transform: scale(0.95);
   opacity: 0.7;
   border-radius: 4px;
@@ -173,7 +173,7 @@
   color: var(--ui-accent);
   font-size: 0.85rem;
   flex-shrink: 0;
-  transition: opacity 0.3s cubic-bezier(0.4, 0, 0.2, 1), color 0.3s cubic-bezier(0.4, 0, 0.2, 1), font-weight 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+  transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing), color var(--expandable-transition-duration) var(--expandable-transition-easing), font-weight var(--expandable-transition-duration) var(--expandable-transition-easing);
   opacity: 0.8;
 }
 

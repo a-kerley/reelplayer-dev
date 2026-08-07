@@ -7,6 +7,7 @@ import { backgroundZoomAnimation } from './modules/backgroundZoomAnimation.js';
 import { playlistScroll } from './modules/playlistScroll.js';
 import { videoLayerState } from './modules/videoLayerState.js';
 import { videoPlayback } from './modules/videoPlayback.js';
+import { extractFileName } from './modules/urlUtils.js';
 
 const playerAppCore = {
   elements: {},
@@ -366,35 +367,25 @@ const playerAppCore = {
         const trackFadeState = this.videoState.activeFades.get(currentTrackLayer);
         const hasActiveClass = currentTrackLayer.classList.contains('active');
         const currentOpacity = parseFloat(window.getComputedStyle(currentTrackLayer).opacity);
-        
+
         if (hasActiveClass || trackFadeState || currentOpacity > 0) {
-          if (trackFadeState) {
-          } else {
-          }
-          this.fadeOutVideo(currentTrackLayer, fadeOutDuration, true).catch(err => 
+          this.fadeOutVideo(currentTrackLayer, fadeOutDuration, true).catch(err =>
             console.error('[TRACK SWITCH] ❌ Track video fadeout error:', err)
           );
-        } else {
         }
-      } else {
       }
-      
+
       // Check if main video needs fade-out (either fully active OR currently fading)
       if (currentMainLayer) {
         const mainFadeState = this.videoState.activeFades.get(currentMainLayer);
         const hasActiveClass = currentMainLayer.classList.contains('active');
         const currentOpacity = parseFloat(window.getComputedStyle(currentMainLayer).opacity);
-        
+
         if (hasActiveClass || mainFadeState || currentOpacity > 0) {
-          if (mainFadeState) {
-          } else {
-          }
           this.fadeOutVideo(currentMainLayer, fadeOutDuration, true).catch(err =>
             console.error('[TRACK SWITCH] ❌ Main video fadeout error:', err)
           );
-        } else {
         }
-      } else {
       }
       
       // Clear the track switching flag after video fade-outs have been initiated
@@ -433,7 +424,6 @@ const playerAppCore = {
     // This prevents loading on a layer that's currently fading out
     if (!isPlaybackActive) {
       this.preloadVideos();
-    } else {
     }
     
     // Reset playhead to beginning when changing tracks
@@ -616,10 +606,7 @@ const playerAppCore = {
   updateTrackInfo(audioURL, title) {
     const trackInfo = this.elements.trackInfo;
     if (trackInfo) {
-      const fileName = title || 
-        audioURL.split('/').pop().split('?')[0]
-          .replace(/[_-]/g, ' ')
-          .replace(/\.[^/.]+$/, '');
+      const fileName = title || extractFileName(audioURL);
       trackInfo.textContent = fileName;
       trackInfo.classList.add('visible');
     }
@@ -2107,14 +2094,7 @@ const playerAppCore = {
       
       // Set track info for preview
       const trackInfo = this.elements.trackInfo;
-      const fileName =
-        firstTrack.title ||
-        firstTrack.url
-          .split("/")
-          .pop()
-          .split("?")[0]
-          .replace(/[_-]/g, " ")
-          .replace(/\.[^/.]+$/, "");
+      const fileName = firstTrack.title || extractFileName(firstTrack.url);
       if (trackInfo) {
         trackInfo.textContent = fileName;
         trackInfo.classList.add("visible");

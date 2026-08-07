@@ -338,8 +338,11 @@
       // Build project title overlay HTML for expandable mode
       let projectTitleOverlayHTML = '';
       if (mode === 'expandable' && settings.projectTitleImage) {
+        // needs-intro always applies here - an embed only ever renders once,
+        // so this is always playerApp's first load (see renderPlayer()'s
+        // isFirstLoad/lastProjectTitleImageUrl check in js/player.js).
         projectTitleOverlayHTML = `
-          <div class="project-title-overlay" style="background-image: url('${settings.projectTitleImage}');" data-image-url="${settings.projectTitleImage}"></div>
+          <div class="project-title-overlay needs-intro" style="background-image: url('${settings.projectTitleImage}');" data-image-url="${settings.projectTitleImage}"></div>
         `;
       }
       
@@ -507,7 +510,10 @@
         const firstTrack = reelData.playlist[0];
         const url = playerApp.convertDropboxLinkToDirect(firstTrack.url);
         playerApp.initializePlayer(url, firstTrack.title, 0);
-        
+        // Pre-buffer the inactive video layer so the first crossfade is
+        // instant, matching renderPlayer()'s call in js/player.js.
+        playerApp.preloadVideos();
+
         // Set initial track info display
         const trackInfo = playerApp.elements.trackInfo;
         if (trackInfo) {

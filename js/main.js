@@ -21,6 +21,7 @@ import {
 } from "./modules/draftStore.js";
 import { maybeRunMigration } from "./modules/draftMigration.js";
 import { getBuilderPassword } from "./modules/builderAuth.js";
+import { extractFileName } from "./modules/urlUtils.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -369,14 +370,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     // Show track info for the first track on load
     const trackInfo = playerApp.elements.trackInfo;
-    const fileName =
-      firstTrack.title ||
-      firstTrack.url
-        .split("/")
-        .pop()
-        .split("?")[0]
-        .replace(/[_-]/g, " ")
-        .replace(/\.[^/.]+$/, "");
+    const fileName = firstTrack.title || extractFileName(firstTrack.url);
     if (trackInfo) {
       trackInfo.textContent = fileName;
       trackInfo.classList.add("visible");
@@ -387,14 +381,7 @@ document.addEventListener("DOMContentLoaded", async () => {
   document.addEventListener("track:change", (e) => {
     const { audioURL, title, index } = e.detail;
     const trackInfo = playerApp.elements.trackInfo;
-    const fileName =
-      title ||
-      audioURL
-        .split("/")
-        .pop()
-        .split("?")[0]
-        .replace(/[_-]/g, " ")
-        .replace(/\.[^/.]+$/, "");
+    const fileName = title || extractFileName(audioURL);
     if (trackInfo) {
       trackInfo.textContent = fileName;
     }
@@ -438,6 +425,8 @@ document.addEventListener("DOMContentLoaded", async () => {
         </svg>
       `;
     }
+    const playheadTime = playerApp.elements.playheadTime;
+    if (playheadTime) playheadTime.style.opacity = "1";
   });
 
   document.addEventListener("playback:pause", () => {
@@ -449,13 +438,6 @@ document.addEventListener("DOMContentLoaded", async () => {
         </svg>
       `;
     }
-  });
-
-  document.addEventListener("playback:play", () => {
-    const playheadTime = playerApp.elements.playheadTime;
-    if (playheadTime) playheadTime.style.opacity = "1";
-  });
-  document.addEventListener("playback:pause", () => {
     const playheadTime = playerApp.elements.playheadTime;
     if (playheadTime) playheadTime.style.opacity = "0";
   });

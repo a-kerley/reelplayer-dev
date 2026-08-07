@@ -3,6 +3,7 @@
 import { ValidationUtils } from './validation.js';
 import { openFilePicker } from './filePicker.js';
 import { extractFileName } from './urlUtils.js';
+import { createFilePickerButton as createFilePickerButtonEl } from './domUtils.js';
 
 export function updateTracksEditor(reel, onChange) {
 
@@ -38,7 +39,7 @@ function createTrackRow(track, index, reel, onChange) {
   const copyBtn = createCopyFilenameButton(track, titleField, onChange);
   
   // File picker button
-  const filePickerBtn = createFilePickerButton(track, onChange);
+  const filePickerBtn = createFilePickerButton(track, onChange, index);
   
   // URL field with filename display
   const { fileNameSpan, urlField } = createUrlField(track, onChange);
@@ -317,45 +318,13 @@ function setupDragAndDrop(row, index, reel, onChange) {
   });
 }
 
-function createFilePickerButton(track, onChange) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "file-picker-btn";
-  btn.setAttribute("aria-label", "Browse local files");
-  btn.title = "Browse files from assets/audio";
-  
-  // Folder icon SVG
-  btn.innerHTML = `
-    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
-      <path stroke-linecap="round" stroke-linejoin="round" d="M2.25 12.75V12A2.25 2.25 0 0 1 4.5 9.75h15A2.25 2.25 0 0 1 21.75 12v.75m-8.69-6.44-2.12-2.12a1.5 1.5 0 0 0-1.061-.44H4.5A2.25 2.25 0 0 0 2.25 6v12a2.25 2.25 0 0 0 2.25 2.25h15A2.25 2.25 0 0 0 21.75 18V9a2.25 2.25 0 0 0-2.25-2.25h-5.379a1.5 1.5 0 0 1-1.06-.44Z" />
-    </svg>
-  `;
-
-  // Styling
-  Object.assign(btn.style, {
-    background: "transparent",
-    color: "#ccc",
-    border: "none",
-    borderRadius: "4px",
-    padding: "0.35em 0.5em",
-    cursor: "pointer",
-    display: "flex",
-    alignItems: "center",
-    justifyContent: "center",
-    transition: "all 0.2s ease"
+function createFilePickerButton(track, onChange, index) {
+  const btn = createFilePickerButtonEl({
+    id: `track-${index}-audio-picker`,
+    ariaLabel: "Browse local files",
+    title: "Browse files from assets/audio"
   });
 
-  // Hover effect - changes icon color to blue
-  btn.addEventListener("mouseenter", () => {
-    const svg = btn.querySelector('svg');
-    if (svg) svg.style.color = "#4a90e2";
-  });
-
-  btn.addEventListener("mouseleave", () => {
-    const svg = btn.querySelector('svg');
-    if (svg) svg.style.color = "#ccc";
-  });
-  
   // Click handler - uses the file picker module
   btn.onclick = () => {
     openFilePicker({

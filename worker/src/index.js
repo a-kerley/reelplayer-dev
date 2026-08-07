@@ -51,6 +51,49 @@ function isAuthorized(request, env) {
   return !!match && match[1] === env.BUILDER_PASSWORD;
 }
 
+// Returns a 401 Response if the request isn't authorized, or null if it's
+// fine to proceed - callers do `const authError = requireAuth(...); if
+// (authError) return authError;`.
+function requireAuth(request, env) {
+  return isAuthorized(request, env) ? null : jsonResponse({ error: "Unauthorized" }, 401);
+}
+
+// Raw pass-through of an already-JSON-string KV value, for GET routes that
+// return the stored document verbatim rather than re-serializing it.
+function rawJsonResponse(value) {
+  return new Response(value, {
+    status: 200,
+    headers: { "Content-Type": "application/json", ...CORS_HEADERS },
+  });
+}
+
+async function parseJsonBody(request) {
+  try {
+    return { body: JSON.parse(await request.text()) };
+  } catch {
+    return { error: jsonResponse({ error: "Invalid JSON body" }, 400) };
+  }
+}
+
+// Shared shape for the /reels and /drafts list routes: list every key under
+// a prefix, fetch + parse each one, and pluck out just the summary fields
+// each listing view needs.
+async function listEntries(env, prefix, pickFields) {
+  const list = await env.REELS.list({ prefix });
+  const entries = await Promise.all(
+    list.keys.map(async (key) => {
+      const value = await env.REELS.get(key.name);
+      if (!value) return null;
+      try {
+        return pickFields(JSON.parse(value));
+      } catch {
+        return null;
+      }
+    })
+  );
+  return entries.filter(Boolean);
+}
+
 // Keys are user-controlled folder/file paths (e.g. "backgrounds/nature/foo.jpg").
 // Reject anything that could escape the intended prefix or target a hidden/empty key.
 function isValidMediaKey(key) {
@@ -131,24 +174,11 @@ export default {
 
     // GET /reels - list all published reels (management view)
     if (pathname === "/reels" && request.method === "GET") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
 
-      const list = await env.REELS.list();
-      const entries = await Promise.all(
-        list.keys.map(async (key) => {
-          const value = await env.REELS.get(key.name);
-          if (!value) return null;
-          try {
-            const parsed = JSON.parse(value);
-            return { id: parsed.id, title: parsed.title, created: parsed.created };
-          } catch {
-            return null;
-          }
-        })
-      );
-      return jsonResponse(entries.filter(Boolean));
+      const entries = await listEntries(env, "", (r) => ({ id: r.id, title: r.title, created: r.created }));
+      return jsonResponse(entries);
     }
 
     // /reels/:id
@@ -159,16 +189,12 @@ export default {
       if (request.method === "GET") {
         const value = await env.REELS.get(key);
         if (!value) return jsonResponse({ error: "Not found" }, 404);
-        return new Response(value, {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return rawJsonResponse(value);
       }
 
       if (request.method === "POST") {
-        if (!isAuthorized(request, env)) {
-          return jsonResponse({ error: "Unauthorized" }, 401);
-        }
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
         const body = await request.text();
         try {
           JSON.parse(body);
@@ -180,9 +206,8 @@ export default {
       }
 
       if (request.method === "DELETE") {
-        if (!isAuthorized(request, env)) {
-          return jsonResponse({ error: "Unauthorized" }, 401);
-        }
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
         await env.REELS.delete(key);
         return jsonResponse({ ok: true });
       }
@@ -190,24 +215,13 @@ export default {
 
     // GET /drafts - list all drafts (builder sidebar), password-gated
     if (pathname === "/drafts" && request.method === "GET") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
 
-      const list = await env.REELS.list({ prefix: "draft_" });
-      const entries = await Promise.all(
-        list.keys.map(async (key) => {
-          const value = await env.REELS.get(key.name);
-          if (!value) return null;
-          try {
-            const parsed = JSON.parse(value);
-            return { id: parsed.id, title: parsed.title, createdAt: parsed.createdAt, updatedAt: parsed.updatedAt };
-          } catch {
-            return null;
-          }
-        })
-      );
-      return jsonResponse(entries.filter(Boolean));
+      const entries = await listEntries(env, "draft_", (r) => ({
+        id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
+      }));
+      return jsonResponse(entries);
     }
 
     // /drafts/:id - unlike /reels/:id, every method here is password-gated:
@@ -218,27 +232,18 @@ export default {
       const key = `draft_${draftMatch[1]}`;
 
       if (request.method === "GET") {
-        if (!isAuthorized(request, env)) {
-          return jsonResponse({ error: "Unauthorized" }, 401);
-        }
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
         const value = await env.REELS.get(key);
         if (!value) return jsonResponse({ error: "Not found" }, 404);
-        return new Response(value, {
-          status: 200,
-          headers: { "Content-Type": "application/json", ...CORS_HEADERS },
-        });
+        return rawJsonResponse(value);
       }
 
       if (request.method === "POST") {
-        if (!isAuthorized(request, env)) {
-          return jsonResponse({ error: "Unauthorized" }, 401);
-        }
-        let body;
-        try {
-          body = JSON.parse(await request.text());
-        } catch {
-          return jsonResponse({ error: "Invalid JSON body" }, 400);
-        }
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
         // Stamped server-side, not trusted from the client, so "most
         // recently edited" sort order stays correct regardless of client
         // clock skew.
@@ -248,9 +253,8 @@ export default {
       }
 
       if (request.method === "DELETE") {
-        if (!isAuthorized(request, env)) {
-          return jsonResponse({ error: "Unauthorized" }, 401);
-        }
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
         await env.REELS.delete(key);
         return jsonResponse({ ok: true });
       }
@@ -258,9 +262,8 @@ export default {
 
     // POST /media/upload?key=<key>
     if (pathname === "/media/upload" && request.method === "POST") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
       const key = new URL(request.url).searchParams.get("key");
       if (!isValidMediaKey(key)) {
         return jsonResponse({ error: "Invalid key" }, 400);
@@ -293,9 +296,8 @@ export default {
     // level at a time with folders grouped via R2's delimiter option - used
     // by the Media Library tab's own folder-by-folder browsing.
     if (pathname === "/media/list" && request.method === "GET") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
       const params = new URL(request.url).searchParams;
       const prefix = params.get("prefix") || "";
       const flat = params.get("flat") === "1";
@@ -327,15 +329,10 @@ export default {
 
     // POST /media/rename  body: { from, to }
     if (pathname === "/media/rename" && request.method === "POST") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
-      let body;
-      try {
-        body = JSON.parse(await request.text());
-      } catch {
-        return jsonResponse({ error: "Invalid JSON body" }, 400);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+      const { body, error } = await parseJsonBody(request);
+      if (error) return error;
       const { from, to } = body || {};
       if (!isValidMediaKey(from) || !isValidMediaKey(to)) {
         return jsonResponse({ error: "Invalid key" }, 400);
@@ -354,9 +351,8 @@ export default {
 
     // DELETE /media/delete?key=<key>
     if (pathname === "/media/delete" && request.method === "DELETE") {
-      if (!isAuthorized(request, env)) {
-        return jsonResponse({ error: "Unauthorized" }, 401);
-      }
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
       const key = new URL(request.url).searchParams.get("key");
       if (!isValidMediaKey(key)) {
         return jsonResponse({ error: "Invalid key" }, 400);

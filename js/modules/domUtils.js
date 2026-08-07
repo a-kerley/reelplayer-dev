@@ -100,7 +100,7 @@ export function createToggleSwitch({ id, checked = false, onChange = null }) {
 export function createFilePickerButton({ id, ariaLabel, title, disabled = false }) {
   const button = document.createElement("button");
   button.type = "button";
-  button.id = id;
+  if (id) button.id = id;
   button.className = "file-picker-btn";
   button.setAttribute("aria-label", ariaLabel);
   button.title = title;

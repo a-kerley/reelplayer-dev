@@ -57,7 +57,6 @@ export const videoPlayback = {
     if (oppositeLayer?.classList.contains('active')) {
       const fadeOutDuration = this.getVideoTransitionDuration('fadeOut');
       this.fadeOutVideo(oppositeLayer, fadeOutDuration, true);
-    } else {
     }
 
     // Check if current layer already has the right video playing
@@ -91,7 +90,6 @@ export const videoPlayback = {
         const loadStart = performance.now();
         await this.loadVideo(nextLayer, activeVideo.url, activeVideo.type);
         this.setLayerUrl(activeVideo.type, nextLayerName, activeVideo.url);
-      } else {
       }
 
       // Crossfade: fade out old layer while fading in new layer
@@ -105,7 +103,6 @@ export const videoPlayback = {
         this.fadeOutVideo(currentLayer, fadeInDuration, true).catch(err =>
           console.error('[Play Video] ❌ Crossfade out error:', err)
         );
-      } else {
       }
 
       const fadeInCompleted = await fadeInPromise;
@@ -145,66 +142,34 @@ export const videoPlayback = {
    * Fades out and cleans up any active videos
    */
   async stopVideo() {
-
     const fadeOutDuration = this.getVideoTransitionDuration('fadeOut');
     const promises = [];
 
-    // Check BOTH layers (A and B) for each video type
-    // This is critical because fade-in happens on the "next" layer while "current" points to the old layer
-    const trackVideoA = this.videoState.trackVideoA;
-    const trackVideoB = this.videoState.trackVideoB;
-    const mainVideoA = this.videoState.mainVideoA;
-    const mainVideoB = this.videoState.mainVideoB;
+    // Check BOTH layers (A and B) for each video type - critical because
+    // fade-in happens on the "next" layer while "current" points to the old layer
+    const layers = [
+      this.videoState.trackVideoA,
+      this.videoState.trackVideoB,
+      this.videoState.mainVideoA,
+      this.videoState.mainVideoB
+    ];
 
-
-    // Stop track video A if it's active OR has a fade in progress
-    const shouldStopTrackA = trackVideoA &&
-                            (trackVideoA.classList.contains('active') || this.videoState.activeFades.has(trackVideoA));
-
-    if (shouldStopTrackA) {
-      const hasFade = this.videoState.activeFades.has(trackVideoA);
-      promises.push(this.fadeOutVideo(trackVideoA, fadeOutDuration, true));
-    }
-
-    // Stop track video B if it's active OR has a fade in progress
-    const shouldStopTrackB = trackVideoB &&
-                            (trackVideoB.classList.contains('active') || this.videoState.activeFades.has(trackVideoB));
-
-    if (shouldStopTrackB) {
-      const hasFade = this.videoState.activeFades.has(trackVideoB);
-      promises.push(this.fadeOutVideo(trackVideoB, fadeOutDuration, true));
-    }
-
-    // Stop main video A if it's active OR has a fade in progress
-    const shouldStopMainA = mainVideoA &&
-                           (mainVideoA.classList.contains('active') || this.videoState.activeFades.has(mainVideoA));
-
-    if (shouldStopMainA) {
-      const hasFade = this.videoState.activeFades.has(mainVideoA);
-      promises.push(this.fadeOutVideo(mainVideoA, fadeOutDuration, true));
-    }
-
-    // Stop main video B if it's active OR has a fade in progress
-    const shouldStopMainB = mainVideoB &&
-                           (mainVideoB.classList.contains('active') || this.videoState.activeFades.has(mainVideoB));
-
-    if (shouldStopMainB) {
-      const hasFade = this.videoState.activeFades.has(mainVideoB);
-      promises.push(this.fadeOutVideo(mainVideoB, fadeOutDuration, true));
-    }
-
-    if (!shouldStopTrackA && !shouldStopTrackB && !shouldStopMainA && !shouldStopMainB) {
+    for (const layer of layers) {
+      // Stop this layer if it's active OR has a fade in progress
+      const shouldStop = layer &&
+        (layer.classList.contains('active') || this.videoState.activeFades.has(layer));
+      if (shouldStop) {
+        promises.push(this.fadeOutVideo(layer, fadeOutDuration, true));
+      }
     }
 
     if (promises.length > 0) {
       await Promise.all(promises);
-    } else {
     }
 
     // Resume background animations when video stops
     const duration = this.parseCssDuration('--playback-idle-zoom-slow-down-duration', 800);
     this.pauseBackgroundAnimations(true, duration);
-
   },
 
   /**
@@ -242,7 +207,6 @@ export const videoPlayback = {
         .catch(err => {
           console.error(`[Preload Video] Failed on layer ${nextLayerName}:`, err);
         });
-    } else {
     }
   },
 
@@ -361,9 +325,6 @@ export const videoPlayback = {
       console.warn('[Fade In Video] ⚠️ Called with null/undefined videoElement');
       return Promise.resolve();
     }
-
-    // Identify which video element this is
-    const videoId = videoElement.className.split(' ').filter(c => c.includes('video')).join(' ');
 
     // Cancel any in-progress fade on this element
     if (this.videoState.activeFades.has(videoElement)) {
@@ -501,7 +462,6 @@ export const videoPlayback = {
         if (!isAborted) {
           this.videoState.activeFades.delete(videoElement);
           resolve(true);
-        } else {
         }
       }, duration);
     });
@@ -526,9 +486,6 @@ export const videoPlayback = {
       console.warn('[Fade Out Video] ⚠️ Called with null/undefined videoElement');
       return Promise.resolve();
     }
-
-    // Identify which video element this is
-    const videoId = videoElement.className.split(' ').filter(c => c.includes('video')).join(' ');
 
     // Cancel any in-progress fade on this element
     if (this.videoState.activeFades.has(videoElement)) {
@@ -601,7 +558,6 @@ export const videoPlayback = {
           } else {
             videoElement.pause();
           }
-        } else {
         }
         resolve();
       };
@@ -687,7 +643,6 @@ export const videoPlayback = {
       const fade = this.videoState.activeFades.get(videoElement);
       fade.abort();
       this.videoState.activeFades.delete(videoElement);
-    } else {
     }
 
     // Drop any in-flight loadVideo() registration for this element - the
@@ -740,8 +695,6 @@ export const videoPlayback = {
       } else if (type === 'main') {
         this.videoState.mainVideoPlaying = false;
       }
-    } else {
     }
-
   },
 };

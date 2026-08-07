@@ -416,14 +416,9 @@ export async function renderMediaBrowser(container, options = {}) {
   render();
 
   function visibleFiles() {
-    let list;
-    if (state.view.type === 'all') {
-      list = state.files;
-    } else if (state.view.type === 'folder') {
-      list = state.files.filter(f => folderOf(f.key) === state.view.path);
-    } else {
-      list = state.files;
-    }
+    let list = state.view.type === 'folder'
+      ? state.files.filter(f => folderOf(f.key) === state.view.path)
+      : state.files;
     if (state.search.trim()) {
       const q = state.search.trim().toLowerCase();
       list = list.filter(f => f.name.toLowerCase().includes(q));
