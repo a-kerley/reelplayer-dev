@@ -70,8 +70,8 @@
      SHARED TRACK INFO POSITIONING
      Used by both static and expandable modes
      ======================================== */
-  --expandable-track-info-left: 3.7rem;           /* Left offset for track info (matches play button width) */
-  --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text */
+  --expandable-track-info-left: 2.875rem;         /* Left offset for track info (matches play button's actual 46px rendered width) */
+  --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text (matches --expandable-player-gap, so text lines up with the waveform's left edge) */
   --expandable-track-info-top: 1rem;              /* Top margin above track info */
   --expandable-track-info-bottom: 0.5rem;         /* Bottom margin below track info */
   
