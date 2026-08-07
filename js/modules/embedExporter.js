@@ -1,6 +1,7 @@
 // embedExporter.js - Handles exporting embed code for Squarespace and other platforms
 import { WORKER_BASE_URL } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 
 export class EmbedExporter {
   constructor() {
@@ -139,15 +140,15 @@ export class EmbedExporter {
       playerHeight: reel.playerHeight || 500, // Player height setting
       mode: reel.mode || "static", // Player mode: "static" or "expandable"
       // Store backgroundColor at top level for easy access (matches PreviewManager)
-      backgroundColor: reel.backgroundColor || "rgba(255, 255, 255, 1)",
+      backgroundColor: reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor,
       settings: {
         // Color settings
-        varUiAccent: reel.varUiAccent || "#2a0026",
-        varWaveformUnplayed: reel.varWaveformUnplayed || "#929292",
-        varWaveformHover: reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
+        varUiAccent: reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent,
+        varWaveformUnplayed: reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
+        varWaveformHover: reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverRgba,
 
         // Background settings
-        backgroundColor: reel.backgroundColor || "rgba(255, 255, 255, 1)", // Also in settings for backwards compatibility
+        backgroundColor: reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor, // Also in settings for backwards compatibility
         backgroundImage: reel.backgroundImage,
         backgroundImageEnabled: reel.backgroundImageEnabled,
         backgroundVideo: reel.backgroundVideo,
@@ -172,7 +173,7 @@ export class EmbedExporter {
         showWaveformOnCollapse: reel.showWaveformOnCollapse !== false, // Default to true
         enablePlayerClosedIdle: reel.enablePlayerClosedIdle === true,
         playerClosedIdleVideo: reel.playerClosedIdleVideo || "",
-        playerClosedIdleOverlayColor: reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)",
+        playerClosedIdleOverlayColor: reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor,
         playerClosedIdleBlur: reel.playerClosedIdleBlur ?? 8
       },
       created: new Date().toISOString()

@@ -1,5 +1,5 @@
 // previewManager.js - Handles preview functionality with template-based approach
-import { getColorFilters } from './colorUtils.js';
+import { getColorFilters, REEL_COLOR_DEFAULTS } from './colorUtils.js';
 
 export class PreviewManager {
   constructor() {
@@ -83,7 +83,7 @@ export class PreviewManager {
 
     // Process overlay color and background color
     // backgroundColor is ALWAYS the base solid color behind everything
-    let backgroundColor = reel.backgroundColor || "rgba(255, 255, 255, 1)";
+    let backgroundColor = reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor;
     
     // overlayColor is ALWAYS applied to the ::before pseudo-element (with blur)
     // It works whether background image is on or off
@@ -110,20 +110,20 @@ export class PreviewManager {
     const overlayBaseColor = `${overlayRGBA.r}, ${overlayRGBA.g}, ${overlayRGBA.b}`;
     const overlayOpacity = overlayRGBA.a;
 
-    const closedIdleOverlayRGBA = parseRGBA(reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)");
+    const closedIdleOverlayRGBA = parseRGBA(reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor);
     const closedIdleOverlayBaseColor = `${closedIdleOverlayRGBA.r}, ${closedIdleOverlayRGBA.g}, ${closedIdleOverlayRGBA.b}`;
     const closedIdleOverlayOpacity = closedIdleOverlayRGBA.a;
 
-    const uiAccentColor = reel.varUiAccent || "#2a0026";
-    
+    const uiAccentColor = reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent;
+
     // For better color matching, especially with white/light colors
     const colorFilters = getColorFilters(uiAccentColor);
 
     return {
       // Color variables
       "--ui-accent": uiAccentColor,
-      "--waveform-unplayed": reel.varWaveformUnplayed || "#929292",
-      "--waveform-hover": reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
+      "--waveform-unplayed": reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
+      "--waveform-hover": reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverRgba,
 
       // Title appearance variables
       "--reel-title-size": ta.fontSize || "1.3rem",

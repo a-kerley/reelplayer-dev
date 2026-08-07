@@ -1,5 +1,23 @@
 // colorUtils.js - Shared color utility functions for consistent color handling
 
+// Canonical fallback values for reel colors that haven't been customized yet.
+// Each reel-color field is independently duplicated as `reel.<field> ||
+// <default>` across colorPicker.js, embedExporter.js, previewManager.js,
+// presetModal.js, and playlistScroll.js - kept here as the single source of
+// truth so the actual default only needs updating in one place. Waveform
+// hover has two forms because colorPicker.js's Pickr widget wants an opaque
+// hex base (it applies alpha itself via its own `alpha:` config) while every
+// other consumer wants the pre-multiplied rgba string.
+export const REEL_COLOR_DEFAULTS = {
+  uiAccent: "#2a0026",
+  waveformUnplayed: "#929292",
+  waveformHoverHex: "#001f67",
+  waveformHoverRgba: "rgba(0, 31, 103, 0.13)",
+  backgroundColor: "rgba(255, 255, 255, 1)",
+  overlayColor: "rgba(255, 255, 255, 0.5)",
+  playerClosedIdleOverlayColor: "rgba(0, 0, 0, 0.7)",
+};
+
 /**
  * Convert hex color to HSL hue value
  * @param {string} hex - Hex color code (with or without #)
@@ -60,7 +78,7 @@ export function getColorFilters(hexColor) {
   }
   
   // For colored values, use hue rotation from base color
-  const baseHue = hexToHue("#2a0026"); // Base purple color
+  const baseHue = hexToHue(REEL_COLOR_DEFAULTS.uiAccent); // Base purple color
   const targetHue = hexToHue(hexColor);
   const hueRotation = targetHue - baseHue;
   

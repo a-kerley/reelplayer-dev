@@ -3,6 +3,7 @@
 import { loadColourPresets, saveColourPresets } from './colorPresets.js';
 import { applyPresetToPickrs } from './colorPicker.js';
 import { dialog } from './dialogSystem.js';
+import { REEL_COLOR_DEFAULTS } from './colorUtils.js';
 
 export function createPresetModal() {
   let colourPresetModal = document.getElementById("colourPresetModal");
@@ -20,7 +21,7 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
   
   function makeSwatch(preset) {
     return `
-      <div class="preset-swatch" style="display:inline-block;width:38px;height:22px;border-radius:5px;border:1.5px solid #ccc;vertical-align:middle;background:linear-gradient(to right,${preset.varUiAccent||'#2a0026'},${preset.varWaveformUnplayed||'#929292'},${preset.varWaveformHover||'rgba(0,31,103,0.13)'})"></div>
+      <div class="preset-swatch" style="display:inline-block;width:38px;height:22px;border-radius:5px;border:1.5px solid #ccc;vertical-align:middle;background:linear-gradient(to right,${preset.varUiAccent||REEL_COLOR_DEFAULTS.uiAccent},${preset.varWaveformUnplayed||REEL_COLOR_DEFAULTS.waveformUnplayed},${preset.varWaveformHover||REEL_COLOR_DEFAULTS.waveformHoverRgba})"></div>
     `;
   }
   

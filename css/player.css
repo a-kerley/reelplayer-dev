@@ -573,7 +573,15 @@ button {
 }
 
 /* ========================================
-   STATIC MODE PLAYBACK-IDLE STATE
+   PLAYBACK-IDLE STATE
+   The rules below are mode-independent (the --playback-idle-* vars they use
+   are never overridden per-mode in variables.css) and used to be duplicated
+   verbatim under both a `:not(.expandable-mode)` prefix here and an
+   `.expandable-mode` prefix in css/expandable.css - collapsed into one
+   shared copy here. css/expandable.css still carries its own
+   .expanded-only exit-transition (a genuine behavioral difference: static
+   mode's elements always get it, expandable's only while expanded) and its
+   .collapsed-idle-specific rules, which have no static-mode equivalent.
    ======================================== */
 
 /* Base transition for UI elements when exiting idle (fast transition out) */
@@ -586,43 +594,43 @@ button {
   transition: opacity var(--playback-idle-transition-out) ease-out;
 }
 
-/* Reduce UI opacity when player is in static mode and idle during playback */
-.player-wrapper:not(.expandable-mode).playback-idle #playPause,
-.player-wrapper:not(.expandable-mode).playback-idle .volume-control,
-.player-wrapper:not(.expandable-mode).playback-idle .playlist,
-.player-wrapper:not(.expandable-mode).playback-idle .reel-title,
-.player-wrapper:not(.expandable-mode).playback-idle .track-info,
-.player-wrapper:not(.expandable-mode).playback-idle .playhead-time,
-.player-wrapper:not(.expandable-mode).playback-idle #total-time {
+/* Reduce UI opacity when idle during playback, in either mode */
+.player-wrapper.playback-idle #playPause,
+.player-wrapper.playback-idle .volume-control,
+.player-wrapper.playback-idle .playlist,
+.player-wrapper.playback-idle .reel-title,
+.player-wrapper.playback-idle .track-info,
+.player-wrapper.playback-idle .playhead-time,
+.player-wrapper.playback-idle #total-time {
   opacity: var(--playback-idle-opacity) !important;
   transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
-/* #total-time stays fully visible through idle, same reasoning as the
-   equivalent overrides in css/expandable.css. */
-.player-wrapper:not(.expandable-mode).playback-idle #total-time.visible {
+/* #total-time stays fully visible through playback-idle in either mode -
+   css/expandable.css adds its own .collapsed-idle equivalent alongside this. */
+.player-wrapper.playback-idle #total-time.visible {
   opacity: 1 !important;
   transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
-/* Same reasoning as the equivalent override in expandable.css - no spacebar
-   fallback on touch, so play/volume shouldn't dim to near-invisibility. */
+/* No spacebar fallback on touch, so play/volume shouldn't dim to
+   near-invisibility, in either mode. */
 @media (hover: none) and (pointer: coarse) {
-  .player-wrapper:not(.expandable-mode).playback-idle #playPause,
-  .player-wrapper:not(.expandable-mode).playback-idle .volume-control {
+  .player-wrapper.playback-idle #playPause,
+  .player-wrapper.playback-idle .volume-control {
     opacity: 1 !important;
   }
 }
 
-/* Background overlay transitions for static mode */
-.player-wrapper:not(.expandable-mode)::before {
+/* Background overlay transitions, in either mode */
+.player-wrapper::before {
   transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
               -webkit-backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
               opacity var(--playback-idle-overlay-transition-out) ease-out var(--playback-idle-overlay-delay-out);
 }
 
-/* Remove blur and reduce overlay opacity in static mode idle */
-.player-wrapper:not(.expandable-mode).playback-idle::before {
+/* Remove blur and reduce overlay opacity when idle, in either mode */
+.player-wrapper.playback-idle::before {
   backdrop-filter: blur(0) !important;
   -webkit-backdrop-filter: blur(0) !important;
   opacity: var(--playback-idle-overlay-opacity-multiplier);

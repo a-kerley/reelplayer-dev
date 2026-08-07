@@ -209,7 +209,13 @@
 
 /* ========================================
    IDLE STATES
-   Two types: playback-idle (expanded) and collapsed-idle (collapsed)
+   Two types: playback-idle (expanded) and collapsed-idle (collapsed).
+   playback-idle's dimming/overlay rules are mode-independent and now live
+   as a single shared copy in css/player.css (see the PLAYBACK-IDLE STATE
+   section there) - only what's genuinely expandable-only stays here: the
+   .expanded-scoped exit-transition below (static mode's equivalent applies
+   unconditionally instead, since static has no collapsed state to exclude)
+   and collapsed-idle's own rules.
    ======================================== */
 
 /* Base transition for UI elements when exiting idle (fast transition out) */
@@ -222,53 +228,8 @@
   transition: opacity var(--playback-idle-transition-out) ease-out;
 }
 
-/* EXPANDED PLAYBACK IDLE STATE */
-/* Reduce UI opacity when player is expanded and idle during playback */
-.player-wrapper.expandable-mode.playback-idle #playPause,
-.player-wrapper.expandable-mode.playback-idle .volume-control,
-.player-wrapper.expandable-mode.playback-idle .playlist,
-.player-wrapper.expandable-mode.playback-idle .reel-title,
-.player-wrapper.expandable-mode.playback-idle .track-info,
-.player-wrapper.expandable-mode.playback-idle .playhead-time,
-.player-wrapper.expandable-mode.playback-idle #total-time {
-  opacity: var(--playback-idle-opacity) !important;
-  transition: opacity var(--playback-idle-transition-in) ease-out;
-}
-
-/* Dimming play/volume during idle is fine on desktop specifically because
-   spacebar still works even when the button itself is nearly invisible -
-   touch has no equivalent fallback, so a barely-visible tap target there is
-   just confusing. Keep those two undimmed on touch; everything else above
-   still dims normally for the same idle/cinematic effect. */
-@media (hover: none) and (pointer: coarse) {
-  .player-wrapper.expandable-mode.playback-idle #playPause,
-  .player-wrapper.expandable-mode.playback-idle .volume-control {
-    opacity: 1 !important;
-  }
-}
-
-/* Background overlay transitions (shared between both idle states) */
-.player-wrapper.expandable-mode::before {
-  transition: backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
-              -webkit-backdrop-filter var(--playback-idle-blur-transition-out) ease-out var(--playback-idle-blur-delay-out),
-              opacity var(--playback-idle-overlay-transition-out) ease-out var(--playback-idle-overlay-delay-out);
-}
-
-/* Remove blur and reduce overlay opacity in expanded idle */
-.player-wrapper.expandable-mode.playback-idle::before {
-  backdrop-filter: blur(0) !important;
-  -webkit-backdrop-filter: blur(0) !important;
-  opacity: var(--playback-idle-overlay-opacity-multiplier);
-  transition: backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
-              -webkit-backdrop-filter var(--playback-idle-blur-transition-in) ease-out var(--playback-idle-blur-delay-in),
-              opacity var(--playback-idle-overlay-transition-in) ease-out var(--playback-idle-overlay-delay-in);
-}
-
-/* #total-time stays fully visible through both the playback-idle rule above
-   and the collapsed-idle rule below - see the fuller reasoning on the
-   equivalent override after the pre-collapsing/collapsing rules earlier in
-   this file. */
-.player-wrapper.expandable-mode.playback-idle #total-time.visible,
+/* #total-time stays fully visible through collapsed-idle too - the
+   playback-idle case is handled by the shared rule in css/player.css. */
 .player-wrapper.expandable-mode.collapsed-idle #total-time.visible {
   opacity: 1 !important;
   transition: opacity var(--playback-idle-transition-in) ease-out;

@@ -1,4 +1,5 @@
 // colorPicker.js - Handles Pickr color picker functionality
+import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 
 let pickrInstances = [];
 
@@ -14,38 +15,38 @@ export function createColorPickers(reel, onChange) {
     {
       id: "pickr-ui-accent",
       var: "--ui-accent",
-      default: reel.varUiAccent || "#2a0026",
+      default: reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent,
       reelKey: "varUiAccent",
     },
     {
       id: "pickr-waveform-unplayed",
       var: "--waveform-unplayed",
-      default: reel.varWaveformUnplayed || "#929292",
+      default: reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
       reelKey: "varWaveformUnplayed",
     },
     {
       id: "pickr-waveform-hover",
       var: "--waveform-hover",
-      default: reel.varWaveformHover || "#001f67",
+      default: reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverHex,
       reelKey: "varWaveformHover",
       alpha: 0.13,
     },
     {
       id: "pickr-background-color",
       var: "--background-color",
-      default: reel.backgroundColor || "rgba(255, 255, 255, 1)",
+      default: reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor,
       reelKey: "backgroundColor",
     },
     {
       id: "pickr-overlay-color",
       var: "--overlay-color",
-      default: reel.overlayColor || "rgba(255, 255, 255, 0.5)",
+      default: reel.overlayColor || REEL_COLOR_DEFAULTS.overlayColor,
       reelKey: "overlayColor",
     },
     {
       id: "pickr-player-closed-idle-overlay-color",
       var: "--player-closed-idle-overlay-base-color",
-      default: reel.playerClosedIdleOverlayColor || "rgba(0, 0, 0, 0.7)",
+      default: reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor,
       reelKey: "playerClosedIdleOverlayColor",
     },
   ];
@@ -65,8 +66,8 @@ export function createColorPickers(reel, onChange) {
           theme: "nano",
           default: cfg.default,
           swatches: [
-            "#2a0026",
-            "#001f67",
+            REEL_COLOR_DEFAULTS.uiAccent,
+            REEL_COLOR_DEFAULTS.waveformHoverHex,
             "#219e36",
             "#b00000",
             "#f4cd2a",
@@ -140,11 +141,11 @@ export function applyPresetToPickrs(preset, reel) {
   pickrInstances.forEach((pickr) => {
     if (pickr.options && pickr.options.el && pickr.options.el.id) {
       if (pickr.options.el.id === "pickr-ui-accent") {
-        pickr.setColor(preset.varUiAccent || "#2a0026");
+        pickr.setColor(preset.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent);
       } else if (pickr.options.el.id === "pickr-waveform-unplayed") {
-        pickr.setColor(preset.varWaveformUnplayed || "#929292");
+        pickr.setColor(preset.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed);
       } else if (pickr.options.el.id === "pickr-waveform-hover") {
-        pickr.setColor(preset.varWaveformHover || "rgba(0, 31, 103, 0.13)");
+        pickr.setColor(preset.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverRgba);
       }
     }
   });
@@ -152,8 +153,8 @@ export function applyPresetToPickrs(preset, reel) {
 
 export function getCurrentPickrValues(reel) {
   return {
-    varUiAccent: reel.varUiAccent || "#2a0026",
-    varWaveformUnplayed: reel.varWaveformUnplayed || "#929292",
-    varWaveformHover: reel.varWaveformHover || "rgba(0, 31, 103, 0.13)",
+    varUiAccent: reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent,
+    varWaveformUnplayed: reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
+    varWaveformHover: reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverRgba,
   };
 }

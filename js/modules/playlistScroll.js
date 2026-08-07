@@ -1,4 +1,4 @@
-import { colorToRgba } from './colorUtils.js';
+import { colorToRgba, REEL_COLOR_DEFAULTS } from './colorUtils.js';
 
 // Playlist rendering and its custom scrollbar (drag thumb + momentum wheel scrolling).
 // Mixed into playerApp via Object.assign, so methods rely on `this` referring to playerApp.
@@ -65,7 +65,7 @@ export const playlistScroll = {
     }
 
     // Get UI accent color from CSS variable
-    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || '#2a0026';
+    const accentColor = getComputedStyle(document.documentElement).getPropertyValue('--ui-accent').trim() || REEL_COLOR_DEFAULTS.uiAccent;
     const thumbColor = colorToRgba(accentColor, 0.3);
 
     // Create custom scrollbar elements - position relative to playlist's parent
