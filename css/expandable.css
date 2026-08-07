@@ -268,6 +268,46 @@
   transition: opacity var(--playback-idle-transition-in) ease-out;
 }
 
+/* Mobile only: keep play/pause and volume visible alongside the waveform
+   while collapsed and playing, rather than hidden entirely like the rest of
+   the collapsed-idle UI above - desktop keeps the existing fully-hidden
+   behavior (hover-to-expand makes the collapsed state comparatively
+   short-lived there). Split into two rules: the first overrides the base
+   "hidden while collapsed" rule for as long as it's playing-collapsed at
+   all; the second, once settled into collapsed-idle specifically, fades
+   both to the SAME reduced opacity the waveform rule above uses instead of
+   collapsed-idle's own opacity:0 - same visual treatment as the waveform,
+   not just "not hidden". */
+@media (hover: none) and (pointer: coarse) {
+  .player-wrapper.expandable-mode.playing-collapsed:not(.expanded) #playPause,
+  .player-wrapper.expandable-mode.playing-collapsed:not(.expanded) .volume-control {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  /* #playPause only gets align-self:center when .expanded (see the "Ensure
+     play button stays aligned with waveform center" rule below) - it was
+     never needed for the collapsed state before since the button was
+     invisible there (opacity:0, above the media query). align-self:center
+     alone leaves it sitting a few pixels low relative to the waveform's own
+     visual centerline - small enough that it's more likely the icon's own
+     optical weight within its box than the row's shared
+     --expandable-collapsed-waveform-offset padding (that's a much larger
+     ~24px shift; a mismatch of that size would look wildly off, not "a bit
+     low"). Starting nudge below - straightforward to retune if not exact. */
+  .player-wrapper.expandable-mode.playing-collapsed:not(.expanded) #playPause {
+    align-self: center;
+    margin-top: -12px;
+  }
+
+  .player-wrapper.expandable-mode.playing-collapsed.collapsed-idle #playPause,
+  .player-wrapper.expandable-mode.playing-collapsed.collapsed-idle .volume-control {
+    opacity: var(--playback-idle-collapsed-waveform-opacity) !important;
+    pointer-events: auto;
+    transition: opacity var(--playback-idle-transition-in) ease-out;
+  }
+}
+
 /* Remove blur and reduce overlay opacity in collapsed idle */
 .player-wrapper.expandable-mode.collapsed-idle::before {
   backdrop-filter: blur(0) !important;

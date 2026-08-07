@@ -660,6 +660,11 @@ const playerAppCore = {
         };
 
         volumeToggle.addEventListener("click", (e) => {
+          // Tapping volume while collapsed should reopen the player (unlike
+          // play/pause, which deliberately has no such trigger) - see
+          // expandFromMobileTap()'s own comment. No-ops once already
+          // expanded, via that method's own isExpanded guard.
+          playerApp.expandFromMobileTap();
           if (!volumeControl.classList.contains("show-slider")) {
             volumeControl.classList.add("show-slider");
             e.stopImmediatePropagation();
@@ -1241,6 +1246,27 @@ const playerAppCore = {
   // firing within TAP_COOLDOWN_MS of a manual tap is ignored outright,
   // regardless of what it reports, and normal scroll-driven behavior only
   // resumes once that's elapsed.
+  // Expands a collapsed player from a deliberate mobile tap elsewhere in the
+  // UI (the tap-bar/heading tap handler below, and setupVolumeControls()'s
+  // volume-icon tap while collapsed-and-playing). Sets the same
+  // mobileManualOverrideUntil cooldown handleTap() below does, so the
+  // scroll-driven IntersectionObserver in setupExpandableModeTouchInteractions()
+  // doesn't immediately fight a deliberate tap by re-collapsing/re-expanding
+  // off scroll position alone right after it. No-ops in static mode (no
+  // expand/collapse concept there) or if already expanded -
+  // setupVolumeControls() calls this unconditionally on every volume-icon
+  // tap, relying on this guard rather than checking mode/state itself.
+  expandFromMobileTap() {
+    if (!this.expandable.enabled || this.expandable.isExpanded) return;
+    const styles = getComputedStyle(document.documentElement);
+    const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
+    const transitionDuration = (parseFloat(styles.getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
+    this.expandable.mobileManualOverrideUntil = Date.now() + fadeDuration + transitionDuration + 150;
+    this.expandPlayer();
+    this.exitPlaybackIdle();
+    this.exitCollapsedIdle();
+  },
+
   setupExpandableModeTouchInteractions(wrapper) {
     const styles = getComputedStyle(document.documentElement);
     const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
@@ -1303,14 +1329,14 @@ const playerAppCore = {
     observer.observe(wrapper);
 
     const handleTap = () => {
-      this.expandable.mobileManualOverrideUntil = Date.now() + TAP_COOLDOWN_MS;
       if (this.expandable.isExpanded) {
+        this.expandable.mobileManualOverrideUntil = Date.now() + TAP_COOLDOWN_MS;
         this.collapsePlayer(true); // immediate - explicit tap, not incidental hover-leave
+        this.exitPlaybackIdle();
+        this.exitCollapsedIdle();
       } else {
-        this.expandPlayer();
+        this.expandFromMobileTap();
       }
-      this.exitPlaybackIdle();
-      this.exitCollapsedIdle();
     };
 
     // Primary tap target: the bottom handle bar, present regardless of

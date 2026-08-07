@@ -784,9 +784,10 @@ button {
    those are driven by a "no mouse movement for N ms while still hovering"
    timer whose mouseleave handler only clears the pending timer rather than
    entering idle, so it never actually fires on "the mouse left the player",
-   which is what this feature wants. Four separate rules below instead cover
-   static vs expandable mode, and desktop-hover vs mobile-touch input, since
-   "settled" means something different in each combination. */
+   which is what this feature wants. Five separate rules below instead cover
+   static vs expandable mode, desktop-hover vs mobile-touch input, and (for
+   expandable-mobile specifically) expanded vs collapsed, since "settled"
+   means something different in each combination. */
 
 /* Static, desktop: settled the instant the mouse actually leaves the player -
    no separate cooldown, mirrors hover-darken's immediate :hover reaction
@@ -824,5 +825,15 @@ button {
    unrelated to the listener being "done" with it, so this additionally waits
    for the same .touch-settled cooldown as the static-mobile rule above. */
 .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing:not(.expanded).touch-settled {
+  --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
+}
+
+/* Expandable, mobile, still EXPANDED: unlike desktop (where hovering is what
+   keeps it expanded, so "expanded" already implies "actively engaged" -
+   hence no equivalent rule above for the desktop-expanded case), the
+   scroll-triggered auto-expand can leave a mobile player open and playing
+   while the listener's attention and touches have moved on entirely - so
+   this settles the same way once .touch-settled, even without contracting. */
+.player-wrapper.idle-unblur-enabled.expandable-mode.is-playing.expanded.touch-settled {
   --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
 }
