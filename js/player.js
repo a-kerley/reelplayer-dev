@@ -639,6 +639,22 @@ const playerAppCore = {
       });
 
       if (this.isTouchDevice()) {
+        // KNOWN ISSUE - DO NOT STRIP THE [vol-debug] console.log/trace CALLS
+        // BELOW WITHOUT RE-TESTING FIRST. On mobile expandable, tapping the
+        // volume icon while collapsed used to reveal the slider and then
+        // near-instantly hide it again - reopening the player worked, only
+        // the slider reveal was affected. Adding the [vol-debug] logging
+        // below (pure console.log/console.trace, no behavior change) made
+        // the bug stop reproducing, which points to a timing/race condition
+        // that the logging's own synchronous execution happens to perturb
+        // just enough to avoid - not an actual fix. The real cause was never
+        // isolated (candidates: a duplicate/ghost touchstart being seen as
+        // "outside" volumeControl by the listener below, or the scroll
+        // observer's collapse branch firing on a timing this logging
+        // delays). If touching this code, keep the logging in place (or
+        // replace it with an equivalent deliberate delay) until the actual
+        // race is found and fixed properly.
+        //
         // No hover on touch, so reveal is tap-driven instead: the first tap
         // on the icon just reveals the slider (captured ahead of the
         // mute-toggle click handler above, and swallowed so that tap doesn't
@@ -654,19 +670,24 @@ const playerAppCore = {
         // open indefinitely with nothing to dismiss it.
         const scheduleAutoHide = () => {
           clearTimeout(hideSliderTimeout);
+          console.log('[vol-debug] scheduleAutoHide: 2500ms timer (re)armed');
           hideSliderTimeout = setTimeout(() => {
+            console.log('[vol-debug] 2500ms auto-hide FIRED - removing show-slider');
             volumeControl.classList.remove("show-slider");
           }, 2500);
         };
 
         volumeToggle.addEventListener("click", (e) => {
+          console.log('[vol-debug] volumeToggle click - isExpanded before:', playerApp.expandable.isExpanded);
           // Tapping volume while collapsed should reopen the player (unlike
           // play/pause, which deliberately has no such trigger) - see
           // expandFromMobileTap()'s own comment. No-ops once already
           // expanded, via that method's own isExpanded guard.
           playerApp.expandFromMobileTap();
+          console.log('[vol-debug] volumeToggle click - isExpanded after expandFromMobileTap:', playerApp.expandable.isExpanded);
           if (!volumeControl.classList.contains("show-slider")) {
             volumeControl.classList.add("show-slider");
+            console.log('[vol-debug] show-slider ADDED');
             e.stopImmediatePropagation();
             e.preventDefault();
             scheduleAutoHide();
@@ -681,7 +702,9 @@ const playerAppCore = {
         });
 
         document.addEventListener("touchstart", (e) => {
-          if (volumeControl.contains(e.target)) {
+          const inside = volumeControl.contains(e.target);
+          console.log('[vol-debug] document touchstart - target:', e.target?.id || e.target?.className, ', inside volumeControl:', inside);
+          if (inside) {
             // Touching the control itself (icon or slider) resets the
             // countdown rather than cancelling it outright, so the slider
             // still eventually hides even if the user just keeps tapping
@@ -689,7 +712,9 @@ const playerAppCore = {
             scheduleAutoHide();
             return;
           }
+          console.log('[vol-debug] touchstart OUTSIDE volumeControl - scheduling 300ms hide');
           hideSliderTimeout = setTimeout(() => {
+            console.log('[vol-debug] 300ms outside-touch hide FIRED - removing show-slider');
             volumeControl.classList.remove("show-slider");
           }, 300);
         }, { passive: true });
@@ -1257,11 +1282,15 @@ const playerAppCore = {
   // setupVolumeControls() calls this unconditionally on every volume-icon
   // tap, relying on this guard rather than checking mode/state itself.
   expandFromMobileTap() {
-    if (!this.expandable.enabled || this.expandable.isExpanded) return;
+    if (!this.expandable.enabled || this.expandable.isExpanded) {
+      console.log('[vol-debug] expandFromMobileTap bailed - enabled:', this.expandable.enabled, ', isExpanded:', this.expandable.isExpanded);
+      return;
+    }
     const styles = getComputedStyle(document.documentElement);
     const fadeDuration = parseFloat(styles.getPropertyValue('--expandable-collapse-fade-duration')) * 1000 || 200;
     const transitionDuration = (parseFloat(styles.getPropertyValue('--expandable-transition-duration')) || 0.3) * 1000;
     this.expandable.mobileManualOverrideUntil = Date.now() + fadeDuration + transitionDuration + 150;
+    console.log('[vol-debug] expandFromMobileTap - override cooldown until', this.expandable.mobileManualOverrideUntil, '(now =', Date.now(), ')');
     this.expandPlayer();
     this.exitPlaybackIdle();
     this.exitCollapsedIdle();
@@ -1301,13 +1330,16 @@ const playerAppCore = {
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (Date.now() < (this.expandable.mobileManualOverrideUntil || 0)) {
+          console.log('[vol-debug] scroll observer fired but BLOCKED by cooldown - isIntersecting:', entry.isIntersecting, ', ms remaining:', this.expandable.mobileManualOverrideUntil - Date.now());
           return;
         }
+        console.log('[vol-debug] scroll observer fired and NOT blocked - isIntersecting:', entry.isIntersecting, ', isExpanded:', this.expandable.isExpanded);
         if (entry.isIntersecting) {
           if (!this.expandable.isExpanded) this.expandPlayer();
           this.exitPlaybackIdle();
           this.exitCollapsedIdle();
         } else if (this.expandable.isExpanded) {
+          console.log('[vol-debug] scroll observer TRIGGERING COLLAPSE');
           // immediate - by the time the default ~1.2s pre-collapsing/fade
           // dead-time (built for an incidental desktop mouseleave) elapsed,
           // a scrolling user could easily have moved well past where the
@@ -1738,6 +1770,7 @@ const playerAppCore = {
   // when it detects the player exited off the bottom of the screen, see the
   // observer callback in setupExpandableModeTouchInteractions() for why.
   collapsePlayer(immediate = false, compensateScroll = true) {
+    console.trace('[vol-debug] collapsePlayer() called - immediate:', immediate);
     const wrapper = this.elements.playerWrapper;
     if (!wrapper) return;
 
