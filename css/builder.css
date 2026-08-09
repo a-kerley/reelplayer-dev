@@ -58,7 +58,8 @@ body {
   box-sizing: border-box;
 }
 
-#reelsPanel > #newReelBtn {
+#reelsPanel > #newReelBtn,
+#pagesPanel > #newPageBtn {
   width: 100%;
   margin-bottom: 1.2rem;
   background: var(--builder-accent);
@@ -93,7 +94,7 @@ body {
 }
 
 /* ==============================================
-   SIDEBAR TABS (Reels / Media Library)
+   SIDEBAR TABS (Reels / Pages / Media Library)
    ============================================== */
 .sidebar-tabs {
   display: flex;
@@ -120,9 +121,13 @@ body {
 }
 
 /* ==============================================
-   REEL LIST SIDEBAR SECTION
+   REEL / PAGE LIST SIDEBAR SECTIONS
+   Both lists share the exact same generic renderer
+   (js/modules/sidebarList.js) and so share this styling too -
+   #reelList and #pageList are just its two mount points.
    ============================================== */
-#reelList {
+#reelList,
+#pageList {
   list-style: none;
   margin: 0;
   padding: 0;
@@ -130,17 +135,20 @@ body {
   box-sizing: border-box;
 }
 
-#reelList li.active {
+#reelList li.active,
+#pageList li.active {
   background: var(--builder-accent);
   color: white;
 }
 
-#reelList li:hover {
+#reelList li:hover,
+#pageList li:hover {
   background: var(--builder-hover);
   color: white;
 }
 
-#reelList li {
+#reelList li,
+#pageList li {
   width: 100%;
   box-sizing: border-box;
   display: flex;
@@ -158,7 +166,8 @@ body {
   overflow: hidden;
 }
 
-#reelList li span {
+#reelList li span,
+#pageList li span {
   flex: 1 1 auto;
   min-width: 0;
   cursor: pointer;
@@ -169,7 +178,26 @@ body {
   text-overflow: ellipsis;
 }
 
-#reelList li .delete-reel-btn {
+/* Pages-only: the "/page?slug=..." / "not yet published" line under a
+   page's title (js/pagesSidebar.js's renderSubtitle) - reels have no
+   equivalent, since a reel's embed id isn't a renameable public identifier
+   worth surfacing here. flex-wrap is scoped to just #pageList (not the
+   shared li rule above) so this never changes #reelList's layout. */
+#pageList li {
+  flex-wrap: wrap;
+}
+
+#pageList li .sidebar-item-subtitle {
+  flex-basis: 100%;
+  font-size: var(--builder-text-sm);
+  font-weight: var(--builder-weight-medium);
+  color: inherit;
+  opacity: 0.7;
+  margin-top: 0.1rem;
+}
+
+#reelList li .delete-reel-btn,
+#pageList li .delete-reel-btn {
   background: none;
   border: none;
   cursor: pointer;
@@ -183,12 +211,14 @@ body {
   margin-left: auto; /* ✅ this makes the icon always hug the right edge */
 }
 
-#reelList li .delete-reel-btn svg {
+#reelList li .delete-reel-btn svg,
+#pageList li .delete-reel-btn svg {
   color: inherit;
   transition: color 0.15s, transform 0.15s;
 }
 
-#reelList li .delete-reel-btn:hover svg {
+#reelList li .delete-reel-btn:hover svg,
+#pageList li .delete-reel-btn:hover svg {
   color: var(--builder-delete-hover);
   transform: scale(1.23);
 }
@@ -401,6 +431,7 @@ body {
 #addTrackBtn,
 #exportEmbedBtn,
 #manageEmbedsBtn,
+#managePagesBtn,
 #refreshPreviewBtn {
   background: var(--builder-accent);
   color: white;
@@ -415,7 +446,8 @@ body {
 
 #addTrackBtn,
 #exportEmbedBtn,
-#manageEmbedsBtn {
+#manageEmbedsBtn,
+#managePagesBtn {
   font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
@@ -424,6 +456,7 @@ body {
 #addTrackBtn:hover,
 #exportEmbedBtn:hover,
 #manageEmbedsBtn:hover,
+#managePagesBtn:hover,
 #refreshPreviewBtn:hover {
   background: var(--builder-hover);
 }
@@ -1080,4 +1113,130 @@ input[type="range"]:focus::-moz-range-thumb {
 .value-control-input:disabled,
 .value-control-slider-wrap input[type="range"]:disabled {
   cursor: not-allowed;
+}
+
+/* ==============================================
+   PAGE BLOCKS EDITOR
+   js/modules/pageBlocksEditor.js - one row per block (drag handle, type
+   label, remove button, per-type config form, live preview via
+   js/modules/pageBlockRenderer.js). Mirrors the Tracks editor's visual
+   language (.track-drag-handle/.track-remove-btn above) under its own
+   .page-block-* names, since blocks and tracks aren't styled identically
+   enough to just reuse those classes directly (blocks are full rows with
+   a config form + preview stacked below the header, tracks are a single
+   inline row).
+   ============================================== */
+.page-blocks-editor {
+  margin-top: 1.2rem;
+}
+
+.page-block-row {
+  border: 1px solid #444;
+  border-radius: 8px;
+  padding: 0.8rem;
+  margin-bottom: 0.8rem;
+  background: #262626;
+}
+
+.page-block-row-header {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.6rem;
+}
+
+.page-block-drag-handle {
+  display: flex;
+  align-items: center;
+  cursor: grab;
+  opacity: 0.6;
+  user-select: none;
+  color: #ccc;
+}
+
+.page-block-drag-handle svg {
+  display: block;
+  pointer-events: none;
+}
+
+.page-block-type-label {
+  flex: 1;
+  font-size: var(--builder-text-md);
+  font-weight: var(--builder-weight-semibold);
+  color: var(--builder-accent);
+}
+
+.page-block-remove-btn {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  color: #ccc;
+  transition: transform 0.15s, color 0.15s;
+}
+
+.page-block-remove-btn:hover {
+  color: #c00;
+  transform: scale(1.1);
+}
+
+.page-block-config .color-row {
+  margin-bottom: 0.5rem;
+}
+
+.page-block-config .color-row span:first-child {
+  min-width: 5.5rem;
+}
+
+.page-block-row-preview {
+  margin-top: 0.8rem;
+  border: 1px solid #3a3a3a;
+  border-radius: 6px;
+  overflow: hidden;
+  background: #1a1a1a;
+}
+
+/* The actual rendered block content (.page-block/.page-block-banner/etc,
+   produced by js/modules/pageBlockRenderer.js) is styled in css/page.css,
+   not here - that CSS is shared between this preview pane and the public
+   page.html renderer, so it can't depend on --builder-accent/etc or any
+   other builder-chrome-only token (see CLAUDE.md's "Builder dark theme -
+   scope boundary" section). index.html loads css/page.css alongside
+   css/builder.css for exactly this reason. */
+
+.page-block-add-row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-wrap: wrap;
+  padding: 0.6rem 0;
+}
+
+.page-block-add-label {
+  color: #999;
+  font-size: var(--builder-text-md);
+  margin-right: 0.3rem;
+}
+
+.page-block-add-btn {
+  background: none;
+  border: 1px solid var(--builder-accent);
+  color: var(--builder-accent);
+  border-radius: 5px;
+  padding: 0.35rem 0.8rem;
+  font-size: var(--builder-text-sm);
+  font-weight: var(--builder-weight-semibold);
+  cursor: pointer;
+  transition: background 0.15s, color 0.15s;
+}
+
+.page-block-add-btn:hover {
+  background: var(--builder-accent);
+  color: #fff;
 }

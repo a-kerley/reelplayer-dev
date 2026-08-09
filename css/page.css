@@ -1,0 +1,117 @@
+/* page.css - Styling for rendered page-block content
+   (js/modules/pageBlockRenderer.js's .page-block* output).
+
+   Shared between two very different contexts:
+   - the builder's own live block-preview pane (index.html, inside
+     .page-block-row-preview - see css/builder.css)
+   - the public standalone page renderer (page.html)
+
+   Because of that second consumer, this file must stay fully self-
+   contained - no --builder-accent or other builder-chrome-only custom
+   property (see CLAUDE.md's "Builder dark theme - scope boundary"
+   section for why: page.html is loaded by anonymous visitors, same as
+   player.html, and must never depend on tokens that only exist inside
+   .builder-app). Anything editor-chrome-specific (drag handles, remove
+   buttons, config forms, the "Add block" row) lives in css/builder.css
+   instead, since only the builder ever renders that. */
+
+:root {
+  --page-bg: #16161a;
+  --page-text: #e8e8ec;
+  --page-text-muted: #9a9aa2;
+  --page-accent: #5b8def;
+}
+
+body.page-body {
+  margin: 0;
+  background: var(--page-bg);
+  color: var(--page-text);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+}
+
+.page-blocks-list {
+  max-width: 900px;
+  margin: 0 auto;
+}
+
+.page-block {
+  min-height: 2rem;
+}
+
+.page-block-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1.2rem;
+  color: var(--page-text-muted);
+  font-size: 0.85rem;
+  font-style: italic;
+}
+
+.page-block-banner {
+  background-size: cover;
+  background-position: center;
+  background-color: #1e1e22;
+  position: relative;
+  display: flex;
+  align-items: flex-end;
+}
+
+.page-block-caption {
+  background: rgba(0, 0, 0, 0.55);
+  color: #fff;
+  padding: 0.5rem 0.8rem;
+  width: 100%;
+  box-sizing: border-box;
+  font-size: 0.85rem;
+}
+
+.page-block-text {
+  padding: 1.5rem 1rem;
+  color: var(--page-text);
+}
+
+.page-block-text h2 {
+  margin: 0 0 0.6rem;
+  color: #fff;
+  font-size: 1.4rem;
+}
+
+.page-block-text p {
+  margin: 0 0 0.7rem;
+  line-height: 1.6;
+  color: var(--page-text-muted);
+}
+
+.page-block-image {
+  padding: 1rem;
+}
+
+.page-block-image img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
+  border-radius: 6px;
+}
+
+.page-block-player {
+  padding: 0.5rem 0;
+}
+
+.page-block-player iframe {
+  width: 100%;
+  border-radius: 8px;
+}
+
+/* page.html-only: the top-level loading/error states before/if blocks
+   never render - the builder's own preview pane never shows these, since
+   it always has a page object in hand already. */
+.page-status-message {
+  max-width: 900px;
+  margin: 3rem auto;
+  padding: 2rem;
+  text-align: center;
+  color: var(--page-text-muted);
+  font-size: 0.95rem;
+}

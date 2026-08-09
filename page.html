@@ -1,0 +1,89 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Page</title>
+
+  <!-- Warm the connection to R2 (media host) as early as possible, matching
+       player.html's own preconnect - keep in sync with js/config.js's
+       R2_PUBLIC_URL if it ever changes. -->
+  <link rel="preconnect" href="https://media.boxedape.com" crossorigin>
+
+  <link rel="stylesheet" href="css/page.css">
+</head>
+<body class="page-body">
+  <div id="pageRoot">
+    <p class="page-status-message">Loading…</p>
+  </div>
+
+  <script type="module">
+    // page.html - public, standalone renderer for a published page (an
+    // ordered list of content blocks: banner image, text, player, image).
+    // Structurally mirrors player.html's own bootstrap (URLSearchParams ->
+    // fetch from the Worker -> render -> error state), and reuses
+    // js/modules/pageBlockRenderer.js's renderBlock() - the SAME render
+    // function the builder's own block-editor live preview uses - so this
+    // file never becomes a second, hand-kept-in-sync copy of block-
+    // rendering logic (see CLAUDE.md's player.html/player.js postmortem for
+    // exactly the bug class this is designed to avoid repeating).
+    import { WORKER_BASE_URL } from './js/config.js';
+    import { renderBlock } from './js/modules/pageBlockRenderer.js';
+
+    const root = document.getElementById('pageRoot');
+
+    function showStatus(message) {
+      root.innerHTML = `<p class="page-status-message">${message}</p>`;
+    }
+
+    async function loadPageData(slug) {
+      try {
+        const response = await fetch(`${WORKER_BASE_URL}/pages/${slug}`);
+        if (!response.ok) return null;
+        return await response.json();
+      } catch (e) {
+        console.error('Failed to fetch page from Worker:', e);
+        return null;
+      }
+    }
+
+    function renderPage(pageData) {
+      document.title = pageData.title || 'Page';
+
+      const list = document.createElement('div');
+      list.className = 'page-blocks-list';
+
+      const blocks = Array.isArray(pageData.blocks) ? pageData.blocks : [];
+      if (!blocks.length) {
+        showStatus('This page has no content yet.');
+        return;
+      }
+
+      blocks.forEach((block) => {
+        list.appendChild(renderBlock(block));
+      });
+
+      root.innerHTML = '';
+      root.appendChild(list);
+    }
+
+    async function init() {
+      const slug = new URLSearchParams(window.location.search).get('slug');
+      if (!slug) {
+        showStatus('No page specified.');
+        return;
+      }
+
+      const pageData = await loadPageData(slug);
+      if (!pageData) {
+        showStatus('Page not found.');
+        return;
+      }
+
+      renderPage(pageData);
+    }
+
+    init();
+  </script>
+</body>
+</html>

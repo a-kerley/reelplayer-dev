@@ -96,6 +96,52 @@ curl http://localhost:8787/drafts -H "Authorization: Bearer YOUR_PASSWORD"
 curl -X DELETE http://localhost:8787/drafts/test123 -H "Authorization: Bearer YOUR_PASSWORD"
 ```
 
+## Pages (standalone shareable pages built from blocks)
+
+A second, parallel content type alongside reels - a page is an ordered list
+of content blocks (image banner, text, player, image) published to its own
+public, shareable URL (`page.html?slug=<slug>`, see `page.html`). Same KV
+namespace, `page_<slug>` for published pages and `draft_page_<id>` for
+in-progress drafts - mirrors the reel/draft split above almost exactly, with
+one difference: a page is keyed publicly by its **slug**, which is editable
+and renameable after first publish (unlike a reel's embed id, which never
+changes). Publishing sends the page's stable `id`, its desired `slug`, and -
+if renaming - the `previousSlug` being replaced, so the old slug's entry can
+be cleaned up and a genuine collision (the new slug already used by a
+*different* page) can be rejected with `409`:
+
+```bash
+# Save/update a page draft (password-gated) - updatedAt is stamped server-side
+curl -X POST http://localhost:8787/drafts/pages/test123 \
+  -H "Authorization: Bearer YOUR_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"test123","title":"Test Page","blocks":[]}'
+
+# Fetch it (password-gated - drafts are never public)
+curl http://localhost:8787/drafts/pages/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+
+# List all page drafts (password-gated)
+curl http://localhost:8787/drafts/pages -H "Authorization: Bearer YOUR_PASSWORD"
+
+# Delete a page draft (password-gated)
+curl -X DELETE http://localhost:8787/drafts/pages/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+
+# Publish (password-gated) - id/slug required, previousSlug only when renaming
+curl -X POST http://localhost:8787/pages/my-page-slug \
+  -H "Authorization: Bearer YOUR_PASSWORD" \
+  -H "Content-Type: application/json" \
+  -d '{"id":"test123","slug":"my-page-slug","title":"Test Page","blocks":[]}'
+
+# Fetch the published page (public, no auth needed - this is what page.html fetches)
+curl http://localhost:8787/pages/my-page-slug
+
+# List all published pages (password-gated)
+curl http://localhost:8787/pages -H "Authorization: Bearer YOUR_PASSWORD"
+
+# Delete a published page (password-gated)
+curl -X DELETE http://localhost:8787/pages/my-page-slug -H "Authorization: Bearer YOUR_PASSWORD"
+```
+
 ## Redeploying after changes
 
 Any time `worker/src/index.js` changes, run `npx wrangler deploy` again from this directory. The URL stays the same, so `js/config.js` doesn't need updating unless you tear down and recreate the Worker itself.

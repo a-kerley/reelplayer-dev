@@ -1,33 +1,9 @@
-// mediaLibrary.js - "Media Library" tab: owns the sidebar-tab toggle wiring;
-// the actual browsing/upload/organize UI is the shared mediaBrowser component.
+// mediaLibrary.js - Media Library tab content. Sidebar-tab switching itself
+// is owned by js/modules/tabController.js (wired once in js/main.js); this
+// module only renders the actual browsing UI when that tab becomes active.
 import { renderMediaBrowser } from "./mediaBrowser.js";
 
-export function setupMediaLibraryTab() {
-  const tabReelsBtn = document.getElementById("tabReelsBtn");
-  const tabMediaBtn = document.getElementById("tabMediaBtn");
-  const reelsPanel = document.getElementById("reelsPanel");
-  const reelBuilderView = document.getElementById("reelBuilderView");
+export function renderMediaLibraryTab() {
   const mediaLibraryView = document.getElementById("mediaLibraryView");
-  const builderMain = document.querySelector(".builder-main");
-
-  if (!tabReelsBtn || !tabMediaBtn) return;
-
-  tabReelsBtn.onclick = () => {
-    tabReelsBtn.classList.add("active");
-    tabMediaBtn.classList.remove("active");
-    reelsPanel.style.display = "";
-    reelBuilderView.style.display = "";
-    mediaLibraryView.style.display = "none";
-    builderMain.classList.remove("media-library-active");
-  };
-
-  tabMediaBtn.onclick = () => {
-    tabMediaBtn.classList.add("active");
-    tabReelsBtn.classList.remove("active");
-    reelsPanel.style.display = "none";
-    reelBuilderView.style.display = "none";
-    mediaLibraryView.style.display = "";
-    builderMain.classList.add("media-library-active");
-    renderMediaBrowser(mediaLibraryView, { mode: "manage" });
-  };
+  if (mediaLibraryView) renderMediaBrowser(mediaLibraryView, { mode: "manage" });
 }

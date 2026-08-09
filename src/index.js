@@ -2,10 +2,11 @@
 // so the browser's own native login prompt handles it - no custom login page
 // needed). Runs in front of every request (assets.run_worker_first in
 // wrangler.jsonc), but only actually checks auth for the builder's own entry
-// document - player.html and every css/js asset it shares with the builder
-// must stay fully public, since they're loaded by anonymous visitors'
-// browsers wherever a reel is embedded on a third-party site. Everything not
-// explicitly gated here falls straight through to static asset serving.
+// document - player.html, page.html, and every css/js asset they share with
+// the builder must stay fully public, since they're loaded by anonymous
+// visitors' browsers wherever a reel is embedded or a page link is shared.
+// Everything not explicitly gated here falls straight through to static
+// asset serving.
 const PROTECTED_PATHS = new Set(["/", "/index.html"]);
 
 const COOKIE_NAME = "builder_auth";

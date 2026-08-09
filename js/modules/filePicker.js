@@ -7,14 +7,16 @@
  */
 import { renderMediaBrowser } from "./mediaBrowser.js";
 
-// The 4 known asset categories, mapped to their equivalent R2 media prefix
+// The known asset categories, mapped to their equivalent R2 media prefix
 // (where uploads for that category land in the Media Library) so the picker
 // opens straight into the relevant folder.
 const R2_PREFIX_MAP = {
   'assets/audio': 'audio/',
   'assets/images/backgrounds': 'images/backgrounds/',
   'assets/images/project-titles': 'images/project-titles/',
-  'assets/video': 'video/'
+  'assets/video': 'video/',
+  'assets/images/page-banners': 'images/page-banners/',
+  'assets/images/page-blocks': 'images/page-blocks/'
 };
 
 function createModalOverlay() {
@@ -53,7 +55,7 @@ function createModalFooter(onClose) {
 /**
  * Opens a file browser modal for selecting a file for a specific field.
  * @param {Object} options
- * @param {string} options.directory - one of the 4 known categories, e.g. 'assets/audio'
+ * @param {string} options.directory - one of the known categories (see R2_PREFIX_MAP above), e.g. 'assets/audio'
  * @param {string[]} options.extensions - allowed file extensions, e.g. ['.jpg', '.png']
  * @param {string} options.title - modal title
  * @param {Function} options.onSelect - called with the selected file's URL

@@ -9,28 +9,44 @@
 // not proxied through this Worker.
 //
 // Routes:
-//   GET    /reels/:id       - public, returns the stored reel JSON or 404
-//   POST   /reels/:id       - password-gated, stores the JSON body
-//   GET    /reels           - password-gated, lists {id, title, created} for every stored reel
-//   DELETE /reels/:id       - password-gated, removes the entry
-//   GET    /drafts/:id      - password-gated (NOT public, unlike /reels/:id - drafts have no
-//                             legitimate anonymous consumer), returns the stored draft JSON or 404
-//   POST   /drafts/:id      - password-gated, stores the JSON body (stamps updatedAt server-side)
-//   GET    /drafts          - password-gated, lists {id, title, createdAt, updatedAt} for every draft
-//   DELETE /drafts/:id      - password-gated, removes the entry
-//   POST   /media/upload    - password-gated, ?key=<key>, body = raw file bytes
-//   GET    /media/list      - password-gated, ?prefix=<prefix>, lists folders/files under it
-//   POST   /media/rename    - password-gated, body {from, to}
-//   DELETE /media/delete    - password-gated, ?key=<key>
+//   GET    /reels/:id         - public, returns the stored reel JSON or 404
+//   POST   /reels/:id         - password-gated, stores the JSON body
+//   GET    /reels             - password-gated, lists {id, title, created} for every stored reel
+//   DELETE /reels/:id         - password-gated, removes the entry
+//   GET    /drafts/:id        - password-gated (NOT public, unlike /reels/:id - drafts have no
+//                               legitimate anonymous consumer), returns the stored draft JSON or 404
+//   POST   /drafts/:id        - password-gated, stores the JSON body (stamps updatedAt server-side)
+//   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt} for every draft
+//   DELETE /drafts/:id        - password-gated, removes the entry
+//   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
+//   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks}; 409
+//                               if `slug` is already used by a different page's `id`. Deletes the
+//                               `previousSlug` entry first if renaming, so old slugs don't linger.
+//   GET    /pages             - password-gated, lists {id, slug, title, published} for every page
+//   DELETE /pages/:slug       - password-gated, removes the entry
+//   GET    /drafts/pages/:id  - password-gated, same visibility rules as /drafts/:id
+//   POST   /drafts/pages/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
+//   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt}
+//   DELETE /drafts/pages/:id  - password-gated, removes the entry
+//   POST   /media/upload      - password-gated, ?key=<key>, body = raw file bytes
+//   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
+//   POST   /media/rename      - password-gated, body {from, to}
+//   DELETE /media/delete      - password-gated, ?key=<key>
 //
-// Drafts (in-progress builder reels, auto-saved as the user edits) use a
-// separate `draft_<id>` key prefix in the same REELS namespace as published
-// reels (`reel_<id>`) - same store, disjoint keys, different JSON shape (the
-// raw flat builder object, not the nested settings:{} export shape) and
-// different visibility (drafts are never public, since only the password-
-// gated builder itself ever needs to read them - unlike a published reel,
+// Drafts (in-progress builder reels/pages, auto-saved as the user edits) use
+// a separate `draft_<id>` / `draft_page_<id>` key prefix in the same REELS
+// namespace as published reels/pages (`reel_<id>` / `page_<slug>`) - same
+// store, disjoint keys, different JSON shape (the raw flat builder object,
+// not the nested settings:{}/blocks:[] export shape) and different
+// visibility (drafts are never public, since only the password-gated
+// builder itself ever needs to read them - unlike a published reel or page,
 // which anonymous visitors' browsers must be able to fetch anywhere it's
-// embedded).
+// embedded/shared).
+//
+// Pages are keyed by `slug` (a user-editable, renameable public identifier)
+// rather than a stable id, unlike reels which are keyed by their immutable
+// embed id - see the POST /pages/:slug handler for the rename/collision
+// mechanics this requires that reels don't need.
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -177,7 +193,9 @@ export default {
       const authError = requireAuth(request, env);
       if (authError) return authError;
 
-      const entries = await listEntries(env, "", (r) => ({ id: r.id, title: r.title, created: r.created }));
+      // Explicit "reel_" prefix (not "") so this never picks up draft_/
+      // page_/draft_page_ keys sharing the same REELS namespace.
+      const entries = await listEntries(env, "reel_", (r) => ({ id: r.id, title: r.title, created: r.created }));
       return jsonResponse(entries);
     }
 
@@ -224,6 +242,20 @@ export default {
       return jsonResponse(entries);
     }
 
+    // GET /drafts/pages - list all page drafts (Pages sidebar), password-
+    // gated. Must be checked before the generic /drafts/:id block below,
+    // since "/drafts/pages" would otherwise match that regex too (with
+    // "pages" incorrectly treated as a draft id).
+    if (pathname === "/drafts/pages" && request.method === "GET") {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+
+      const entries = await listEntries(env, "draft_page_", (p) => ({
+        id: p.id, title: p.title, slug: p.slug, createdAt: p.createdAt, updatedAt: p.updatedAt,
+      }));
+      return jsonResponse(entries);
+    }
+
     // /drafts/:id - unlike /reels/:id, every method here is password-gated:
     // drafts have no legitimate anonymous consumer (only the builder itself
     // ever reads them), so there's no reason for GET to be public here.
@@ -256,6 +288,115 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
         await env.REELS.delete(key);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    // /drafts/pages/:id - page drafts, same visibility rules as /drafts/:id
+    // (password-gated on every method, no legitimate anonymous consumer).
+    const pageDraftMatch = pathname.match(/^\/drafts\/pages\/([a-zA-Z0-9_-]+)$/);
+    if (pageDraftMatch) {
+      const key = `draft_page_${pageDraftMatch[1]}`;
+
+      if (request.method === "GET") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const value = await env.REELS.get(key);
+        if (!value) return jsonResponse({ error: "Not found" }, 404);
+        return rawJsonResponse(value);
+      }
+
+      if (request.method === "POST") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
+        body.updatedAt = Date.now();
+        await env.REELS.put(key, JSON.stringify(body));
+        return jsonResponse({ ok: true, updatedAt: body.updatedAt });
+      }
+
+      if (request.method === "DELETE") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        await env.REELS.delete(key);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    // GET /pages - list all published pages (management view)
+    if (pathname === "/pages" && request.method === "GET") {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+
+      const entries = await listEntries(env, "page_", (p) => ({
+        id: p.id, slug: p.slug, title: p.title, published: p.published,
+      }));
+      return jsonResponse(entries);
+    }
+
+    // /pages/:slug - public GET (the page.html renderer's fetch target),
+    // password-gated POST (publish/republish) and DELETE.
+    const pageMatch = pathname.match(/^\/pages\/([a-zA-Z0-9_-]+)$/);
+    if (pageMatch) {
+      const slugParam = pageMatch[1];
+
+      if (request.method === "GET") {
+        const value = await env.REELS.get(`page_${slugParam}`);
+        if (!value) return jsonResponse({ error: "Not found" }, 404);
+        return rawJsonResponse(value);
+      }
+
+      if (request.method === "POST") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
+
+        const { id, slug, previousSlug } = body || {};
+        if (!id || !slug || !/^[a-zA-Z0-9_-]+$/.test(slug) || slug !== slugParam) {
+          return jsonResponse({ error: "Missing or invalid id/slug" }, 400);
+        }
+
+        // Collision only if page_<slug> belongs to a *different* page id -
+        // republishing under its own already-live slug must succeed.
+        const existingAtSlug = await env.REELS.get(`page_${slug}`);
+        if (existingAtSlug) {
+          let existingId;
+          try {
+            existingId = JSON.parse(existingAtSlug).id;
+          } catch {
+            existingId = null;
+          }
+          if (existingId !== id) {
+            return jsonResponse({ error: "Slug already in use" }, 409);
+          }
+        }
+
+        // Rename case: this page was previously published under a
+        // different slug - remove that old entry so it doesn't linger as a
+        // dangling duplicate/dead URL. The client sends the old slug
+        // explicitly rather than this route scanning all page_* entries
+        // for a matching id (would be an unbounded list() on every publish).
+        if (previousSlug && previousSlug !== slug) {
+          await env.REELS.delete(`page_${previousSlug}`);
+        }
+
+        const published = {
+          id,
+          slug,
+          title: body.title || "",
+          blocks: Array.isArray(body.blocks) ? body.blocks : [],
+          published: new Date().toISOString(),
+        };
+        await env.REELS.put(`page_${slug}`, JSON.stringify(published));
+        return jsonResponse({ ok: true, slug });
+      }
+
+      if (request.method === "DELETE") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        await env.REELS.delete(`page_${slugParam}`);
         return jsonResponse({ ok: true });
       }
     }

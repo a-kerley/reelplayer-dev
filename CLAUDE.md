@@ -4,12 +4,33 @@ Vanilla JS/CSS embeddable audio/video player builder. No build tooling — plain
 `<script type="module">` ES modules, no bundler, no framework, no package.json
 dependencies to install for the app itself.
 
-## Two apps in one repo
+## Three apps in one repo
 
 - **`index.html` + `js/builder.js`** — the builder: the internal tool used to
-  configure a "reel" (playlist + player config) and publish it as an embed.
+  configure a "reel" (playlist + player config) and publish it as an embed,
+  or a "page" (ordered content blocks) and publish it as a standalone
+  shareable URL. Three sidebar tabs — Reels, Pages, Media Library — switched
+  via `js/modules/tabController.js`.
 - **`player.html` + `js/player.js`** — the actual embeddable player that runs
   on third-party sites once a reel is published.
+- **`page.html`** — the public, standalone renderer for a published page.
+  Fetches `GET /pages/:slug` from the Worker and renders each block via
+  `js/modules/pageBlockRenderer.js`'s `renderBlock()` — the same function
+  the builder's own block-editor live preview uses (`js/modules/
+  pageBlocksEditor.js`), so this is never a second copy of block-rendering
+  logic. A page's "player" block embeds `player?id=<reelId>` as an iframe,
+  reusing `player.html` completely unmodified rather than re-implementing
+  reel playback a third time (see `js/modules/embedExporter.js`, which
+  already generates that exact markup for third-party embeds).
+
+Pages and reels are separate content types stored in the same Worker/KV
+namespace under different key prefixes (`page_<slug>`/`draft_page_<id>` vs
+`reel_<id>`/`draft_<id>`) — see `worker/CLAUDE.md`. Unlike a reel's embed id
+(an opaque content hash, silently regenerated on every publish), a page's
+`slug` is a stable, user-editable public identifier that survives content
+edits — `js/modules/pagePublish.js`/`worker/src/index.js`'s `POST
+/pages/:slug` handle the resulting rename/collision mechanics that reels
+have no equivalent of.
 
 ## `player.html`'s embed bootstrap duplicates `js/player.js`, and drifts
 
@@ -89,44 +110,11 @@ work around this padding (see `.builder-main.media-library-active` for the
 pattern of overriding it just for that view) or don't nest inside
 `.builder-main` at all.
 
-## Media browsing: one shared component, two contexts
+## Media browsing and Cloudflare backend
 
-`js/modules/mediaBrowser.js` (`renderMediaBrowser(container, options)`) is
-the single UI for both:
-- the Media Library tab (`js/modules/mediaLibrary.js`, `mode: 'manage'`)
-- the file-picker modal (`js/modules/filePicker.js`, `mode: 'select'`),
-  used everywhere a track/background file needs picking.
-
-Don't fork this into two implementations again — extend the shared
-component and thread through `mode`/options instead.
-
-Sizing: both contexts size off the viewport, not off however many files are
-in the current folder — see `.file-picker-content` (modal) and
-`#mediaLibraryView` (tab) in their respective CSS. `.media-browser-body`
-itself is `flex: 1; min-height: 0` and relies on internal `overflow-y: auto`
-scrolling on the sidebar/main panes, not on the outer container growing.
-
-## Cloudflare backend (`worker/`)
-
-Reel publishing and the Media Library are backed by a Cloudflare Worker +
-KV (reel JSON) + R2 (media files) — see `worker/README.md` for setup.
-`js/config.js` holds the live `WORKER_BASE_URL` and `R2_PUBLIC_URL`.
-
-- `worker/secret` holds the plaintext shared password locally and is
-  gitignored — never let it leak into a committed file. Grep for it before
-  committing if you've touched worker/auth-related code.
-- Publish/manage/upload routes are gated by `Authorization: Bearer
-  <BUILDER_PASSWORD>`, checked via `isAuthorized()` in `worker/src/index.js`.
-  Read-only media serving is public, via R2's custom domain
-  (`media.boxedape.com`, not the rate-limited `pub-*.r2.dev` dev URL) fronted
-  by a Cloudflare Cache Rule for edge caching.
-- The builder + player static site itself (`index.html`/`player.html`/`css`/
-  `js`) deploys via a root-level `wrangler.jsonc` as a Cloudflare Workers
-  static-assets project (`reelplayer-app`), auto-deploying on push to `main`.
-  `src/index.js` gates just the builder's entry page (`/` and `/index.html`)
-  behind a shared password (`BUILDER_ACCESS_PASSWORD` secret, separate from
-  `BUILDER_PASSWORD`) - `/player` and every asset it needs stay fully public,
-  since anonymous visitors load those wherever a reel is embedded.
+See `js/modules/CLAUDE.md` for the shared media-browser component
+(`mediaBrowser.js`/`mediaLibrary.js`/`filePicker.js`) and `worker/CLAUDE.md`
+for the Cloudflare Worker + KV + R2 backend.
 
 ## Verification workflow
 

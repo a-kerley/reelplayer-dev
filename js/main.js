@@ -10,7 +10,9 @@ import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
-import { setupMediaLibraryTab } from "./modules/mediaLibrary.js";
+import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
+import { createTabController } from "./modules/tabController.js";
+import { initPagesController } from "./pagesController.js";
 import {
   listDrafts,
   loadDraft,
@@ -83,6 +85,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       console.error("Failed to initialize preview manager");
       return;
     }
+
+    // Reels/Pages/Media Library sidebar tabs - wired once here (not inside
+    // render(), unlike the old per-render setupMediaLibraryTab() call this
+    // replaces), since the tab buttons/panels are static DOM that never gets
+    // torn down. Reels needs no onActivate: render() already keeps the reel
+    // form/preview live in the background, so switching back to it is just
+    // an unhide. Pages/Media Library render on demand, the first time each
+    // tab is actually opened.
+    const pagesController = initPagesController();
+    createTabController([
+      {
+        btn: document.getElementById("tabReelsBtn"),
+        panel: document.getElementById("reelsPanel"),
+        mainView: document.getElementById("reelBuilderView"),
+      },
+      {
+        btn: document.getElementById("tabPagesBtn"),
+        panel: document.getElementById("pagesPanel"),
+        mainView: document.getElementById("pageBuilderView"),
+        onActivate: () => pagesController.activate(),
+      },
+      {
+        btn: document.getElementById("tabMediaBtn"),
+        panel: document.getElementById("mediaPanel"),
+        mainView: document.getElementById("mediaLibraryView"),
+        activeClass: "media-library-active",
+        onActivate: () => renderMediaLibraryTab(),
+      },
+    ]);
 
     async function init() {
       showBuilderLoading();
@@ -225,7 +256,6 @@ document.addEventListener("DOMContentLoaded", async () => {
       setupRefreshPreviewButton();
       setupExportEmbedButton();
       setupEmbedManagerButton();
-      setupMediaLibraryTab();
       // showPreview(); // preview is only refreshed via button now
       showPreview();
     }

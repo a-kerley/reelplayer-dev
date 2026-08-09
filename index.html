@@ -15,6 +15,7 @@
     <link rel="stylesheet" href="css/player.css" />
     <link rel="stylesheet" href="css/playlist.css" />
     <link rel="stylesheet" href="css/builder.css" />
+    <link rel="stylesheet" href="css/page.css" />
     <link rel="stylesheet" href="css/expandable.css" />
     <link rel="stylesheet" href="css/file-picker.css" />
   </head>
@@ -24,12 +25,21 @@
       <aside class="builder-sidebar">
         <div class="sidebar-tabs">
           <button type="button" id="tabReelsBtn" class="sidebar-tab active">Reels</button>
+          <button type="button" id="tabPagesBtn" class="sidebar-tab">Pages</button>
           <button type="button" id="tabMediaBtn" class="sidebar-tab">Media Library</button>
         </div>
         <div id="reelsPanel">
           <button id="newReelBtn">+ New Reel</button>
           <span id="draftSaveStatus" class="draft-save-status"></span>
           <ul id="reelList"></ul>
+        </div>
+        <div id="pagesPanel" style="display: none;">
+          <button id="newPageBtn">+ New Page</button>
+          <span id="pageDraftSaveStatus" class="draft-save-status"></span>
+          <ul id="pageList"></ul>
+        </div>
+        <div id="mediaPanel" style="display: none;">
+          <p class="builder-empty-state">Browse and manage all uploaded media.</p>
         </div>
       </aside>
       <main class="builder-main">
@@ -53,6 +63,7 @@
           <button type="button" id="refreshPreviewBtn">Refresh Preview</button>
           <div id="reelPlayerPreview"></div>
         </div>
+        <div id="pageBuilderView" style="display: none;"></div>
         <div id="mediaLibraryView" style="display: none;"></div>
       </main>
     </div>
