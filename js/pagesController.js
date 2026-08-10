@@ -14,6 +14,7 @@ import {
 } from "./modules/pageDraftStore.js";
 import { renderPagesSidebar } from "./pagesSidebar.js";
 import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
+import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
 
@@ -35,7 +36,8 @@ export function initPagesController() {
 
   const loadingOverlay = document.getElementById("builderLoadingOverlay");
   const loadingContent = document.getElementById("builderLoadingContent");
-  const pageBuilderView = document.getElementById("pageBuilderView");
+  const pageEditorPane = document.getElementById("pageEditorPane");
+  const pagePreviewPane = document.getElementById("pagePreviewPane");
   const saveStatusEl = document.getElementById("pageDraftSaveStatus");
 
   function showLoading(html = "Loading…") {
@@ -100,8 +102,30 @@ export function initPagesController() {
 
   function updateCurrentPage() {
     const current = pages.find((p) => p.id === currentPageId);
-    if (current) schedulePageDraftSave(current);
+    if (current) {
+      schedulePageDraftSave(current);
+      renderPagePreview(current);
+    }
     renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete);
+  }
+
+  // Live preview: the same renderBlock() used by page.html itself and each
+  // block row's own inline preview, just assembled together - never a
+  // fourth copy of block-rendering logic. Called on every settle point
+  // (field blur, add/remove/reorder block) via updateCurrentPage() above,
+  // not per-keystroke.
+  function renderPagePreview(page) {
+    if (!pagePreviewPane) return;
+    const blocks = Array.isArray(page.blocks) ? page.blocks : [];
+    if (!blocks.length) {
+      pagePreviewPane.innerHTML = `<p class="page-status-message">This page has no content yet.</p>`;
+      return;
+    }
+    const list = document.createElement("div");
+    list.className = "page-blocks-list";
+    blocks.forEach((block) => list.appendChild(renderBlock(block)));
+    pagePreviewPane.innerHTML = "";
+    pagePreviewPane.appendChild(list);
   }
 
   function updatePublishStatus(page) {
@@ -167,8 +191,8 @@ export function initPagesController() {
   }
 
   function renderPageBuilderForm(page) {
-    if (!pageBuilderView) return;
-    pageBuilderView.innerHTML = `
+    if (!pageEditorPane) return;
+    pageEditorPane.innerHTML = `
       <form id="pageForm" autocomplete="off">
         <label>
           Title:
@@ -209,6 +233,7 @@ export function initPagesController() {
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);
+    renderPagePreview(page);
   }
 
   async function render() {
@@ -216,8 +241,11 @@ export function initPagesController() {
 
     if (!pages.length) {
       hideLoading(); // init()'s showLoading() has no stub-load branch to pair with when there's nothing to load
-      if (pageBuilderView) {
-        pageBuilderView.innerHTML = `<p class="builder-empty-state">No pages yet. Click "+ New Page" to create one.</p>`;
+      if (pageEditorPane) {
+        pageEditorPane.innerHTML = `<p class="builder-empty-state">No pages yet. Click "+ New Page" to create one.</p>`;
+      }
+      if (pagePreviewPane) {
+        pagePreviewPane.innerHTML = "";
       }
       return;
     }

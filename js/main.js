@@ -12,6 +12,8 @@ import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
 import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
 import { createTabController } from "./modules/tabController.js";
+import { initSidebarResize } from "./modules/sidebarResize.js";
+import { initPagePreviewResize } from "./modules/pagePreviewResize.js";
 import { initPagesController } from "./pagesController.js";
 import {
   listDrafts,
@@ -104,6 +106,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn: document.getElementById("tabPagesBtn"),
         panel: document.getElementById("pagesPanel"),
         mainView: document.getElementById("pageBuilderView"),
+        activeClass: "page-editor-active",
         onActivate: () => pagesController.activate(),
       },
       {
@@ -114,6 +117,9 @@ document.addEventListener("DOMContentLoaded", async () => {
         onActivate: () => renderMediaLibraryTab(),
       },
     ]);
+
+    initSidebarResize();
+    initPagePreviewResize();
 
     async function init() {
       showBuilderLoading();

@@ -442,9 +442,13 @@
   color: #fff;
 }
 
-/* Small anchored dropdown menu (row "..." / folder "..."), replaces what
-   used to be a full-screen dialog for a simple 3-item choice. */
-.media-browser-context-menu {
+/* Small anchored dropdown menu (js/modules/contextMenu.js) - row "..." /
+   folder "..." in the media browser, "+ Add block" in the page editor,
+   etc. Replaces what used to be a full-screen dialog for a simple choice
+   list. Generic/shared, not media-browser-specific despite living in this
+   file (file-picker.css is already the "shared small builder widgets" CSS
+   file, loaded only by index.html). */
+.app-context-menu {
   position: fixed;
   z-index: 10001; /* above the file-picker modal overlay (10000) */
   background: #2f2f2f;
@@ -457,7 +461,10 @@
   flex-direction: column;
 }
 
-.media-browser-context-menu button {
+.app-context-menu button {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
   background: transparent;
   border: none;
   color: #ccc;
@@ -468,16 +475,23 @@
   font-size: var(--builder-text-base);
 }
 
-.media-browser-context-menu button:hover {
+.app-context-menu button svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
+  color: inherit;
+}
+
+.app-context-menu button:hover {
   background: #3a3a3a;
   color: #fff;
 }
 
-.media-browser-context-menu button.danger {
+.app-context-menu button.danger {
   color: #f27686;
 }
 
-.media-browser-context-menu button.danger:hover {
+.app-context-menu button.danger:hover {
   background: rgba(220, 53, 69, 0.15);
   color: #fff;
 }

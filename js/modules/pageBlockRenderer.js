@@ -14,21 +14,30 @@
 // third-party embeds, so a reel's rendering logic itself is never
 // duplicated a third time either.
 
-const HEIGHT_PRESETS = { small: "200px", medium: "360px", large: "520px" };
+const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
 
 function renderBannerImage(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-banner";
-  el.style.backgroundImage = block.imageUrl ? `url("${block.imageUrl}")` : "none";
-  el.style.height = HEIGHT_PRESETS[block.heightPreset] || HEIGHT_PRESETS.medium;
-  if (!block.imageUrl) {
+  if (block.imageUrl) {
+    // An <img> (not a CSS background-image + background-size:cover) so the
+    // full image is always visible - background-size:cover inside a fixed-
+    // height box crops whatever doesn't fit that exact aspect ratio.
+    // max-height is a cap, not an exact size: combined with the CSS
+    // max-width:100%/height:auto pair below, it only ever shrinks unusually
+    // tall (portrait) images down to something reasonable - wide/landscape
+    // images typically render well under it and are unaffected. Never
+    // crops either dimension; letterboxes (extra space, no fill color)
+    // rather than cutting off part of the image.
+    const img = document.createElement("img");
+    img.src = block.imageUrl;
+    img.alt = block.altText || "";
+    img.style.maxHeight = `${block.maxHeight || DEFAULT_BANNER_MAX_HEIGHT}px`;
+    el.appendChild(img);
+  } else {
     el.textContent = "Banner image not set";
     el.classList.add("page-block-empty");
-  }
-  if (block.altText) {
-    el.setAttribute("role", "img");
-    el.setAttribute("aria-label", block.altText);
   }
   if (block.caption) {
     const caption = document.createElement("div");

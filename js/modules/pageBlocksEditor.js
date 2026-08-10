@@ -6,8 +6,10 @@
 // specific config forms here vs. fixed title/url fields there) that forcing
 // a shared component would add more indirection than it'd save.
 import { createUrlInputRow } from "./domUtils.js";
+import { createValueControl } from "./valueControl.js";
 import { renderBlock } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
+import { openContextMenu } from "./contextMenu.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -16,11 +18,23 @@ const BLOCK_TYPE_LABELS = {
   player: "Player",
 };
 
+// Iconoir (MIT license, iconoir.com) icons, inlined per this codebase's
+// existing convention of embedding raw SVG markup directly rather than
+// loading an icon font/library - see e.g. js/modules/domUtils.js,
+// js/modules/tracksEditor.js.
+const ICONS = {
+  plus: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 12H12M18 12H12M12 12V6M12 12V18" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  "banner-image": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16L10 13L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 10C14.8954 10 14 9.10457 14 8C14 6.89543 14.8954 6 16 6C17.1046 6 18 6.89543 18 8C18 9.10457 17.1046 10 16 10Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  text: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9V7L17 7V9" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V17M12 17H10M12 17H14" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  image: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7.6V20.4C21 20.7314 20.7314 21 20.4 21H7.6C7.26863 21 7 20.7314 7 20.4V7.6C7 7.26863 7.26863 7 7.6 7H20.4C20.7314 7 21 7.26863 21 7.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4H4.6C4.26863 4 4 4.26863 4 4.6V18" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16.8L12.4444 15L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 13C15.6716 13 15 12.3284 15 11.5C15 10.6716 15.6716 10 16.5 10C17.3284 10 18 10.6716 18 11.5C18 12.3284 17.3284 13 16.5 13Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  player: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+};
+
 function createEmptyBlock(type) {
   const blockId = "block-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
   switch (type) {
     case "banner-image":
-      return { blockId, type, imageUrl: "", altText: "", caption: "", heightPreset: "medium" };
+      return { blockId, type, imageUrl: "", altText: "", caption: "", maxHeight: 600 };
     case "text":
       return { blockId, type, heading: "", body: "", alignment: "left" };
     case "image":
@@ -57,7 +71,7 @@ function createBlockRow(block, index, page, onChange) {
 
   const typeLabel = document.createElement("span");
   typeLabel.className = "page-block-type-label";
-  typeLabel.textContent = BLOCK_TYPE_LABELS[block.type] || block.type;
+  typeLabel.innerHTML = `${ICONS[block.type] || ""}<span>${BLOCK_TYPE_LABELS[block.type] || block.type}</span>`;
   header.appendChild(typeLabel);
 
   const removeBtn = createRemoveButton(index, page, onChange);
@@ -244,25 +258,28 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
   captionRow.append(captionLabel, captionInput);
   wrap.appendChild(captionRow);
 
-  const heightRow = document.createElement("div");
-  heightRow.className = "color-row";
-  const heightLabel = document.createElement("span");
-  heightLabel.textContent = "Height:";
-  const heightSelect = document.createElement("select");
-  ["small", "medium", "large"].forEach((v) => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v[0].toUpperCase() + v.slice(1);
-    if (block.heightPreset === v) opt.selected = true;
-    heightSelect.appendChild(opt);
+  // A cap, not an exact size - the image is never cropped (see
+  // pageBlockRenderer.js), so this only ever shrinks unusually tall
+  // (portrait) images down to a reasonable size; wide/landscape images
+  // routinely render well under this without it doing anything visible.
+  const { row: maxHeightRow, input: maxHeightInput } = createValueControl({
+    id: `${block.blockId}-maxHeight`,
+    label: "Max Height (px):",
+    value: block.maxHeight ?? 600,
+    min: 100,
+    max: 1600,
+    step: 10,
+    unit: "px",
   });
-  heightSelect.onchange = () => {
-    block.heightPreset = heightSelect.value;
+  maxHeightInput.addEventListener("input", () => {
+    const val = parseInt(maxHeightInput.value, 10);
+    if (!isNaN(val)) block.maxHeight = val;
+  });
+  maxHeightInput.addEventListener("change", () => {
     refreshPreview();
     onChange();
-  };
-  heightRow.append(heightLabel, heightSelect);
-  wrap.appendChild(heightRow);
+  });
+  wrap.appendChild(maxHeightRow);
 
   return wrap;
 }
@@ -428,27 +445,30 @@ function createPlayerConfig(block, onChange, refreshPreview) {
   return wrap;
 }
 
+// A single trigger button opening a context menu of block types (icon +
+// label per type, via js/modules/contextMenu.js), rather than one button
+// per type - scales to more block types later without the row growing
+// wider indefinitely.
 function createAddBlockRow(page, onChange) {
   const addRow = document.createElement("div");
   addRow.className = "page-block-add-row";
 
-  const label = document.createElement("span");
-  label.className = "page-block-add-label";
-  label.textContent = "Add block:";
-  addRow.appendChild(label);
-
-  Object.entries(BLOCK_TYPE_LABELS).forEach(([type, typeLabel]) => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = "page-block-add-btn";
-    btn.textContent = typeLabel;
-    btn.onclick = () => {
-      page.blocks.push(createEmptyBlock(type));
-      updatePageBlocksEditor(page, onChange);
-      onChange();
-    };
-    addRow.appendChild(btn);
-  });
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "page-block-add-btn";
+  btn.innerHTML = `${ICONS.plus}<span>Add Block</span>`;
+  btn.onclick = () => {
+    openContextMenu(btn, Object.entries(BLOCK_TYPE_LABELS).map(([type, typeLabel]) => ({
+      label: typeLabel,
+      icon: ICONS[type],
+      onClick: () => {
+        page.blocks.push(createEmptyBlock(type));
+        updatePageBlocksEditor(page, onChange);
+        onChange();
+      },
+    })));
+  };
+  addRow.appendChild(btn);
 
   return addRow;
 }

@@ -7,6 +7,7 @@
 import { WORKER_BASE_URL, R2_PUBLIC_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { openContextMenu } from "./contextMenu.js";
 
 const ICONS = {
   FOLDER: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;height:18px;">
@@ -183,69 +184,6 @@ function countsFor(files, folder) {
   const counts = { audio: 0, video: 0, image: 0, other: 0 };
   scoped.forEach(f => { counts[fileType(f.name)]++; });
   return { total: scoped.length, ...counts };
-}
-
-// Small anchored dropdown menu (Copy URL / Rename / Delete, etc.), positioned
-// next to whatever button opened it, instead of a full-screen dialog. Only
-// one instance is ever open at a time.
-let openMenuCleanup = null;
-
-function closeContextMenu() {
-  if (openMenuCleanup) {
-    openMenuCleanup();
-    openMenuCleanup = null;
-  }
-}
-
-function openContextMenu(anchorEl, items) {
-  closeContextMenu();
-
-  const menu = document.createElement("div");
-  menu.className = "media-browser-context-menu";
-  items.forEach(item => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.textContent = item.label;
-    btn.className = item.danger ? "danger" : "";
-    btn.onclick = () => {
-      closeContextMenu();
-      item.onClick();
-    };
-    menu.appendChild(btn);
-  });
-  document.body.appendChild(menu);
-
-  const anchorRect = anchorEl.getBoundingClientRect();
-  const menuRect = menu.getBoundingClientRect();
-  let left = anchorRect.right - menuRect.width;
-  let top = anchorRect.bottom + 4;
-  left = Math.max(4, Math.min(left, window.innerWidth - menuRect.width - 4));
-  if (top + menuRect.height > window.innerHeight - 4) {
-    top = anchorRect.top - menuRect.height - 4;
-  }
-  menu.style.left = `${left}px`;
-  menu.style.top = `${top}px`;
-
-  const onOutsideClick = (e) => {
-    if (!menu.contains(e.target) && e.target !== anchorEl) closeContextMenu();
-  };
-  const onKeydown = (e) => { if (e.key === "Escape") closeContextMenu(); };
-  const onScroll = () => closeContextMenu();
-
-  // Defer listener attach so the click that opened the menu doesn't
-  // immediately close it via the outside-click handler.
-  setTimeout(() => {
-    document.addEventListener("mousedown", onOutsideClick);
-    document.addEventListener("keydown", onKeydown);
-    window.addEventListener("scroll", onScroll, true);
-  }, 0);
-
-  openMenuCleanup = () => {
-    menu.remove();
-    document.removeEventListener("mousedown", onOutsideClick);
-    document.removeEventListener("keydown", onKeydown);
-    window.removeEventListener("scroll", onScroll, true);
-  };
 }
 
 function promptForText(message, defaultValue = "") {

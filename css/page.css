@@ -48,22 +48,31 @@ body.page-body {
   font-style: italic;
 }
 
+/* No background color here (or on any other .page-block-* below) - blocks
+   are transparent by default, showing whatever's behind them (the page's
+   own --page-bg, or the builder preview pane's matching background) rather
+   than a fill color nobody asked for. */
 .page-block-banner {
-  background-size: cover;
-  background-position: center;
-  background-color: #1e1e22;
-  position: relative;
   display: flex;
-  align-items: flex-end;
+  flex-direction: column;
+  align-items: center;
+}
+
+.page-block-banner img {
+  display: block;
+  max-width: 100%;
+  height: auto;
+  margin: 0 auto;
 }
 
 .page-block-caption {
-  background: rgba(0, 0, 0, 0.55);
-  color: #fff;
-  padding: 0.5rem 0.8rem;
+  color: var(--page-text-muted);
   width: 100%;
+  max-width: 100%;
   box-sizing: border-box;
+  padding: 0.5rem 0.2rem 0;
   font-size: 0.85rem;
+  text-align: center;
 }
 
 .page-block-text {

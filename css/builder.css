@@ -18,13 +18,25 @@ body {
   flex-direction: row;
   min-height: 100vh;
   height: 100vh;
-  /* Below this, .builder-sidebar's own 220px min-width leaves so little
+  /* Below this, .builder-sidebar's own 200px min-width leaves so little
      room for .builder-main that form rows and buttons wrap and overlap
      into an unusable mess - a page-level horizontal scrollbar (the
      default overflow-x behavior, nothing extra needed) is a better
      failure mode than that. */
   min-width: 1000px;
-  gap: 2.5rem;
+  /* No flex `gap` here - that spacing lives entirely in .builder-main's own
+     padding-left instead (see below). A flex `gap` sits *outside* both
+     items' border-boxes, in .builder-app's own box - a child bleeding left
+     via negative margin (the Pages live-preview pane, #pagePreviewPane)
+     would have to escape .builder-main's border-box to reach it, and
+     .builder-main's overflow-y:auto forces overflow-x to auto too per the
+     CSS overflow spec (you can't have one axis visible and the other not),
+     which clips exactly that kind of escape. Padding, unlike gap/margin, is
+     *inside* the border-box, so a negative-margin child filling it back in
+     never has anything to escape - see the padding-right/margin-right pair
+     below, which already worked correctly for this exact reason before
+     .page-preview-resize-handle/#pagePreviewPane needed the same trick on
+     the left. */
   align-items: stretch;
   background: #1e1e1e;
   /* Scoped here rather than on `body` (shared with player.html, which must
@@ -44,18 +56,45 @@ body {
    ============================================== */
 
 .builder-sidebar {
-  min-width: 220px;
+  position: relative; /* anchors .sidebar-resize-handle */
+  /* Fixed (but user-resizable, see sidebarResize.js) width - previously
+     unset here, so the sidebar auto-sized to whatever content happened to
+     be widest (a long page title, a long "/page?slug=..." subtitle),
+     visibly jumping width on every selection change. width + flex-shrink:0
+     makes it a stable column that .builder-main's flex:1 always fills the
+     remainder around, with list-item text truncating (ellipsis) inside it
+     instead of stretching it. */
+  width: var(--builder-sidebar-width, 260px);
+  min-width: 200px;
+  max-width: 480px;
+  flex-shrink: 0;
   background: var(--builder-bg);
   border: 1px solid var(--builder-border);
   box-shadow: 0 2px 10px 0 var(--builder-sidebar-shadow);
   border-radius: 0 10px 10px 0;
   padding: 1rem 0.5rem;
-  margin-right: 1rem;
   height: 100vh;
   display: flex;
   flex-direction: column;
   align-items: stretch;
   box-sizing: border-box;
+}
+
+.sidebar-resize-handle {
+  position: absolute;
+  top: 0;
+  right: -5px;
+  width: 10px;
+  height: 100%;
+  cursor: col-resize;
+  z-index: 10;
+  background: transparent;
+}
+
+.sidebar-resize-handle:hover,
+.sidebar-resize-handle.resizing {
+  background: var(--builder-accent);
+  opacity: 0.35;
 }
 
 #reelsPanel > #newReelBtn,
@@ -189,11 +228,15 @@ body {
 
 #pageList li .sidebar-item-subtitle {
   flex-basis: 100%;
+  min-width: 0;
   font-size: var(--builder-text-sm);
   font-weight: var(--builder-weight-medium);
   color: inherit;
   opacity: 0.7;
   margin-top: 0.1rem;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 #reelList li .delete-reel-btn,
@@ -236,6 +279,14 @@ body {
   overflow-y: auto;
   padding-top: 2.2rem;
   padding-right: 2.5rem;
+  /* Replaces the old .builder-sidebar margin-right (1rem) + .builder-app
+     gap (2.5rem) = 3.5rem total - moved here (see .builder-app's comment)
+     so a full-bleed child (#pagePreviewPane) can cancel it via negative
+     margin without escaping this element's own clipped border-box. Every
+     view (#reelBuilderView/#pageBuilderView/#mediaLibraryView) gets the
+     same visual inset as before, automatically, since they're all direct
+     children of this element. */
+  padding-left: 3.5rem;
   padding-bottom: 500px;
 }
 
@@ -277,9 +328,11 @@ body {
 }
 
 /* The 500px bottom padding above exists only for the reel form's scroll
-   comfort - it's irrelevant (and would starve #mediaLibraryView's flex-grow
-   down to a sliver) while the Media Library tab is showing, so drop it then. */
-.builder-main.media-library-active {
+   comfort - it's irrelevant (and would starve #mediaLibraryView's/
+   #pageBuilderView's flex-grow down to a sliver) while the Media Library or
+   Pages tab is showing, so drop it then. */
+.builder-main.media-library-active,
+.builder-main.page-editor-active {
   padding-bottom: 2rem;
 }
 
@@ -289,6 +342,88 @@ body {
   flex-direction: column;
   min-height: 0;
 }
+
+/* ==============================================
+   PAGES TAB: split-pane editor + live preview
+   #pageBuilderView's three children (editor pane, resize handle, preview
+   pane) are static in index.html and never recreated - js/pagesController.js
+   only ever replaces their *contents*, so js/modules/pagePreviewResize.js
+   only has to wire up drag behavior once, not re-attach it on every render.
+   ============================================== */
+#pageBuilderView {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.page-editor-pane {
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
+/* Bleeds out to the full width of .builder-main (cancelling its own
+   padding-right: 2.5rem - there's no padding-left to cancel, .builder-main
+   has none) on both the handle and the pane below, so the preview reads as
+   a real webpage viewport - edge-to-edge, no rounded "card" corners -
+   rather than another boxed-in builder-chrome widget. */
+.page-preview-resize-handle {
+  flex-shrink: 0;
+  height: 7px;
+  /* Cancels .builder-main's own padding-right (2.5rem) and padding-left
+     (3.5rem) - both *within* .builder-main's border-box, so this stays
+     flush against the sidebar's own right edge (wherever
+     js/modules/sidebarResize.js currently has it) without needing to
+     escape .builder-main's box, which its overflow-y:auto would otherwise
+     clip - see .builder-app's comment for why. */
+  margin: 0 -2.5rem 0 -3.5rem;
+  cursor: row-resize;
+  background: transparent;
+  border-top: 3px solid #3a3a3a;
+  box-sizing: border-box;
+}
+
+.page-preview-resize-handle:hover,
+.page-preview-resize-handle.resizing {
+  border-top-color: var(--builder-accent);
+}
+
+/* The rendered blocks inside (.page-blocks-list/.page-block* from
+   css/page.css) already carry their own dark styling designed for
+   page.html's standalone <body class="page-body">, which this pane isn't -
+   so its background/text color are set directly here from the same
+   --page-bg/--page-text tokens (page.css's :root block), not inherited. */
+/* Padding (not applied to .page-blocks-list/.page-status-message
+   themselves - see below) is deliberately equal left/right, even though
+   the pane's own bleed (margin, below) isn't - matching the bleed exactly
+   would need only a 1rem left/right difference, but *any* visible
+   difference here reads as a misaligned preview, so this trades "content
+   lines up exactly with the editor form above" for "the preview is
+   symmetric," which is the more important property for something
+   imitating a webpage. */
+#pagePreviewPane {
+  flex-shrink: 0;
+  height: var(--page-preview-height, 320px);
+  min-height: 120px;
+  max-height: 900px;
+  overflow-y: auto;
+  overflow-x: hidden;
+  margin: 0 -2.5rem 0 -3.5rem; /* see .page-preview-resize-handle above for why left/right differ */
+  padding: 1rem 2.5rem;
+  box-sizing: border-box;
+  background: var(--page-bg);
+  color: var(--page-text);
+}
+
+/* .page-blocks-list/.page-status-message deliberately carry NO padding
+   override here - both already have their own max-width:900px + margin:
+   auto centering in css/page.css, and padding added directly to an element
+   that also centers via auto margins lands *outside* its max-width (default
+   content-box sizing), breaking the centering math and producing visibly
+   uneven left/right space. All the builder-preview-specific inset lives on
+   #pagePreviewPane itself above instead, so the content column centers
+   identically here and on the real page.html. */
 
 #reelTitle {
   margin-bottom: 1rem;
@@ -1161,9 +1296,18 @@ input[type="range"]:focus::-moz-range-thumb {
 
 .page-block-type-label {
   flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
   font-size: var(--builder-text-md);
   font-weight: var(--builder-weight-semibold);
   color: var(--builder-accent);
+}
+
+.page-block-type-label svg {
+  width: 18px;
+  height: 18px;
+  flex-shrink: 0;
 }
 
 .page-block-remove-btn {
@@ -1213,18 +1357,17 @@ input[type="range"]:focus::-moz-range-thumb {
 .page-block-add-row {
   display: flex;
   align-items: center;
-  gap: 0.5rem;
-  flex-wrap: wrap;
   padding: 0.6rem 0;
 }
 
-.page-block-add-label {
-  color: #999;
-  font-size: var(--builder-text-md);
-  margin-right: 0.3rem;
-}
-
+/* Also reused, unstyled-by-icon, for the reel-picker's plain-text
+   "Select Reel"/"Change" button (js/modules/pageBlocksEditor.js's
+   createPlayerConfig) - the flex/gap layout below is a no-op without an
+   <svg> child. */
 .page-block-add-btn {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
   background: none;
   border: 1px solid var(--builder-accent);
   color: var(--builder-accent);
@@ -1234,6 +1377,12 @@ input[type="range"]:focus::-moz-range-thumb {
   font-weight: var(--builder-weight-semibold);
   cursor: pointer;
   transition: background 0.15s, color 0.15s;
+}
+
+.page-block-add-btn svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .page-block-add-btn:hover {

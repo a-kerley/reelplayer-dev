@@ -41,6 +41,7 @@
         <div id="mediaPanel" style="display: none;">
           <p class="builder-empty-state">Browse and manage all uploaded media.</p>
         </div>
+        <div id="sidebarResizeHandle" class="sidebar-resize-handle"></div>
       </aside>
       <main class="builder-main">
         <div id="builderLoadingOverlay" class="builder-loading-overlay" hidden>
@@ -63,7 +64,11 @@
           <button type="button" id="refreshPreviewBtn">Refresh Preview</button>
           <div id="reelPlayerPreview"></div>
         </div>
-        <div id="pageBuilderView" style="display: none;"></div>
+        <div id="pageBuilderView" style="display: none;">
+          <div id="pageEditorPane" class="page-editor-pane"></div>
+          <div id="pagePreviewResizeHandle" class="page-preview-resize-handle"></div>
+          <div id="pagePreviewPane" class="page-preview-pane"></div>
+        </div>
         <div id="mediaLibraryView" style="display: none;"></div>
       </main>
     </div>
