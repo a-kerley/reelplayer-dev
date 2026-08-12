@@ -69,6 +69,7 @@ export async function publishPage(page, slug) {
       previousSlug,
       title: page.title || "",
       blocks: page.blocks || [],
+      analyticsEnabled: page.analyticsEnabled === true,
     }),
   });
 

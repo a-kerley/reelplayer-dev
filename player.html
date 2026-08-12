@@ -83,6 +83,19 @@
     import { getColorFilters } from './js/modules/colorUtils.js';
     import { WORKER_BASE_URL } from './js/config.js';
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
+    import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
+
+    // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
+    // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
+    // reelData.analyticsEnabled, read by setupPlaybackEventListeners()'s
+    // listen-segment tracking below. sessionId ties every "play" beacon
+    // from this page load back to its one "view" beacon.
+    let analyticsEnabled = false;
+    let analyticsReelId = null;
+    let analyticsPlaylist = [];
+    const sessionId = createSessionId();
+    let segmentTrackIndex = null;
+    let segmentStartedAt = null;
 
     // Exposed so sibling reelplayer <iframe>s on the same host page (any
     // number of separate embeds, each same-origin to this one regardless of
@@ -124,9 +137,20 @@
           return;
         }
         
+        // Opt-in analytics - a "view" beacon fires once, immediately, if
+        // this reel has analyticsEnabled=true. Listen-segment tracking
+        // (setupPlaybackEventListeners below) reads these same module-level
+        // vars, so this must run before playback can start.
+        analyticsEnabled = reelData.analyticsEnabled === true;
+        analyticsReelId = reelId;
+        analyticsPlaylist = reelData.playlist || [];
+        if (analyticsEnabled) {
+          sendStatBeacon('reel', analyticsReelId, { event: 'view', sessionId });
+        }
+
         // Apply custom CSS variables from reel settings
         applyReelStyles(reelData);
-        
+
         // Render player HTML using same structure as main player
         renderPlayerHTML(reelData);
         
@@ -577,8 +601,9 @@
             </svg>
           `;
         }
+        beginListenSegment();
       });
-      
+
       // Update to play icon when paused
       document.addEventListener("playback:pause", () => {
         const playPauseBtn = playerApp.elements.playPauseBtn;
@@ -589,6 +614,46 @@
             </svg>
           `;
         }
+        endListenSegment();
+      });
+
+      // No icon change needed here (playback:pause already fired alongside
+      // "finish" in js/player.js's wavesurfer "finish" handler) - this
+      // listener only exists to close out the listen segment.
+      document.addEventListener("playback:finish", () => {
+        endListenSegment();
+      });
+
+      // Tab closed/navigated away mid-playback - flush whatever segment is
+      // still open. keepalive:true on the beacon fetch (statsBeacon.js) is
+      // what makes this actually land instead of being cancelled.
+      window.addEventListener("pagehide", () => {
+        endListenSegment();
+      });
+    }
+
+    /* ============================================
+       LISTEN-SEGMENT TRACKING (opt-in analytics)
+       One "play" beacon per continuous play->pause/finish/unload span,
+       bucketed by whichever track was playing when the segment started.
+       ============================================ */
+    function beginListenSegment() {
+      if (!analyticsEnabled) return;
+      segmentTrackIndex = playerApp.currentTrackIndex ?? null;
+      segmentStartedAt = Date.now();
+    }
+
+    function endListenSegment() {
+      if (!analyticsEnabled || segmentStartedAt === null) return;
+      const listenSeconds = Math.round((Date.now() - segmentStartedAt) / 1000);
+      const trackIndex = segmentTrackIndex;
+      segmentStartedAt = null;
+      segmentTrackIndex = null;
+      if (listenSeconds < 1) return; // ignore accidental/instant clicks
+
+      const trackTitle = (trackIndex !== null && analyticsPlaylist[trackIndex]?.title) || "";
+      sendStatBeacon('reel', analyticsReelId, {
+        event: 'play', sessionId, trackIndex, trackTitle, listenSeconds,
       });
     }
   </script>

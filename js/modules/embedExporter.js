@@ -132,6 +132,7 @@ export class EmbedExporter {
       id: reelId,
       title: reel.title,
       showTitle: reel.showTitle,
+      analyticsEnabled: reel.analyticsEnabled === true,
       playlist: playlist,
       playerHeight: reel.playerHeight || 500, // Player height setting
       mode: reel.mode || "static", // Player mode: "static" or "expandable"

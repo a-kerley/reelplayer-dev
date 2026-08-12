@@ -9,6 +9,7 @@ import { dialog } from "./dialogSystem.js";
 import { showToast } from "./toast.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { publicPageUrl } from "./pagePublish.js";
+import { openStatsModal } from "./statsViewer.js";
 
 async function fetchPageList(password) {
   const response = await fetch(`${WORKER_BASE_URL}/pages`, {
@@ -60,6 +61,8 @@ function renderListHTML(entries, currentSlug) {
             <div style="font-size:0.8rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/page?slug=${entry.slug}${entry.published ? " &middot; " + new Date(entry.published).toLocaleString() : ""}</div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+            <button type="button" class="page-manager-stats-btn" data-slug="${entry.slug}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+              style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
             <button type="button" class="page-manager-copy-btn" data-slug="${entry.slug}"
               style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Copy Link</button>
             <button type="button" class="page-manager-delete-btn" data-slug="${entry.slug}"
@@ -96,6 +99,12 @@ async function openPageManager(getCurrentPage) {
   });
 
   setTimeout(() => {
+    document.querySelectorAll(".page-manager-stats-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        openStatsModal("page", btn.dataset.slug, btn.dataset.title);
+      });
+    });
+
     document.querySelectorAll(".page-manager-copy-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         navigator.clipboard.writeText(publicPageUrl(btn.dataset.slug)).then(() => {

@@ -32,6 +32,11 @@
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
 //   POST   /media/rename      - password-gated, body {from, to}
 //   DELETE /media/delete      - password-gated, ?key=<key>
+//   POST   /stats/:type/:id   - public, body {event, sessionId, trackIndex?, trackTitle?,
+//                               listenSeconds?}; :type is "reel" or "page". No-ops (200, no
+//                               write) unless the target exists and has analyticsEnabled=true.
+//   GET    /stats/:type/:id   - password-gated, lists every raw stat event for that target,
+//                               newest first - the builder aggregates client-side.
 //
 // Drafts (in-progress builder reels/pages, auto-saved as the user edits) use
 // a separate `draft_<id>` / `draft_page_<id>` key prefix in the same REELS
@@ -387,6 +392,7 @@ export default {
           slug,
           title: body.title || "",
           blocks: Array.isArray(body.blocks) ? body.blocks : [],
+          analyticsEnabled: body.analyticsEnabled === true,
           published: new Date().toISOString(),
         };
         await env.REELS.put(`page_${slug}`, JSON.stringify(published));
@@ -398,6 +404,69 @@ export default {
         if (authError) return authError;
         await env.REELS.delete(`page_${slugParam}`);
         return jsonResponse({ ok: true });
+      }
+    }
+
+    // /stats/:type/:id - :type constrained to "reel"/"page" directly in the
+    // regex. POST is public (called from player.html/page.html for any
+    // visitor), GET is password-gated (the builder's "View Stats" modal).
+    const statsMatch = pathname.match(/^\/stats\/(reel|page)\/([a-zA-Z0-9_-]+)$/);
+    if (statsMatch) {
+      const [, targetType, targetId] = statsMatch;
+      const targetKey = targetType === "reel" ? `reel_${targetId}` : `page_${targetId}`;
+
+      if (request.method === "POST") {
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
+
+        // Only record a beacon for a target that actually exists and has
+        // opted in - this also means flipping analyticsEnabled off stops
+        // the Worker from accepting any further beacons for it immediately,
+        // not just future ones from an updated client.
+        const targetValue = await env.REELS.get(targetKey);
+        if (!targetValue) return jsonResponse({ ok: true });
+        let target;
+        try {
+          target = JSON.parse(targetValue);
+        } catch {
+          return jsonResponse({ ok: true });
+        }
+        if (target.analyticsEnabled !== true) return jsonResponse({ ok: true });
+
+        const { event, sessionId, trackIndex, trackTitle, listenSeconds } = body || {};
+        if ((event !== "view" && event !== "play") || typeof sessionId !== "string" || !sessionId) {
+          return jsonResponse({ error: "Invalid stat event" }, 400);
+        }
+
+        const record = {
+          event,
+          targetType,
+          targetId,
+          sessionId,
+          ts: new Date().toISOString(),
+          country: request.cf?.country || null,
+          city: request.cf?.city || null,
+          region: request.cf?.region || null,
+          timezone: request.cf?.timezone || null,
+        };
+        if (event === "play") {
+          record.trackIndex = typeof trackIndex === "number" ? trackIndex : null;
+          record.trackTitle = typeof trackTitle === "string" ? trackTitle : "";
+          record.listenSeconds = typeof listenSeconds === "number" ? Math.round(listenSeconds) : 0;
+        }
+
+        const statKey = `stat_${targetType}_${targetId}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+        await env.REELS.put(statKey, JSON.stringify(record));
+        return jsonResponse({ ok: true });
+      }
+
+      if (request.method === "GET") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+
+        const entries = await listEntries(env, `stat_${targetType}_${targetId}_`, (r) => r);
+        entries.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+        return jsonResponse(entries);
       }
     }
 

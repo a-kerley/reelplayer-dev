@@ -31,6 +31,7 @@ export function createEmptyReel() {
     id: "reel-" + Date.now(),
     title: "",
     showTitle: true,
+    analyticsEnabled: false,
     playlist: [{ title: "", url: "" }],
     createdAt: Date.now(),
     // Background effects

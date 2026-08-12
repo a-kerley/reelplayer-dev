@@ -13,6 +13,13 @@ reel's embed id, a page's `slug` is user-editable after first publish; the
 clean up the old entry when renaming, and rejects a genuine collision
 (the slug already used by a *different* page's `id`) with `409`.
 
+- Opt-in per-item analytics (`reel.analyticsEnabled`/`page.analyticsEnabled`,
+  default `false`) stores raw view/play events under `stat_<type>_<id>_<ts>_<rand>`
+  in the same `REELS` namespace - one KV entry per beacon, no server-side
+  aggregation (the builder's "View Stats" modal sums/groups client-side).
+  `POST /stats/:type/:id` is public but only writes if the target exists
+  and has opted in, re-checked on every beacon - see `worker/README.md`'s
+  "Stats" section.
 - `worker/secret` holds the plaintext shared password locally and is
   gitignored — never let it leak into a committed file. Grep for it before
   committing if you've touched worker/auth-related code.

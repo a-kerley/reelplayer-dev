@@ -29,6 +29,7 @@
     // exactly the bug class this is designed to avoid repeating).
     import { WORKER_BASE_URL } from './js/config.js';
     import { renderBlock } from './js/modules/pageBlockRenderer.js';
+    import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
 
     const root = document.getElementById('pageRoot');
 
@@ -78,6 +79,14 @@
       if (!pageData) {
         showStatus('Page not found.');
         return;
+      }
+
+      // Opt-in analytics - a page never plays anything itself (a player
+      // block's iframe is just player.html, tracked independently under
+      // that reel's own analyticsEnabled - see js/modules/statsBeacon.js),
+      // so this is the entire page-side integration: one "view" beacon.
+      if (pageData.analyticsEnabled === true) {
+        sendStatBeacon('page', slug, { event: 'view', sessionId: createSessionId() });
       }
 
       renderPage(pageData);

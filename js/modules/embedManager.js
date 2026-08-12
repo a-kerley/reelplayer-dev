@@ -3,6 +3,7 @@
 import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { openStatsModal } from "./statsViewer.js";
 
 async function fetchReelList(password) {
   const response = await fetch(`${WORKER_BASE_URL}/reels`, {
@@ -55,8 +56,12 @@ function renderListHTML(entries, currentEmbedId) {
             <div style="font-weight:600;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
             <div style="font-size:0.8rem;color:#888;">${entry.id}${entry.created ? " &middot; " + new Date(entry.created).toLocaleString() : ""}</div>
           </div>
-          <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
-            style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
+          <div style="display:flex;gap:0.4rem;flex-shrink:0;">
+            <button type="button" class="embed-manager-stats-btn" data-id="${entry.id}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+              style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
+            <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
+              style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
+          </div>
         </div>
       `;
       }).join("")}
@@ -88,6 +93,12 @@ async function openEmbedManager(getCurrentReel) {
   });
 
   setTimeout(() => {
+    document.querySelectorAll(".embed-manager-stats-btn").forEach(btn => {
+      btn.addEventListener("click", () => {
+        openStatsModal("reel", btn.dataset.id, btn.dataset.title);
+      });
+    });
+
     document.querySelectorAll(".embed-manager-delete-btn").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;

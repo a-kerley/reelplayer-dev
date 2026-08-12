@@ -11,6 +11,8 @@ import { dialog } from "./modules/dialogSystem.js";
 import { showToast } from "./modules/toast.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
+import { createToggleSwitch } from "./modules/domUtils.js";
+import { markAsOperatorBrowser } from "./modules/statsBeacon.js";
 import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
 import { createTabController } from "./modules/tabController.js";
 import { initSidebarResize } from "./modules/sidebarResize.js";
@@ -32,6 +34,14 @@ document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
   const builderRoot = document.querySelector(".builder-app");
   if (builderRoot) {
+    // Any browser that has loaded the builder is presumed to be an
+    // operator's, not a client's - js/modules/statsBeacon.js checks this
+    // flag (shared via same-origin localStorage) before sending any
+    // view/play beacon, so testing a reel/page (including via the "Test
+    // Embed" button, which opens player.html same-origin) never pollutes a
+    // client's real analytics.
+    markAsOperatorBrowser();
+
     // --- Reel Builder SPA mode ---
     // Drafts (the reels shown in the sidebar and being actively edited) are
     // server-backed via js/modules/draftStore.js, so they auto-save and are
@@ -109,6 +119,27 @@ document.addEventListener("DOMContentLoaded", async () => {
       } else {
         statusEl.textContent = "⚠ Unpublished changes - re-export to update the live embed.";
         statusEl.dataset.status = "stale";
+      }
+    }
+
+    // Analytics toggle - reuses the same createToggleSwitch component
+    // titleAppearance.js already uses for "Display Reel Title in Player".
+    // Stats themselves are viewed via a "Stats" button on each row of the
+    // "Manage Published Embeds" modal (js/modules/embedManager.js), not a
+    // dedicated button here - that works for any published reel, not just
+    // whichever one happens to be open in the builder right now.
+    function setupAnalyticsControls(reel) {
+      const slot = document.getElementById("reelAnalyticsToggleSlot");
+      if (slot) {
+        slot.innerHTML = "";
+        slot.appendChild(createToggleSwitch({
+          id: "reelAnalyticsEnabled",
+          checked: !!reel.analyticsEnabled,
+          onChange: (e) => {
+            reel.analyticsEnabled = e.target.checked;
+            updateCurrentReel();
+          },
+        }));
       }
     }
 
@@ -294,6 +325,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       setupRefreshPreviewButton();
       setupExportEmbedButton();
       setupEmbedManagerButton(() => reels.find((r) => r.id === currentId));
+      setupAnalyticsControls(current);
       updateReelPublishStatus(current);
       // showPreview(); // preview is only refreshed via button now
       showPreview();
@@ -348,6 +380,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       current.publishedAt = new Date().toISOString();
       saveReels(reels);
       updateReelPublishStatus(current);
+      setupAnalyticsControls(current);
 
       dialog.createDialog({
         type: 'custom',

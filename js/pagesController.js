@@ -18,6 +18,7 @@ import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
 import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
+import { createToggleSwitch } from "./modules/domUtils.js";
 
 function createEmptyPage() {
   return {
@@ -25,6 +26,7 @@ function createEmptyPage() {
     slug: null,
     publishedSlug: null,
     publishedContentHash: null,
+    analyticsEnabled: false,
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -158,6 +160,29 @@ export function initPagesController() {
     }
   }
 
+  // Analytics toggle - mirrors js/main.js's setupAnalyticsControls() for
+  // reels. Stats themselves are viewed via a "Stats" button on each row of
+  // the "Manage Published Pages" modal (js/modules/pageManager.js), not a
+  // dedicated button here - works for any published page, not just
+  // whichever one happens to be open in the builder right now. (A page
+  // never plays anything itself - see js/modules/statsBeacon.js's split - a
+  // page block's iframe is just player.html, tracked under that reel's own
+  // analyticsEnabled independently - so a page's own stats are opens only.)
+  function setupAnalyticsControls(page) {
+    const slot = document.getElementById("pageAnalyticsToggleSlot");
+    if (slot) {
+      slot.innerHTML = "";
+      slot.appendChild(createToggleSwitch({
+        id: "pageAnalyticsEnabled",
+        checked: !!page.analyticsEnabled,
+        onChange: (e) => {
+          page.analyticsEnabled = e.target.checked;
+          updateCurrentPage();
+        },
+      }));
+    }
+  }
+
   async function handlePublish(page) {
     const slugInput = document.getElementById("pageSlugInput");
     const publishBtn = document.getElementById("publishPageBtn");
@@ -182,6 +207,7 @@ export function initPagesController() {
       page.publishedContentHash = contentFingerprint(page);
       updateCurrentPage();
       updatePublishStatus(page);
+      setupAnalyticsControls(page);
       dialog.createDialog({
         type: "custom",
         message: "Page published!",
@@ -229,6 +255,10 @@ export function initPagesController() {
         </div>
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
         <button type="button" id="managePagesBtn">Manage Published Pages</button>
+        <div class="color-row" style="margin-top:1rem;">
+          <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
+          <span id="pageAnalyticsToggleSlot"></span>
+        </div>
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
     `;
@@ -254,6 +284,7 @@ export function initPagesController() {
     document.getElementById("publishPageBtn").onclick = () => handlePublish(page);
     updatePublishStatus(page);
     setupPageManagerButton(() => page);
+    setupAnalyticsControls(page);
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);

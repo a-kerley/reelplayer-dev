@@ -142,6 +142,36 @@ curl http://localhost:8787/pages -H "Authorization: Bearer YOUR_PASSWORD"
 curl -X DELETE http://localhost:8787/pages/my-page-slug -H "Authorization: Bearer YOUR_PASSWORD"
 ```
 
+## Stats (opt-in per-reel/per-page analytics)
+
+Each reel/page has an `analyticsEnabled` flag (off by default). When on,
+`player.html`/`page.html` POST small "view"/"play" beacons to this Worker,
+stored as individual `stat_<type>_<id>_<timestamp>_<rand>` KV entries in
+the same `REELS` namespace - no aggregation happens server-side, since
+expected volume is low; the builder's "View Stats" modal fetches the raw
+list and summarizes it client-side. The POST route is public (called from
+any visitor's browser) but is a no-op unless the target exists and has
+opted in - flip `analyticsEnabled` off and the Worker immediately stops
+accepting further beacons for it, regardless of what a stale client sends:
+
+```bash
+# Record a view (public, no auth) - only writes if reel_test123 exists and analyticsEnabled=true
+curl -X POST http://localhost:8787/stats/reel/test123 \
+  -H "Content-Type: application/json" \
+  -d '{"event":"view","sessionId":"abc123"}'
+
+# Record a play/listen segment (public, no auth)
+curl -X POST http://localhost:8787/stats/reel/test123 \
+  -H "Content-Type: application/json" \
+  -d '{"event":"play","sessionId":"abc123","trackIndex":0,"trackTitle":"Track One","listenSeconds":42}'
+
+# Fetch raw events for a target, newest first (password-gated)
+curl http://localhost:8787/stats/reel/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+
+# Same shape for pages, keyed by slug instead of id
+curl http://localhost:8787/stats/page/my-page-slug -H "Authorization: Bearer YOUR_PASSWORD"
+```
+
 ## Redeploying after changes
 
 Any time `worker/src/index.js` changes, run `npx wrangler deploy` again from this directory. The URL stays the same, so `js/config.js` doesn't need updating unless you tear down and recreate the Worker itself.
