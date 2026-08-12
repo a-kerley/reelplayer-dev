@@ -421,25 +421,31 @@ function createPlayerConfig(block, onChange, refreshPreview) {
 
   wrap.appendChild(pickRow);
 
-  const heightRow = document.createElement("div");
-  heightRow.className = "color-row";
-  const heightLabel = document.createElement("span");
-  heightLabel.textContent = "Height (px):";
-  const heightInput = document.createElement("input");
-  heightInput.type = "number";
-  heightInput.min = "100";
-  heightInput.max = "2000";
-  heightInput.value = block.height || 500;
-  heightInput.style.cssText = "width:6rem;padding:0.4rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
-  heightInput.oninput = () => {
+  // Just a starting guess, not a fixed size: player.html corrects it
+  // automatically once the embedded reel loads (via the postMessage
+  // handshake in pageBlockRenderer.js's renderPlayer()) - a static reel
+  // reports its real configured height on load, an expandable one keeps
+  // reporting a new height every time it expands/collapses. This only
+  // matters for how the block looks for an instant before that first
+  // message arrives.
+  const { row: heightRow, input: heightInput } = createValueControl({
+    id: `${block.blockId}-height`,
+    label: "Starting Height (px):",
+    value: block.height || 500,
+    min: 100,
+    max: 2000,
+    step: 10,
+    unit: "px",
+    tooltip: "Corrected automatically once the player loads - this only affects the instant before that.",
+  });
+  heightInput.addEventListener("input", () => {
     const val = parseInt(heightInput.value, 10);
-    block.height = Number.isFinite(val) ? val : 500;
-  };
-  heightInput.onblur = () => {
+    if (!isNaN(val)) block.height = val;
+  });
+  heightInput.addEventListener("change", () => {
     refreshPreview();
     onChange();
-  };
-  heightRow.append(heightLabel, heightInput);
+  });
   wrap.appendChild(heightRow);
 
   return wrap;

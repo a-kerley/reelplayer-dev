@@ -103,9 +103,46 @@ function renderPlayer(block) {
   iframe.src = `player?id=${block.reelId}`;
   iframe.width = "100%";
   iframe.height = String(height);
-  iframe.style.cssText = `display:block;border:none;min-height:${height}px;`;
+  iframe.style.cssText = `display:block;border:none;min-height:${height}px;transition:height 0.3s ease;`;
   iframe.setAttribute("frameborder", "0");
   wrapper.appendChild(iframe);
+
+  // player.html posts these regardless of reel mode - an expandable reel
+  // resizes itself (collapsed banner <-> full controls on hover) and
+  // reports its new height every time, exactly like it does for a
+  // third-party <iframe> embed (see embedExporter.js's generateIframeEmbed()
+  // for the same handshake). Without this listener, an expandable reel in
+  // a page would be stuck at whatever height was configured here - either
+  // clipped once expanded, or wasting space while collapsed. Even a static
+  // reel benefits: player.html always posts one `initial: true` message on
+  // load with its real configured height, correcting a wrong guess in the
+  // block's own "Height" field without waiting for any user interaction.
+  function handleMessage(event) {
+    // Self-removing once this iframe's gone (block deleted, or the whole
+    // row rebuilt by pageBlocksEditor.js's updatePageBlocksEditor() on the
+    // next edit) - renderPlayer() runs again on every such rebuild in the
+    // block editor, and without this the old listener would linger on
+    // window forever, matched against a detached iframe that can never
+    // post anything again.
+    if (!document.body.contains(iframe)) {
+      window.removeEventListener("message", handleMessage);
+      return;
+    }
+    if (event.source !== iframe.contentWindow || !event.data) return;
+    if (event.data.type === "reelplayer:resize") {
+      // No animated resize for the first message - it's correcting this
+      // block's own initial-height guess, not a user-triggered expand, so
+      // it should snap instantly rather than play what looks like an
+      // unwanted expand animation on load (mirrors player.html's own
+      // reasoning for flagging that first message `initial: true`).
+      iframe.style.transition = event.data.initial ? "none" : "height 0.3s ease";
+      iframe.style.height = `${event.data.height}px`;
+    } else if (event.data.type === "reelplayer:scrollCompensate") {
+      window.scrollBy(0, event.data.delta);
+    }
+  }
+  window.addEventListener("message", handleMessage);
+
   return wrapper;
 }
 
