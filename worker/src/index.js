@@ -21,7 +21,9 @@
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
 //                               analyticsEnabled?, backgroundImageEnabled?, backgroundImage?,
-//                               backgroundBlur?, backgroundParallaxMode?}; 409
+//                               backgroundBlur?, backgroundParallaxMode?, contentOverlayColor?,
+//                               contentOverlayOpacity?, contentMaxWidth?, contentPaddingTop?,
+//                               contentPaddingBottom?}; 409
 //                               if `slug` is already used by a different page's `id`. Deletes the
 //                               `previousSlug` entry first if renaming, so old slugs don't linger.
 //   GET    /pages             - password-gated, lists {id, slug, title, published} for every page
@@ -401,6 +403,11 @@ export default {
           backgroundImage: typeof body.backgroundImage === "string" ? body.backgroundImage : "",
           backgroundBlur: typeof body.backgroundBlur === "number" ? body.backgroundBlur : 12,
           backgroundParallaxMode: body.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
+          contentOverlayColor: typeof body.contentOverlayColor === "string" ? body.contentOverlayColor : "#000000",
+          contentOverlayOpacity: typeof body.contentOverlayOpacity === "number" ? body.contentOverlayOpacity : 0,
+          contentMaxWidth: typeof body.contentMaxWidth === "number" ? body.contentMaxWidth : 900,
+          contentPaddingTop: typeof body.contentPaddingTop === "number" ? body.contentPaddingTop : 0,
+          contentPaddingBottom: typeof body.contentPaddingBottom === "number" ? body.contentPaddingBottom : 0,
           published: new Date().toISOString(),
         };
         await env.REELS.put(`page_${slug}`, JSON.stringify(published));

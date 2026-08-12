@@ -7,6 +7,12 @@
 // hand-duplicating js/player.js's render logic) this is designed to avoid
 // repeating for page-level styling too.
 //
+// Also sets the content column's own overlay tint (--page-content-overlay,
+// read by .page-blocks-list/.page-status-message in css/page.css) - a
+// second, independent effect that happens to live in this same function
+// since it's set on the same scopeEl at the same call site, not because
+// it's related to the background image/parallax mechanics below.
+//
 // "Fixed" and "scroll with parallax" are the same code path with a
 // different multiplier, not two separate implementations (no
 // position:fixed/background-attachment:fixed anywhere - that wouldn't work
@@ -19,6 +25,8 @@
 //     the-page motion, so it reads as pinned regardless of scroll depth.
 //   - factor <1 ("scroll") lets it still move, just slower than the
 //     foreground, producing drift.
+import { colorToRgba } from "./colorUtils.js";
+
 const FIXED_FACTOR = 1;
 const PARALLAX_FACTOR = 0.4;
 const EDGE_BUFFER = 40; // px - oversize beyond computed height, hides blur's own edge softening
@@ -44,7 +52,9 @@ function getContentHeight(scopeEl, scrollSource) {
  *   already) - document.body for page.html, #pagePreviewPane for the
  *   builder preview.
  * @param {Object} page - backgroundImageEnabled, backgroundImage,
- *   backgroundBlur (px), backgroundParallaxMode ("fixed"|"scroll")
+ *   backgroundBlur (px), backgroundParallaxMode ("fixed"|"scroll"),
+ *   contentOverlayColor (hex), contentOverlayOpacity (0-100),
+ *   contentMaxWidth (px), contentPaddingTop (px), contentPaddingBottom (px)
  * @param {Window|HTMLElement} scrollSource - window for page.html, the
  *   scrollable preview pane element for the builder (its own internal
  *   scroll, not the window's)
@@ -56,6 +66,17 @@ function getContentHeight(scopeEl, scrollSource) {
  *   persistent element like the preview pane, not the wiped content).
  */
 export function applyPageBackground(scopeEl, page, scrollSource) {
+  // Independent of backgroundImageEnabled below - the content overlay and
+  // layout properties all work (and default to their normal/invisible
+  // values) whether or not a background image is on.
+  scopeEl.style.setProperty(
+    "--page-content-overlay",
+    colorToRgba(page.contentOverlayColor || "#000000", (page.contentOverlayOpacity ?? 0) / 100)
+  );
+  scopeEl.style.setProperty("--page-content-max-width", `${page.contentMaxWidth ?? 900}px`);
+  scopeEl.style.setProperty("--page-content-padding-top", `${page.contentPaddingTop ?? 0}px`);
+  scopeEl.style.setProperty("--page-content-padding-bottom", `${page.contentPaddingBottom ?? 0}px`);
+
   if (!page.backgroundImageEnabled || !page.backgroundImage) {
     return () => {};
   }

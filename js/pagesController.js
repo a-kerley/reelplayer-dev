@@ -33,6 +33,11 @@ function createEmptyPage() {
     backgroundImage: "",
     backgroundBlur: 12,
     backgroundParallaxMode: "fixed",
+    contentOverlayColor: "#000000",
+    contentOverlayOpacity: 0,
+    contentMaxWidth: 900,
+    contentPaddingTop: 0,
+    contentPaddingBottom: 0,
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -274,6 +279,112 @@ export function initPagesController() {
       });
       blurSlot.appendChild(row);
     }
+
+    const overlayColorInput = document.getElementById("pageContentOverlayColor");
+    if (overlayColorInput) {
+      overlayColorInput.value = page.contentOverlayColor || "#000000";
+      overlayColorInput.addEventListener("input", () => {
+        page.contentOverlayColor = overlayColorInput.value;
+      });
+      overlayColorInput.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+    }
+
+    const overlayOpacitySlot = document.getElementById("pageContentOverlayOpacitySlot");
+    if (overlayOpacitySlot) {
+      overlayOpacitySlot.innerHTML = "";
+      const { row, input: opacityInput } = createValueControl({
+        id: "pageContentOverlayOpacity",
+        label: "Opacity (%):",
+        value: page.contentOverlayOpacity ?? 0,
+        min: 0,
+        max: 100,
+        step: 1,
+        unit: "%",
+      });
+      opacityInput.addEventListener("input", () => {
+        const val = parseInt(opacityInput.value, 10);
+        if (!isNaN(val)) page.contentOverlayOpacity = val;
+      });
+      opacityInput.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      overlayOpacitySlot.appendChild(row);
+    }
+  }
+
+  // Page-level layout (content column max-width + top/bottom padding) -
+  // same shared applyPageBackground() call in renderPagePreview()/page.html
+  // renders these (as CSS custom properties css/page.css reads), so this
+  // function only needs to own the form controls, same wiring pattern as
+  // setupBackgroundControls() above.
+  function setupLayoutControls(page) {
+    const maxWidthSlot = document.getElementById("pageContentMaxWidthSlot");
+    if (maxWidthSlot) {
+      maxWidthSlot.innerHTML = "";
+      const { row, input } = createValueControl({
+        id: "pageContentMaxWidth",
+        label: "Max Width (px):",
+        value: page.contentMaxWidth ?? 900,
+        min: 400,
+        max: 1600,
+        step: 10,
+        unit: "px",
+      });
+      input.addEventListener("input", () => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) page.contentMaxWidth = val;
+      });
+      input.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      maxWidthSlot.appendChild(row);
+    }
+
+    const paddingTopSlot = document.getElementById("pageContentPaddingTopSlot");
+    if (paddingTopSlot) {
+      paddingTopSlot.innerHTML = "";
+      const { row, input } = createValueControl({
+        id: "pageContentPaddingTop",
+        label: "Padding Top (px):",
+        value: page.contentPaddingTop ?? 0,
+        min: 0,
+        max: 300,
+        step: 5,
+        unit: "px",
+      });
+      input.addEventListener("input", () => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) page.contentPaddingTop = val;
+      });
+      input.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      paddingTopSlot.appendChild(row);
+    }
+
+    const paddingBottomSlot = document.getElementById("pageContentPaddingBottomSlot");
+    if (paddingBottomSlot) {
+      paddingBottomSlot.innerHTML = "";
+      const { row, input } = createValueControl({
+        id: "pageContentPaddingBottom",
+        label: "Padding Bottom (px):",
+        value: page.contentPaddingBottom ?? 0,
+        min: 0,
+        max: 300,
+        step: 5,
+        unit: "px",
+      });
+      input.addEventListener("input", () => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) page.contentPaddingBottom = val;
+      });
+      input.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      paddingBottomSlot.appendChild(row);
+    }
   }
 
   async function handlePublish(page) {
@@ -367,6 +478,20 @@ export function initPagesController() {
             </select>
           </div>
           <div id="pageBackgroundBlurSlot" style="margin-top:1rem;"></div>
+          <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid #444;">
+            <div style="font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;font-size:0.95rem;">Content Background</div>
+            <div class="color-row" style="margin-bottom:1rem;">
+              <span>Color:</span>
+              <input type="color" id="pageContentOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+            </div>
+            <div id="pageContentOverlayOpacitySlot"></div>
+          </div>
+        </fieldset>
+        <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
+          <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Page Layout</legend>
+          <div id="pageContentMaxWidthSlot"></div>
+          <div id="pageContentPaddingTopSlot" style="margin-top:1rem;"></div>
+          <div id="pageContentPaddingBottomSlot" style="margin-top:1rem;"></div>
         </fieldset>
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
@@ -395,6 +520,7 @@ export function initPagesController() {
     setupPageManagerButton(() => page);
     setupAnalyticsControls(page);
     setupBackgroundControls(page);
+    setupLayoutControls(page);
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);

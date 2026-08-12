@@ -27,6 +27,11 @@ export function contentFingerprint(page) {
     backgroundImage: page.backgroundImage,
     backgroundBlur: page.backgroundBlur,
     backgroundParallaxMode: page.backgroundParallaxMode,
+    contentOverlayColor: page.contentOverlayColor,
+    contentOverlayOpacity: page.contentOverlayOpacity,
+    contentMaxWidth: page.contentMaxWidth,
+    contentPaddingTop: page.contentPaddingTop,
+    contentPaddingBottom: page.contentPaddingBottom,
   });
 }
 
@@ -81,6 +86,11 @@ export async function publishPage(page, slug) {
       backgroundImage: page.backgroundImage || "",
       backgroundBlur: typeof page.backgroundBlur === "number" ? page.backgroundBlur : 12,
       backgroundParallaxMode: page.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
+      contentOverlayColor: page.contentOverlayColor || "#000000",
+      contentOverlayOpacity: typeof page.contentOverlayOpacity === "number" ? page.contentOverlayOpacity : 0,
+      contentMaxWidth: typeof page.contentMaxWidth === "number" ? page.contentMaxWidth : 900,
+      contentPaddingTop: typeof page.contentPaddingTop === "number" ? page.contentPaddingTop : 0,
+      contentPaddingBottom: typeof page.contentPaddingBottom === "number" ? page.contentPaddingBottom : 0,
     }),
   });
 

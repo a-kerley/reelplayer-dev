@@ -128,11 +128,13 @@ curl -X DELETE http://localhost:8787/drafts/pages/test123 -H "Authorization: Bea
 
 # Publish (password-gated) - id/slug required, previousSlug only when renaming.
 # analyticsEnabled/backgroundImageEnabled/backgroundImage/backgroundBlur/
-# backgroundParallaxMode are all optional, defaulting to off/empty/12/"fixed".
+# backgroundParallaxMode/contentOverlayColor/contentOverlayOpacity/
+# contentMaxWidth/contentPaddingTop/contentPaddingBottom are all optional,
+# defaulting to off/empty/12/"fixed"/"#000000"/0/900/0/0.
 curl -X POST http://localhost:8787/pages/my-page-slug \
   -H "Authorization: Bearer YOUR_PASSWORD" \
   -H "Content-Type: application/json" \
-  -d '{"id":"test123","slug":"my-page-slug","title":"Test Page","blocks":[],"backgroundImageEnabled":true,"backgroundImage":"https://media.boxedape.com/images/page-backgrounds/example.jpg","backgroundBlur":12,"backgroundParallaxMode":"fixed"}'
+  -d '{"id":"test123","slug":"my-page-slug","title":"Test Page","blocks":[],"backgroundImageEnabled":true,"backgroundImage":"https://media.boxedape.com/images/page-backgrounds/example.jpg","backgroundBlur":12,"backgroundParallaxMode":"fixed","contentOverlayColor":"#000000","contentOverlayOpacity":40}'
 
 # Fetch the published page (public, no auth needed - this is what page.html fetches)
 curl http://localhost:8787/pages/my-page-slug

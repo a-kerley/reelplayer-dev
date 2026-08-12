@@ -22,6 +22,11 @@ function normalizePage(page) {
   if (page.backgroundImage === undefined) page.backgroundImage = "";
   if (page.backgroundBlur === undefined) page.backgroundBlur = 12;
   if (page.backgroundParallaxMode === undefined) page.backgroundParallaxMode = "fixed";
+  if (page.contentOverlayColor === undefined) page.contentOverlayColor = "#000000";
+  if (page.contentOverlayOpacity === undefined) page.contentOverlayOpacity = 0;
+  if (page.contentMaxWidth === undefined) page.contentMaxWidth = 900;
+  if (page.contentPaddingTop === undefined) page.contentPaddingTop = 0;
+  if (page.contentPaddingBottom === undefined) page.contentPaddingBottom = 0;
   return page;
 }
 

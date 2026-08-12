@@ -48,8 +48,10 @@ body.page-body {
 }
 
 .page-blocks-list {
-  max-width: 900px;
+  max-width: var(--page-content-max-width, 900px);
   margin: 0 auto;
+  padding-top: var(--page-content-padding-top, 0px);
+  padding-bottom: var(--page-content-padding-bottom, 0px);
   /* Without an explicit position, this (static, in-flow) content would
      paint BEHIND .page-background-layer regardless of DOM order - CSS
      stacking rules paint positioned descendants with z-index:auto as their
@@ -60,6 +62,13 @@ body.page-body {
      order - the background layer is always inserted as the first child -
      correctly decide the order within that shared group instead. */
   position: relative;
+  /* Content-column tint (js/modules/pageBackground.js sets this custom
+     property on the outer scopeEl - document.body/the preview pane - and
+     it inherits down to here) - lets a background image show unobstructed
+     outside this column's own max-width while the column itself gets a
+     readable tint over it. transparent by default (opacity 0), so this is
+     a no-op until the builder's Content Background controls raise it. */
+  background-color: var(--page-content-overlay, transparent);
 }
 
 .page-block {
@@ -145,11 +154,12 @@ body.page-body {
    empty state (both page.html and the builder's own preview pane, via
    js/pagesController.js's renderPagePreview()). */
 .page-status-message {
-  max-width: 900px;
+  max-width: var(--page-content-max-width, 900px);
   margin: 3rem auto;
   padding: 2rem;
   text-align: center;
   color: var(--page-text-muted);
   font-size: 0.95rem;
   position: relative; /* see .page-blocks-list's comment - same reason */
+  background-color: var(--page-content-overlay, transparent); /* see .page-blocks-list's comment - same reason */
 }
