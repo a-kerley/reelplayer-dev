@@ -103,7 +103,12 @@ function renderPlayer(block) {
   iframe.src = `player?id=${block.reelId}`;
   iframe.width = "100%";
   iframe.height = String(height);
-  iframe.style.cssText = `display:block;border:none;min-height:${height}px;transition:height 0.3s ease;`;
+  // No min-height here - min-height is a floor, and pinning it to the
+  // starting-height guess would stop the iframe ever shrinking below it
+  // once a real (possibly smaller, e.g. an expandable reel's collapsed
+  // height) size arrives via postMessage below. The height attribute
+  // above already prevents a zero-height flash before that first message.
+  iframe.style.cssText = `display:block;border:none;transition:height 0.3s ease;`;
   iframe.setAttribute("frameborder", "0");
   wrapper.appendChild(iframe);
 
