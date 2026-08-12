@@ -41,24 +41,42 @@ async function deletePublishedPage(slug, password) {
   }
 }
 
+const BADGE_STYLE = "display:inline-block;background:#1e1e1e;border:1px solid #444;border-radius:4px;padding:0.15em 0.55em;font-size:0.75rem;color:#999;";
+
 // currentSlug - the publishedSlug of the page currently open in the
 // builder, if any (js/pagesController.js's handlePublish() sets this on
 // publish) - marks that one row so "which of these is the one I'm looking
 // at right now" doesn't require cross-referencing slugs by eye.
 function renderListHTML(entries, currentSlug) {
+  // Mirrors embedManager.js's identical note - KV writes aren't instantly
+  // consistent across every edge location, so a page published moments ago
+  // can briefly be missing from this list even though the publish itself
+  // succeeded.
+  const lagNotice = `<p style="font-size:0.8rem;color:#888;margin:0 0 1rem;">Just published something? It can take a few seconds to show up here - reopen this dialog if you don't see it yet.</p>`;
+
   if (!entries.length) {
-    return '<p class="builder-empty-state">No published pages yet.</p>';
+    return lagNotice + '<p class="builder-empty-state">No published pages yet.</p>';
   }
 
-  return `
-    <div style="max-height:300px;overflow-y:auto;">
+  const rows = `
+    <div style="max-height:420px;overflow-y:auto;">
       ${entries.map(entry => {
         const isCurrent = currentSlug && entry.slug === currentSlug;
+        const analyticsBadge = entry.analyticsEnabled
+          ? `<span style="${BADGE_STYLE}color:var(--builder-accent);border-color:var(--builder-accent);">Analytics on</span>`
+          : `<span style="${BADGE_STYLE}">Analytics off</span>`;
+        const dateBadge = entry.published
+          ? `<span style="${BADGE_STYLE}">Published ${new Date(entry.published).toLocaleString()}</span>`
+          : "";
+        const slugBadge = `<span style="${BADGE_STYLE}font-family:monospace;">/page?slug=${entry.slug}</span>`;
+
         return `
-        <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;gap:0.5rem;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
-          <div style="min-width:0;">
-            <div style="font-weight:600;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
-            <div style="font-size:0.8rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/page?slug=${entry.slug}${entry.published ? " &middot; " + new Date(entry.published).toLocaleString() : ""}</div>
+        <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid #444;gap:1rem;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
+          <div style="min-width:0;flex:1;">
+            <div style="font-weight:600;font-size:0.95rem;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
+            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.4rem;">
+              ${dateBadge}${analyticsBadge}${slugBadge}
+            </div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
             <button type="button" class="page-manager-stats-btn" data-slug="${entry.slug}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
@@ -73,6 +91,8 @@ function renderListHTML(entries, currentSlug) {
       }).join("")}
     </div>
   `;
+
+  return lagNotice + rows;
 }
 
 async function openPageManager(getCurrentPage) {
@@ -93,6 +113,7 @@ async function openPageManager(getCurrentPage) {
     type: "custom",
     message: "Published Pages",
     content: renderListHTML(entries, currentSlug),
+    maxWidth: "640px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
     ]

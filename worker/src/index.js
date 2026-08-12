@@ -200,7 +200,9 @@ export default {
 
       // Explicit "reel_" prefix (not "") so this never picks up draft_/
       // page_/draft_page_ keys sharing the same REELS namespace.
-      const entries = await listEntries(env, "reel_", (r) => ({ id: r.id, title: r.title, created: r.created }));
+      const entries = await listEntries(env, "reel_", (r) => ({
+        id: r.id, title: r.title, created: r.created, analyticsEnabled: r.analyticsEnabled === true,
+      }));
       return jsonResponse(entries);
     }
 
@@ -335,7 +337,7 @@ export default {
       if (authError) return authError;
 
       const entries = await listEntries(env, "page_", (p) => ({
-        id: p.id, slug: p.slug, title: p.title, published: p.published,
+        id: p.id, slug: p.slug, title: p.title, published: p.published, analyticsEnabled: p.analyticsEnabled === true,
       }));
       return jsonResponse(entries);
     }
