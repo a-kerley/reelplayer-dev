@@ -16,7 +16,8 @@ const R2_PREFIX_MAP = {
   'assets/images/project-titles': 'images/project-titles/',
   'assets/video': 'video/',
   'assets/images/page-banners': 'images/page-banners/',
-  'assets/images/page-blocks': 'images/page-blocks/'
+  'assets/images/page-blocks': 'images/page-blocks/',
+  'assets/images/page-backgrounds': 'images/page-backgrounds/'
 };
 
 function createModalOverlay() {

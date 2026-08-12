@@ -29,9 +29,37 @@ body.page-body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
+/* Page-level background image (js/modules/pageBackground.js). Inserted as
+   the FIRST child of its positioning container (document.body for
+   page.html, #pagePreviewPane for the builder's own live preview) and left
+   at the default z-index:auto - painting order among same-stacking-level
+   elements follows DOM order, so being first is what keeps this behind the
+   actual content, no z-index trickery (and the stacking-context edge cases
+   that come with it) needed. position/top/left/right/height/transform are
+   all set inline by pageBackground.js (height and the scroll-driven
+   transform are computed, not static); this class only carries what's
+   static across every page. */
+.page-background-layer {
+  position: absolute;
+  pointer-events: none;
+  background-size: cover;
+  background-position: center;
+  background-repeat: no-repeat;
+}
+
 .page-blocks-list {
   max-width: 900px;
   margin: 0 auto;
+  /* Without an explicit position, this (static, in-flow) content would
+     paint BEHIND .page-background-layer regardless of DOM order - CSS
+     stacking rules paint positioned descendants with z-index:auto as their
+     own group, always after non-positioned in-flow descendants, no matter
+     which comes first in the DOM. Being position:relative here (with no
+     z-index set, so no new stacking context or explicit layering, just
+     enough to join the same paint group as the background layer) lets DOM
+     order - the background layer is always inserted as the first child -
+     correctly decide the order within that shared group instead. */
+  position: relative;
 }
 
 .page-block {
@@ -113,9 +141,9 @@ body.page-body {
   border-radius: 8px;
 }
 
-/* page.html-only: the top-level loading/error states before/if blocks
-   never render - the builder's own preview pane never shows these, since
-   it always has a page object in hand already. */
+/* Top-level loading/error states (page.html) and the "no content yet"
+   empty state (both page.html and the builder's own preview pane, via
+   js/pagesController.js's renderPagePreview()). */
 .page-status-message {
   max-width: 900px;
   margin: 3rem auto;
@@ -123,4 +151,5 @@ body.page-body {
   text-align: center;
   color: var(--page-text-muted);
   font-size: 0.95rem;
+  position: relative; /* see .page-blocks-list's comment - same reason */
 }

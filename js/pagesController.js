@@ -18,7 +18,9 @@ import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
 import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
-import { createToggleSwitch } from "./modules/domUtils.js";
+import { createToggleSwitch, createUrlInputRow } from "./modules/domUtils.js";
+import { createValueControl } from "./modules/valueControl.js";
+import { applyPageBackground } from "./modules/pageBackground.js";
 
 function createEmptyPage() {
   return {
@@ -27,6 +29,10 @@ function createEmptyPage() {
     publishedSlug: null,
     publishedContentHash: null,
     analyticsEnabled: false,
+    backgroundImageEnabled: false,
+    backgroundImage: "",
+    backgroundBlur: 12,
+    backgroundParallaxMode: "fixed",
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -37,6 +43,12 @@ export function initPagesController() {
   let pages = [];
   let currentPageId = null;
   let loaded = false;
+  // Teardown for the previously-applied background layer (see
+  // js/modules/pageBackground.js) - must run before every re-render of the
+  // preview pane, since #pagePreviewPane is a persistent element whose
+  // scroll listener wouldn't otherwise be cleaned up just by innerHTML=""
+  // wiping its (wiped) children.
+  let backgroundCleanup = () => {};
 
   const loadingOverlay = document.getElementById("builderLoadingOverlay");
   const loadingContent = document.getElementById("builderLoadingContent");
@@ -121,16 +133,22 @@ export function initPagesController() {
   // not per-keystroke.
   function renderPagePreview(page) {
     if (!pagePreviewPane) return;
+    backgroundCleanup();
+
     const blocks = Array.isArray(page.blocks) ? page.blocks : [];
     if (!blocks.length) {
       pagePreviewPane.innerHTML = `<p class="page-status-message">This page has no content yet.</p>`;
-      return;
+    } else {
+      const list = document.createElement("div");
+      list.className = "page-blocks-list";
+      blocks.forEach((block) => list.appendChild(renderBlock(block)));
+      pagePreviewPane.innerHTML = "";
+      pagePreviewPane.appendChild(list);
     }
-    const list = document.createElement("div");
-    list.className = "page-blocks-list";
-    blocks.forEach((block) => list.appendChild(renderBlock(block)));
-    pagePreviewPane.innerHTML = "";
-    pagePreviewPane.appendChild(list);
+
+    // #pagePreviewPane is its own scroll container (not the window) - see
+    // js/modules/pageBackground.js's scrollSource param.
+    backgroundCleanup = applyPageBackground(pagePreviewPane, page, pagePreviewPane);
   }
 
   // Mirrors js/main.js's updateReelPublishStatus() - a page has no content-
@@ -180,6 +198,81 @@ export function initPagesController() {
           updateCurrentPage();
         },
       }));
+    }
+  }
+
+  // Page-level background image (blur + parallax) - see
+  // js/modules/pageBackground.js for the shared render function this
+  // config drives (used identically by renderPagePreview() below and
+  // page.html). Reuses the same toggle/url-picker/slider components the
+  // analytics toggle and the banner-image block already use.
+  function setupBackgroundControls(page) {
+    const toggleSlot = document.getElementById("pageBackgroundToggleSlot");
+    if (toggleSlot) {
+      toggleSlot.innerHTML = "";
+      toggleSlot.appendChild(createToggleSwitch({
+        id: "pageBackgroundEnabled",
+        checked: !!page.backgroundImageEnabled,
+        onChange: (e) => {
+          page.backgroundImageEnabled = e.target.checked;
+          updateCurrentPage();
+        },
+      }));
+    }
+
+    const urlSlot = document.getElementById("pageBackgroundUrlRowSlot");
+    if (urlSlot) {
+      urlSlot.innerHTML = "";
+      const { row, input } = createUrlInputRow({
+        id: "pageBackgroundImage",
+        label: "Image:",
+        value: page.backgroundImage || "",
+        placeholder: "Paste an image URL or select from Media Library",
+        pickerOptions: {
+          directory: "assets/images/page-backgrounds",
+          extensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
+          title: "Select Background Image",
+        },
+      });
+      input.addEventListener("input", () => {
+        page.backgroundImage = input.value;
+        updateCurrentPage(); // picking via the file browser only fires "input", never "blur"
+      });
+      input.addEventListener("blur", () => {
+        updateCurrentPage();
+      });
+      urlSlot.appendChild(row);
+    }
+
+    const modeSelect = document.getElementById("pageBackgroundParallaxMode");
+    if (modeSelect) {
+      modeSelect.value = page.backgroundParallaxMode === "scroll" ? "scroll" : "fixed";
+      modeSelect.onchange = () => {
+        page.backgroundParallaxMode = modeSelect.value;
+        updateCurrentPage();
+      };
+    }
+
+    const blurSlot = document.getElementById("pageBackgroundBlurSlot");
+    if (blurSlot) {
+      blurSlot.innerHTML = "";
+      const { row, input: blurInput } = createValueControl({
+        id: "pageBackgroundBlur",
+        label: "Blur (px):",
+        value: page.backgroundBlur ?? 12,
+        min: 0,
+        max: 60,
+        step: 1,
+        unit: "px",
+      });
+      blurInput.addEventListener("input", () => {
+        const val = parseInt(blurInput.value, 10);
+        if (!isNaN(val)) page.backgroundBlur = val;
+      });
+      blurInput.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      blurSlot.appendChild(row);
     }
   }
 
@@ -259,6 +352,22 @@ export function initPagesController() {
           <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
         </div>
+        <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
+          <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Background Image</legend>
+          <div class="color-row" style="margin-bottom:1rem;">
+            <label for="pageBackgroundEnabled" style="cursor:pointer;">Enable</label>
+            <span id="pageBackgroundToggleSlot"></span>
+          </div>
+          <div id="pageBackgroundUrlRowSlot"></div>
+          <div class="color-row" style="margin-top:1rem;">
+            <span>Scroll behavior:</span>
+            <select id="pageBackgroundParallaxMode" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
+              <option value="fixed">Fixed</option>
+              <option value="scroll">Scroll (parallax)</option>
+            </select>
+          </div>
+          <div id="pageBackgroundBlurSlot" style="margin-top:1rem;"></div>
+        </fieldset>
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
     `;
@@ -285,6 +394,7 @@ export function initPagesController() {
     updatePublishStatus(page);
     setupPageManagerButton(() => page);
     setupAnalyticsControls(page);
+    setupBackgroundControls(page);
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);
@@ -300,6 +410,8 @@ export function initPagesController() {
         pageEditorPane.innerHTML = `<p class="builder-empty-state">No pages yet. Click "+ New Page" to create one.</p>`;
       }
       if (pagePreviewPane) {
+        backgroundCleanup();
+        backgroundCleanup = () => {};
         pagePreviewPane.innerHTML = "";
       }
       return;

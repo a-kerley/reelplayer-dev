@@ -126,11 +126,13 @@ curl http://localhost:8787/drafts/pages -H "Authorization: Bearer YOUR_PASSWORD"
 # Delete a page draft (password-gated)
 curl -X DELETE http://localhost:8787/drafts/pages/test123 -H "Authorization: Bearer YOUR_PASSWORD"
 
-# Publish (password-gated) - id/slug required, previousSlug only when renaming
+# Publish (password-gated) - id/slug required, previousSlug only when renaming.
+# analyticsEnabled/backgroundImageEnabled/backgroundImage/backgroundBlur/
+# backgroundParallaxMode are all optional, defaulting to off/empty/12/"fixed".
 curl -X POST http://localhost:8787/pages/my-page-slug \
   -H "Authorization: Bearer YOUR_PASSWORD" \
   -H "Content-Type: application/json" \
-  -d '{"id":"test123","slug":"my-page-slug","title":"Test Page","blocks":[]}'
+  -d '{"id":"test123","slug":"my-page-slug","title":"Test Page","blocks":[],"backgroundImageEnabled":true,"backgroundImage":"https://media.boxedape.com/images/page-backgrounds/example.jpg","backgroundBlur":12,"backgroundParallaxMode":"fixed"}'
 
 # Fetch the published page (public, no auth needed - this is what page.html fetches)
 curl http://localhost:8787/pages/my-page-slug

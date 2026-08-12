@@ -30,6 +30,7 @@
     import { WORKER_BASE_URL } from './js/config.js';
     import { renderBlock } from './js/modules/pageBlockRenderer.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
+    import { applyPageBackground } from './js/modules/pageBackground.js';
 
     const root = document.getElementById('pageRoot');
 
@@ -88,6 +89,12 @@
       if (pageData.analyticsEnabled === true) {
         sendStatBeacon('page', slug, { event: 'view', sessionId: createSessionId() });
       }
+
+      // scrollSource is `window` here (the real, standalone page) - see
+      // js/modules/pageBackground.js's header comment for why the builder's
+      // own live preview passes its own scrollable pane instead, and why
+      // both call the exact same function rather than two implementations.
+      applyPageBackground(document.body, pageData, window);
 
       renderPage(pageData);
     }

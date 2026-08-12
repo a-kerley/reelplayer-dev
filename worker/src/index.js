@@ -19,7 +19,9 @@
 //   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt} for every draft
 //   DELETE /drafts/:id        - password-gated, removes the entry
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
-//   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks}; 409
+//   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
+//                               analyticsEnabled?, backgroundImageEnabled?, backgroundImage?,
+//                               backgroundBlur?, backgroundParallaxMode?}; 409
 //                               if `slug` is already used by a different page's `id`. Deletes the
 //                               `previousSlug` entry first if renaming, so old slugs don't linger.
 //   GET    /pages             - password-gated, lists {id, slug, title, published} for every page
@@ -395,6 +397,10 @@ export default {
           title: body.title || "",
           blocks: Array.isArray(body.blocks) ? body.blocks : [],
           analyticsEnabled: body.analyticsEnabled === true,
+          backgroundImageEnabled: body.backgroundImageEnabled === true,
+          backgroundImage: typeof body.backgroundImage === "string" ? body.backgroundImage : "",
+          backgroundBlur: typeof body.backgroundBlur === "number" ? body.backgroundBlur : 12,
+          backgroundParallaxMode: body.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
           published: new Date().toISOString(),
         };
         await env.REELS.put(`page_${slug}`, JSON.stringify(published));

@@ -17,6 +17,11 @@ function normalizePage(page) {
   // to the "stale" (unpublished changes) state rather than false-reporting
   // "up to date" for a page it actually has no basis to compare.
   if (page.publishedContentHash === undefined) page.publishedContentHash = null;
+  if (page.analyticsEnabled === undefined) page.analyticsEnabled = false;
+  if (page.backgroundImageEnabled === undefined) page.backgroundImageEnabled = false;
+  if (page.backgroundImage === undefined) page.backgroundImage = "";
+  if (page.backgroundBlur === undefined) page.backgroundBlur = 12;
+  if (page.backgroundParallaxMode === undefined) page.backgroundParallaxMode = "fixed";
   return page;
 }
 

@@ -20,7 +20,14 @@ const SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
  * id (itself a content hash, see embedExporter.js) already doubles as that
  * signal for Reels. */
 export function contentFingerprint(page) {
-  return hashContent({ title: page.title, blocks: page.blocks });
+  return hashContent({
+    title: page.title,
+    blocks: page.blocks,
+    backgroundImageEnabled: page.backgroundImageEnabled,
+    backgroundImage: page.backgroundImage,
+    backgroundBlur: page.backgroundBlur,
+    backgroundParallaxMode: page.backgroundParallaxMode,
+  });
 }
 
 /** Lowercases, replaces anything not alphanumeric/hyphen with a hyphen, trims/collapses repeats. */
@@ -70,6 +77,10 @@ export async function publishPage(page, slug) {
       title: page.title || "",
       blocks: page.blocks || [],
       analyticsEnabled: page.analyticsEnabled === true,
+      backgroundImageEnabled: page.backgroundImageEnabled === true,
+      backgroundImage: page.backgroundImage || "",
+      backgroundBlur: typeof page.backgroundBlur === "number" ? page.backgroundBlur : 12,
+      backgroundParallaxMode: page.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
     }),
   });
 
