@@ -8,6 +8,7 @@ import { renderSidebar } from "./sidebar.js";
 import { renderBuilder, createEmptyReel } from "./builder.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
+import { showToast } from "./modules/toast.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
 import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
@@ -79,6 +80,36 @@ document.addEventListener("DOMContentLoaded", async () => {
       }[status] || "";
       el.textContent = text;
       el.dataset.status = status;
+    }
+
+    // A reel's embed id is a content hash (embedExporter.generateReelId) -
+    // deterministic, so comparing a fresh hash of the current draft against
+    // the id actually published last time (reel.publishedEmbedId, set in
+    // exportEmbedCode() below) tells us whether the live embed matches the
+    // draft, with no separate diffing mechanism needed. This is the Reels
+    // equivalent of js/pagesController.js's updatePublishStatus() - Pages
+    // already had this distinction (Live / Not yet published / stale);
+    // Reels previously had nothing, so "Export Embed Code" gave no sense of
+    // whether the click even needed to happen.
+    function updateReelPublishStatus(reel) {
+      const statusEl = document.getElementById("reelPublishStatus");
+      if (!statusEl || !reel) return;
+
+      if (!reel.publishedEmbedId) {
+        statusEl.textContent = "Not yet published.";
+        statusEl.dataset.status = "unpublished";
+        return;
+      }
+
+      const currentId = embedExporter.generateReelId(reel);
+      if (currentId === reel.publishedEmbedId) {
+        const when = reel.publishedAt ? ` (${new Date(reel.publishedAt).toLocaleString()})` : "";
+        statusEl.textContent = `Published${when}.`;
+        statusEl.dataset.status = "published";
+      } else {
+        statusEl.textContent = "⚠ Unpublished changes - re-export to update the live embed.";
+        statusEl.dataset.status = "stale";
+      }
     }
 
     // Initialize preview manager
@@ -222,6 +253,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
+      updateReelPublishStatus(reels.find((r) => r.id === currentId));
       // Don't re-render builder here - it destroys form elements and causes issues
       // Preview refresh is debounced so rapid field commits (e.g. tabbing
       // through several fields) don't rebuild the player on every blur.
@@ -261,7 +293,8 @@ document.addEventListener("DOMContentLoaded", async () => {
       renderBuilder(current, updateCurrentReel);
       setupRefreshPreviewButton();
       setupExportEmbedButton();
-      setupEmbedManagerButton();
+      setupEmbedManagerButton(() => reels.find((r) => r.id === currentId));
+      updateReelPublishStatus(current);
       // showPreview(); // preview is only refreshed via button now
       showPreview();
     }
@@ -287,100 +320,112 @@ document.addEventListener("DOMContentLoaded", async () => {
         return;
       }
 
+      const btn = document.getElementById("exportEmbedBtn");
+      const originalLabel = btn ? btn.textContent : "";
+      if (btn) {
+        btn.disabled = true;
+        btn.textContent = "Publishing…";
+      }
+
+      let embedOptions;
       try {
-        const embedOptions = await embedExporter.generateEmbedOptions(current);
-
-        dialog.createDialog({
-          type: 'custom',
-          maxWidth: '600px',
-          message: "Your embed code is ready!",
-          content: `
-            <div style="margin-bottom: 1.5rem;">
-              <h3 style="color: var(--builder-accent); margin: 0 0 1rem 0; font-size: 1.1rem;">🎯 iframe Embed Code</h3>
-              
-              <div style="background: #1e1e1e; color: #ccc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
-                <strong style="color:#fff;">Perfect for:</strong> Squarespace, WordPress, Wix, and most website platforms. Ultra-concise 3-line embed code that inherits all your styling automatically.
-              </div>
-
-              <textarea id="embedCodeArea" readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #444; border-radius: 4px; resize: vertical; background: #1e1e1e; color: #fff;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
-            </div>
-          `,
-          buttons: [
-            {
-              text: "Copy to Clipboard",
-              type: "primary",
-              onClick: () => {
-                const textarea = document.getElementById('embedCodeArea');
-                const currentCode = textarea.value;
-                navigator.clipboard.writeText(currentCode).then(() => {
-                  dialog.closeDialog();
-                  setTimeout(() => {
-                    dialog.alert("Embed code copied to clipboard!");
-                  }, 200);
-                }).catch(() => {
-                  dialog.closeDialog();
-                  setTimeout(() => {
-                    dialog.alert("Failed to copy to clipboard. Please manually select and copy the code.");
-                  }, 200);
-                });
-              }
-            },
-            {
-              text: "Download HTML",
-              type: "secondary",
-              onClick: () => {
-                try {
-                  const textarea = document.getElementById('embedCodeArea');
-                  const currentCode = textarea.value;
-                  const blob = new Blob([currentCode], { type: 'text/html' });
-                  const url = URL.createObjectURL(blob);
-                  const a = document.createElement('a');
-                  a.href = url;
-                  a.download = `${(current.title || 'reel').replace(/[^a-zA-Z0-9]/g, '_')}_iframe.html`;
-                  document.body.appendChild(a);
-                  a.click();
-                  document.body.removeChild(a);
-                  URL.revokeObjectURL(url);
-                  dialog.closeDialog();
-                } catch (error) {
-                  console.error('Download failed:', error);
-                  dialog.closeDialog();
-                  setTimeout(() => {
-                    dialog.alert("Download failed. Please try copying to clipboard instead.");
-                  }, 200);
-                }
-              }
-            },
-            {
-              // Dev-only convenience - opens the GitHub Pages embed-testing
-              // harness (testHTMLpages/embed-test-live.html) and copies the
-              // code to the clipboard first, so the flow is just "paste".
-              // Update this URL if that test page ever moves.
-              text: "Test Embed ↗",
-              type: "secondary",
-              onClick: () => {
-                const textarea = document.getElementById('embedCodeArea');
-                const currentCode = textarea.value;
-                navigator.clipboard.writeText(currentCode).catch(() => {
-                  // Clipboard write failing isn't fatal - the code is still
-                  // visible/selectable in the textarea for a manual copy.
-                });
-                window.open('https://a-kerley.github.io/reelplayer-dev/testHTMLpages/embed-test-live.html', '_blank');
-              }
-            },
-            {
-              text: "Close",
-              type: "secondary",
-              onClick: () => {
-                dialog.closeDialog();
-              }
-            }
-          ]
-        });
-
+        embedOptions = await embedExporter.generateEmbedOptions(current);
       } catch (error) {
         dialog.alert(`Export Error: ${error.message}`);
+        return;
+      } finally {
+        if (btn) {
+          btn.disabled = false;
+          btn.textContent = originalLabel;
+        }
       }
+
+      // The click just made a real, live change - the reel is published
+      // (or re-published) at this exact id right now. Record that so
+      // updateReelPublishStatus() can tell "published and matches this
+      // draft" apart from "draft has changed since the last publish".
+      current.publishedEmbedId = embedOptions.reelId;
+      current.publishedAt = new Date().toISOString();
+      saveReels(reels);
+      updateReelPublishStatus(current);
+
+      dialog.createDialog({
+        type: 'custom',
+        maxWidth: '600px',
+        message: "Published! Your embed code is ready.",
+        content: `
+          <div style="margin-bottom: 1.5rem;">
+            <h3 style="color: var(--builder-accent); margin: 0 0 1rem 0; font-size: 1.1rem;">🎯 iframe Embed Code</h3>
+
+            <div style="background: #1e1e1e; color: #ccc; padding: 1rem; border-radius: 6px; margin-bottom: 1rem; font-size: 0.9rem;">
+              <strong style="color:#fff;">Perfect for:</strong> Squarespace, WordPress, Wix, and most website platforms. Ultra-concise 3-line embed code that inherits all your styling automatically.
+            </div>
+
+            <textarea id="embedCodeArea" readonly style="width: 100%; height: 150px; font-family: monospace; font-size: 12px; padding: 10px; border: 1px solid #444; border-radius: 4px; resize: vertical; background: #1e1e1e; color: #fff;">${embedOptions.iframe.replace(/</g, '&lt;').replace(/>/g, '&gt;')}</textarea>
+          </div>
+        `,
+        buttons: [
+          {
+            text: "Copy to Clipboard",
+            type: "primary",
+            onClick: () => {
+              const textarea = document.getElementById('embedCodeArea');
+              navigator.clipboard.writeText(textarea.value).then(() => {
+                showToast("Embed code copied to clipboard!");
+              }).catch(() => {
+                showToast("Failed to copy - please select and copy the code manually.");
+              });
+            }
+          },
+          {
+            text: "Download HTML",
+            type: "secondary",
+            onClick: () => {
+              try {
+                const textarea = document.getElementById('embedCodeArea');
+                const currentCode = textarea.value;
+                const blob = new Blob([currentCode], { type: 'text/html' });
+                const url = URL.createObjectURL(blob);
+                const a = document.createElement('a');
+                a.href = url;
+                a.download = `${(current.title || 'reel').replace(/[^a-zA-Z0-9]/g, '_')}_iframe.html`;
+                document.body.appendChild(a);
+                a.click();
+                document.body.removeChild(a);
+                URL.revokeObjectURL(url);
+                showToast("Downloaded.");
+              } catch (error) {
+                console.error('Download failed:', error);
+                showToast("Download failed - please try copying to clipboard instead.");
+              }
+            }
+          },
+          {
+            // Dev-only convenience - opens the GitHub Pages embed-testing
+            // harness (testHTMLpages/embed-test-live.html) and copies the
+            // code to the clipboard first, so the flow is just "paste".
+            // Update this URL if that test page ever moves.
+            text: "Test Embed ↗",
+            type: "secondary",
+            onClick: () => {
+              const textarea = document.getElementById('embedCodeArea');
+              const currentCode = textarea.value;
+              navigator.clipboard.writeText(currentCode).catch(() => {
+                // Clipboard write failing isn't fatal - the code is still
+                // visible/selectable in the textarea for a manual copy.
+              });
+              window.open('https://a-kerley.github.io/reelplayer-dev/testHTMLpages/embed-test-live.html', '_blank');
+            }
+          },
+          {
+            text: "Close",
+            type: "secondary",
+            onClick: () => {
+              dialog.closeDialog();
+            }
+          }
+        ]
+      });
     }
 
     function showPreview() {

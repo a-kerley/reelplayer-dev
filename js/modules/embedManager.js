@@ -34,28 +34,37 @@ async function deleteReel(id, password) {
   }
 }
 
-function renderListHTML(entries) {
+// currentEmbedId - the reel currently open in the builder's own
+// publishedEmbedId (js/main.js's updateReelPublishStatus() sets this on
+// publish), if any. Since a reel's embed id is a content hash, this only
+// ever matches when the currently-open draft is exactly what's live at
+// that entry - marks that one row so "which of these is the one I'm
+// looking at right now" doesn't require cross-referencing ids by eye.
+function renderListHTML(entries, currentEmbedId) {
   if (!entries.length) {
     return '<p class="builder-empty-state">No published reels yet.</p>';
   }
 
   return `
     <div style="max-height:300px;overflow-y:auto;">
-      ${entries.map(entry => `
-        <div class="embed-manager-row" data-id="${entry.id}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;">
+      ${entries.map(entry => {
+        const isCurrent = currentEmbedId && entry.id === currentEmbedId;
+        return `
+        <div class="embed-manager-row" data-id="${entry.id}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
           <div>
-            <div style="font-weight:600;">${entry.title || "(untitled)"}</div>
+            <div style="font-weight:600;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
             <div style="font-size:0.8rem;color:#888;">${entry.id}${entry.created ? " &middot; " + new Date(entry.created).toLocaleString() : ""}</div>
           </div>
           <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
             style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
         </div>
-      `).join("")}
+      `;
+      }).join("")}
     </div>
   `;
 }
 
-async function openEmbedManager() {
+async function openEmbedManager(getCurrentReel) {
   const password = await getBuilderPassword();
   if (!password) return;
 
@@ -67,10 +76,12 @@ async function openEmbedManager() {
     return;
   }
 
+  const currentEmbedId = getCurrentReel?.()?.publishedEmbedId;
+
   dialog.createDialog({
     type: "custom",
     message: "Published Reels",
-    content: renderListHTML(entries),
+    content: renderListHTML(entries, currentEmbedId),
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
     ]
@@ -89,7 +100,7 @@ async function openEmbedManager() {
 
         try {
           await deleteReel(id, password);
-          openEmbedManager(); // refresh the list
+          openEmbedManager(getCurrentReel); // refresh the list
         } catch (error) {
           dialog.alert(error.message);
         }
@@ -98,9 +109,14 @@ async function openEmbedManager() {
   }, 50);
 }
 
-export function setupEmbedManagerButton() {
+/**
+ * @param {() => Object|undefined} [getCurrentReel] - returns the reel
+ *   currently open in the builder, if any - used only to highlight its
+ *   entry in the list (via its publishedEmbedId). Omit to skip that.
+ */
+export function setupEmbedManagerButton(getCurrentReel) {
   const btn = document.getElementById("manageEmbedsBtn");
   if (btn) {
-    btn.onclick = () => openEmbedManager();
+    btn.onclick = () => openEmbedManager(getCurrentReel);
   }
 }

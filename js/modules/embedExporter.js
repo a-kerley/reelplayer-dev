@@ -2,6 +2,7 @@
 import { WORKER_BASE_URL } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
+import { hashContent } from "./contentHash.js";
 
 export class EmbedExporter {
   constructor() {
@@ -19,11 +20,14 @@ export class EmbedExporter {
       throw new Error("No valid tracks found in the reel. Please add some tracks before exporting.");
     }
 
-    return {
-      iframe: await this.generateIframeEmbed(reel)
-    };
+    return this.generateIframeEmbed(reel);
   }
 
+  // Returns { iframe, reelId } - callers that want to track publish state
+  // (e.g. js/main.js's "is this reel's live embed up to date with the
+  // current draft" indicator) compare a fresh generateReelId(reel) call
+  // against the reelId returned here the last time this actually
+  // succeeded, rather than this module tracking that itself.
   async generateIframeEmbed(reel) {
     const reelId = this.generateReelId(reel);
     await this.storeReelData(reelId, reel);
@@ -84,19 +88,20 @@ export class EmbedExporter {
     // iframe (its only child) at whatever height the iframe currently has,
     // frame by frame, as the iframe's own JS-driven height transition
     // below plays out - no separate transition needed on the div itself.
-    return `<div style="border-radius: 8px; overflow: hidden;"><iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player?id=${reelId}"
+    const iframe = `<div style="border-radius: 8px; overflow: hidden;"><iframe id="${iframeId}" src="${this.baseURL.replace('index.html', '')}player?id=${reelId}"
            width="100%" height="${height}px" frameborder="0"
            style="display: block; border: none; min-height: ${height}px; transition: height 0.3s ease;">
           </iframe></div>${resizeScript}`;
+    return { iframe, reelId };
   }
 
   generateReelId(reel) {
     // Generate a short unique ID based on reel content
-    const content = JSON.stringify({
+    return hashContent({
       title: reel.title,
-      playlist: reel.playlist?.map(t => ({ 
-        title: t.title, 
-        url: t.url, 
+      playlist: reel.playlist?.map(t => ({
+        title: t.title,
+        url: t.url,
         backgroundImage: t.backgroundImage,
         backgroundZoom: t.backgroundZoom
       })),
@@ -108,15 +113,6 @@ export class EmbedExporter {
         waveformBars: reel.settings?.waveform
       }
     });
-    
-    // Simple hash function to create short ID
-    let hash = 0;
-    for (let i = 0; i < content.length; i++) {
-      const char = content.charCodeAt(i);
-      hash = ((hash << 5) - hash) + char;
-      hash = hash & hash; // Convert to 32-bit integer
-    }
-    return Math.abs(hash).toString(36).substring(0, 8);
   }
 
   async storeReelData(reelId, reel) {

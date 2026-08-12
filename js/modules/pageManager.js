@@ -6,6 +6,7 @@
 // a reel's embed id which nothing outside this app ever needs to see).
 import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
+import { showToast } from "./toast.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { publicPageUrl } from "./pagePublish.js";
 
@@ -39,17 +40,23 @@ async function deletePublishedPage(slug, password) {
   }
 }
 
-function renderListHTML(entries) {
+// currentSlug - the publishedSlug of the page currently open in the
+// builder, if any (js/pagesController.js's handlePublish() sets this on
+// publish) - marks that one row so "which of these is the one I'm looking
+// at right now" doesn't require cross-referencing slugs by eye.
+function renderListHTML(entries, currentSlug) {
   if (!entries.length) {
     return '<p class="builder-empty-state">No published pages yet.</p>';
   }
 
   return `
     <div style="max-height:300px;overflow-y:auto;">
-      ${entries.map(entry => `
-        <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;gap:0.5rem;">
+      ${entries.map(entry => {
+        const isCurrent = currentSlug && entry.slug === currentSlug;
+        return `
+        <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;gap:0.5rem;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
           <div style="min-width:0;">
-            <div style="font-weight:600;">${entry.title || "(untitled)"}</div>
+            <div style="font-weight:600;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
             <div style="font-size:0.8rem;color:#888;overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">/page?slug=${entry.slug}${entry.published ? " &middot; " + new Date(entry.published).toLocaleString() : ""}</div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
@@ -59,12 +66,13 @@ function renderListHTML(entries) {
               style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
           </div>
         </div>
-      `).join("")}
+      `;
+      }).join("")}
     </div>
   `;
 }
 
-async function openPageManager() {
+async function openPageManager(getCurrentPage) {
   const password = await getBuilderPassword();
   if (!password) return;
 
@@ -76,10 +84,12 @@ async function openPageManager() {
     return;
   }
 
+  const currentSlug = getCurrentPage?.()?.publishedSlug;
+
   dialog.createDialog({
     type: "custom",
     message: "Published Pages",
-    content: renderListHTML(entries),
+    content: renderListHTML(entries, currentSlug),
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
     ]
@@ -89,11 +99,9 @@ async function openPageManager() {
     document.querySelectorAll(".page-manager-copy-btn").forEach(btn => {
       btn.addEventListener("click", () => {
         navigator.clipboard.writeText(publicPageUrl(btn.dataset.slug)).then(() => {
-          dialog.closeDialog();
-          setTimeout(() => dialog.alert("Link copied to clipboard!"), 200);
+          showToast("Link copied to clipboard!");
         }).catch(() => {
-          dialog.closeDialog();
-          setTimeout(() => dialog.alert("Failed to copy - please copy the URL manually."), 200);
+          showToast("Failed to copy - please copy the URL manually.");
         });
       });
     });
@@ -110,7 +118,7 @@ async function openPageManager() {
 
         try {
           await deletePublishedPage(slug, password);
-          openPageManager(); // refresh the list
+          openPageManager(getCurrentPage); // refresh the list
         } catch (error) {
           dialog.alert(error.message);
         }
@@ -119,9 +127,14 @@ async function openPageManager() {
   }, 50);
 }
 
-export function setupPageManagerButton() {
+/**
+ * @param {() => Object|undefined} [getCurrentPage] - returns the page
+ *   currently open in the builder, if any - used only to highlight its
+ *   entry in the list (via its publishedSlug). Omit to skip that.
+ */
+export function setupPageManagerButton(getCurrentPage) {
   const btn = document.getElementById("managePagesBtn");
   if (btn) {
-    btn.onclick = () => openPageManager();
+    btn.onclick = () => openPageManager(getCurrentPage);
   }
 }

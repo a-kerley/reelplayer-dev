@@ -11,6 +11,12 @@ function normalizePage(page) {
   if (!page.blocks) page.blocks = [];
   if (page.slug === undefined) page.slug = null;
   if (page.publishedSlug === undefined) page.publishedSlug = null;
+  // A page published before this field existed has no recorded fingerprint
+  // of what was live - null never equals a real contentFingerprint() value,
+  // so js/pagesController.js's updatePublishStatus() correctly falls back
+  // to the "stale" (unpublished changes) state rather than false-reporting
+  // "up to date" for a page it actually has no basis to compare.
+  if (page.publishedContentHash === undefined) page.publishedContentHash = null;
   return page;
 }
 

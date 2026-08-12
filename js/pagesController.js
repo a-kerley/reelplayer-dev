@@ -4,6 +4,7 @@
 // so the reel/page seams stay easy to see and compare side by side - see
 // each function here against its same-named counterpart in js/main.js.
 import { dialog } from "./modules/dialogSystem.js";
+import { showToast } from "./modules/toast.js";
 import {
   listPageDrafts,
   loadPageDraft,
@@ -15,7 +16,7 @@ import {
 import { renderPagesSidebar } from "./pagesSidebar.js";
 import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
 import { renderBlock } from "./modules/pageBlockRenderer.js";
-import { publishPage, slugify, isValidSlug, publicPageUrl } from "./modules/pagePublish.js";
+import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
 
 function createEmptyPage() {
@@ -23,6 +24,7 @@ function createEmptyPage() {
     id: "page-" + Date.now(),
     slug: null,
     publishedSlug: null,
+    publishedContentHash: null,
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -105,6 +107,7 @@ export function initPagesController() {
     if (current) {
       schedulePageDraftSave(current);
       renderPagePreview(current);
+      updatePublishStatus(current);
     }
     renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete);
   }
@@ -128,12 +131,31 @@ export function initPagesController() {
     pagePreviewPane.appendChild(list);
   }
 
+  // Mirrors js/main.js's updateReelPublishStatus() - a page has no content-
+  // hash id to piggyback on (its slug is stable/user-chosen, not derived
+  // from content), so this compares a fresh contentFingerprint(page) against
+  // page.publishedContentHash (stamped in handlePublish() below, right
+  // after a successful publish) to tell the same three states apart: never
+  // published, published and matching this draft, or published but the
+  // draft has changed since.
   function updatePublishStatus(page) {
     const statusEl = document.getElementById("pagePublishStatus");
     if (!statusEl) return;
-    statusEl.textContent = page.publishedSlug
-      ? `Live at ${publicPageUrl(page.publishedSlug)}`
-      : "Not yet published.";
+
+    if (!page.publishedSlug) {
+      statusEl.textContent = "Not yet published.";
+      statusEl.dataset.status = "unpublished";
+      return;
+    }
+
+    const url = publicPageUrl(page.publishedSlug);
+    if (contentFingerprint(page) === page.publishedContentHash) {
+      statusEl.textContent = `Live at ${url}`;
+      statusEl.dataset.status = "published";
+    } else {
+      statusEl.textContent = `⚠ Live at ${url} - you have unpublished changes.`;
+      statusEl.dataset.status = "stale";
+    }
   }
 
   async function handlePublish(page) {
@@ -154,6 +176,10 @@ export function initPagesController() {
     try {
       await publishPage(page, slug);
       page.publishedSlug = slug;
+      // Records what was actually just published, so updatePublishStatus()
+      // can tell "live and matches this draft" apart from "you've edited
+      // it since" the next time anything changes.
+      page.publishedContentHash = contentFingerprint(page);
       updateCurrentPage();
       updatePublishStatus(page);
       dialog.createDialog({
@@ -171,11 +197,9 @@ export function initPagesController() {
             type: "primary",
             onClick: () => {
               navigator.clipboard.writeText(publicPageUrl(slug)).then(() => {
-                dialog.closeDialog();
-                setTimeout(() => dialog.alert("Link copied to clipboard!"), 200);
+                showToast("Link copied to clipboard!");
               }).catch(() => {
-                dialog.closeDialog();
-                setTimeout(() => dialog.alert("Failed to copy - please select and copy the URL manually."), 200);
+                showToast("Failed to copy - please select and copy the URL manually.");
               });
             },
           },
@@ -229,7 +253,7 @@ export function initPagesController() {
 
     document.getElementById("publishPageBtn").onclick = () => handlePublish(page);
     updatePublishStatus(page);
-    setupPageManagerButton();
+    setupPageManagerButton(() => page);
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);

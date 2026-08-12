@@ -8,8 +8,20 @@
 // handler for the other half of this contract.
 import { WORKER_BASE_URL } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { hashContent } from "./contentHash.js";
 
 const SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
+
+/** A short hash of the page's publish-relevant content (title + blocks).
+ * js/pagesController.js stores this on the page (as publishedContentHash)
+ * right after a successful publish, then compares a fresh call here against
+ * that stored value to tell "live and matches this draft" apart from "live,
+ * but you've edited it since" - the Pages equivalent of how a reel's embed
+ * id (itself a content hash, see embedExporter.js) already doubles as that
+ * signal for Reels. */
+export function contentFingerprint(page) {
+  return hashContent({ title: page.title, blocks: page.blocks });
+}
 
 /** Lowercases, replaces anything not alphanumeric/hyphen with a hyphen, trims/collapses repeats. */
 export function slugify(text) {
