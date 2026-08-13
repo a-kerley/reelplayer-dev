@@ -104,10 +104,20 @@ async function parseJsonBody(request) {
 // Shared shape for the /reels and /drafts list routes: list every key under
 // a prefix, fetch + parse each one, and pluck out just the summary fields
 // each listing view needs.
-async function listEntries(env, prefix, pickFields) {
+//
+// excludePrefix exists because "draft_" and "draft_page_" aren't disjoint -
+// every draft_page_<id> key also starts with "draft_", so KV's plain
+// prefix match alone would have GET /drafts (reel drafts) silently
+// returning page drafts too. GET /drafts/pages doesn't need this itself:
+// "draft_page_" has no shorter prefix elsewhere in this namespace that
+// would similarly swallow it.
+async function listEntries(env, prefix, pickFields, excludePrefix) {
   const list = await env.REELS.list({ prefix });
+  const keys = excludePrefix
+    ? list.keys.filter((key) => !key.name.startsWith(excludePrefix))
+    : list.keys;
   const entries = await Promise.all(
-    list.keys.map(async (key) => {
+    keys.map(async (key) => {
       const value = await env.REELS.get(key.name);
       if (!value) return null;
       try {
@@ -243,14 +253,16 @@ export default {
       }
     }
 
-    // GET /drafts - list all drafts (builder sidebar), password-gated
+    // GET /drafts - list all drafts (builder sidebar), password-gated.
+    // Excludes draft_page_* keys - see listEntries()'s own comment for why
+    // that's not automatic just from the "draft_" prefix alone.
     if (pathname === "/drafts" && request.method === "GET") {
       const authError = requireAuth(request, env);
       if (authError) return authError;
 
       const entries = await listEntries(env, "draft_", (r) => ({
         id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
-      }));
+      }), "draft_page_");
       return jsonResponse(entries);
     }
 
