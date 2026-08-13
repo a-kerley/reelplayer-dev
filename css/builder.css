@@ -1036,17 +1036,18 @@ input.filename-display:focus {
    MATERIAL ICONS & ALIGNMENT
    ============================================== */
 
+/* 1.2em, not the icon font's own much larger native metrics - every current
+   consumer is an .align-icon (Reel Title Appearance and, since this
+   session, the page-builder text block), so this is scoped generically
+   rather than per-section; a future non-align use of this icon font may
+   need its own override if it wants the larger native size back. */
 .material-symbols-outlined {
-  font-size: 1.7em;
+  font-size: 1.2em;
+  line-height: 1;
   color: #ccc;
   user-select: none;
   vertical-align: middle;
   transition: color 0.18s, opacity 0.18s;
-}
-
-#reelTitleAppearanceSection .material-symbols-outlined {
-  font-size: 1.2em;
-  line-height: 1;
 }
 
 /* Matches .color-row's own font-size (css/builder.css) - previously unset

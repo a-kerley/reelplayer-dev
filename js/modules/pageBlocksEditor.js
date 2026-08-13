@@ -372,25 +372,40 @@ function createTextConfig(block, onChange, refreshPreview) {
   hint.textContent = "**bold**, *italic* - URLs, emails, and phone numbers link automatically.";
   wrap.appendChild(hint);
 
+  // Icon toggle, not a <select> - matches titleAppearance.js's Reel Title
+  // Appearance align control exactly (same .align-icon class/material-
+  // symbols-outlined icon pair), so alignment reads the same way in both
+  // builders.
   const alignRow = document.createElement("div");
   alignRow.className = "color-row";
   alignRow.style.marginTop = "0.5rem";
   const alignLabel = document.createElement("span");
   alignLabel.textContent = "Align:";
-  const alignSelect = document.createElement("select");
-  ["left", "center"].forEach((v) => {
-    const opt = document.createElement("option");
-    opt.value = v;
-    opt.textContent = v[0].toUpperCase() + v.slice(1);
-    if ((block.alignment || "left") === v) opt.selected = true;
-    alignSelect.appendChild(opt);
+  alignRow.appendChild(alignLabel);
+
+  const alignIcons = {};
+  [["left", "format_align_left", "Left"], ["center", "format_align_center", "Center"]].forEach(([value, glyph, title]) => {
+    const icon = document.createElement("span");
+    icon.className = "align-icon";
+    icon.title = title;
+    icon.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
+    icon.onclick = () => {
+      block.alignment = value;
+      updateAlignIcons();
+      refreshPreview();
+      onChange();
+    };
+    alignIcons[value] = icon;
+    alignRow.appendChild(icon);
   });
-  alignSelect.onchange = () => {
-    block.alignment = alignSelect.value;
-    refreshPreview();
-    onChange();
-  };
-  alignRow.append(alignLabel, alignSelect);
+
+  function updateAlignIcons() {
+    const align = block.alignment || "left";
+    alignIcons.left.classList.toggle("active", align === "left");
+    alignIcons.center.classList.toggle("active", align === "center");
+  }
+  updateAlignIcons();
+
   wrap.appendChild(alignRow);
 
   return wrap;
