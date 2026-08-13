@@ -7,3 +7,8 @@
 worker
 .wrangler
 node_modules
+# macOS Finder metadata, regenerated constantly in any folder browsed in
+# Finder - harmless as an asset but has no reason to ever be part of the
+# deployed site (see 1df28a9, where a misfired `wrangler deploy` from the
+# wrong directory swept a couple of these into a deploy).
+.DS_Store
