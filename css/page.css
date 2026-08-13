@@ -137,6 +137,15 @@ body.page-body {
   color: var(--page-text-muted);
 }
 
+.page-block-text a {
+  color: var(--page-accent);
+  text-decoration: underline;
+}
+
+.page-block-text a:hover {
+  text-decoration: none;
+}
+
 .page-block-image {
   padding: 1rem;
 }

@@ -48,27 +48,109 @@ function renderBannerImage(block) {
   return el;
 }
 
+// Markdown-lite inline formatting (**bold**, *italic*) plus auto-
+// linkification of URLs/emails/phone numbers - the whole reason this is a
+// layered regex-split pipeline rather than one big regex or an innerHTML
+// pass: it renders on the public page, fed by a client-controlled textarea,
+// so every node here is built via createElement/createTextNode, never
+// innerHTML/markdown-to-HTML-string - there's no string position at which
+// arbitrary markup could be injected.
+const URL_RE = /\bhttps?:\/\/[^\s<]+[^\s<.,:;!?'")\]]/g;
+const EMAIL_RE = /\b[\w.+-]+@[\w-]+\.[\w.-]+\b/g;
+// Deliberately conservative (10+ digits, optional leading +, digit-first
+// and digit-last) - false negatives (a phone number that isn't linked) are
+// far less annoying than false positives (some unrelated number, e.g. a
+// year or a price, turned into a bogus tel: link).
+const PHONE_RE = /(?<![\w@])(\+?\d[\d\-.\s]{8,}\d)(?![\w@])/g;
+
+// Splits `text` on every match of `regex`, returning an alternating list of
+// {type:'text', value} and {type:'match', value, groups} segments in
+// original order - the shared primitive both the bold/italic pass and the
+// link-detection pass build on.
+function splitByRegex(text, regex) {
+  const segments = [];
+  let lastIndex = 0;
+  let m;
+  regex.lastIndex = 0;
+  while ((m = regex.exec(text))) {
+    if (m.index > lastIndex) segments.push({ type: "text", value: text.slice(lastIndex, m.index) });
+    segments.push({ type: "match", value: m[0], groups: m });
+    lastIndex = m.index + m[0].length;
+  }
+  if (lastIndex < text.length) segments.push({ type: "text", value: text.slice(lastIndex) });
+  return segments;
+}
+
+function makeLink(text, href) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.textContent = text;
+  if (/^https?:/.test(href)) {
+    a.target = "_blank";
+    a.rel = "noopener noreferrer";
+  }
+  return a;
+}
+
+// Runs URL -> email -> phone detection in sequence, each pass only looking
+// at whatever plain text the previous pass left behind - so a URL match
+// can never be re-split by the email/phone pass, etc.
+function linkify(text) {
+  let nodes = [{ type: "text", value: text }];
+  [
+    [URL_RE, (m) => makeLink(m, m)],
+    [EMAIL_RE, (m) => makeLink(m, `mailto:${m}`)],
+    [PHONE_RE, (m) => makeLink(m, `tel:${m.replace(/[^\d+]/g, "")}`)],
+  ].forEach(([regex, toNode]) => {
+    nodes = nodes.flatMap((seg) => {
+      if (seg.type !== "text") return [seg];
+      return splitByRegex(seg.value, regex).map((part) =>
+        part.type === "match" ? { type: "node", node: toNode(part.value) } : part
+      );
+    });
+  });
+  return nodes.map((seg) => (seg.type === "node" ? seg.node : document.createTextNode(seg.value)));
+}
+
+function renderInlineMarkdown(line) {
+  return splitByRegex(line, /\*\*(.+?)\*\*/g).flatMap((part) => {
+    if (part.type !== "match") return renderItalicAndLinks(part.value);
+    const strong = document.createElement("strong");
+    renderItalicAndLinks(part.groups[1]).forEach((n) => strong.appendChild(n));
+    return [strong];
+  });
+}
+
+function renderItalicAndLinks(text) {
+  return splitByRegex(text, /\*(.+?)\*/g).flatMap((part) => {
+    if (part.type !== "match") return linkify(part.value);
+    const em = document.createElement("em");
+    linkify(part.groups[1]).forEach((n) => em.appendChild(n));
+    return [em];
+  });
+}
+
 function renderText(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-text";
   el.style.textAlign = block.alignment === "center" ? "center" : "left";
+  // heading is a legacy field from before the text block was simplified to
+  // a single body textarea (see pageBlocksEditor.js) - still rendered so
+  // pages saved before that change don't lose their heading, but the
+  // editor no longer offers a way to set one on new/edited blocks.
   if (block.heading) {
     const h = document.createElement("h2");
     h.textContent = block.heading;
     el.appendChild(h);
   }
   if (block.body) {
-    // Plain text only, never raw HTML - this renders on the public page, so
-    // there's no innerHTML/markdown path here for a client-controlled field
-    // to inject through. Double line breaks become separate <p> elements;
-    // single line breaks within a paragraph become <br> (built as DOM
-    // nodes, not innerHTML, so no markup injection risk).
+    // Double line breaks start a new paragraph; single line breaks within
+    // one become <br>.
     block.body.split(/\n{2,}/).forEach((paragraph) => {
       const p = document.createElement("p");
-      const lines = paragraph.split("\n");
-      lines.forEach((line, i) => {
+      paragraph.split("\n").forEach((line, i) => {
         if (i > 0) p.appendChild(document.createElement("br"));
-        p.appendChild(document.createTextNode(line));
+        renderInlineMarkdown(line).forEach((n) => p.appendChild(n));
       });
       el.appendChild(p);
     });

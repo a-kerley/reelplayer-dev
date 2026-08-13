@@ -324,34 +324,28 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
   return wrap;
 }
 
+// A single textarea, not the old heading+body pair - "heading" is still
+// rendered for blocks saved before this change (see pageBlockRenderer.js's
+// renderText()), but there's no way to set one from here anymore. Bold/
+// italic/links are typed inline (**bold**, *italic*, plain URLs/emails/
+// phone numbers auto-link) rather than needing separate fields.
 function createTextConfig(block, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
-  const headingRow = document.createElement("div");
-  headingRow.className = "color-row";
-  const headingLabel = document.createElement("span");
-  headingLabel.textContent = "Heading:";
-  const headingInput = document.createElement("input");
-  headingInput.type = "text";
-  headingInput.value = block.heading || "";
-  headingInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
-  headingInput.oninput = () => { block.heading = headingInput.value; };
-  headingInput.onblur = () => { refreshPreview(); onChange(); };
-  headingRow.append(headingLabel, headingInput);
-  wrap.appendChild(headingRow);
-
-  const bodyLabel = document.createElement("label");
-  bodyLabel.style.cssText = "display:block;margin:0.5rem 0 0.2rem;";
-  bodyLabel.textContent = "Body:";
-  wrap.appendChild(bodyLabel);
-
   const bodyTextarea = document.createElement("textarea");
   bodyTextarea.value = block.body || "";
-  bodyTextarea.rows = 4;
+  bodyTextarea.rows = 6;
+  bodyTextarea.placeholder = "Type your text here...";
   bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
   bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
   bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
   wrap.appendChild(bodyTextarea);
+
+  const hint = document.createElement("p");
+  hint.className = "builder-empty-state";
+  hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
+  hint.textContent = "**bold**, *italic* - URLs, emails, and phone numbers link automatically.";
+  wrap.appendChild(hint);
 
   const alignRow = document.createElement("div");
   alignRow.className = "color-row";
