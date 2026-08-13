@@ -5,6 +5,7 @@ import {
   convertDropboxLinkToDirect,
 } from "./playlist.js";
 import { renderSidebar } from "./sidebar.js";
+import { ICONS } from "./modules/sidebarList.js";
 import { renderBuilder, createEmptyReel } from "./builder.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { dialog } from "./modules/dialogSystem.js";
@@ -395,7 +396,9 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       form.classList.toggle('builder-locked-form', !!reel.locked);
       lockBtn.classList.toggle('locked', !!reel.locked);
-      lockBtn.textContent = reel.locked ? '🔒 Locked - click to unlock' : '🔓 Lock this reel';
+      lockBtn.innerHTML = reel.locked
+        ? `${ICONS.lockClosed}<span>Locked - click to unlock</span>`
+        : `${ICONS.lockOpen}<span>Lock this reel</span>`;
       lockBtn.onclick = () => toggleReelLock(reel.id);
     }
 

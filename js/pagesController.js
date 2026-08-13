@@ -14,6 +14,7 @@ import {
   onPageSaveStatusChange,
 } from "./modules/pageDraftStore.js";
 import { renderPagesSidebar } from "./pagesSidebar.js";
+import { ICONS } from "./modules/sidebarList.js";
 import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
 import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
@@ -740,7 +741,9 @@ export function initPagesController() {
     lockBtn.style.display = ''; // undo the "no pages at all" hide in render()
     pane.classList.toggle('builder-locked-form', !!page.locked);
     lockBtn.classList.toggle('locked', !!page.locked);
-    lockBtn.textContent = page.locked ? '🔒 Locked - click to unlock' : '🔓 Lock this page';
+    lockBtn.innerHTML = page.locked
+      ? `${ICONS.lockClosed}<span>Locked - click to unlock</span>`
+      : `${ICONS.lockOpen}<span>Lock this page</span>`;
     lockBtn.onclick = () => togglePageLock(page.id);
   }
 
