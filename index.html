@@ -48,6 +48,11 @@
           <div id="builderLoadingContent">Loading…</div>
         </div>
         <div id="reelBuilderView">
+          <!-- Outside #reelForm on purpose - locking dims/disables the form
+               itself (see js/main.js's applyReelLockState()), and this
+               button has to stay clickable through that so a locked reel
+               can still be unlocked. -->
+          <button type="button" id="reelLockBtn" class="lock-toggle-btn"></button>
           <form id="reelForm" autocomplete="off">
             <label>
               Title:
@@ -70,6 +75,9 @@
           <div id="reelPlayerPreview"></div>
         </div>
         <div id="pageBuilderView" style="display: none;">
+          <!-- Outside #pageEditorPane on purpose - see js/main.js's
+               reel-side #reelLockBtn comment for why. -->
+          <button type="button" id="pageLockBtn" class="lock-toggle-btn"></button>
           <div id="pageEditorPane" class="page-editor-pane"></div>
           <div id="pagePreviewResizeHandle" class="page-preview-resize-handle"></div>
           <div id="pagePreviewPane" class="page-preview-pane"></div>

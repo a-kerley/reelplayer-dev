@@ -19,8 +19,9 @@ import { dialog } from './dialogSystem.js';
  * @param {() => void} onNew
  * @param {(id: string) => void} onDelete
  * @param {(item: Object) => string} [renderSubtitle] - optional per-item subtitle line
+ * @param {(id: string) => void} [onToggleLock] - optional lock/unlock icon button per row
  */
-export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle) {
+export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle, onToggleLock) {
   const list = document.getElementById(opts.listElId);
   if (!list) return;
   list.innerHTML = '';
@@ -50,6 +51,33 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       subtitleSpan.textContent = renderSubtitle(item);
       subtitleSpan.onclick = () => onSelect(item.id);
       li.appendChild(subtitleSpan);
+    }
+
+    if (onToggleLock) {
+      const lockBtn = document.createElement('button');
+      lockBtn.type = 'button';
+      lockBtn.className = 'lock-reel-btn' + (item.locked ? ' locked' : '');
+      lockBtn.setAttribute('aria-label', item.locked ? 'Unlock' : 'Lock');
+      lockBtn.title = item.locked ? 'Unlock' : 'Lock';
+      // Closed and open padlock - same currentColor/viewBox convention as
+      // the delete button's icon just below.
+      lockBtn.innerHTML = item.locked
+        ? `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+            <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" />
+          </svg>`
+        : `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+            <path d="M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 0 1-1.5 0V6.75a3.75 3.75 0 1 0-7.5 0v3h7.5a3 3 0 0 1 3 3v6.75a3 3 0 0 1-3 3H3.75a3 3 0 0 1-3-3v-6.75a3 3 0 0 1 3-3h9v-3C12.75 3.85 15.1 1.5 18 1.5Z" />
+          </svg>`;
+      // Confirm-before-unlock lives in the caller's onToggleLock itself
+      // (js/main.js's toggleReelLock(), js/pagesController.js's
+      // equivalent) - not here - so the sidebar icon and the in-editor
+      // lock button (a separate entry point to the same toggle) can't
+      // drift into asking differently.
+      lockBtn.onclick = (e) => {
+        e.stopPropagation();
+        onToggleLock(item.id);
+      };
+      li.appendChild(lockBtn);
     }
 
     const delBtn = document.createElement('button');

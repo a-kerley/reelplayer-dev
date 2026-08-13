@@ -16,7 +16,8 @@
 //   GET    /drafts/:id        - password-gated (NOT public, unlike /reels/:id - drafts have no
 //                               legitimate anonymous consumer), returns the stored draft JSON or 404
 //   POST   /drafts/:id        - password-gated, stores the JSON body (stamps updatedAt server-side)
-//   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt} for every draft
+//   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt,
+//                               publishedEmbedId, publishedAt, locked} for every draft
 //   DELETE /drafts/:id        - password-gated, removes the entry
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
@@ -31,7 +32,8 @@
 //   DELETE /pages/:slug       - password-gated, removes the entry
 //   GET    /drafts/pages/:id  - password-gated, same visibility rules as /drafts/:id
 //   POST   /drafts/pages/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
-//   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt}
+//   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt,
+//                               publishedSlug, locked}
 //   DELETE /drafts/pages/:id  - password-gated, removes the entry
 //   POST   /media/upload      - password-gated, ?key=<key>, body = raw file bytes
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
@@ -272,6 +274,7 @@ export default {
 
       const entries = await listEntries(env, "draft_", (r) => ({
         id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
+        publishedEmbedId: r.publishedEmbedId, publishedAt: r.publishedAt, locked: r.locked,
       }), "draft_page_");
       return jsonResponse(entries);
     }
@@ -286,6 +289,7 @@ export default {
 
       const entries = await listEntries(env, "draft_page_", (p) => ({
         id: p.id, title: p.title, slug: p.slug, createdAt: p.createdAt, updatedAt: p.updatedAt,
+        publishedSlug: p.publishedSlug, locked: p.locked,
       }));
       return jsonResponse(entries);
     }

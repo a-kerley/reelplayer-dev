@@ -220,8 +220,9 @@ export function setupOverlayColorControls(reel, onChange) {
 /**
  * Sets up opacity and blur value controls
  * @param {Object} reel - Reel configuration
+ * @param {Function} onChange - Change callback
  */
-export function setupOpacityAndBlurControls(reel) {
+export function setupOpacityAndBlurControls(reel, onChange) {
   // Stored as a 0-1 fraction (fed straight into a CSS opacity value elsewhere),
   // but the control itself displays/edits it as a 0-100 percentage.
   const backgroundOpacity = document.getElementById("backgroundOpacity");
@@ -236,11 +237,7 @@ export function setupOpacityAndBlurControls(reel) {
       reel.backgroundOpacity = (parseFloat(backgroundOpacity.value) / 100).toString();
     });
 
-    backgroundOpacity.addEventListener("change", () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    backgroundOpacity.addEventListener("change", onChange);
   }
 
   const backgroundBlur = document.getElementById("backgroundBlur");
@@ -253,11 +250,7 @@ export function setupOpacityAndBlurControls(reel) {
       reel.backgroundBlur = backgroundBlur.value;
     });
 
-    backgroundBlur.addEventListener("change", () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    backgroundBlur.addEventListener("change", onChange);
   }
 }
 
@@ -294,11 +287,7 @@ export function setupHoverDarkenControls(reel, onChange) {
     reel.hoverDarkenAmount = parseInt(hoverDarkenAmount.value);
   });
 
-  hoverDarkenAmount.addEventListener("change", () => {
-    if (window.saveReels && window.reels) {
-      window.saveReels(window.reels);
-    }
-  });
+  hoverDarkenAmount.addEventListener("change", onChange);
 }
 
 /**
@@ -336,9 +325,5 @@ export function setupIdleUnblurControls(reel, onChange) {
     reel.idleUnblurAmount = parseInt(idleUnblurAmount.value);
   });
 
-  idleUnblurAmount.addEventListener("change", () => {
-    if (window.saveReels && window.reels) {
-      window.saveReels(window.reels);
-    }
-  });
+  idleUnblurAmount.addEventListener("change", onChange);
 }

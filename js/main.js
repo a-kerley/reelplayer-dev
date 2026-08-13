@@ -223,6 +223,13 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       window.reels = reels;
       window.saveReels = saveReels;
+      // Escape hatch for modules that only receive `onChange` (which also
+      // persists) but want a save-free live preview update - currently
+      // just colorPicker.js's Pickr drag handler. Function declaration
+      // below is hoisted, so this assignment can come before its
+      // definition. Mirrors window.saveReels's own existing shim pattern
+      // (see js/modules/draftStore.js's header comment on that one).
+      window.schedulePreviewRefresh = schedulePreviewRefresh;
 
       onSaveStatusChange((id, status) => {
         if (id === currentId) updateSaveStatusIndicator(status);
@@ -234,6 +241,45 @@ document.addEventListener("DOMContentLoaded", async () => {
     async function setCurrent(id) {
       currentId = id;
       localStorage.setItem('currentReelId', currentId);
+      await render();
+    }
+
+    // Toggling lock has to persist even for a reel that's only ever been a
+    // lightweight stub (never opened) - saveReels() silently skips stubs
+    // (see draftStore.js's own filter), so hydrate the full body first,
+    // exactly like render() already does when a stub reel is selected.
+    async function toggleReelLock(id) {
+      const idx = reels.findIndex((r) => r.id === id);
+      if (idx === -1) return;
+      let reel = reels[idx];
+
+      if (reel.locked) {
+        const confirmed = await dialog.confirm('Unlock this reel for editing?', 'Unlock', 'Cancel');
+        if (!confirmed) return;
+      }
+
+      if (reel._stub) {
+        showBuilderLoading();
+        try {
+          const full = await loadDraft(id);
+          if (!full) {
+            reels.splice(idx, 1);
+            hideBuilderLoading();
+            await render();
+            return;
+          }
+          reels[idx] = full;
+          reel = full;
+        } catch (e) {
+          hideBuilderLoading();
+          dialog.alert(`Couldn't load this reel (offline or server error): ${e.message}`);
+          return;
+        }
+        hideBuilderLoading();
+      }
+
+      reel.locked = !reel.locked;
+      saveReels(reels);
       await render();
     }
 
@@ -281,9 +327,14 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function updateCurrentReel() {
+      // Backstop beyond the visual pointer-events:none block on #reelForm
+      // (see applyReelLockState()) - that alone doesn't stop a keyboard-
+      // focused edit from still firing this.
+      if (reels.find((r) => r.id === currentId)?.locked) return;
+
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete); // re-render sidebar with updated titles
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock); // re-render sidebar with updated titles
       updateReelPublishStatus(reels.find((r) => r.id === currentId));
       // Don't re-render builder here - it destroys form elements and causes issues
       // Preview refresh is debounced so rapid field commits (e.g. tabbing
@@ -292,7 +343,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function render() {
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete);
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock);
 
       const idx = reels.findIndex((r) => r.id === currentId);
       let current = reels[idx];
@@ -327,8 +378,25 @@ document.addEventListener("DOMContentLoaded", async () => {
       setupEmbedManagerButton(() => reels.find((r) => r.id === currentId));
       setupAnalyticsControls(current);
       updateReelPublishStatus(current);
+      applyReelLockState(current);
       // showPreview(); // preview is only refreshed via button now
       showPreview();
+    }
+
+    // Visual half of the lock (dim + block pointer interaction on the
+    // form itself) plus the in-editor lock/unlock button - see
+    // .builder-locked-form/.lock-toggle-btn in css/builder.css. The
+    // sidebar's own lock icon (js/modules/sidebarList.js) is the other
+    // entry point to the exact same toggleReelLock().
+    function applyReelLockState(reel) {
+      const form = document.getElementById('reelForm');
+      const lockBtn = document.getElementById('reelLockBtn');
+      if (!form || !lockBtn || !reel) return;
+
+      form.classList.toggle('builder-locked-form', !!reel.locked);
+      lockBtn.classList.toggle('locked', !!reel.locked);
+      lockBtn.textContent = reel.locked ? '🔒 Locked - click to unlock' : '🔓 Lock this reel';
+      lockBtn.onclick = () => toggleReelLock(reel.id);
     }
 
     function setupRefreshPreviewButton() {
@@ -349,6 +417,10 @@ document.addEventListener("DOMContentLoaded", async () => {
       const current = reels.find((r) => r.id === currentId);
       if (!current) {
         dialog.alert("No reel selected for export.");
+        return;
+      }
+      if (current.locked) {
+        dialog.alert("This reel is locked. Unlock it to export/publish.");
         return;
       }
 

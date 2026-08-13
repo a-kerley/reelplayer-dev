@@ -32,6 +32,7 @@ export function createEmptyReel() {
     title: "",
     showTitle: true,
     analyticsEnabled: false,
+    locked: false,
     playlist: [{ title: "", url: "" }],
     createdAt: Date.now(),
     // Background effects
@@ -429,7 +430,7 @@ async function setupBlendModeControls(reel, onChange) {
     await setupBackgroundVideoFilePicker();
 
     setupOverlayColorControls(reel, onChange);
-    setupOpacityAndBlurControls(reel);
+    setupOpacityAndBlurControls(reel, onChange);
     setupHoverDarkenControls(reel, onChange);
     setupIdleUnblurControls(reel, onChange);
 

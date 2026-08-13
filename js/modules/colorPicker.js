@@ -90,9 +90,23 @@ export function createColorPickers(reel, onChange) {
         pickrInstances.push(pickr);
 
         // Event handlers
+        // "change" fires continuously while dragging inside the popup -
+        // unlike every other field in the builder, a color's actual reel
+        // field/persisted save only happens on "save" below (Pickr's own
+        // explicit save-button interaction model, kept as-is). This still
+        // live-updates the preview iframe while dragging, matching every
+        // other control, by writing straight to the reel field (same
+        // "input mutates local state immediately" pattern every slider
+        // here already uses) and scheduling a save-free preview refresh -
+        // if the popup is dismissed without clicking "save", this value
+        // simply sits uncommitted until either a real save happens
+        // elsewhere or the reel is reloaded, exactly like an abandoned
+        // slider drag today.
         pickr.on("change", (color) => {
           const value = color.toRGBA().toString();
           btn.style.background = value;
+          reel[cfg.reelKey] = value;
+          if (window.schedulePreviewRefresh) window.schedulePreviewRefresh();
         });
 
         pickr.on("init", () => {

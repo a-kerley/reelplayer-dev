@@ -16,9 +16,7 @@ export function createPlayerModeSection(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Player Mode';
-  legend.style.fontWeight = 'var(--builder-weight-bold)';
-  legend.style.fontSize = 'var(--builder-text-md)';
-  legend.style.color = 'var(--builder-accent)';
+  legend.className = 'builder-section-legend';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
@@ -136,16 +134,18 @@ export function createStaticModeSettings(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Static Mode Settings';
-  legend.style.fontWeight = 'var(--builder-weight-bold)';
-  legend.style.fontSize = 'var(--builder-text-md)';
-  legend.style.color = 'var(--builder-accent)';
+  legend.className = 'builder-section-legend';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
   const settingsContainer = document.createElement('div');
   settingsContainer.style.display = 'flex';
   settingsContainer.style.flexDirection = 'column';
-  settingsContainer.style.gap = '1rem';
+  // Matches .color-row's own default margin-bottom (css/builder.css) -
+  // this container used flex gap instead of that class's row margin, so
+  // it was a second, independently-drifting spacing value; now the same
+  // condensed-but-clear 0.6rem as everywhere else.
+  settingsContainer.style.gap = '0.6rem';
   settingsContainer.style.marginTop = '0.75rem';
 
   // Player Height
@@ -179,11 +179,7 @@ export function setupStaticModeSettings(section, reel, onChange) {
         reel.playerHeight = value;
       }
     });
-    playerHeight.addEventListener('change', () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    playerHeight.addEventListener('change', onChange);
   }
 }
 
@@ -201,16 +197,18 @@ export function createExpandableModeSettings(reel, onChange) {
 
   const legend = document.createElement('legend');
   legend.textContent = 'Expandable Mode Settings';
-  legend.style.fontWeight = 'var(--builder-weight-bold)';
-  legend.style.fontSize = 'var(--builder-text-md)';
-  legend.style.color = 'var(--builder-accent)';
+  legend.className = 'builder-section-legend';
   legend.style.padding = '0 0.5rem';
   section.appendChild(legend);
 
   const settingsContainer = document.createElement('div');
   settingsContainer.style.display = 'flex';
   settingsContainer.style.flexDirection = 'column';
-  settingsContainer.style.gap = '1rem';
+  // Matches .color-row's own default margin-bottom (css/builder.css) -
+  // this container used flex gap instead of that class's row margin, so
+  // it was a second, independently-drifting spacing value; now the same
+  // condensed-but-clear 0.6rem as everywhere else.
+  settingsContainer.style.gap = '0.6rem';
   settingsContainer.style.marginTop = '0.75rem';
 
   // Collapsed Height
@@ -332,11 +330,7 @@ export function setupExpandableModeSettings(section, reel, onChange) {
         validateHeightSettings(reel, collapsedHeight, section);
       }
     });
-    collapsedHeight.addEventListener('change', () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    collapsedHeight.addEventListener('change', onChange);
   }
 
   // Expanded Height
@@ -351,11 +345,7 @@ export function setupExpandableModeSettings(section, reel, onChange) {
         validateHeightSettings(reel, expandedHeight, section);
       }
     });
-    expandedHeight.addEventListener('change', () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    expandedHeight.addEventListener('change', onChange);
   }
 
   // Project Title Image
@@ -411,11 +401,7 @@ export function setupExpandableModeSettings(section, reel, onChange) {
     closedIdleBlur.addEventListener('input', () => {
       reel.playerClosedIdleBlur = parseInt(closedIdleBlur.value);
     });
-    closedIdleBlur.addEventListener('change', () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    closedIdleBlur.addEventListener('change', onChange);
   }
 }
 

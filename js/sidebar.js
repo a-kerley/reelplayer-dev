@@ -11,15 +11,22 @@
 // for existing js/main.js call sites.
 import { renderSidebarList } from './modules/sidebarList.js';
 
-export function renderSidebar(reels, currentId, onSelect, onNew, onDelete) {
+export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock) {
   renderSidebarList(
     {
       listElId: 'reelList',
       newBtnId: 'newReelBtn',
-      newBtnLabel: 'New Player',
+      newBtnLabel: '+ New Reel',
       emptyTitlePlaceholder: '(untitled reel)',
       deleteConfirmMessage: 'Delete this reel?',
     },
-    reels, currentId, onSelect, onNew, onDelete
+    reels, currentId, onSelect, onNew, onDelete,
+    // Mirrors js/pagesSidebar.js's own publish-status subtitle - keyed on
+    // reel.publishedEmbedId, the reel-side equivalent of page.publishedSlug
+    // (see updateReelPublishStatus() in js/main.js). Requires the list
+    // payload (GET /drafts) to actually include this field - see
+    // worker/src/index.js.
+    (reel) => reel.publishedEmbedId ? 'Published' : 'not yet published',
+    onToggleLock
   );
 }

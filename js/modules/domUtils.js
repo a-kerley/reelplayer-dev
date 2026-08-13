@@ -23,7 +23,7 @@ export function createFieldset({ id, legend, content, styles = {} }) {
   });
   
   fieldset.innerHTML = `
-    <legend style="font-size:1.1rem;font-weight:600;color:var(--builder-accent)">${legend}</legend>
+    <legend class="builder-section-legend">${legend}</legend>
     ${content}
   `;
   

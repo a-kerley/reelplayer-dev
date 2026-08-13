@@ -97,11 +97,7 @@ export function attachZoomListener(previewPane, track, onChange = null) {
   });
 
   if (onChange) {
-    zoomInput.addEventListener("change", () => {
-      if (window.saveReels && window.reels) {
-        window.saveReels(window.reels);
-      }
-    });
+    zoomInput.addEventListener("change", onChange);
   }
 }
 

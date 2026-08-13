@@ -25,8 +25,8 @@ export function createTitleAppearanceSection(reel, onChange) {
   titleAppearanceSection.style.padding = "1rem";
   
   titleAppearanceSection.innerHTML = `
-    <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Reel Title Appearance</legend>
-    <div class="color-row" style="margin-bottom: 1rem;">
+    <legend class="builder-section-legend">Reel Title Appearance</legend>
+    <div class="color-row">
       <label for="reelShowTitle" style="cursor:pointer;">Display Reel Title in Player</label>
       <span id="reelShowTitleToggleSlot"></span>
     </div>

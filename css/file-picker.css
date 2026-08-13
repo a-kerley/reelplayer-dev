@@ -278,6 +278,11 @@
   flex-shrink: 0;
 }
 
+.media-browser-folder-row.active .media-browser-folder-counts,
+.media-browser-folder-row.drop-target .media-browser-folder-counts {
+  color: #fff;
+}
+
 .media-browser-folder-menu-btn {
   background: transparent;
   border: none;

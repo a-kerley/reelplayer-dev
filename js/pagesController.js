@@ -29,6 +29,7 @@ function createEmptyPage() {
     publishedSlug: null,
     publishedContentHash: null,
     analyticsEnabled: false,
+    locked: false,
     backgroundImageEnabled: false,
     backgroundImage: "",
     backgroundBlur: 12,
@@ -126,12 +127,55 @@ export function initPagesController() {
 
   function updateCurrentPage() {
     const current = pages.find((p) => p.id === currentPageId);
+    // Backstop beyond the visual pointer-events:none block on
+    // #pageEditorPane (see applyPageLockState()) - that alone doesn't stop
+    // a keyboard-focused edit from still firing this.
+    if (current?.locked) return;
     if (current) {
       schedulePageDraftSave(current);
       renderPagePreview(current);
       updatePublishStatus(current);
     }
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock);
+  }
+
+  // Mirrors js/main.js's toggleReelLock() - toggling lock has to persist
+  // even for a page that's only ever been a lightweight stub (never
+  // opened), so hydrate the full body first, exactly like render() already
+  // does when a stub page is selected.
+  async function togglePageLock(id) {
+    const idx = pages.findIndex((p) => p.id === id);
+    if (idx === -1) return;
+    let page = pages[idx];
+
+    if (page.locked) {
+      const confirmed = await dialog.confirm("Unlock this page for editing?", "Unlock", "Cancel");
+      if (!confirmed) return;
+    }
+
+    if (page._stub) {
+      showLoading();
+      try {
+        const full = await loadPageDraft(id);
+        if (!full) {
+          pages.splice(idx, 1);
+          hideLoading();
+          await render();
+          return;
+        }
+        pages[idx] = full;
+        page = full;
+      } catch (e) {
+        hideLoading();
+        dialog.alert(`Couldn't load this page (offline or server error): ${e.message}`);
+        return;
+      }
+      hideLoading();
+    }
+
+    page.locked = !page.locked;
+    schedulePageDraftSave(page);
+    await render();
   }
 
   // Live preview: the same renderBlock() used by page.html itself and each
@@ -478,6 +522,11 @@ export function initPagesController() {
   }
 
   async function handlePublish(page) {
+    if (page.locked) {
+      dialog.alert("This page is locked. Unlock it to publish.");
+      return;
+    }
+
     const slugInput = document.getElementById("pageSlugInput");
     const publishBtn = document.getElementById("publishPageBtn");
     let slug = slugify(slugInput.value) || slugify(page.title);
@@ -542,7 +591,7 @@ export function initPagesController() {
           Title:
           <input type="text" id="pageTitle" class="filename-display" />
         </label>
-        <div class="color-row" style="margin-top:1rem;">
+        <div class="color-row" style="margin-top:0.6rem;">
           <span>URL slug:</span>
           <input type="text" id="pageSlugInput" placeholder="auto-generated from title" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" />
           <button type="button" id="publishPageBtn" class="page-block-add-btn">Publish</button>
@@ -550,45 +599,45 @@ export function initPagesController() {
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
         <button type="button" id="previewPageBtn">Preview Page</button>
         <button type="button" id="managePagesBtn">Manage Published Pages</button>
-        <div class="color-row" style="margin-top:1rem;">
+        <div class="color-row" style="margin-top:0.6rem;">
           <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
         </div>
         <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
-          <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Background Image</legend>
-          <div class="color-row" style="margin-bottom:1rem;">
+          <legend class="builder-section-legend">Background Image</legend>
+          <div class="color-row">
             <label for="pageBackgroundEnabled" style="cursor:pointer;">Enable</label>
             <span id="pageBackgroundToggleSlot"></span>
           </div>
           <div id="pageBackgroundUrlRowSlot"></div>
-          <div class="color-row" style="margin-top:1rem;">
+          <div class="color-row" style="margin-top:0.6rem;">
             <span>Scroll behavior:</span>
             <select id="pageBackgroundParallaxMode" style="max-width:180px;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
               <option value="fixed">Fixed</option>
               <option value="scroll">Scroll (parallax)</option>
             </select>
           </div>
-          <div id="pageBackgroundBlurSlot" style="margin-top:1rem;"></div>
+          <div id="pageBackgroundBlurSlot" style="margin-top:0.6rem;"></div>
           <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid #444;">
-            <div style="font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;font-size:0.95rem;">Content Background</div>
-            <div class="color-row" style="margin-bottom:1rem;">
+            <div class="builder-section-legend">Content Background</div>
+            <div class="color-row">
               <span>Color:</span>
               <input type="color" id="pageContentOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
             </div>
             <div id="pageContentOverlayOpacitySlot"></div>
-            <div class="color-row" style="margin-top:1rem;">
+            <div class="color-row" style="margin-top:0.6rem;">
               <label for="pageContentOverlayFullBleed" style="cursor:pointer;">Extend to top/bottom of page</label>
               <span id="pageContentOverlayFullBleedToggleSlot"></span>
             </div>
-            <div id="pageContentOverlayMarginVerticalSlot" style="margin-top:1rem;"></div>
-            <div id="pageContentOverlayMarginHorizontalSlot" style="margin-top:1rem;"></div>
+            <div id="pageContentOverlayMarginVerticalSlot" style="margin-top:0.6rem;"></div>
+            <div id="pageContentOverlayMarginHorizontalSlot" style="margin-top:0.6rem;"></div>
           </div>
         </fieldset>
         <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
-          <legend style="font-size:1.05rem;font-weight:600;color:var(--builder-accent);margin-bottom:0.6em;">Page Layout</legend>
+          <legend class="builder-section-legend">Page Layout</legend>
           <div id="pageContentMaxWidthSlot"></div>
-          <div id="pageContentPaddingTopSlot" style="margin-top:1rem;"></div>
-          <div id="pageContentPaddingBottomSlot" style="margin-top:1rem;"></div>
+          <div id="pageContentPaddingTopSlot" style="margin-top:0.6rem;"></div>
+          <div id="pageContentPaddingBottomSlot" style="margin-top:0.6rem;"></div>
         </fieldset>
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
@@ -626,7 +675,7 @@ export function initPagesController() {
   }
 
   async function render() {
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock);
 
     if (!pages.length) {
       hideLoading(); // init()'s showLoading() has no stub-load branch to pair with when there's nothing to load
@@ -638,6 +687,8 @@ export function initPagesController() {
         backgroundCleanup = () => {};
         pagePreviewPane.innerHTML = "";
       }
+      const lockBtn = document.getElementById('pageLockBtn');
+      if (lockBtn) lockBtn.style.display = 'none';
       return;
     }
 
@@ -671,6 +722,26 @@ export function initPagesController() {
     }
 
     renderPageBuilderForm(current);
+    applyPageLockState(current);
+  }
+
+  // Mirrors js/main.js's applyReelLockState() - visual half of the lock
+  // (dim + block pointer interaction on #pageEditorPane, which wraps both
+  // #pageForm and the blocks editor as siblings, so locking has to target
+  // that wrapper rather than #pageForm alone) plus the in-editor lock/
+  // unlock button. #pageLockBtn lives outside #pageEditorPane in
+  // index.html on purpose, so it survives renderPageBuilderForm()
+  // replacing that pane's contents and stays clickable when locked.
+  function applyPageLockState(page) {
+    const pane = document.getElementById('pageEditorPane');
+    const lockBtn = document.getElementById('pageLockBtn');
+    if (!pane || !lockBtn || !page) return;
+
+    lockBtn.style.display = ''; // undo the "no pages at all" hide in render()
+    pane.classList.toggle('builder-locked-form', !!page.locked);
+    lockBtn.classList.toggle('locked', !!page.locked);
+    lockBtn.textContent = page.locked ? '🔒 Locked - click to unlock' : '🔓 Lock this page';
+    lockBtn.onclick = () => togglePageLock(page.id);
   }
 
   async function init() {
