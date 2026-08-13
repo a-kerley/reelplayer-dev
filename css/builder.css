@@ -1330,6 +1330,33 @@ input[type="range"]:focus::-moz-range-thumb {
   transform: scale(1.1);
 }
 
+.page-block-collapse-btn {
+  background: none;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  color: #ccc;
+}
+
+.page-block-collapse-btn svg {
+  transition: transform 0.15s;
+}
+
+.page-block-row-collapsed .page-block-collapse-btn svg {
+  transform: rotate(-90deg);
+}
+
+.page-block-row-collapsed .page-block-config,
+.page-block-row-collapsed .page-block-row-preview {
+  display: none;
+}
+
 .page-block-config .color-row {
   margin-bottom: 0.5rem;
 }

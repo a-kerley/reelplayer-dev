@@ -7,7 +7,7 @@
 // a shared component would add more indirection than it'd save.
 import { createUrlInputRow } from "./domUtils.js";
 import { createValueControl } from "./valueControl.js";
-import { renderBlock } from "./pageBlockRenderer.js";
+import { renderBlock, parseVideoEmbedUrl } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 
@@ -16,6 +16,7 @@ const BLOCK_TYPE_LABELS = {
   text: "Text",
   image: "Image",
   player: "Player",
+  "embedded-video": "Embedded Video",
 };
 
 // Iconoir (MIT license, iconoir.com) icons, inlined per this codebase's
@@ -28,7 +29,13 @@ const ICONS = {
   text: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9V7L17 7V9" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V17M12 17H10M12 17H14" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   image: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7.6V20.4C21 20.7314 20.7314 21 20.4 21H7.6C7.26863 21 7 20.7314 7 20.4V7.6C7 7.26863 7.26863 7 7.6 7H20.4C20.7314 7 21 7.26863 21 7.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4H4.6C4.26863 4 4 4.26863 4 4.6V18" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16.8L12.4444 15L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 13C15.6716 13 15 12.3284 15 11.5C15 10.6716 15.6716 10 16.5 10C17.3284 10 18 10.6716 18 11.5C18 12.3284 17.3284 13 16.5 13Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   player: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  "embedded-video": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 6.6V17.4C21 17.9523 20.5523 18.4 20 18.4H4C3.44772 18.4 3 17.9523 3 17.4V6.6C3 6.04772 3.44772 5.6 4 5.6H20C20.5523 5.6 21 6.04772 21 6.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9.2L14.5 12L10 14.8V9.2Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
+
+// Session-only collapsed state, keyed by blockId - not part of the saved
+// page data, and needs to survive updatePageBlocksEditor() rebuilding the
+// row DOM from scratch on every add/remove/reorder.
+const collapsedBlockIds = new Set();
 
 function createEmptyBlock(type) {
   const blockId = "block-" + Date.now() + "-" + Math.random().toString(36).slice(2, 8);
@@ -41,6 +48,8 @@ function createEmptyBlock(type) {
       return { blockId, type, imageUrl: "", altText: "", widthPreset: "full" };
     case "player":
       return { blockId, type, reelId: "", reelTitle: "", height: 500 };
+    case "embedded-video":
+      return { blockId, type, videoUrl: "", aspectRatio: "16:9" };
     default:
       throw new Error(`Unknown block type: ${type}`);
   }
@@ -69,6 +78,9 @@ function createBlockRow(block, index, page, onChange) {
   const dragHandle = createDragHandle(row);
   header.appendChild(dragHandle);
 
+  const collapseBtn = createCollapseButton(block, row);
+  header.appendChild(collapseBtn);
+
   const typeLabel = document.createElement("span");
   typeLabel.className = "page-block-type-label";
   typeLabel.innerHTML = `${ICONS[block.type] || ""}<span>${BLOCK_TYPE_LABELS[block.type] || block.type}</span>`;
@@ -93,9 +105,34 @@ function createBlockRow(block, index, page, onChange) {
   preview.appendChild(renderBlock(block));
   row.appendChild(preview);
 
+  if (collapsedBlockIds.has(block.blockId)) {
+    row.classList.add("page-block-row-collapsed");
+  }
+
   setupDragAndDrop(row, index, page, onChange);
 
   return row;
+}
+
+function createCollapseButton(block, row) {
+  const collapseBtn = document.createElement("button");
+  collapseBtn.type = "button";
+  collapseBtn.className = "page-block-collapse-btn";
+  collapseBtn.setAttribute("aria-label", "Collapse block");
+  collapseBtn.innerHTML = `
+    <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;">
+      <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
+    </svg>
+  `;
+  collapseBtn.onclick = () => {
+    const collapsed = row.classList.toggle("page-block-row-collapsed");
+    if (collapsed) {
+      collapsedBlockIds.add(block.blockId);
+    } else {
+      collapsedBlockIds.delete(block.blockId);
+    }
+  };
+  return collapseBtn;
 }
 
 function createDragHandle(row) {
@@ -214,6 +251,9 @@ function createConfigForm(block, onChange, refreshPreview) {
       break;
     case "player":
       form.appendChild(createPlayerConfig(block, onChange, refreshPreview));
+      break;
+    case "embedded-video":
+      form.appendChild(createEmbeddedVideoConfig(block, onChange, refreshPreview));
       break;
     default:
       form.textContent = `Unknown block type: ${block.type}`;
@@ -447,6 +487,60 @@ function createPlayerConfig(block, onChange, refreshPreview) {
     onChange();
   });
   wrap.appendChild(heightRow);
+
+  return wrap;
+}
+
+function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
+  const wrap = document.createElement("div");
+
+  const urlRow = document.createElement("div");
+  urlRow.className = "color-row";
+  const urlLabel = document.createElement("span");
+  urlLabel.textContent = "Video URL:";
+  const urlInput = document.createElement("input");
+  urlInput.type = "url";
+  urlInput.value = block.videoUrl || "";
+  urlInput.placeholder = "Paste a YouTube or Vimeo link";
+  urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
+  urlRow.append(urlLabel, urlInput);
+  wrap.appendChild(urlRow);
+
+  const errorMsg = document.createElement("p");
+  errorMsg.className = "builder-empty-state";
+  errorMsg.style.cssText = "text-align:left;padding:0.2rem 0 0;display:none;color:#dc3545;";
+  errorMsg.textContent = "Couldn't recognize that as a YouTube or Vimeo link.";
+  wrap.appendChild(errorMsg);
+
+  function commit() {
+    block.videoUrl = urlInput.value.trim();
+    errorMsg.style.display = block.videoUrl && !parseVideoEmbedUrl(block.videoUrl) ? "block" : "none";
+    refreshPreview();
+    onChange();
+  }
+  urlInput.addEventListener("input", () => { block.videoUrl = urlInput.value.trim(); });
+  urlInput.addEventListener("blur", commit);
+
+  const aspectRow = document.createElement("div");
+  aspectRow.className = "color-row";
+  aspectRow.style.marginTop = "0.5rem";
+  const aspectLabel = document.createElement("span");
+  aspectLabel.textContent = "Aspect ratio:";
+  const aspectSelect = document.createElement("select");
+  [["16:9", "Widescreen (16:9)"], ["4:3", "Standard (4:3)"], ["1:1", "Square (1:1)"], ["9:16", "Vertical (9:16)"]].forEach(([v, text]) => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = text;
+    if ((block.aspectRatio || "16:9") === v) opt.selected = true;
+    aspectSelect.appendChild(opt);
+  });
+  aspectSelect.onchange = () => {
+    block.aspectRatio = aspectSelect.value;
+    refreshPreview();
+    onChange();
+  };
+  aspectRow.append(aspectLabel, aspectSelect);
+  wrap.appendChild(aspectRow);
 
   return wrap;
 }

@@ -60,10 +60,16 @@ function renderText(block) {
   if (block.body) {
     // Plain text only, never raw HTML - this renders on the public page, so
     // there's no innerHTML/markdown path here for a client-controlled field
-    // to inject through. Line breaks become separate <p> elements.
+    // to inject through. Double line breaks become separate <p> elements;
+    // single line breaks within a paragraph become <br> (built as DOM
+    // nodes, not innerHTML, so no markup injection risk).
     block.body.split(/\n{2,}/).forEach((paragraph) => {
       const p = document.createElement("p");
-      p.textContent = paragraph;
+      const lines = paragraph.split("\n");
+      lines.forEach((line, i) => {
+        if (i > 0) p.appendChild(document.createElement("br"));
+        p.appendChild(document.createTextNode(line));
+      });
       el.appendChild(p);
     });
   }
@@ -151,11 +157,65 @@ function renderPlayer(block) {
   return wrapper;
 }
 
+// Shared by both the renderer here and the block editor's own URL-field
+// validation (js/modules/pageBlocksEditor.js) - a pasted watch/share URL is
+// parsed into an embeddable iframe src exactly once, so the two never drift
+// on which URL shapes are recognized.
+const VIDEO_URL_PATTERNS = [
+  { host: /(^|\.)youtube\.com$/, extract: (u) => u.searchParams.get("v"), embed: (id) => `https://www.youtube-nocookie.com/embed/${id}` },
+  { host: /(^|\.)youtu\.be$/, extract: (u) => u.pathname.slice(1), embed: (id) => `https://www.youtube-nocookie.com/embed/${id}` },
+  { host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: (id) => `https://player.vimeo.com/video/${id}` },
+];
+
+/** @param {string} videoUrl @returns {string|null} an embeddable iframe src, or null if unrecognized */
+export function parseVideoEmbedUrl(videoUrl) {
+  if (!videoUrl) return null;
+  let parsed;
+  try {
+    parsed = new URL(videoUrl);
+  } catch {
+    return null;
+  }
+  for (const { host, extract, embed } of VIDEO_URL_PATTERNS) {
+    if (host.test(parsed.hostname)) {
+      const id = extract(parsed);
+      return id ? embed(id) : null;
+    }
+  }
+  return null;
+}
+
+const ASPECT_RATIOS = { "16:9": "16 / 9", "4:3": "4 / 3", "1:1": "1 / 1", "9:16": "9 / 16" };
+
+function renderEmbeddedVideo(block) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "page-block page-block-embedded-video";
+
+  const embedSrc = parseVideoEmbedUrl(block.videoUrl);
+  if (!embedSrc) {
+    wrapper.textContent = "No video URL set";
+    wrapper.classList.add("page-block-empty");
+    return wrapper;
+  }
+
+  wrapper.style.aspectRatio = ASPECT_RATIOS[block.aspectRatio] || ASPECT_RATIOS["16:9"];
+  const iframe = document.createElement("iframe");
+  iframe.src = embedSrc;
+  iframe.style.cssText = "width:100%;height:100%;display:block;border:none;";
+  iframe.setAttribute("frameborder", "0");
+  iframe.setAttribute("allow", "accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture; web-share");
+  iframe.setAttribute("allowfullscreen", "");
+  wrapper.appendChild(iframe);
+
+  return wrapper;
+}
+
 const RENDERERS = {
   "banner-image": renderBannerImage,
   text: renderText,
   image: renderImage,
   player: renderPlayer,
+  "embedded-video": renderEmbeddedVideo,
 };
 
 /** @param {Object} block @returns {HTMLElement} */

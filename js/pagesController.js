@@ -461,6 +461,35 @@ export function initPagesController() {
     }
   }
 
+  // page.html only ever serves the last-published content (GET /pages/:slug
+  // has no draft-preview path - drafts are password-gated, page.html is
+  // public), so "preview" opens the live published URL rather than the
+  // in-progress draft. If the draft has unsaved changes since the last
+  // publish, warn before opening so the preview isn't mistaken for a
+  // live view of what's currently in the editor.
+  function handlePreview(page) {
+    if (!page.publishedSlug) {
+      dialog.alert("Publish the page first to preview it.");
+      return;
+    }
+
+    const url = publicPageUrl(page.publishedSlug);
+    if (contentFingerprint(page) !== page.publishedContentHash) {
+      dialog.createDialog({
+        type: "custom",
+        message: "You have unpublished changes",
+        content: `<p>The live page won't reflect your latest edits until you publish again. Preview the currently live version anyway?</p>`,
+        buttons: [
+          { text: "Preview Live Version", type: "primary", onClick: () => { window.open(url, "_blank"); dialog.closeDialog(); } },
+          { text: "Cancel", type: "secondary", onClick: () => dialog.closeDialog() },
+        ],
+      });
+      return;
+    }
+
+    window.open(url, "_blank");
+  }
+
   async function handlePublish(page) {
     const slugInput = document.getElementById("pageSlugInput");
     const publishBtn = document.getElementById("publishPageBtn");
@@ -532,6 +561,7 @@ export function initPagesController() {
           <button type="button" id="publishPageBtn" class="page-block-add-btn">Publish</button>
         </div>
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
+        <button type="button" id="previewPageBtn">Preview Page</button>
         <button type="button" id="managePagesBtn">Manage Published Pages</button>
         <div class="color-row" style="margin-top:1rem;">
           <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
@@ -546,7 +576,7 @@ export function initPagesController() {
           <div id="pageBackgroundUrlRowSlot"></div>
           <div class="color-row" style="margin-top:1rem;">
             <span>Scroll behavior:</span>
-            <select id="pageBackgroundParallaxMode" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
+            <select id="pageBackgroundParallaxMode" style="max-width:180px;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
               <option value="fixed">Fixed</option>
               <option value="scroll">Scroll (parallax)</option>
             </select>
@@ -596,6 +626,7 @@ export function initPagesController() {
     };
 
     document.getElementById("publishPageBtn").onclick = () => handlePublish(page);
+    document.getElementById("previewPageBtn").onclick = () => handlePreview(page);
     updatePublishStatus(page);
     setupPageManagerButton(() => page);
     setupAnalyticsControls(page);

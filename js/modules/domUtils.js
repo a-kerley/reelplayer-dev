@@ -255,6 +255,7 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
         onSelect: (filePath) => {
           input.value = filePath;
           input.dispatchEvent(new Event("input", { bubbles: true }));
+          input.dispatchEvent(new Event("blur", { bubbles: true }));
         }
       });
     });

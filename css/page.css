@@ -158,6 +158,14 @@ body.page-body {
   border-radius: 8px;
 }
 
+.page-block-embedded-video {
+  padding: 0.5rem 0;
+}
+
+.page-block-embedded-video iframe {
+  border-radius: 8px;
+}
+
 /* Top-level loading/error states (page.html) and the "no content yet"
    empty state (both page.html and the builder's own preview pane, via
    js/pagesController.js's renderPagePreview()). */

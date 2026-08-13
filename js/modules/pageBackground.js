@@ -223,10 +223,14 @@ function positionContentOverlay(scopeEl, page) {
     overlay.style.top = "0";
     overlay.style.bottom = "0";
     overlay.style.height = "";
+    overlay.style.borderRadius = "0";
   } else {
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
     overlay.style.bottom = "";
     overlay.style.height = `${contentEl.offsetHeight + marginV * 2}px`;
+    // Matches .player-box's fixed corner radius (css/layout.css) so the
+    // content column reads as the same "card" language as the player.
+    overlay.style.borderRadius = "8px";
   }
 
   contentEl.parentNode.insertBefore(overlay, contentEl);
