@@ -10,6 +10,8 @@ import { createValueControl } from "./valueControl.js";
 import { renderBlock, parseVideoEmbedUrl } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
+import { dialog } from "./dialogSystem.js";
+import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -30,6 +32,7 @@ const ICONS = {
   image: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7.6V20.4C21 20.7314 20.7314 21 20.4 21H7.6C7.26863 21 7 20.7314 7 20.4V7.6C7 7.26863 7.26863 7 7.6 7H20.4C20.7314 7 21 7.26863 21 7.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4H4.6C4.26863 4 4 4.26863 4 4.6V18" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16.8L12.4444 15L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 13C15.6716 13 15 12.3284 15 11.5C15 10.6716 15.6716 10 16.5 10C17.3284 10 18 10.6716 18 11.5C18 12.3284 17.3284 13 16.5 13Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   player: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   "embedded-video": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 6.6V17.4C21 17.9523 20.5523 18.4 20 18.4H4C3.44772 18.4 3 17.9523 3 17.4V6.6C3 6.04772 3.44772 5.6 4 5.6H20C20.5523 5.6 21 6.04772 21 6.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9.2L14.5 12L10 14.8V9.2Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  bookmark: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4.5C6 3.67157 6.67157 3 7.5 3H16.5C17.3284 3 18 3.67157 18 4.5V21L12 17L6 21V4.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
 
 // Session-only collapsed state, keyed by blockId - not part of the saved
@@ -85,6 +88,9 @@ function createBlockRow(block, index, page, onChange) {
   typeLabel.className = "page-block-type-label";
   typeLabel.innerHTML = `${ICONS[block.type] || ""}<span>${BLOCK_TYPE_LABELS[block.type] || block.type}</span>`;
   header.appendChild(typeLabel);
+
+  const savePresetBtn = createSavePresetButton(block);
+  header.appendChild(savePresetBtn);
 
   const removeBtn = createRemoveButton(index, page, onChange);
   header.appendChild(removeBtn);
@@ -153,6 +159,25 @@ function createDragHandle(row) {
   dragHandle.addEventListener("mouseleave", () => { row.draggable = false; });
 
   return dragHandle;
+}
+
+function createSavePresetButton(block) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "page-block-preset-btn";
+  btn.setAttribute("aria-label", "Save as preset");
+  btn.title = "Save as preset";
+  btn.innerHTML = ICONS.bookmark;
+  btn.onclick = async () => {
+    const typeLabel = BLOCK_TYPE_LABELS[block.type] || block.type;
+    const name = await dialog.prompt(`Save this ${typeLabel} block as a preset:`);
+    if (!name) return;
+    // Everything except blockId/type - a preset seeds a fresh block (new
+    // blockId, same type) later, it never stores identity.
+    const { blockId, type, ...config } = block;
+    addBlockPreset(name, type, config);
+  };
+  return btn;
 }
 
 function createRemoveButton(index, page, onChange) {
@@ -552,7 +577,7 @@ function createAddBlockRow(page, onChange) {
   btn.className = "page-block-add-btn";
   btn.innerHTML = `${ICONS.plus}<span>Add Block</span>`;
   btn.onclick = () => {
-    openContextMenu(btn, Object.entries(BLOCK_TYPE_LABELS).map(([type, typeLabel]) => ({
+    const typeItems = Object.entries(BLOCK_TYPE_LABELS).map(([type, typeLabel]) => ({
       label: typeLabel,
       icon: ICONS[type],
       onClick: () => {
@@ -560,9 +585,75 @@ function createAddBlockRow(page, onChange) {
         updatePageBlocksEditor(page, onChange);
         onChange();
       },
-    })));
+    }));
+
+    const presets = loadBlockPresets();
+    const presetItems = presets.map((preset, i) => ({
+      label: `${preset.name} (${BLOCK_TYPE_LABELS[preset.blockType] || preset.blockType})`,
+      icon: ICONS[preset.blockType],
+      onClick: () => {
+        page.blocks.push({ ...createEmptyBlock(preset.blockType), ...preset.config });
+        updatePageBlocksEditor(page, onChange);
+        onChange();
+      },
+    }));
+    if (presets.length) {
+      presetItems.push({
+        label: "Manage Presets...",
+        icon: ICONS.bookmark,
+        onClick: () => openManagePresetsDialog(),
+      });
+    }
+
+    openContextMenu(btn, [...typeItems, ...presetItems]);
   };
   addRow.appendChild(btn);
 
   return addRow;
+}
+
+function openManagePresetsDialog() {
+  const presets = loadBlockPresets();
+
+  const content = document.createElement("div");
+  content.style.cssText = "max-height:16rem;overflow-y:auto;";
+  if (presets.length === 0) {
+    content.textContent = "No saved presets.";
+  }
+  presets.forEach((preset, i) => {
+    const row = document.createElement("div");
+    row.style.cssText = "display:flex;align-items:center;gap:0.5rem;padding:0.4rem 0;border-bottom:1px solid #444;";
+
+    const label = document.createElement("span");
+    label.style.flex = "1";
+    label.textContent = `${preset.name} (${BLOCK_TYPE_LABELS[preset.blockType] || preset.blockType})`;
+    row.appendChild(label);
+
+    const deleteBtn = document.createElement("button");
+    deleteBtn.type = "button";
+    deleteBtn.textContent = "Delete";
+    deleteBtn.className = "media-browser-delete-btn";
+    deleteBtn.onclick = () => {
+      deleteBlockPreset(i);
+      dialog.closeDialog();
+      openManagePresetsDialog();
+    };
+    row.appendChild(deleteBtn);
+
+    content.appendChild(row);
+  });
+
+  dialog.createDialog({
+    type: "custom",
+    message: "Manage Block Presets",
+    content: '<div id="managePresetsSlot"></div>',
+    buttons: [{ text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }],
+  });
+  // createDialog's `content` option only accepts an HTML string (it's
+  // innerHTML'd directly), but the delete buttons above need real onclick
+  // handlers, and preset names are arbitrary user text - building this via
+  // innerHTML would mean interpolating untrusted text into markup. Pass an
+  // empty placeholder slot above and fill it with the real DOM content
+  // built safely (createElement/textContent) once the dialog shell exists.
+  document.getElementById("managePresetsSlot")?.appendChild(content);
 }

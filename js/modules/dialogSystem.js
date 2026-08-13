@@ -65,6 +65,40 @@ export class DialogSystem {
   }
 
   /**
+   * Shows a single-line text-input dialog.
+   * @param {string} message - The message/label to display
+   * @param {string} defaultValue - Pre-filled input value
+   * @returns {Promise<string|null>} - Resolves to the trimmed input, or null if cancelled/empty
+   */
+  prompt(message, defaultValue = "") {
+    return new Promise((resolve) => {
+      this.createDialog({
+        type: "custom",
+        message,
+        content: `<input type="text" id="dialogPromptInput" value="${String(defaultValue).replace(/"/g, "&quot;")}"
+          style="width:100%;padding:0.6em;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />`,
+        buttons: [
+          { text: "Cancel", type: "secondary", onClick: () => { this.closeDialog(); resolve(null); } },
+          {
+            text: "OK",
+            type: "primary",
+            onClick: () => {
+              const input = document.getElementById("dialogPromptInput");
+              const value = input ? input.value.trim() : "";
+              this.closeDialog();
+              resolve(value || null);
+            }
+          }
+        ]
+      });
+      setTimeout(() => {
+        const input = document.getElementById("dialogPromptInput");
+        if (input) { input.focus(); input.select(); }
+      }, 150);
+    });
+  }
+
+  /**
    * Creates and displays a dialog
    * @param {Object} config - Dialog configuration
    */

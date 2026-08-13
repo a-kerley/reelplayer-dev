@@ -205,32 +205,12 @@ function countsFor(files, folder) {
   return { total: scoped.length, ...counts };
 }
 
+// Thin alias over dialog.prompt() - kept so every call site in this file
+// doesn't need touching now that the actual prompt UI lives in
+// dialogSystem.js (js/modules/pageBlocksEditor.js's block-preset save flow
+// uses dialog.prompt() directly instead of importing this).
 function promptForText(message, defaultValue = "") {
-  return new Promise((resolve) => {
-    dialog.createDialog({
-      type: "custom",
-      message,
-      content: `<input type="text" id="mediaBrowserPromptInput" value="${String(defaultValue).replace(/"/g, "&quot;")}"
-        style="width:100%;padding:0.6em;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />`,
-      buttons: [
-        { text: "Cancel", type: "secondary", onClick: () => { dialog.closeDialog(); resolve(null); } },
-        {
-          text: "OK",
-          type: "primary",
-          onClick: () => {
-            const input = document.getElementById("mediaBrowserPromptInput");
-            const value = input ? input.value.trim() : "";
-            dialog.closeDialog();
-            resolve(value || null);
-          }
-        }
-      ]
-    });
-    setTimeout(() => {
-      const input = document.getElementById("mediaBrowserPromptInput");
-      if (input) { input.focus(); input.select(); }
-    }, 150);
-  });
+  return dialog.prompt(message, defaultValue);
 }
 
 /**
