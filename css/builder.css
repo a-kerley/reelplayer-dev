@@ -666,6 +666,14 @@ body {
   cursor: pointer;
   margin-bottom: 1rem;
   transition: background 0.18s, border-color 0.18s, color 0.18s;
+  /* #pageLockBtn is a flex item of #pageBuilderView (a column flex
+     container), so without this it defaults to align-self:stretch and
+     fills the full available width - #reelLockBtn sits in a plain (non-
+     flex) container and was already naturally content-sized, so the two
+     rendered at very different widths. This pins both to content-width;
+     it's a no-op where there's no flex parent to override in the first
+     place. */
+  align-self: flex-start;
 }
 
 .lock-toggle-btn svg {
