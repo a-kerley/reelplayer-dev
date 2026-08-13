@@ -1041,6 +1041,14 @@ input.filename-display:focus {
   line-height: 1;
 }
 
+/* Matches .color-row's own font-size (css/builder.css) - previously unset
+   here, so these labels ("Font Size:", "Font Weight:", "Align:", "Padding
+   Below:") fell back to the browser default (16px) instead of the
+   0.85rem every other parameter row in the builder uses. */
+.appearance-option {
+  font-size: var(--builder-text-base);
+}
+
 .align-icon {
   opacity: 0.5;
   cursor: pointer;
