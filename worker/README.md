@@ -129,8 +129,10 @@ curl -X DELETE http://localhost:8787/drafts/pages/test123 -H "Authorization: Bea
 # Publish (password-gated) - id/slug required, previousSlug only when renaming.
 # analyticsEnabled/backgroundImageEnabled/backgroundImage/backgroundBlur/
 # backgroundParallaxMode/contentOverlayColor/contentOverlayOpacity/
-# contentMaxWidth/contentPaddingTop/contentPaddingBottom are all optional,
-# defaulting to off/empty/12/"fixed"/"#000000"/0/900/0/0.
+# contentOverlayFullBleed/contentOverlayMarginVertical/
+# contentOverlayMarginHorizontal/contentMaxWidth/contentPaddingTop/
+# contentPaddingBottom are all optional, defaulting to
+# off/empty/12/"fixed"/"#000000"/0/false/0/0/900/0/0.
 curl -X POST http://localhost:8787/pages/my-page-slug \
   -H "Authorization: Bearer YOUR_PASSWORD" \
   -H "Content-Type: application/json" \

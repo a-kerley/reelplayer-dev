@@ -90,13 +90,19 @@
         sendStatBeacon('page', slug, { event: 'view', sessionId: createSessionId() });
       }
 
+      // renderPage() first, THEN applyPageBackground() - the content-
+      // overlay layer inside applyPageBackground() measures the actual
+      // rendered .page-blocks-list/.page-status-message element, so it
+      // needs to already be in the DOM. (js/pagesController.js's
+      // renderPagePreview() already mounts content before calling this,
+      // so only this file needed reordering.)
+      renderPage(pageData);
+
       // scrollSource is `window` here (the real, standalone page) - see
       // js/modules/pageBackground.js's header comment for why the builder's
       // own live preview passes its own scrollable pane instead, and why
       // both call the exact same function rather than two implementations.
       applyPageBackground(document.body, pageData, window);
-
-      renderPage(pageData);
     }
 
     init();

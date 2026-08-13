@@ -47,28 +47,36 @@ body.page-body {
   background-repeat: no-repeat;
 }
 
+/* Content-column tint - js/modules/pageBackground.js's positionContentOverlay()
+   creates/positions/sizes this by MEASURING the actual content element
+   (.page-blocks-list/.page-status-message), rather than the element
+   carrying its own background-color, specifically so it can bleed outward
+   past that element's box (contentOverlayMarginVertical/Horizontal) or
+   stretch to the page's full height (contentOverlayFullBleed) - things a
+   background-color bound to the content element's own box could never do.
+   top/bottom/height/width/background-color are all set inline per-page;
+   this class only carries what's static across every page. */
+.page-content-overlay-layer {
+  position: absolute;
+  pointer-events: none;
+}
+
 .page-blocks-list {
   max-width: var(--page-content-max-width, 900px);
   margin: 0 auto;
   padding-top: var(--page-content-padding-top, 0px);
   padding-bottom: var(--page-content-padding-bottom, 0px);
   /* Without an explicit position, this (static, in-flow) content would
-     paint BEHIND .page-background-layer regardless of DOM order - CSS
-     stacking rules paint positioned descendants with z-index:auto as their
-     own group, always after non-positioned in-flow descendants, no matter
-     which comes first in the DOM. Being position:relative here (with no
-     z-index set, so no new stacking context or explicit layering, just
-     enough to join the same paint group as the background layer) lets DOM
-     order - the background layer is always inserted as the first child -
-     correctly decide the order within that shared group instead. */
+     paint BEHIND .page-background-layer/.page-content-overlay-layer
+     regardless of DOM order - CSS stacking rules paint positioned
+     descendants with z-index:auto as their own group, always after non-
+     positioned in-flow descendants, no matter which comes first in the
+     DOM. Being position:relative here (with no z-index set, so no new
+     stacking context or explicit layering, just enough to join the same
+     paint group as those layers) lets DOM order - both layers are always
+     inserted before this element - correctly decide the order within that
+     shared group instead. */
   position: relative;
-  /* Content-column tint (js/modules/pageBackground.js sets this custom
-     property on the outer scopeEl - document.body/the preview pane - and
-     it inherits down to here) - lets a background image show unobstructed
-     outside this column's own max-width while the column itself gets a
-     readable tint over it. transparent by default (opacity 0), so this is
-     a no-op until the builder's Content Background controls raise it. */
-  background-color: var(--page-content-overlay, transparent);
 }
 
 .page-block {
@@ -161,5 +169,4 @@ body.page-body {
   color: var(--page-text-muted);
   font-size: 0.95rem;
   position: relative; /* see .page-blocks-list's comment - same reason */
-  background-color: var(--page-content-overlay, transparent); /* see .page-blocks-list's comment - same reason */
 }

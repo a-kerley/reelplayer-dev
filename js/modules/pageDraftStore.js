@@ -24,6 +24,9 @@ function normalizePage(page) {
   if (page.backgroundParallaxMode === undefined) page.backgroundParallaxMode = "fixed";
   if (page.contentOverlayColor === undefined) page.contentOverlayColor = "#000000";
   if (page.contentOverlayOpacity === undefined) page.contentOverlayOpacity = 0;
+  if (page.contentOverlayFullBleed === undefined) page.contentOverlayFullBleed = false;
+  if (page.contentOverlayMarginVertical === undefined) page.contentOverlayMarginVertical = 0;
+  if (page.contentOverlayMarginHorizontal === undefined) page.contentOverlayMarginHorizontal = 0;
   if (page.contentMaxWidth === undefined) page.contentMaxWidth = 900;
   if (page.contentPaddingTop === undefined) page.contentPaddingTop = 0;
   if (page.contentPaddingBottom === undefined) page.contentPaddingBottom = 0;

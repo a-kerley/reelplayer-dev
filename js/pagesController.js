@@ -35,6 +35,9 @@ function createEmptyPage() {
     backgroundParallaxMode: "fixed",
     contentOverlayColor: "#000000",
     contentOverlayOpacity: 0,
+    contentOverlayFullBleed: false,
+    contentOverlayMarginVertical: 0,
+    contentOverlayMarginHorizontal: 0,
     contentMaxWidth: 900,
     contentPaddingTop: 0,
     contentPaddingBottom: 0,
@@ -312,6 +315,77 @@ export function initPagesController() {
       });
       overlayOpacitySlot.appendChild(row);
     }
+
+    const marginVerticalSlot = document.getElementById("pageContentOverlayMarginVerticalSlot");
+    const marginHorizontalSlot = document.getElementById("pageContentOverlayMarginHorizontalSlot");
+
+    // The vertical margin only has an effect when full-bleed is off (full-
+    // bleed already spans the whole page top-to-bottom, so a vertical
+    // margin on top of that would have nothing left to expand into) -
+    // hiding its row while full-bleed is on avoids offering a control that
+    // visibly does nothing.
+    function updateMarginVerticalVisibility() {
+      if (marginVerticalSlot) {
+        marginVerticalSlot.style.display = page.contentOverlayFullBleed ? "none" : "";
+      }
+    }
+
+    const fullBleedSlot = document.getElementById("pageContentOverlayFullBleedToggleSlot");
+    if (fullBleedSlot) {
+      fullBleedSlot.innerHTML = "";
+      fullBleedSlot.appendChild(createToggleSwitch({
+        id: "pageContentOverlayFullBleed",
+        checked: !!page.contentOverlayFullBleed,
+        onChange: (e) => {
+          page.contentOverlayFullBleed = e.target.checked;
+          updateMarginVerticalVisibility();
+          updateCurrentPage();
+        },
+      }));
+    }
+
+    if (marginVerticalSlot) {
+      marginVerticalSlot.innerHTML = "";
+      const { row, input } = createValueControl({
+        id: "pageContentOverlayMarginVertical",
+        label: "Vertical Margin (px):",
+        value: page.contentOverlayMarginVertical ?? 0,
+        min: 0,
+        max: 300,
+        step: 5,
+        unit: "px",
+      });
+      input.addEventListener("input", () => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) page.contentOverlayMarginVertical = val;
+      });
+      input.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      marginVerticalSlot.appendChild(row);
+    }
+    updateMarginVerticalVisibility();
+
+    if (marginHorizontalSlot) {
+      marginHorizontalSlot.innerHTML = "";
+      const { row, input } = createValueControl({
+        id: "pageContentOverlayMarginHorizontal",
+        label: "Horizontal Margin (px):",
+        value: page.contentOverlayMarginHorizontal ?? 0,
+        min: 0,
+        max: 300,
+        step: 5,
+        unit: "px",
+      });
+      input.addEventListener("input", () => {
+        const val = parseInt(input.value, 10);
+        if (!isNaN(val)) page.contentOverlayMarginHorizontal = val;
+      });
+      input.addEventListener("change", () => {
+        updateCurrentPage();
+      });
+      marginHorizontalSlot.appendChild(row);
+    }
   }
 
   // Page-level layout (content column max-width + top/bottom padding) -
@@ -485,6 +559,12 @@ export function initPagesController() {
               <input type="color" id="pageContentOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
             </div>
             <div id="pageContentOverlayOpacitySlot"></div>
+            <div class="color-row" style="margin-top:1rem;">
+              <label for="pageContentOverlayFullBleed" style="cursor:pointer;">Extend to top/bottom of page</label>
+              <span id="pageContentOverlayFullBleedToggleSlot"></span>
+            </div>
+            <div id="pageContentOverlayMarginVerticalSlot" style="margin-top:1rem;"></div>
+            <div id="pageContentOverlayMarginHorizontalSlot" style="margin-top:1rem;"></div>
           </div>
         </fieldset>
         <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">

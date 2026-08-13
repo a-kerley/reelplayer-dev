@@ -7,11 +7,18 @@
 // hand-duplicating js/player.js's render logic) this is designed to avoid
 // repeating for page-level styling too.
 //
-// Also sets the content column's own overlay tint (--page-content-overlay,
-// read by .page-blocks-list/.page-status-message in css/page.css) - a
-// second, independent effect that happens to live in this same function
-// since it's set on the same scopeEl at the same call site, not because
-// it's related to the background image/parallax mechanics below.
+// Also positions a second layer, .page-content-overlay-layer, a color+
+// opacity tint over the content column - independent of the background
+// image/parallax mechanics below (works with or without a background
+// image), living in this same function because it's page-level styling
+// applied the same way in both contexts, same reasoning as everything
+// else here. Sized by MEASURING the actual rendered content element
+// (.page-blocks-list/.page-status-message) rather than matching it via a
+// shared CSS property, specifically so it can be told to bleed outward
+// past that element's own box (contentOverlayMarginVertical/Horizontal)
+// or stretch to the page's full height (contentOverlayFullBleed) - things
+// a background-color set directly on the content element could never do,
+// since it's bound to that element's own box.
 //
 // "Fixed" and "scroll with parallax" are the same code path with a
 // different multiplier, not two separate implementations (no
@@ -54,6 +61,8 @@ function getContentHeight(scopeEl, scrollSource) {
  * @param {Object} page - backgroundImageEnabled, backgroundImage,
  *   backgroundBlur (px), backgroundParallaxMode ("fixed"|"scroll"),
  *   contentOverlayColor (hex), contentOverlayOpacity (0-100),
+ *   contentOverlayFullBleed (bool), contentOverlayMarginVertical (px,
+ *   ignored when contentOverlayFullBleed is true), contentOverlayMarginHorizontal (px),
  *   contentMaxWidth (px), contentPaddingTop (px), contentPaddingBottom (px)
  * @param {Window|HTMLElement} scrollSource - window for page.html, the
  *   scrollable preview pane element for the builder (its own internal
@@ -66,19 +75,41 @@ function getContentHeight(scopeEl, scrollSource) {
  *   persistent element like the preview pane, not the wiped content).
  */
 export function applyPageBackground(scopeEl, page, scrollSource) {
-  // Independent of backgroundImageEnabled below - the content overlay and
-  // layout properties all work (and default to their normal/invisible
-  // values) whether or not a background image is on.
-  scopeEl.style.setProperty(
-    "--page-content-overlay",
-    colorToRgba(page.contentOverlayColor || "#000000", (page.contentOverlayOpacity ?? 0) / 100)
-  );
+  const teardowns = [];
+
+  // Layout properties (independent of backgroundImageEnabled below - these
+  // work whether or not a background image is on).
   scopeEl.style.setProperty("--page-content-max-width", `${page.contentMaxWidth ?? 900}px`);
   scopeEl.style.setProperty("--page-content-padding-top", `${page.contentPaddingTop ?? 0}px`);
   scopeEl.style.setProperty("--page-content-padding-bottom", `${page.contentPaddingBottom ?? 0}px`);
 
+  if (getComputedStyle(scopeEl).position === "static") {
+    scopeEl.style.position = "relative";
+  }
+
+  // Positioned by measuring the content element (see positionContentOverlay
+  // below), so it needs to re-run any time that element's own size
+  // changes - not just on window resize, but also e.g. an image inside a
+  // block finishing its async load and growing the content taller after
+  // the initial measurement already ran. A ResizeObserver on the content
+  // element itself catches all of those causes uniformly, window resize
+  // included (resizing reflows the content, which resizes the observed
+  // element), so no separate "resize" listener is needed alongside it.
+  positionContentOverlay(scopeEl, page);
+  const overlayContentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
+  let contentResizeObserver = null;
+  if (overlayContentEl) {
+    contentResizeObserver = new ResizeObserver(() => positionContentOverlay(scopeEl, page));
+    contentResizeObserver.observe(overlayContentEl);
+  }
+  teardowns.push(() => contentResizeObserver?.disconnect());
+  teardowns.push(() => {
+    const existing = scopeEl.querySelector(".page-content-overlay-layer");
+    if (existing) existing.remove();
+  });
+
   if (!page.backgroundImageEnabled || !page.backgroundImage) {
-    return () => {};
+    return () => teardowns.forEach((fn) => fn());
   }
 
   const layer = document.createElement("div");
@@ -99,9 +130,6 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   layer.style.left = "0";
   layer.style.right = "0";
 
-  if (getComputedStyle(scopeEl).position === "static") {
-    scopeEl.style.position = "relative";
-  }
   scopeEl.insertBefore(layer, scopeEl.firstChild);
 
   const factor = page.backgroundParallaxMode === "scroll" ? PARALLAX_FACTOR : FIXED_FACTOR;
@@ -139,9 +167,67 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   scrollTarget.addEventListener("scroll", onScroll, { passive: true });
   window.addEventListener("resize", sizeLayer);
 
-  return () => {
+  teardowns.push(() => {
     scrollTarget.removeEventListener("scroll", onScroll);
     window.removeEventListener("resize", sizeLayer);
     layer.remove();
-  };
+  });
+
+  return () => teardowns.forEach((fn) => fn());
+}
+
+// Measures the actual rendered content element and positions/sizes
+// .page-content-overlay-layer to match it, optionally expanded outward by
+// contentOverlayMarginVertical/Horizontal or stretched to the full page
+// height (contentOverlayFullBleed). Re-runs on every call (idempotent -
+// finds and replaces the one instance), so both the initial call and the
+// resize listener above can share it directly. No-ops if the content
+// element isn't in the DOM yet (nothing to measure/align to).
+//
+// Searches with a plain (non `:scope >`) selector and inserts via
+// `contentEl.parentNode`, not `scopeEl`, because page.html nests the
+// content one level deeper (`body > #pageRoot > .page-blocks-list`) than
+// the builder's preview pane does (`#pagePreviewPane > .page-blocks-list`
+// directly) - this handles both without the caller needing to know which
+// shape it's in. The resulting DOM position doesn't affect the layer's
+// actual screen position (position:absolute resolves against the nearest
+// positioned ancestor, which is scopeEl in both cases since #pageRoot is
+// a plain static div with no position of its own), and still produces the
+// correct paint order (behind the background layer... behind this
+// overlay... behind the real content) because "positioned, z-index:auto"
+// elements paint in tree order across the whole subtree, not just among
+// literal siblings, as long as nothing between them establishes its own
+// stacking context - which #pageRoot doesn't.
+function positionContentOverlay(scopeEl, page) {
+  const existing = scopeEl.querySelector(".page-content-overlay-layer");
+  if (existing) existing.remove();
+
+  const contentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
+  if (!contentEl) return;
+
+  const marginH = page.contentOverlayMarginHorizontal ?? 0;
+  const marginV = page.contentOverlayMarginVertical ?? 0;
+  const fullBleed = page.contentOverlayFullBleed === true;
+
+  const overlay = document.createElement("div");
+  overlay.className = "page-content-overlay-layer";
+  overlay.style.left = "50%";
+  overlay.style.transform = "translateX(-50%)";
+  overlay.style.width = `${contentEl.offsetWidth + marginH * 2}px`;
+  overlay.style.backgroundColor = colorToRgba(
+    page.contentOverlayColor || "#000000",
+    (page.contentOverlayOpacity ?? 0) / 100
+  );
+
+  if (fullBleed) {
+    overlay.style.top = "0";
+    overlay.style.bottom = "0";
+    overlay.style.height = "";
+  } else {
+    overlay.style.top = `${contentEl.offsetTop - marginV}px`;
+    overlay.style.bottom = "";
+    overlay.style.height = `${contentEl.offsetHeight + marginV * 2}px`;
+  }
+
+  contentEl.parentNode.insertBefore(overlay, contentEl);
 }
