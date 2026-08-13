@@ -818,6 +818,52 @@ export async function renderMediaBrowser(container, options = {}) {
     body.replaceChild(newSidebar, oldSidebar);
   }
 
+  const TYPE_ROOT_FOLDERS = { audio: 'audio/', image: 'images/', video: 'video/' };
+
+  // Rule-based upload-destination suggestion, never automatic - just
+  // offered as a one-click nudge after uploading into the root/Unfiled
+  // view (see suggestMoveAfterUpload() below). Keyword match against
+  // existing folder names first (e.g. "hero-banner-2.jpg" landing while a
+  // "page-banners/" folder already exists), falling back to the file's
+  // broad type - the same audio/images/video split filePicker.js's
+  // R2_PREFIX_MAP already routes context-specific pickers' uploads to.
+  function suggestFolder(fileName) {
+    const base = fileName.toLowerCase().replace(/\.[^.]+$/, '');
+    const allFolders = computeFolders(state.files);
+    const keywordMatch = allFolders.find(f => {
+      const leaf = f.split('/').filter(Boolean).pop().toLowerCase();
+      return leaf.length > 2 && base.includes(leaf);
+    });
+    if (keywordMatch) return keywordMatch;
+    return TYPE_ROOT_FOLDERS[fileType(fileName)] || null;
+  }
+
+  // Only called after uploading into the Media Library's own root/Unfiled
+  // view - a select-mode picker is already folder-scoped to the right
+  // category by filePicker.js, and a named folder was presumably chosen on
+  // purpose, so neither needs a suggestion. Groups the just-uploaded files
+  // by suggested destination and asks once per group; declining leaves
+  // them exactly where they landed.
+  async function suggestMoveAfterUpload(fileNames) {
+    const byFolder = new Map();
+    fileNames.forEach((name) => {
+      const folder = suggestFolder(name);
+      if (!folder) return;
+      if (!byFolder.has(folder)) byFolder.set(folder, []);
+      byFolder.get(folder).push(name);
+    });
+    for (const [folder, names] of byFolder) {
+      const label = names.length === 1 ? names[0] : `${names.length} files`;
+      const confirmed = await dialog.confirm(
+        `${label} look like they belong in "${folder}" - move them there now?`,
+        "Move", "Leave in Unfiled"
+      );
+      if (!confirmed) continue;
+      const keys = state.files.filter((f) => folderOf(f.key) === '' && names.includes(f.name)).map((f) => f.key);
+      await moveFiles(keys, folder);
+    }
+  }
+
   function renderUploadZone() {
     const zone = document.createElement("div");
     zone.className = "media-browser-upload-zone";
@@ -835,26 +881,54 @@ export async function renderMediaBrowser(container, options = {}) {
 
     const targetFolder = state.view.type === 'folder' ? state.view.path : '';
 
+    // Per-file progress text (not a single "Uploading N file(s)..." for the
+    // whole batch) and continue-on-error (one bad file no longer aborts
+    // every file queued after it, which a single try/for-loop did before -
+    // failures are collected and reported together at the end instead).
     const handleFiles = async (fileList) => {
       const files = Array.from(fileList);
       if (!files.length) return;
-      zone.textContent = `Uploading ${files.length} file(s)...`;
-      try {
-        for (const file of files) {
+
+      const failures = [];
+      const succeeded = [];
+      for (let i = 0; i < files.length; i++) {
+        const file = files[i];
+        zone.textContent = `Uploading ${i + 1} of ${files.length}: ${file.name}...`;
+        try {
           await uploadFile(targetFolder, file, state.password);
+          succeeded.push(file.name);
+        } catch (error) {
+          failures.push(`${file.name}: ${error.message}`);
         }
-        await refresh();
-      } catch (error) {
-        dialog.alert(error.message);
-        await refresh();
+      }
+
+      await refresh();
+
+      if (failures.length) {
+        dialog.alert(`${failures.length} of ${files.length} file(s) failed to upload:\n\n${failures.join('\n')}`);
+      }
+
+      if (mode === 'manage' && targetFolder === '' && succeeded.length) {
+        await suggestMoveAfterUpload(succeeded);
       }
     };
 
     link.onclick = (e) => { e.preventDefault(); input.click(); };
     input.onchange = () => handleFiles(input.files);
-    zone.addEventListener("dragover", (e) => { e.preventDefault(); zone.classList.add("dragover"); });
+    // types.includes("Files") excludes an internal file-row/card drag (see
+    // dragKeysFor()'s "application/x-media-keys" payload) from lighting up
+    // this zone as a drop target - that drag is for moving between
+    // folders, not uploading, and dataTransfer.files is empty for it
+    // anyway, but skipping the dragover highlight avoids a confusing flash
+    // of "drop to upload" affordance during an unrelated organize-drag.
+    zone.addEventListener("dragover", (e) => {
+      if (!e.dataTransfer.types.includes("Files")) return;
+      e.preventDefault();
+      zone.classList.add("dragover");
+    });
     zone.addEventListener("dragleave", () => zone.classList.remove("dragover"));
     zone.addEventListener("drop", (e) => {
+      if (!e.dataTransfer.types.includes("Files")) return;
       e.preventDefault();
       zone.classList.remove("dragover");
       handleFiles(e.dataTransfer.files);
