@@ -35,7 +35,12 @@
 //   DELETE /drafts/pages/:id  - password-gated, removes the entry
 //   POST   /media/upload      - password-gated, ?key=<key>, body = raw file bytes
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
-//   POST   /media/rename      - password-gated, body {from, to}
+//   POST   /media/rename      - password-gated, body {from, to}. Also scans every reel/page
+//                               (published and draft) for a stored URL pointing at `from` and
+//                               rewrites it to `to` in place - a rename/move never silently
+//                               orphans a reference (see findMediaReferences()).
+//   GET    /media/usages      - password-gated, ?key=<key>, read-only preview of exactly what
+//                               that rewrite above would touch - {matches: [{key, type, title}]}
 //   DELETE /media/delete      - password-gated, ?key=<key>
 //   POST   /stats/:type/:id   - public, body {event, sessionId, trackIndex?, trackTitle?,
 //                               listenSeconds?}; :type is "reel" or "page". No-ops (200, no
@@ -57,6 +62,11 @@
 // rather than a stable id, unlike reels which are keyed by their immutable
 // embed id - see the POST /pages/:slug handler for the rename/collision
 // mechanics this requires that reels don't need.
+
+// Keep in sync with js/config.js's R2_PUBLIC_URL - reels/pages store a
+// file's full public URL (this + "/" + its R2 key), not the bare key, so
+// finding/rewriting references needs to reconstruct that same URL here.
+const R2_PUBLIC_URL = "https://media.boxedape.com";
 
 const CORS_HEADERS = {
   "Access-Control-Allow-Origin": "*",
@@ -501,7 +511,67 @@ export default {
       }
     }
 
-    // POST /media/upload?key=<key>
+    // Type label for a REELS-namespace key, for display in the /media/usages
+// preview and nowhere else - matches worker/CLAUDE.md's key-prefix scheme.
+// Order matters: "draft_page_" must be checked before "draft_", since every
+// draft_page_<id> key also starts with "draft_" (see listEntries()'s own
+// comment on the same ambiguity).
+function keyEntryType(keyName) {
+  if (keyName.startsWith("draft_page_")) return "page draft";
+  if (keyName.startsWith("page_")) return "page";
+  if (keyName.startsWith("draft_")) return "reel draft";
+  if (keyName.startsWith("reel_")) return "reel";
+  return "other";
+}
+
+// Every reel/page (published or draft) whose stored JSON contains
+// `urlSubstring` - a file's full public URL, since that's what's actually
+// embedded in a block/track field, not the bare R2 key. Scans the whole
+// REELS namespace (skipping stat_* entries, which never hold media
+// references) - no cursor pagination, matching listEntries()'s existing
+// convention elsewhere in this file; acceptable at current KV volume, but
+// a scaling caveat if this namespace grows into the tens of thousands of
+// entries.
+async function findMediaReferences(env, urlSubstring) {
+  const list = await env.REELS.list({ prefix: "" });
+  const matches = [];
+  for (const key of list.keys) {
+    if (key.name.startsWith("stat_")) continue;
+    const value = await env.REELS.get(key.name);
+    if (!value || !value.includes(urlSubstring)) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      continue;
+    }
+    matches.push({ key: key.name, type: keyEntryType(key.name), title: parsed.title || parsed.slug || key.name });
+  }
+  return matches;
+}
+
+// After a media file's R2 key changes (rename or move - same worker
+// operation, see POST /media/rename), rewrite every reference to its old
+// URL found by findMediaReferences() to the new one, in place. A plain
+// substring replace on the raw stored JSON text (not a parse/mutate/re-
+// stringify) - safe here because a URL contains no characters that need
+// JSON escaping, and simpler than walking an unknown, evolving set of
+// possible field shapes (block.imageUrl, track.url, block.backgroundImage,
+// ...) by hand.
+async function rewriteMediaReferences(env, fromUrl, toUrl) {
+  const list = await env.REELS.list({ prefix: "" });
+  let updated = 0;
+  for (const key of list.keys) {
+    if (key.name.startsWith("stat_")) continue;
+    const value = await env.REELS.get(key.name);
+    if (!value || !value.includes(fromUrl)) continue;
+    await env.REELS.put(key.name, value.split(fromUrl).join(toUrl));
+    updated++;
+  }
+  return updated;
+}
+
+// POST /media/upload?key=<key>
     if (pathname === "/media/upload" && request.method === "POST") {
       const authError = requireAuth(request, env);
       if (authError) return authError;
@@ -568,6 +638,21 @@ export default {
       return jsonResponse({ folders, files });
     }
 
+    // GET /media/usages?key=<key> - read-only preview of every reel/page
+    // (published or draft) whose stored JSON currently references this
+    // file, so the builder can warn before a rename/move that's about to
+    // rewrite them.
+    if (pathname === "/media/usages" && request.method === "GET") {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+      const key = new URL(request.url).searchParams.get("key");
+      if (!isValidMediaKey(key)) {
+        return jsonResponse({ error: "Invalid key" }, 400);
+      }
+      const matches = await findMediaReferences(env, `${R2_PUBLIC_URL}/${key}`);
+      return jsonResponse({ matches });
+    }
+
     // POST /media/rename  body: { from, to }
     if (pathname === "/media/rename" && request.method === "POST") {
       const authError = requireAuth(request, env);
@@ -587,7 +672,9 @@ export default {
         customMetadata: existing.customMetadata,
       });
       await env.MEDIA.delete(from);
-      return jsonResponse({ ok: true });
+
+      const updated = await rewriteMediaReferences(env, `${R2_PUBLIC_URL}/${from}`, `${R2_PUBLIC_URL}/${to}`);
+      return jsonResponse({ ok: true, updated });
     }
 
     // DELETE /media/delete?key=<key>

@@ -211,6 +211,21 @@
   color: #fff;
 }
 
+.media-browser-folder-row.drop-target {
+  background: #4a90e2;
+  color: #fff;
+  outline: 2px dashed #fff;
+  outline-offset: -2px;
+}
+
+.media-browser-row[draggable="true"] {
+  cursor: grab;
+}
+
+.media-browser-card[draggable="true"] {
+  cursor: grab;
+}
+
 .media-browser-folder-label {
   display: flex;
   align-items: center;

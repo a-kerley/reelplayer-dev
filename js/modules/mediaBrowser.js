@@ -142,6 +142,25 @@ async function renameFile(from, to, password) {
   }
 }
 
+// Read-only preview of what POST /media/rename would rewrite - see
+// worker/src/index.js's findMediaReferences(). Used to warn before a
+// rename/move that a file is actually in use, not to perform the rewrite
+// itself (the Worker does that unconditionally as part of the rename call).
+async function fetchMediaUsages(key, password) {
+  const response = await fetch(`${WORKER_BASE_URL}/media/usages?key=${encodeURIComponent(key)}`, {
+    headers: authHeaders(password)
+  });
+  if (response.status === 401) {
+    clearBuilderPassword();
+    throw new Error("Incorrect password.");
+  }
+  if (!response.ok) {
+    throw new Error(`Failed to check file usages (status ${response.status}).`);
+  }
+  const { matches } = await response.json();
+  return matches;
+}
+
 async function deleteFile(key, password) {
   const response = await fetch(`${WORKER_BASE_URL}/media/delete?key=${encodeURIComponent(key)}`, {
     method: "DELETE",
@@ -479,7 +498,7 @@ export async function renderMediaBrowser(container, options = {}) {
     sidebar.style.width = `${state.sidebarWidth}px`;
 
     const unfiledRow = folderNavItem("Unfiled", () => navigateToFolder(''),
-      state.view.type === 'folder' && state.view.path === '', countsFor(state.files, ''));
+      state.view.type === 'folder' && state.view.path === '', countsFor(state.files, ''), 0, '');
     sidebar.appendChild(unfiledRow);
 
     if (mode === 'manage') {
@@ -581,7 +600,85 @@ export async function renderMediaBrowser(container, options = {}) {
     }
 
     row.onclick = onClick;
+    if (path !== null) setupFolderDropTarget(row, path);
     return row;
+  }
+
+  // Renaming/moving a file changes its R2 key, which used to silently
+  // orphan any reel/page block still pointing at the old URL - the Worker
+  // now self-heals that automatically as part of the rename call itself
+  // (see worker/src/index.js's rewriteMediaReferences()), but the user
+  // should still get a say in whether the move happens at all, not just a
+  // silent rewrite after the fact - hence this confirmation, checked
+  // BEFORE calling renameFile. Returns true if it's fine to proceed
+  // (nothing referenced it, or the user confirmed anyway).
+  async function confirmIfInUse(keys) {
+    let matches;
+    try {
+      const perKey = await Promise.all(keys.map((key) => fetchMediaUsages(key, state.password)));
+      const seen = new Set();
+      matches = perKey.flat().filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)));
+    } catch (error) {
+      dialog.alert(error.message);
+      return false;
+    }
+    if (matches.length === 0) return true;
+
+    const list = matches.slice(0, 10).map((m) => `${m.title} (${m.type})`).join(", ")
+      + (matches.length > 10 ? `, and ${matches.length - 10} more` : "");
+    return dialog.confirm(
+      `This will update ${matches.length} place(s) that reference the file(s) you're moving: ${list}. Continue?`,
+      "Move", "Cancel"
+    );
+  }
+
+  // Shared by the bulk-bar "Move to folder..." button, a file row's "Move
+  // to..." context-menu entry, and drag-and-drop - all three are just this
+  // same rename-to-a-new-prefix operation, one call per file.
+  async function moveFiles(keys, destFolder) {
+    const toMove = keys.filter((key) => {
+      const file = state.files.find(f => f.key === key);
+      return file && !file.readOnly && folderOf(file.key) !== destFolder;
+    });
+    if (toMove.length === 0) return;
+    if (!(await confirmIfInUse(toMove))) return;
+
+    try {
+      for (const key of toMove) {
+        const file = state.files.find(f => f.key === key);
+        await renameFile(key, `${destFolder}${file.name}`, state.password);
+      }
+      await refresh();
+    } catch (error) {
+      dialog.alert(error.message);
+      await refresh();
+    }
+  }
+
+  // Keys carried by an in-progress drag - a dragged file that's part of the
+  // active multi-selection drags the whole selection, otherwise just itself.
+  function dragKeysFor(file) {
+    return state.selected.has(file.key) && state.selected.size > 1
+      ? Array.from(state.selected)
+      : [file.key];
+  }
+
+  function setupFolderDropTarget(row, path) {
+    if (mode !== 'manage') return;
+    row.addEventListener("dragover", (e) => {
+      e.preventDefault();
+      e.dataTransfer.dropEffect = "move";
+      row.classList.add("drop-target");
+    });
+    row.addEventListener("dragleave", () => row.classList.remove("drop-target"));
+    row.addEventListener("drop", (e) => {
+      e.preventDefault();
+      row.classList.remove("drop-target");
+      const raw = e.dataTransfer.getData("application/x-media-keys");
+      if (!raw) return;
+      const keys = JSON.parse(raw);
+      moveFiles(keys, path);
+    });
   }
 
   function showFolderMenu(path, anchorEl) {
@@ -597,6 +694,7 @@ export async function renderMediaBrowser(container, options = {}) {
           if (!newName || newName === currentName) return;
           const newPrefix = `${parentPath}${newName}/`;
           const filesToMove = state.files.filter(f => f.key.startsWith(path));
+          if (!(await confirmIfInUse(filesToMove.map(f => f.key)))) return;
           try {
             for (const f of filesToMove) {
               const newKey = `${newPrefix}${f.key.slice(path.length)}`;
@@ -778,16 +876,7 @@ export async function renderMediaBrowser(container, options = {}) {
       const dest = await promptForText("Move selected files to folder (e.g. backgrounds/nature):");
       if (dest === null) return;
       const folder = dest ? dest.replace(/^\/+|\/+$/g, '') + '/' : '';
-      try {
-        for (const key of state.selected) {
-          const file = state.files.find(f => f.key === key);
-          if (!file || file.readOnly) continue;
-          await renameFile(key, `${folder}${file.name}`, state.password);
-        }
-        await refresh();
-      } catch (error) {
-        dialog.alert(error.message);
-      }
+      await moveFiles(Array.from(state.selected), folder);
     };
 
     const deleteBtn = document.createElement("button");
@@ -876,6 +965,14 @@ export async function renderMediaBrowser(container, options = {}) {
     const row = document.createElement("tr");
     row.className = "media-browser-row";
 
+    if (mode === 'manage' && !file.readOnly) {
+      row.draggable = true;
+      row.addEventListener("dragstart", (e) => {
+        e.dataTransfer.effectAllowed = "move";
+        e.dataTransfer.setData("application/x-media-keys", JSON.stringify(dragKeysFor(file)));
+      });
+    }
+
     if (mode === 'manage') {
       const cb = document.createElement("td");
       const checkbox = document.createElement("input");
@@ -962,12 +1059,22 @@ export async function renderMediaBrowser(container, options = {}) {
         onClick: async () => {
           const newName = await promptForText("Rename file", file.name);
           if (!newName || newName === file.name) return;
+          if (!(await confirmIfInUse([file.key]))) return;
           try {
             await renameFile(file.key, `${folderOf(file.key)}${newName}`, state.password);
             await refresh();
           } catch (error) {
             dialog.alert(error.message);
           }
+        }
+      },
+      {
+        label: "Move to...",
+        onClick: async () => {
+          const dest = await promptForText("Move to folder (e.g. backgrounds/nature):", folderOf(file.key));
+          if (dest === null) return;
+          const folder = dest ? dest.replace(/^\/+|\/+$/g, '') + '/' : '';
+          await moveFiles([file.key], folder);
         }
       },
       {
@@ -995,6 +1102,14 @@ export async function renderMediaBrowser(container, options = {}) {
       const type = fileType(file.name);
       const card = document.createElement("div");
       card.className = "media-browser-card";
+
+      if (mode === 'manage' && !file.readOnly) {
+        card.draggable = true;
+        card.addEventListener("dragstart", (e) => {
+          e.dataTransfer.effectAllowed = "move";
+          e.dataTransfer.setData("application/x-media-keys", JSON.stringify(dragKeysFor(file)));
+        });
+      }
 
       const preview = document.createElement("div");
       preview.className = "media-browser-card-preview";
