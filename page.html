@@ -32,6 +32,7 @@
     import { renderBlock } from './js/modules/pageBlockRenderer.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
     import { applyPageBackground } from './js/modules/pageBackground.js';
+    import { applyTextStyles } from './js/modules/pageTextStyles.js';
 
     const root = document.getElementById('pageRoot');
 
@@ -149,6 +150,7 @@
       // own live preview passes its own scrollable pane instead, and why
       // both call the exact same function rather than two implementations.
       applyPageBackground(document.body, pageData, window);
+      applyTextStyles(document.body, pageData);
     }
 
     init();

@@ -35,6 +35,9 @@ export function contentFingerprint(page) {
     contentMaxWidth: page.contentMaxWidth,
     contentPaddingTop: page.contentPaddingTop,
     contentPaddingBottom: page.contentPaddingBottom,
+    textFontFamily: page.textFontFamily,
+    textFontSize: page.textFontSize,
+    textFontWeight: page.textFontWeight,
   });
 }
 
@@ -97,6 +100,9 @@ export async function publishPage(page, slug) {
       contentMaxWidth: typeof page.contentMaxWidth === "number" ? page.contentMaxWidth : 900,
       contentPaddingTop: typeof page.contentPaddingTop === "number" ? page.contentPaddingTop : 0,
       contentPaddingBottom: typeof page.contentPaddingBottom === "number" ? page.contentPaddingBottom : 0,
+      textFontFamily: page.textFontFamily || null,
+      textFontSize: typeof page.textFontSize === "number" ? page.textFontSize : null,
+      textFontWeight: page.textFontWeight || null,
     }),
   });
 

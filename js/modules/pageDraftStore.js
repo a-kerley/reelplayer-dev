@@ -30,6 +30,9 @@ function normalizePage(page) {
   if (page.contentMaxWidth === undefined) page.contentMaxWidth = 900;
   if (page.contentPaddingTop === undefined) page.contentPaddingTop = 0;
   if (page.contentPaddingBottom === undefined) page.contentPaddingBottom = 0;
+  if (page.textFontFamily === undefined) page.textFontFamily = null;
+  if (page.textFontSize === undefined) page.textFontSize = null;
+  if (page.textFontWeight === undefined) page.textFontWeight = null;
   return page;
 }
 

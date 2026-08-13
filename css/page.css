@@ -123,6 +123,12 @@ body.page-body {
 .page-block-text {
   padding: 1.5rem 1rem;
   color: var(--page-text);
+  /* Per-page overrides (js/modules/pageTextStyles.js) set these as inline
+     custom properties on an ancestor - a page with none of them set falls
+     straight back to the font-family already inherited from body and this
+     rule's own default size/weight, so this is invisible/no-op for every
+     page saved before this feature existed. */
+  font-family: var(--page-text-font-family, inherit);
 }
 
 .page-block-text h2 {
@@ -135,6 +141,8 @@ body.page-body {
   margin: 0 0 0.7rem;
   line-height: 1.6;
   color: var(--page-text-muted);
+  font-size: var(--page-text-font-size, 1rem);
+  font-weight: var(--page-text-font-weight, 400);
 }
 
 .page-block-text a {
