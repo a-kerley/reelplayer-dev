@@ -567,6 +567,7 @@ body {
 #exportEmbedBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
+#previewPageBtn,
 #refreshPreviewBtn {
   background: var(--builder-accent);
   color: white;
@@ -582,7 +583,8 @@ body {
 #addTrackBtn,
 #exportEmbedBtn,
 #manageEmbedsBtn,
-#managePagesBtn {
+#managePagesBtn,
+#previewPageBtn {
   font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
@@ -592,6 +594,7 @@ body {
 #exportEmbedBtn:hover,
 #manageEmbedsBtn:hover,
 #managePagesBtn:hover,
+#previewPageBtn:hover,
 #refreshPreviewBtn:hover {
   background: var(--builder-hover);
 }

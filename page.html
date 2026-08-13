@@ -50,6 +50,34 @@
       }
     }
 
+    // Draft preview mode ("Preview Page" in the builder) - reads the
+    // in-progress, possibly-unpublished/unsaved page straight out of
+    // localStorage rather than fetching a published slug from the Worker,
+    // so it always reflects exactly what's in the editor right now, not
+    // whatever was last published. Same-origin only (localStorage doesn't
+    // cross origins), which holds here since page.html and the builder are
+    // served from the same static host. js/pagesController.js's
+    // handlePreview() is the sole writer of this key.
+    const PREVIEW_STORAGE_KEY = 'reelplayer:pagePreview';
+
+    function loadPreviewPageData() {
+      try {
+        const raw = localStorage.getItem(PREVIEW_STORAGE_KEY);
+        return raw ? JSON.parse(raw) : null;
+      } catch (e) {
+        console.error('Failed to read page preview data:', e);
+        return null;
+      }
+    }
+
+    function addPreviewWatermark() {
+      const bar = document.createElement('div');
+      bar.className = 'page-preview-watermark';
+      bar.textContent = 'PREVIEW — this is not the published page';
+      document.body.prepend(bar);
+      document.body.classList.add('page-preview-mode');
+    }
+
     function renderPage(pageData) {
       document.title = pageData.title || 'Page';
 
@@ -71,23 +99,35 @@
     }
 
     async function init() {
-      const slug = new URLSearchParams(window.location.search).get('slug');
-      if (!slug) {
-        showStatus('No page specified.');
-        return;
-      }
+      const params = new URLSearchParams(window.location.search);
+      const isPreview = params.get('preview') === '1';
+      const slug = params.get('slug');
 
-      const pageData = await loadPageData(slug);
-      if (!pageData) {
-        showStatus('Page not found.');
-        return;
+      let pageData;
+      if (isPreview) {
+        pageData = loadPreviewPageData();
+        if (!pageData) {
+          showStatus('No preview data found - open this from the "Preview Page" button in the builder.');
+          return;
+        }
+      } else {
+        if (!slug) {
+          showStatus('No page specified.');
+          return;
+        }
+        pageData = await loadPageData(slug);
+        if (!pageData) {
+          showStatus('Page not found.');
+          return;
+        }
       }
 
       // Opt-in analytics - a page never plays anything itself (a player
       // block's iframe is just player.html, tracked independently under
       // that reel's own analyticsEnabled - see js/modules/statsBeacon.js),
       // so this is the entire page-side integration: one "view" beacon.
-      if (pageData.analyticsEnabled === true) {
+      // Skipped entirely in preview mode - it's not a real visit.
+      if (!isPreview && pageData.analyticsEnabled === true) {
         sendStatBeacon('page', slug, { event: 'view', sessionId: createSessionId() });
       }
 
@@ -98,6 +138,11 @@
       // renderPagePreview() already mounts content before calling this,
       // so only this file needed reordering.)
       renderPage(pageData);
+
+      // Added before applyPageBackground() runs, not after - it measures
+      // contentEl.offsetTop, which the watermark bar's body padding-top
+      // shifts. Adding the padding first keeps that measurement accurate.
+      if (isPreview) addPreviewWatermark();
 
       // scrollSource is `window` here (the real, standalone page) - see
       // js/modules/pageBackground.js's header comment for why the builder's

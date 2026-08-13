@@ -461,33 +461,20 @@ export function initPagesController() {
     }
   }
 
-  // page.html only ever serves the last-published content (GET /pages/:slug
-  // has no draft-preview path - drafts are password-gated, page.html is
-  // public), so "preview" opens the live published URL rather than the
-  // in-progress draft. If the draft has unsaved changes since the last
-  // publish, warn before opening so the preview isn't mistaken for a
-  // live view of what's currently in the editor.
+  // Works before the page is ever published/saved, unlike a real GET
+  // /pages/:slug fetch (password-gated, and there's no draft-preview route
+  // on the Worker anyway - see worker/CLAUDE.md). Instead this writes the
+  // in-progress page straight into localStorage and opens page.html in
+  // preview mode, which reads it back out from there rather than fetching
+  // anything - see page.html's PREVIEW_STORAGE_KEY. Same-origin only
+  // (page.html and the builder share a host), and the opened tab gets a
+  // watermark so a draft preview is never mistaken for the live page - it
+  // deliberately does NOT use the real publish URL.
+  const PAGE_PREVIEW_STORAGE_KEY = "reelplayer:pagePreview";
+
   function handlePreview(page) {
-    if (!page.publishedSlug) {
-      dialog.alert("Publish the page first to preview it.");
-      return;
-    }
-
-    const url = publicPageUrl(page.publishedSlug);
-    if (contentFingerprint(page) !== page.publishedContentHash) {
-      dialog.createDialog({
-        type: "custom",
-        message: "You have unpublished changes",
-        content: `<p>The live page won't reflect your latest edits until you publish again. Preview the currently live version anyway?</p>`,
-        buttons: [
-          { text: "Preview Live Version", type: "primary", onClick: () => { window.open(url, "_blank"); dialog.closeDialog(); } },
-          { text: "Cancel", type: "secondary", onClick: () => dialog.closeDialog() },
-        ],
-      });
-      return;
-    }
-
-    window.open(url, "_blank");
+    localStorage.setItem(PAGE_PREVIEW_STORAGE_KEY, JSON.stringify(page));
+    window.open("page.html?preview=1", "_blank");
   }
 
   async function handlePublish(page) {

@@ -166,6 +166,29 @@ body.page-body {
   border-radius: 8px;
 }
 
+/* page.html-only, preview-mode ("Preview Page" in the builder): a fixed
+   banner making it unmistakable this is draft content, not the live page -
+   never rendered by the builder's own preview pane, which has its own
+   surrounding chrome making that obvious already. */
+.page-preview-watermark {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  z-index: 9999;
+  padding: 0.5rem 1rem;
+  background: #e2a03f;
+  color: #1a1200;
+  font-weight: 700;
+  font-size: 0.85rem;
+  text-align: center;
+  letter-spacing: 0.02em;
+}
+
+body.page-preview-mode {
+  padding-top: 2.2rem;
+}
+
 /* Top-level loading/error states (page.html) and the "no content yet"
    empty state (both page.html and the builder's own preview pane, via
    js/pagesController.js's renderPagePreview()). */
