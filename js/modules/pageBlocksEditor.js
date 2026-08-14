@@ -704,6 +704,37 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return Math.round(parseFloat(getComputedStyle(el || editable).fontSize)) || 16;
   }
 
+  // The size to *display* for a real (non-collapsed) selection - null if
+  // it's mixed (several different sizes in it, e.g. right after
+  // applyFontSizeStep() scaled differently-sized runs by differing
+  // amounts), a single px number if every run in it agrees. Reads via
+  // cloneContents() rather than findWrappingSpan()'s single-ancestor walk
+  // - that only ever finds a size when the *whole* selection sits inside
+  // one common span, so it silently fell back to the surrounding
+  // <p>'s own base size (e.g. showing a stale "16" after a multi-run
+  // step actually took each run to a different, correct, size) for any
+  // selection spanning more than one span - not wrong, but confusing
+  // enough to read as the spinner not doing anything.
+  function selectionFontSizePx(range, baseSizePx) {
+    const fragment = range.cloneContents();
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+    let result = null;
+    let textNode;
+    while ((textNode = walker.nextNode())) {
+      if (!textNode.textContent) continue;
+      let el = textNode.parentElement;
+      let size = null;
+      while (el && el !== fragment) {
+        if (el.tagName === "SPAN" && el.style.fontSize) { size = parseInt(el.style.fontSize, 10); break; }
+        el = el.parentElement;
+      }
+      if (size === null) size = baseSizePx;
+      if (result === null) result = size;
+      else if (result !== size) return null;
+    }
+    return result;
+  }
+
   // Reflects the current selection's actual style/font/size back into the
   // toolbar - called on every selection change (mouseup/keyup/click below)
   // and right after applying a change, the same idea as
@@ -715,8 +746,15 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     const hasRange = sel.rangeCount && editable.contains(sel.anchorNode);
     const range = hasRange ? sel.getRangeAt(0) : null;
 
-    const sizeSpan = range && findWrappingSpan(range, "fontSize");
-    sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();
+    if (range && !range.collapsed) {
+      const px = selectionFontSizePx(range, effectiveFontSizePx());
+      sizeInput.value = px === null ? "" : px;
+      sizeInput.placeholder = px === null ? "Mixed" : "";
+    } else {
+      const sizeSpan = range && findWrappingSpan(range, "fontSize");
+      sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();
+      sizeInput.placeholder = "";
+    }
 
     const fontSpan = range && findWrappingSpan(range, "fontFamily");
     // Compared with quotes stripped on both sides - see htmlSanitizer.js's
