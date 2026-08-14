@@ -21,6 +21,7 @@ const BLOCK_TYPE_LABELS = {
   image: "Image",
   player: "Player",
   "embedded-video": "Embedded Video",
+  button: "Button",
 };
 
 // Same Pickr library the reel builder's own color controls use (see
@@ -119,6 +120,7 @@ const ICONS = {
   image: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7.6V20.4C21 20.7314 20.7314 21 20.4 21H7.6C7.26863 21 7 20.7314 7 20.4V7.6C7 7.26863 7.26863 7 7.6 7H20.4C20.7314 7 21 7.26863 21 7.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4H4.6C4.26863 4 4 4.26863 4 4.6V18" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16.8L12.4444 15L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 13C15.6716 13 15 12.3284 15 11.5C15 10.6716 15.6716 10 16.5 10C17.3284 10 18 10.6716 18 11.5C18 12.3284 17.3284 13 16.5 13Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   player: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   "embedded-video": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 6.6V17.4C21 17.9523 20.5523 18.4 20 18.4H4C3.44772 18.4 3 17.9523 3 17.4V6.6C3 6.04772 3.44772 5.6 4 5.6H20C20.5523 5.6 21 6.04772 21 6.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9.2L14.5 12L10 14.8V9.2Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  button: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.6C3 7.71634 3.71634 7 4.6 7H19.4C20.2837 7 21 7.71634 21 8.6V15.4C21 16.2837 20.2837 17 19.4 17H4.6C3.71634 17 3 16.2837 3 15.4V8.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12H17" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   bookmark: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6 4.5C6 3.67157 6.67157 3 7.5 3H16.5C17.3284 3 18 3.67157 18 4.5V21L12 17L6 21V4.5Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
 };
 
@@ -144,6 +146,8 @@ function createEmptyBlock(type) {
       return { blockId, type, reelId: "", reelTitle: "", height: 500 };
     case "embedded-video":
       return { blockId, type, videoUrl: "", aspectRatio: "16:9" };
+    case "button":
+      return { blockId, type, label: "Click Here", url: "", alignment: "center", backgroundColor: "#4a90e2", textColor: "#ffffff" };
     default:
       throw new Error(`Unknown block type: ${type}`);
   }
@@ -378,6 +382,9 @@ function createConfigForm(block, page, onChange, refreshPreview) {
       break;
     case "embedded-video":
       form.appendChild(createEmbeddedVideoConfig(block, onChange, refreshPreview));
+      break;
+    case "button":
+      form.appendChild(createButtonConfig(block, onChange, refreshPreview));
       break;
     default:
       form.textContent = `Unknown block type: ${block.type}`;
@@ -1730,6 +1737,116 @@ function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
   };
   aspectRow.append(aspectLabel, aspectSelect);
   wrap.appendChild(aspectRow);
+
+  return wrap;
+}
+
+function createButtonConfig(block, onChange, refreshPreview) {
+  const wrap = document.createElement("div");
+
+  const labelRow = document.createElement("div");
+  labelRow.className = "color-row";
+  const labelLabel = document.createElement("span");
+  labelLabel.textContent = "Label:";
+  const labelInput = document.createElement("input");
+  labelInput.type = "text";
+  labelInput.value = block.label || "";
+  labelInput.placeholder = "Click Here";
+  labelInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
+  labelInput.oninput = () => { block.label = labelInput.value; };
+  labelInput.onblur = () => { refreshPreview(); onChange(); };
+  labelRow.append(labelLabel, labelInput);
+  wrap.appendChild(labelRow);
+
+  const urlRow = document.createElement("div");
+  urlRow.className = "color-row";
+  urlRow.style.marginTop = "0.5rem";
+  const urlLabel = document.createElement("span");
+  urlLabel.textContent = "Link URL:";
+  const urlInput = document.createElement("input");
+  urlInput.type = "url";
+  urlInput.value = block.url || "";
+  urlInput.placeholder = "https://example.com";
+  urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
+  // Always opens in a new tab (renderButtonBlock() sets target="_blank"
+  // unconditionally, no per-block toggle) - the scheme is normalized the
+  // same way the toolbar's own link button does, so a pasted "example.com"
+  // still becomes a real, followable https:// URL rather than a broken
+  // page-relative one.
+  urlInput.oninput = () => { block.url = urlInput.value; };
+  urlInput.onblur = () => {
+    const trimmed = urlInput.value.trim();
+    block.url = trimmed && !/^[a-z][a-z0-9+.-]*:/i.test(trimmed) ? `https://${trimmed}` : trimmed;
+    urlInput.value = block.url;
+    refreshPreview();
+    onChange();
+  };
+  urlRow.append(urlLabel, urlInput);
+  wrap.appendChild(urlRow);
+
+  // Same icon-toggle-group/.align-icon pattern the text block's own
+  // alignment control uses (createTextConfig() above), plus a third
+  // "right" option - a single button has no equivalent to text's natural
+  // ragged-right reading flow, so right-alignment is a genuinely useful
+  // placement here in a way it isn't for a paragraph.
+  const alignRow = document.createElement("div");
+  alignRow.className = "color-row";
+  alignRow.style.marginTop = "0.5rem";
+  const alignLabel = document.createElement("span");
+  alignLabel.textContent = "Alignment:";
+  alignRow.appendChild(alignLabel);
+  const alignGroup = document.createElement("span");
+  alignGroup.className = "icon-toggle-group";
+  const alignIcons = {};
+  [["left", "format_align_left", "Left"], ["center", "format_align_center", "Center"], ["right", "format_align_right", "Right"]].forEach(([value, glyph, title]) => {
+    const icon = document.createElement("span");
+    icon.className = "align-icon";
+    icon.title = title;
+    icon.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
+    icon.onclick = () => {
+      block.alignment = value;
+      updateAlignIcons();
+      refreshPreview();
+      onChange();
+    };
+    alignIcons[value] = icon;
+    alignGroup.appendChild(icon);
+  });
+  alignRow.appendChild(alignGroup);
+  wrap.appendChild(alignRow);
+
+  function updateAlignIcons() {
+    const align = block.alignment || "center";
+    Object.entries(alignIcons).forEach(([value, icon]) => icon.classList.toggle("active", align === value));
+  }
+  updateAlignIcons();
+
+  const colorRow = document.createElement("div");
+  colorRow.className = "color-row";
+  colorRow.style.marginTop = "0.5rem";
+
+  const bgLabel = document.createElement("span");
+  bgLabel.textContent = "Background:";
+  colorRow.appendChild(bgLabel);
+  const bgPickr = createColorPickrButton(block.backgroundColor || "#4a90e2", (hex) => {
+    block.backgroundColor = hex;
+    refreshPreview();
+    onChange();
+  }, toolbarPickrInstances);
+  colorRow.appendChild(bgPickr.btn);
+
+  const textLabel = document.createElement("span");
+  textLabel.textContent = "Text:";
+  textLabel.style.marginLeft = "1rem";
+  colorRow.appendChild(textLabel);
+  const textPickr = createColorPickrButton(block.textColor || "#ffffff", (hex) => {
+    block.textColor = hex;
+    refreshPreview();
+    onChange();
+  }, toolbarPickrInstances);
+  colorRow.appendChild(textPickr.btn);
+
+  wrap.appendChild(colorRow);
 
   return wrap;
 }

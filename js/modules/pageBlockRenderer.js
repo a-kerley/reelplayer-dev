@@ -361,12 +361,42 @@ function renderEmbeddedVideo(block) {
   return wrapper;
 }
 
+// A styled <a>, not a <button> - it's always a navigation to block.url, and
+// an anchor is the correct semantic element for that (also means it works
+// with no JS at all on the public page, unlike a <button onclick>).
+// target="_blank"/rel="noopener noreferrer" unconditionally, same as
+// makeLink() above for a plain http(s) URL - per the spec for this block,
+// it always opens in a new tab, no per-block toggle for it.
+function renderButtonBlock(block) {
+  const wrapper = document.createElement("div");
+  wrapper.className = "page-block page-block-button";
+  wrapper.style.textAlign = block.alignment || "center";
+
+  if (!block.url || !block.label) {
+    wrapper.textContent = "Button not configured";
+    wrapper.classList.add("page-block-empty");
+    return wrapper;
+  }
+
+  const a = document.createElement("a");
+  a.className = "page-block-button-link";
+  a.href = block.url;
+  a.target = "_blank";
+  a.rel = "noopener noreferrer";
+  a.textContent = block.label;
+  a.style.backgroundColor = block.backgroundColor || "#4a90e2";
+  a.style.color = block.textColor || "#ffffff";
+  wrapper.appendChild(a);
+  return wrapper;
+}
+
 const RENDERERS = {
   "banner-image": renderBannerImage,
   text: renderText,
   image: renderImage,
   player: renderPlayer,
   "embedded-video": renderEmbeddedVideo,
+  button: renderButtonBlock,
 };
 
 /** @param {Object} block @returns {HTMLElement} */

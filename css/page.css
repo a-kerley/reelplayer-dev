@@ -202,6 +202,26 @@ body.page-body {
   text-decoration: none;
 }
 
+/* Button block (js/modules/pageBlockRenderer.js's renderButtonBlock()) -
+   background-color/color are set inline per-block (block.backgroundColor/
+   .textColor), so only layout/shape lives here. */
+.page-block-button {
+  padding: 1rem;
+}
+
+.page-block-button-link {
+  display: inline-block;
+  padding: 0.75rem 1.75rem;
+  border-radius: 6px;
+  font-weight: 600;
+  text-decoration: none;
+  transition: opacity 0.15s ease;
+}
+
+.page-block-button-link:hover {
+  opacity: 0.85;
+}
+
 .page-block-image {
   padding: 1rem;
 }
