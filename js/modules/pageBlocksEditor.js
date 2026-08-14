@@ -721,6 +721,30 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return Math.round(parseFloat(getComputedStyle(el || editable).fontSize)) || 16;
   }
 
+  // The base size for a *range's* bare/unstyled runs specifically -
+  // applyFontSizeStep()'s multi-run branch needs this, and effectiveFontSizePx()
+  // above is the wrong tool for it: that reads from wherever the live
+  // selection's anchor happens to sit, which is frequently *inside* an
+  // already-styled span (e.g. a selection that starts on already-resized
+  // text and extends into plain text after it) - silently leaking that
+  // span's size into every bare run's "base" instead of the block's real
+  // inherited default, converging previously-distinct sizes toward each
+  // other a little more on every click. This instead walks up from the
+  // range's own commonAncestorContainer (guaranteed to contain the whole
+  // range) to the nearest *block-level* ancestor - skipping over any span,
+  // rather than potentially landing inside one - so it reads the role's
+  // own font-size regardless of what the selection's anchor point
+  // happens to be sitting on.
+  function baseFontSizePxForRange(range) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    while (node && node !== editable && !["P", "H1", "H2", "H3"].includes(node.tagName)) {
+      node = node.parentNode;
+    }
+    const el = node && node !== editable ? node : editable;
+    return Math.round(parseFloat(getComputedStyle(el).fontSize)) || 16;
+  }
+
   // The size to *display* for a real (non-collapsed) selection - null if
   // it's mixed (several different sizes in it, e.g. right after
   // applyFontSizeStep() scaled differently-sized runs by differing
@@ -836,7 +860,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     // this one base size regardless: ad hoc spans are the only thing that
     // ever gives inline text its own size in this editor, and block-level
     // roles (H1/H2/H3/Body) don't change mid-selection within one block.
-    const baseSizePx = effectiveFontSizePx();
+    const baseSizePx = baseFontSizePxForRange(range);
     const fragment = range.extractContents();
     const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
     const textNodes = [];
