@@ -392,10 +392,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // field - and its selection - never loses focus at all while picking a
   // style, the same mechanism document.execCommand()-based toolbars
   // always rely on.
-  const styleBtn = document.createElement("button");
-  styleBtn.type = "button";
-  styleBtn.className = "page-block-add-btn";
-  styleBtn.textContent = "Apply style...";
+  const styleBtn = createDropdownMenuButton("Apply style...");
   styleBtn.addEventListener("mousedown", (e) => e.preventDefault());
   styleBtn.onclick = () => {
     // Block-level styles only (headings + plain body) - Bold/Italic/
@@ -469,10 +466,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     }
   }
 
-  const fontBtn = document.createElement("button");
-  fontBtn.type = "button";
-  fontBtn.className = "page-block-add-btn";
-  fontBtn.textContent = "Font...";
+  const fontBtn = createDropdownMenuButton("Font...");
   fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
   fontBtn.onclick = () => {
     saveSelection();
@@ -669,6 +663,29 @@ function createToolbarDivider() {
   const divider = document.createElement("span");
   divider.className = "page-block-toolbar-divider";
   return divider;
+}
+
+// A menu-trigger button styled like the builder's segmented value-control
+// spinners (css/builder.css's .value-control-number/.value-control-spin) -
+// a bordered, dark label segment plus a distinct chevron segment on the
+// right - rather than a plain solid-accent action button, so it visually
+// reads as "opens a dropdown" the same way the rest of the builder's
+// dropdown-shaped controls do. Used for the text block toolbar's "Apply
+// style..."/"Font..." menu buttons (js/modules/contextMenu.js still
+// supplies the actual menu popup - this only changes the trigger's look).
+function createDropdownMenuButton(label) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "dropdown-menu-btn";
+  btn.innerHTML = `
+    <span class="dropdown-menu-btn-label">${label}</span>
+    <span class="dropdown-menu-btn-arrow">
+      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
+        <path d="M6 9L12 15L18 9" stroke-linecap="round" stroke-linejoin="round"/>
+      </svg>
+    </span>
+  `;
+  return btn;
 }
 
 // Operates directly on a Range's own DOM node references - works

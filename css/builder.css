@@ -1656,6 +1656,51 @@ input[type="range"]:focus::-moz-range-thumb {
   flex-shrink: 0;
 }
 
+/* Menu-trigger button (text block toolbar's "Apply style..."/"Font...") -
+   same segmented look as the builder's value-control spinners
+   (.value-control-number/.value-control-spin above): a dark bordered box
+   with a distinct, separately-shaded arrow segment, rather than a plain
+   solid-accent action button - reads as "opens a dropdown" the way the
+   rest of the builder's dropdown-shaped controls already do. */
+.dropdown-menu-btn {
+  display: flex;
+  align-items: stretch;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  overflow: hidden;
+  padding: 0;
+  cursor: pointer;
+  transition: border-color 0.15s;
+}
+
+.dropdown-menu-btn:hover {
+  border-color: var(--builder-accent);
+}
+
+.dropdown-menu-btn-label {
+  padding: 0.35rem 0.6rem;
+  color: #fff;
+  font-size: var(--builder-text-base);
+  white-space: nowrap;
+}
+
+.dropdown-menu-btn-arrow {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.6rem;
+  border-left: 1px solid #444;
+  background: #2a2a2a;
+  color: #999;
+  transition: background 0.15s, color 0.15s;
+}
+
+.dropdown-menu-btn:hover .dropdown-menu-btn-arrow {
+  background: #333;
+  color: var(--builder-accent);
+}
+
 .page-block-add-btn:hover {
   background: var(--builder-accent);
   color: #fff;
