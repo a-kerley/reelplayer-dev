@@ -759,18 +759,19 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return has ? result : null;
   }
 
-  // Font's counterpart to selectionFontSizePx() - null if every run in the
-  // selection agrees there's no explicit font-family override (show
-  // "Font..."), a normalized stack string if they all agree on the same
-  // explicit one (show its label), MIXED if they don't all agree.
-  function selectionFontFamily(range) {
+  // Font's counterpart to selectionFontSizePx() - `baseFamily` (a run's
+  // actual rendered font when nothing overrides it, see
+  // baseFontFamilyForRange() below) if every run in the selection agrees
+  // there's no explicit font-family override, a normalized stack string if
+  // they all agree on the same explicit one, MIXED if they don't all agree.
+  function selectionFontFamily(range, baseFamily) {
     return selectionRunValue(range, (textNode) => {
       let el = textNode.parentElement;
       while (el && el !== editable) {
         if (el.tagName === "SPAN" && el.style.fontFamily) return normalizeFontFamily(el.style.fontFamily);
         el = el.parentElement;
       }
-      return null;
+      return baseFamily;
     });
   }
 
@@ -802,6 +803,22 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return Math.round(parseFloat(getComputedStyle(el || editable).fontSize)) || 16;
   }
 
+  // Font's counterpart to effectiveFontSizePx() - the caret's actual
+  // rendered font (normalized) when nothing explicitly overrides it, so
+  // the toolbar can show a real font name instead of always falling back
+  // to "Font..." just because there's no inline override span. In
+  // practice this is almost always one of TEXT_FONT_OPTIONS' own stacks
+  // already - page.css's base font-family and every per-role Customize
+  // Styles override both come from that exact same list - so it reliably
+  // resolves to a real label rather than silently landing on "Font..."
+  // anyway.
+  function effectiveFontFamily() {
+    const sel = window.getSelection();
+    const node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : null;
+    const el = node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : editable;
+    return normalizeFontFamily(getComputedStyle(el || editable).fontFamily);
+  }
+
   // The base size for a *range's* bare/unstyled runs specifically -
   // applyFontSizeStep()'s multi-run branch needs this, and effectiveFontSizePx()
   // above is the wrong tool for it: that reads from wherever the live
@@ -824,6 +841,20 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     }
     const el = node && node !== editable ? node : editable;
     return Math.round(parseFloat(getComputedStyle(el).fontSize)) || 16;
+  }
+
+  // Font's counterpart to baseFontSizePxForRange() - same reasoning, same
+  // block-level-ancestor walk (skipping over any span so a selection that
+  // starts inside one doesn't leak its font into the "no override"
+  // baseline for the rest of the selection).
+  function baseFontFamilyForRange(range) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    while (node && node !== editable && !["P", "H1", "H2", "H3"].includes(node.tagName)) {
+      node = node.parentNode;
+    }
+    const el = node && node !== editable ? node : editable;
+    return normalizeFontFamily(getComputedStyle(el).fontFamily);
   }
 
   // The size to *display* for a real (non-collapsed) selection - null if
@@ -865,8 +896,8 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       sizeInput.value = px === null ? "" : px;
       sizeInput.placeholder = px === null ? "Mixed" : "";
 
-      const family = selectionFontFamily(range);
-      const fontOpt = family && family !== MIXED && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === family);
+      const family = selectionFontFamily(range, baseFontFamilyForRange(range));
+      const fontOpt = family !== MIXED && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === family);
       setDropdownLabel(fontBtn, family === MIXED ? "Mixed" : fontOpt ? fontOpt.label : "Font...");
 
       const role = selectionBlockRole(range);
@@ -879,8 +910,11 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       const fontSpan = range && findWrappingSpan(range, "fontFamily");
       // Compared with quotes stripped on both sides - see htmlSanitizer.js's
       // normalizeFontFamily() for why the browser's own fontFamily read-back
-      // never matches TEXT_FONT_OPTIONS' stack strings literally.
-      const fontOpt = fontSpan && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === normalizeFontFamily(fontSpan.style.fontFamily));
+      // never matches TEXT_FONT_OPTIONS' stack strings literally. Falls back
+      // to the caret's actual effective font (not just "Font...") when
+      // there's no explicit override span - see effectiveFontFamily().
+      const family = fontSpan ? normalizeFontFamily(fontSpan.style.fontFamily) : effectiveFontFamily();
+      const fontOpt = TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === family);
       setDropdownLabel(fontBtn, fontOpt ? fontOpt.label : "Font...");
 
       const role = currentBlockRole();
@@ -1195,7 +1229,17 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     });
   });
   wrap.appendChild(editable);
-  updateInlineControlDisplays();
+  // Deferred, not called synchronously here - `wrap` (and so `editable`)
+  // isn't connected to the document yet at this point in createTextConfig()
+  // (its caller does that, appending this function's return value right
+  // after it returns), and getComputedStyle() on a disconnected element
+  // doesn't reflect the real CSS cascade - effectiveFontFamily()'s read
+  // came back empty/unmatched every time, which is why the Font button
+  // showed "Font..." on first load even though the same page, once
+  // actually interacted with, correctly showed a real font. By the time
+  // this fires, the synchronous appendChild() that follows createTextConfig()
+  // has already run.
+  setTimeout(updateInlineControlDisplays, 0);
 
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
