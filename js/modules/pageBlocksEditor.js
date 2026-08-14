@@ -23,6 +23,91 @@ const BLOCK_TYPE_LABELS = {
   "embedded-video": "Embedded Video",
 };
 
+// Same Pickr library the reel builder's own color controls use (see
+// js/modules/colorPicker.js) - two separate instance arrays here rather
+// than reusing that module's, since these swatches are for page
+// text-block content colors, not reel appearance CSS variables, and
+// colorPicker.js's helper is hardcoded to a fixed set of reel-only fields.
+// Split in two because the two call sites rebuild on different lifecycles:
+// toolbarPickrInstances alongside the rest of a text block's toolbar
+// (destroyed whenever updatePageBlocksEditor() rebuilds the whole editor),
+// dialogPickrInstances alongside the Customize Styles dialog's rows
+// (destroyed whenever that dialog is opened or closed) - destroying one
+// array must never tear down a Pickr button still live in the other spot.
+let toolbarPickrInstances = [];
+let dialogPickrInstances = [];
+function destroyToolbarPickrInstances() {
+  toolbarPickrInstances.forEach((p) => p.destroy());
+  toolbarPickrInstances = [];
+}
+function destroyDialogPickrInstances() {
+  dialogPickrInstances.forEach((p) => p.destroy());
+  dialogPickrInstances = [];
+}
+const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
+
+// Renders as the same small square .pickr-button used throughout the reel
+// builder (css/builder.css), opening the same nano-themed Pickr popup -
+// instead of a plain native <input type="color">. Pickr needs the button
+// actually attached to the DOM to position/measure its popup, so creation
+// is deferred a tick (same setTimeout(...,0) "DOM readiness" pattern
+// colorPicker.js uses), after the caller has synchronously appended the
+// returned .btn to the document.
+function createColorPickrButton(initialColor, onApply, instanceList) {
+  const btn = document.createElement("button");
+  btn.type = "button";
+  btn.className = "pickr-button";
+  let pickrRef = null;
+  setTimeout(() => {
+    const pickr = Pickr.create({
+      el: btn,
+      theme: "nano",
+      default: initialColor || "#ffffff",
+      swatches: TEXT_COLOR_SWATCHES,
+      // No opacity component - text color has no use for alpha here, and
+      // htmlSanitizer.js's COLOR_RE only accepts a plain 6-digit #rrggbb/
+      // rgb(), not an alpha channel, so keeping this off means the value
+      // this button ever hands to onApply is always something the
+      // sanitizer will actually keep.
+      components: {
+        preview: true,
+        opacity: false,
+        hue: true,
+        interaction: { hex: true, input: true, save: true },
+      },
+    });
+    pickrRef = pickr;
+    instanceList.push(pickr);
+    // Built from the raw RGB channels rather than color.toHEXA().toString()
+    // - Pickr's own HEXA stringification includes an alpha suffix (e.g.
+    // "#dc3545ff") that htmlSanitizer.js's 6-digit COLOR_RE rejects
+    // outright, which silently dropped every applied color until this was
+    // switched to always emit exactly #rrggbb.
+    const toSanitizableHex = (color) => {
+      const [r, g, b] = color.toRGBA();
+      return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
+    };
+    pickr.on("init", () => {
+      btn.style.background = toSanitizableHex(pickr.getColor());
+    });
+    pickr.on("change", (color) => {
+      btn.style.background = toSanitizableHex(color);
+    });
+    pickr.on("save", (color) => {
+      const hex = toSanitizableHex(color);
+      btn.style.background = hex;
+      onApply(hex);
+      pickr.hide();
+    });
+  }, 0);
+  return {
+    btn,
+    reset(hex) {
+      if (pickrRef) pickrRef.setColor(hex);
+    },
+  };
+}
+
 // Iconoir (MIT license, iconoir.com) icons, inlined per this codebase's
 // existing convention of embedding raw SVG markup directly rather than
 // loading an icon font/library - see e.g. js/modules/domUtils.js,
@@ -67,6 +152,7 @@ function createEmptyBlock(type) {
 export function updatePageBlocksEditor(page, onChange) {
   const container = document.getElementById("pageBlocksEditor");
   if (!container) return;
+  destroyToolbarPickrInstances();
   container.innerHTML = "";
 
   page.blocks.forEach((block, i) => {
@@ -498,17 +584,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   });
   toolbarRow.appendChild(sizeInput);
 
-  const colorInput = document.createElement("input");
-  colorInput.type = "color";
-  colorInput.title = "Text color for the selected text";
-  colorInput.className = "page-block-text-toolbar-color";
-  colorInput.value = "#ffffff";
-  colorInput.addEventListener("change", () => {
+  const colorPickr = createColorPickrButton("#ffffff", (hex) => {
     if (!savedRange || savedRange.collapsed) return;
-    wrapRangeInSpan(savedRange, { color: colorInput.value });
+    wrapRangeInSpan(savedRange, { color: hex });
     commit();
-  });
-  toolbarRow.appendChild(colorInput);
+  }, toolbarPickrInstances);
+  colorPickr.btn.title = "Text color for the selected text";
+  toolbarRow.appendChild(colorPickr.btn);
   toolbarRow.appendChild(createToolbarDivider());
 
   // Link/unlink toggle - unlike the styling controls above, this doesn't
@@ -719,6 +801,7 @@ const BLOCK_STYLE_ROLES = ["h1", "h2", "h3", "body"];
 const FORMAT_BLOCK_TAGS = { h1: "H1", h2: "H2", h3: "H3", body: "P" };
 
 function openCustomizeStylesDialog(page, onChange, refreshPreview) {
+  destroyDialogPickrInstances();
   if (!page.textStyleDefs) page.textStyleDefs = {};
 
   const content = document.createElement("div");
@@ -828,30 +911,32 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
 
     const colorTd = document.createElement("td");
     colorTd.style.cssText = cellStyle;
-    const colorInput = document.createElement("input");
-    colorInput.type = "color";
-    colorInput.style.cssText = "width:2.4rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;";
-    colorInput.value = def.color || "#ffffff";
-    colorInput.onchange = () => { def.color = colorInput.value; commit(); };
-    colorTd.appendChild(colorInput);
+    const colorPickr = createColorPickrButton(def.color || "#ffffff", (hex) => { def.color = hex; commit(); }, dialogPickrInstances);
+    colorTd.appendChild(colorPickr.btn);
     tr.appendChild(colorTd);
 
-    // A native <input type=color> always holds a concrete value, so there's
-    // no way to "unset" it back to the CSS default from the swatch alone -
-    // this clears all four fields for the row at once instead of adding a
+    // A Pickr swatch always holds a concrete value, so there's no way to
+    // "unset" it back to the CSS default from the swatch alone - this
+    // clears all four fields for the row at once instead of adding a
     // separate per-field reset control for just this one property.
     const resetTd = document.createElement("td");
     resetTd.style.cssText = cellStyle;
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.textContent = "Reset";
-    resetBtn.className = "media-browser-delete-btn";
+    // Not .media-browser-delete-btn - that class only has a background
+    // rule scoped under .media-browser-bulk-bar (css/file-picker.css), so
+    // used bare here it fell through to native dark-mode button chrome
+    // (inherited from the dialog overlay's color-scheme:dark), rendering
+    // as an unreadable white-on-white box - see CLAUDE.md's note on this
+    // exact failure mode for unstyled buttons under color-scheme:dark.
+    resetBtn.style.cssText = "padding:0.3rem 0.6rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#ccc;cursor:pointer;font-size:var(--builder-text-base);";
     resetBtn.onclick = () => {
       page.textStyleDefs[role] = {};
       fontSelect.value = "";
       sizeInput.value = "";
       weightSelect.value = "";
-      colorInput.value = "#ffffff";
+      colorPickr.reset("#ffffff");
       commit();
     };
     resetTd.appendChild(resetBtn);
@@ -866,7 +951,7 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     type: "custom",
     message: "Customize Text Styles",
     content: '<div id="customizeStylesSlot"></div>',
-    buttons: [{ text: "Done", type: "primary", onClick: () => dialog.closeDialog() }],
+    buttons: [{ text: "Done", type: "primary", onClick: () => { destroyDialogPickrInstances(); dialog.closeDialog(); } }],
     // Widened from 560px - the Font column's <select> now sizes to fit
     // its widest option ("Merriweather (Google Font)") rather than being
     // squeezed into a narrow fixed-width cell, so the dialog needs more
