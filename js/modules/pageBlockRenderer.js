@@ -114,19 +114,31 @@ function linkify(text) {
 
 function renderInlineMarkdown(line) {
   return splitByRegex(line, /\*\*(.+?)\*\*/g).flatMap((part) => {
-    if (part.type !== "match") return renderItalicAndLinks(part.value);
+    if (part.type !== "match") return renderItalicAndRest(part.value);
     const strong = document.createElement("strong");
-    renderItalicAndLinks(part.groups[1]).forEach((n) => strong.appendChild(n));
+    renderItalicAndRest(part.groups[1]).forEach((n) => strong.appendChild(n));
     return [strong];
   });
 }
 
-function renderItalicAndLinks(text) {
+function renderItalicAndRest(text) {
   return splitByRegex(text, /\*(.+?)\*/g).flatMap((part) => {
-    if (part.type !== "match") return linkify(part.value);
+    if (part.type !== "match") return renderUnderlineAndLinks(part.value);
     const em = document.createElement("em");
-    linkify(part.groups[1]).forEach((n) => em.appendChild(n));
+    renderUnderlineAndLinks(part.groups[1]).forEach((n) => em.appendChild(n));
     return [em];
+  });
+}
+
+// __underline__ - not standard Markdown (which has no underline syntax at
+// all), but symmetric with **bold**/*italic*'s marker-count convention and
+// unambiguous alongside them (neither uses a bare "_").
+function renderUnderlineAndLinks(text) {
+  return splitByRegex(text, /__(.+?)__/g).flatMap((part) => {
+    if (part.type !== "match") return linkify(part.value);
+    const u = document.createElement("u");
+    linkify(part.groups[1]).forEach((n) => u.appendChild(n));
+    return [u];
   });
 }
 

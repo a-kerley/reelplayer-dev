@@ -1073,6 +1073,26 @@ input.filename-display:focus {
   color: var(--builder-accent);
 }
 
+/* Classic B/I/U toolbar (js/modules/pageBlocksEditor.js's text block) -
+   same visual treatment as .align-icon, but a plain action button rather
+   than a persistent-state toggle (no .active variant - there's no cheap
+   way to know if the current textarea selection is already bold/italic/
+   underlined, same reasoning as the style menu next to it not tracking
+   "current style" either). */
+.format-icon {
+  opacity: 0.6;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  transition: opacity 0.18s, color 0.18s;
+  margin-right: 0.15em;
+}
+
+.format-icon:hover {
+  opacity: 1;
+  color: var(--builder-accent);
+}
+
 #reelTitleAppearanceSection.disabled .appearance-option,
 #reelTitleAppearanceSection.disabled .align-icon {
   opacity: 0.5;

@@ -375,7 +375,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   styleBtn.textContent = "Apply style...";
   styleBtn.addEventListener("mousedown", (e) => e.preventDefault());
   styleBtn.onclick = () => {
-    openContextMenu(styleBtn, ROLES.map((role) => ({
+    // Block-level styles only (headings + plain body) - Bold/Italic/
+    // Underline get their own always-visible icon buttons just below,
+    // the classic B/I/U toolbar convention, instead of living in this menu.
+    openContextMenu(styleBtn, BLOCK_STYLE_ROLES.map((role) => ({
       label: ROLE_LABELS[role],
       onClick: () => {
         applyStyleToSelection(bodyTextarea, role);
@@ -386,6 +389,24 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     })), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(styleBtn);
+
+  // Same focus-preserving mousedown trick as the style menu above - these
+  // are direct-action buttons (no menu to open), so only their own
+  // mousedown needs guarding.
+  [["bold", "format_bold", "Bold"], ["italic", "format_italic", "Italic"], ["underline", "format_underlined", "Underline"]].forEach(([role, glyph, title]) => {
+    const btn = document.createElement("span");
+    btn.className = "format-icon";
+    btn.title = title;
+    btn.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.onclick = () => {
+      applyStyleToSelection(bodyTextarea, role);
+      block.body = bodyTextarea.value;
+      refreshPreview();
+      onChange();
+    };
+    toolbarRow.appendChild(btn);
+  });
 
   const customizeBtn = document.createElement("button");
   customizeBtn.type = "button";
@@ -408,7 +429,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
   hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
-  hint.textContent = "# Heading, **bold**, *italic* - URLs, emails, and phone numbers link automatically. Or select text and use the style menu above.";
+  hint.textContent = "# Heading, **bold**, *italic*, __underline__ - URLs, emails, and phone numbers link automatically. Or select text and use the style menu/B I U buttons above.";
   wrap.appendChild(hint);
 
   // Icon toggle, not a <select> - matches titleAppearance.js's Reel Title
@@ -450,6 +471,11 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   return wrap;
 }
 
+// The "Apply style..." menu's contents - everything in ROLES (pageTextStyles.js)
+// except bold/italic/underline, which get their own dedicated B/I/U icon
+// buttons instead (see createTextConfig() above).
+const BLOCK_STYLE_ROLES = ["h1", "h2", "h3", "body"];
+
 const HEADING_MARKERS = { h1: "#", h2: "##", h3: "###" };
 
 // Strips one layer of a leading/trailing marker (e.g. "**") if the whole
@@ -469,6 +495,11 @@ function unwrapMarker(text, marker) {
 // strips a heading marker and one layer of **/* wrapping. Multi-line
 // selections only get a heading marker on their first line, same as
 // typing "# " at the start of a multi-line paragraph would.
+// "**" checked before "*" in both the unwrap chain and the double-wrap
+// guard below matters (a bare "*" is a prefix of "**"); "__" (underline)
+// never collides with either, so its position among them doesn't.
+const INLINE_MARKERS = { bold: "**", italic: "*", underline: "__" };
+
 function styledText(text, role) {
   const withoutHeading = text.replace(/^(#{1,3})\s+/, "");
 
@@ -476,9 +507,9 @@ function styledText(text, role) {
     return `${HEADING_MARKERS[role]} ${withoutHeading}`;
   }
   if (role === "body") {
-    return unwrapMarker(unwrapMarker(withoutHeading, "**"), "*");
+    return unwrapMarker(unwrapMarker(unwrapMarker(withoutHeading, "**"), "__"), "*");
   }
-  const marker = role === "bold" ? "**" : "*";
+  const marker = INLINE_MARKERS[role];
   if (withoutHeading.startsWith(marker) && withoutHeading.endsWith(marker) && withoutHeading.length >= marker.length * 2) {
     return withoutHeading;
   }

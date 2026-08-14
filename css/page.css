@@ -178,6 +178,13 @@ body.page-body {
   font-style: italic;
 }
 
+.page-block-text u {
+  color: var(--page-text-underline-color, inherit);
+  font-family: var(--page-text-underline-font-family, inherit);
+  font-weight: var(--page-text-underline-font-weight, inherit);
+  text-decoration: underline;
+}
+
 .page-block-text a {
   color: var(--page-accent);
   text-decoration: underline;
