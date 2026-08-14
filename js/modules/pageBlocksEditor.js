@@ -6,14 +6,14 @@
 // specific config forms here vs. fixed title/url fields there) that forcing
 // a shared component would add more indirection than it'd save.
 import { createUrlInputRow } from "./domUtils.js";
-import { createValueControl } from "./valueControl.js";
+import { createValueControl, buildValueControl, wireValueControl } from "./valueControl.js";
 import { renderBlock, parseVideoEmbedUrl } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
 import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
-import { sanitizeHtml } from "./htmlSanitizer.js";
+import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -490,6 +490,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
         editable.focus();
         document.execCommand("formatBlock", false, FORMAT_BLOCK_TAGS[role]);
         commit();
+        updateInlineControlDisplays();
       },
     })), { preventFocusSteal: true });
   };
@@ -552,6 +553,110 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     }
   }
 
+  // The nearest SPAN ancestor of `range` (walking up from its
+  // commonAncestorContainer - the one node guaranteed to contain the whole
+  // range, not just one end of it) that already carries an explicit value
+  // for `prop`. Used both to display the current selection's style back
+  // into the toolbar (updateInlineControlDisplays()) and to decide, in
+  // applyInlineStyle() below, whether a new style application should
+  // mutate that span in place rather than nest another one inside it.
+  function findWrappingSpan(range, prop) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    while (node && node !== editable) {
+      if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "SPAN" && node.style[prop]) return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  // Font/size/color all funnel through here rather than calling
+  // wrapRangeInSpan() directly. Font's and Style's own menus never steal
+  // the editable's live selection (preventFocusSteal), so the *live*
+  // selection is preferred when it's still usable; Size (a real focusable
+  // input) and Color (a Pickr popup) do steal it, so savedRange is the
+  // fallback for those. Either way: if the range is already fully inside a
+  // span with this exact property, mutate that span's style directly
+  // instead of nesting a fresh span around it - matters most for Size's
+  // repeatable +/- buttons, where nesting a new span per click would
+  // otherwise build up a deep chain of one-property spans on every click.
+  // On a fresh wrap, both the live selection and savedRange are pointed at
+  // the new span's contents afterward, so a second application (e.g. a
+  // second +/- click with no reselection in between) still has a live,
+  // non-collapsed range to work with - wrapRangeInSpan()'s
+  // range.extractContents() otherwise leaves the original range collapsed
+  // and unusable for a repeat call.
+  function applyInlineStyle(prop, value) {
+    const sel = window.getSelection();
+    const liveRange = sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    const range = liveRange || (savedRange && !savedRange.collapsed ? savedRange : null);
+    if (!range) return;
+
+    const existing = findWrappingSpan(range, prop);
+    if (existing) {
+      existing.style[prop] = value;
+    } else {
+      const span = wrapRangeInSpan(range, { [prop]: value });
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedRange = newRange.cloneRange();
+    }
+    commit();
+  }
+
+  // Current block-level tag at the selection (H1/H2/H3/P), walking up from
+  // anchorNode the same way findAncestorLink() does below - used to show
+  // the active paragraph style in styleBtn, mirroring how a selection's
+  // actual bold/italic/underline state already drives formatButtons.
+  const BLOCK_TAG_ROLES = { H1: "h1", H2: "h2", H3: "h3", P: "body" };
+  function currentBlockRole() {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !editable.contains(sel.anchorNode)) return null;
+    let node = sel.anchorNode;
+    while (node && node !== editable) {
+      if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
+      node = node.parentNode;
+    }
+    return null;
+  }
+
+  // The size to show/step from when nothing at the selection has an
+  // explicit inline override yet - the selection's own computed size
+  // (which already reflects the page's per-role Customize Styles
+  // defaults), not a hardcoded fallback, so the field always starts from
+  // what the text actually looks like right now.
+  function effectiveFontSizePx() {
+    const sel = window.getSelection();
+    const node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : null;
+    const el = node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : editable;
+    return Math.round(parseFloat(getComputedStyle(el || editable).fontSize)) || 16;
+  }
+
+  // Reflects the current selection's actual style/font/size back into the
+  // toolbar - called on every selection change (mouseup/keyup/click below)
+  // and right after applying a change, the same idea as
+  // updateFormatButtonStates() for B/I/U.
+  function updateInlineControlDisplays() {
+    const sel = window.getSelection();
+    const hasSelection = sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode);
+    const range = hasSelection ? sel.getRangeAt(0) : null;
+
+    const sizeSpan = range && findWrappingSpan(range, "fontSize");
+    sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();
+
+    const fontSpan = range && findWrappingSpan(range, "fontFamily");
+    // Compared with quotes stripped on both sides - see htmlSanitizer.js's
+    // normalizeFontFamily() for why the browser's own fontFamily read-back
+    // never matches TEXT_FONT_OPTIONS' stack strings literally.
+    const fontOpt = fontSpan && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === normalizeFontFamily(fontSpan.style.fontFamily));
+    setDropdownLabel(fontBtn, fontOpt ? fontOpt.label : "Font...");
+
+    const role = currentBlockRole();
+    setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Apply style...");
+  }
+
   const fontBtn = createDropdownMenuButton("Font...");
   fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
   fontBtn.onclick = () => {
@@ -561,33 +666,45 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       label: f.label,
       onClick: () => {
         ensureInlineGoogleFont(f.value);
-        wrapRangeInSpan(savedRange, { fontFamily: f.stack });
-        commit();
+        applyInlineStyle("fontFamily", f.stack);
+        updateInlineControlDisplays();
       },
     })), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(fontBtn);
 
-  const sizeInput = document.createElement("input");
-  sizeInput.type = "number";
-  sizeInput.min = "8";
-  sizeInput.max = "96";
-  sizeInput.placeholder = "Size";
-  sizeInput.title = "Font size (px) for the selected text";
-  sizeInput.className = "page-block-text-toolbar-number";
-  sizeInput.addEventListener("change", () => {
-    const val = parseInt(sizeInput.value, 10);
-    sizeInput.value = "";
-    if (isNaN(val) || !savedRange || savedRange.collapsed) return;
-    wrapRangeInSpan(savedRange, { fontSize: `${val}px` });
-    commit();
+  // Segmented number+spin control (css/builder.css's .value-control-number/
+  // .value-control-spin, see valueControl.js) instead of a plain
+  // <input type="number"> - discrete +/- buttons for stepping the size up/
+  // down, matching every other numeric control in the builder, plus the
+  // field stays a real typeable input for an exact value. The slider half
+  // of valueControl.js's normal hover-reveal behavior is suppressed via
+  // CSS (.page-block-text-toolbar-size) - out of place in a compact
+  // toolbar - but the slider element itself is still built and mounted
+  // (just hidden), since wireValueControl() requires one to be present to
+  // wire the number input and spin buttons up at all.
+  const sizeControl = buildValueControl({
+    id: `${block.blockId}-toolbarFontSize`,
+    label: "",
+    value: 16,
+    min: 8,
+    max: 96,
+    step: 1,
+    unit: "px",
   });
-  toolbarRow.appendChild(sizeInput);
+  sizeControl.control.classList.add("page-block-text-toolbar-size");
+  sizeControl.input.title = "Font size (px) for the selected text";
+  wireValueControl(sizeControl.control);
+  const sizeInput = sizeControl.input;
+  sizeInput.addEventListener("input", () => {
+    const val = parseInt(sizeInput.value, 10);
+    if (isNaN(val)) return;
+    applyInlineStyle("fontSize", `${val}px`);
+  });
+  toolbarRow.appendChild(sizeControl.control);
 
   const colorPickr = createColorPickrButton("#ffffff", (hex) => {
-    if (!savedRange || savedRange.collapsed) return;
-    wrapRangeInSpan(savedRange, { color: hex });
-    commit();
+    applyInlineStyle("color", hex);
   }, toolbarPickrInstances);
   colorPickr.btn.title = "Text color for the selected text";
   toolbarRow.appendChild(colorPickr.btn);
@@ -716,9 +833,11 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     editable.addEventListener(evt, () => {
       updateFormatButtonStates();
       saveSelection();
+      updateInlineControlDisplays();
     });
   });
   wrap.appendChild(editable);
+  updateInlineControlDisplays();
 
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
@@ -760,7 +879,7 @@ function createDropdownMenuButton(label, icon = "") {
   btn.type = "button";
   btn.className = "dropdown-menu-btn";
   btn.innerHTML = `
-    <span class="dropdown-menu-btn-label">${icon}<span>${label}</span></span>
+    <span class="dropdown-menu-btn-label">${icon}<span class="dropdown-menu-btn-label-text">${label}</span></span>
     <span class="dropdown-menu-btn-arrow">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M6 9L12 15L18 9" stroke-linecap="round" stroke-linejoin="round"/>
@@ -768,6 +887,15 @@ function createDropdownMenuButton(label, icon = "") {
     </span>
   `;
   return btn;
+}
+
+// Updates a createDropdownMenuButton()'s visible text in place - used to
+// reflect the current selection's actual style/font back into the "Apply
+// style..."/"Font..." buttons (see updateInlineControlDisplays() below),
+// the same way updateFormatButtonStates() reflects it into B/I/U.
+function setDropdownLabel(btn, text) {
+  const labelText = btn.querySelector(".dropdown-menu-btn-label-text");
+  if (labelText) labelText.textContent = text;
 }
 
 // Operates directly on a Range's own DOM node references - works

@@ -30,8 +30,17 @@ const TAG_ALIASES = { B: "STRONG", I: "EM" };
 
 // Exact-match only, not a free-text font-family - same curated stacks the
 // per-page style roles use (js/modules/pageTextStyles.js), so an inline
-// span can never smuggle in an arbitrary font-family value.
-const ALLOWED_FONT_FAMILIES = new Set(TEXT_FONT_OPTIONS.map((f) => f.stack));
+// span can never smuggle in an arbitrary font-family value. Matched with
+// quotes stripped on both sides (see normalizeFontFamily() below) - a
+// browser reading `node.style.fontFamily` back out drops the quotes
+// TEXT_FONT_OPTIONS' stacks wrap single-word names in (e.g. "'Merriweather',
+// serif" round-trips as "Merriweather, serif"), so comparing the raw
+// strings directly always missed - every inline font choice was silently
+// dropped by this sanitizer before it ever reached storage.
+export function normalizeFontFamily(value) {
+  return value.replace(/['"]/g, "").trim();
+}
+const ALLOWED_FONT_FAMILIES = new Set(TEXT_FONT_OPTIONS.map((f) => normalizeFontFamily(f.stack)));
 
 // Browsers normalize a color set via JS (`el.style.color = '#ff0000'`) to
 // rgb(...) when the style attribute is read back out - both forms are
@@ -48,7 +57,7 @@ function sanitizeSpanStyle(node) {
   const { color, fontFamily, fontSize } = node.style;
   node.removeAttribute("style");
   if (color && COLOR_RE.test(color)) node.style.color = color;
-  if (fontFamily && ALLOWED_FONT_FAMILIES.has(fontFamily)) node.style.fontFamily = fontFamily;
+  if (fontFamily && ALLOWED_FONT_FAMILIES.has(normalizeFontFamily(fontFamily))) node.style.fontFamily = fontFamily;
   if (fontSize && FONT_SIZE_RE.test(fontSize)) {
     const px = parseInt(fontSize, 10);
     if (px >= 8 && px <= 96) node.style.fontSize = fontSize;

@@ -1557,21 +1557,49 @@ input[type="range"]:focus::-moz-range-thumb {
   margin-bottom: 0.5rem;
 }
 
+/* "Apply style..."/"Font..." - wide enough that the button doesn't visibly
+   resize every time its label changes to reflect the current selection
+   (updateInlineControlDisplays()), from a short default like "Font..." up
+   to a longer picked value like "Merriweather". */
+.page-block-text-toolbar .dropdown-menu-btn {
+  min-width: 9rem;
+}
+
+.page-block-text-toolbar .dropdown-menu-btn-label {
+  justify-content: flex-start;
+}
+
+/* Same segmented number+spin look as every other value control
+   (valueControl.js), but without its normal hover-reveal slider - out of
+   place in a compact toolbar, and would otherwise auto-expand on hover per
+   .value-control:hover's rule. display:none (not the default width:0
+   collapse) sidesteps that rule outright rather than fighting its
+   transition/reveal states. flex/min-width are also reset from the
+   slider-sharing defaults (flex:1;min-width:0, meant to share a row with
+   that slider) to flex:0 0 auto so this sits at its own content width
+   among the toolbar's other items instead of stretching to fill it. */
+.page-block-text-toolbar-size {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
+.page-block-text-toolbar-size .value-control-slider-wrap {
+  display: none;
+}
+
+/* Pickr's own .pickr wrapper carries a bit of built-in vertical padding
+   the other toolbar items don't have, which sits the 20px swatch a touch
+   below their shared center line despite .page-block-text-toolbar's own
+   align-items:center - nudged up to actually land on it. */
+.page-block-text-toolbar .pickr {
+  margin-top: -1px;
+}
+
 .page-block-toolbar-divider {
   align-self: stretch;
   width: 1px;
   margin: 0.2rem 0;
   background: #444;
-}
-
-.page-block-text-toolbar-number {
-  width: 4.2rem;
-  padding: 0.4rem;
-  border: 1px solid #444;
-  border-radius: 4px;
-  background: #1e1e1e;
-  color: #fff;
-  font-size: var(--builder-text-base);
 }
 
 /* Builder-chrome-only additions on top of .page-block-text (css/page.css,
