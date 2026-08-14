@@ -657,8 +657,18 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       span.appendChild(fragment);
       range.insertNode(span);
       removeEmptySpans();
+      // Reselects the new span itself (start-before/end-after it), not
+      // selectNodeContents(span) (just its children) - the latter looks
+      // equivalent (same highlighted text) but means any later
+      // extractContents()/cloneContents() over this exact selection - a
+      // second format applied without reselecting, or just re-reading it
+      // for display - only ever sees span's *children* as top-level
+      // fragment nodes, never span itself. That silently drops the very
+      // property that was just set: nothing in the resulting fragment
+      // still carries it, since it lived on the now-excluded container.
       const newRange = document.createRange();
-      newRange.selectNodeContents(span);
+      newRange.setStartBefore(span);
+      newRange.setEndAfter(span);
       sel.removeAllRanges();
       sel.addRange(newRange);
       savedRange = newRange.cloneRange();
@@ -709,6 +719,77 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return null;
   }
 
+  // Shared "the selection doesn't agree on one value" result for the
+  // selectionFontFamily()/selectionBlockRole() scans below - same idea as
+  // selectionFontSizePx()'s null return, kept as a distinct sentinel here
+  // (rather than reusing null) since these two also need null to mean a
+  // real, agreed-on "no override" state (plain Font.../"Body" - default,
+  // not mixed).
+  const MIXED = Symbol("mixed");
+
+  // Shared scan behind selectionFontFamily()/selectionFontSizePx() below -
+  // MIXED if `getValue` disagrees across any two runs in the range, else
+  // whatever value they all agreed on (including null, a real "no
+  // override" agreement, distinct from MIXED).
+  //
+  // Walks *live* text nodes still attached to `editable` (filtered to ones
+  // the range actually intersects), not range.cloneContents() - a clone
+  // only contains the range's own contents, so a selection shaped like
+  // "all of span X's children" (exactly what happens right after
+  // applyInlineStyle() wraps a fresh span and reselects it - or just as
+  // easily from an ordinary mouse drag that happens to land on a span's
+  // boundary) clones X's *children* as top-level fragment nodes without
+  // ever cloning X itself. Any property that lives on X - the one this
+  // whole selection was just wrapped in - is then invisible to a walk that
+  // stops at the fragment boundary. Walking the real DOM instead means
+  // every ancestor, including X, is still there to find.
+  function selectionRunValue(range, getValue) {
+    const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+    });
+    let result;
+    let has = false;
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!node.textContent) continue;
+      const value = getValue(node);
+      if (!has) { result = value; has = true; }
+      else if (result !== value) return MIXED;
+    }
+    return has ? result : null;
+  }
+
+  // Font's counterpart to selectionFontSizePx() - null if every run in the
+  // selection agrees there's no explicit font-family override (show
+  // "Font..."), a normalized stack string if they all agree on the same
+  // explicit one (show its label), MIXED if they don't all agree.
+  function selectionFontFamily(range) {
+    return selectionRunValue(range, (textNode) => {
+      let el = textNode.parentElement;
+      while (el && el !== editable) {
+        if (el.tagName === "SPAN" && el.style.fontFamily) return normalizeFontFamily(el.style.fontFamily);
+        el = el.parentElement;
+      }
+      return null;
+    });
+  }
+
+  // Style's counterpart - null if the selection isn't inside a recognized
+  // block at all, a role string if every block-level element the selection
+  // actually touches agrees (via Range.intersectsNode(), not just every
+  // block that happens to be a sibling under the common ancestor), MIXED if
+  // it spans more than one kind (e.g. the end of a heading through the
+  // start of the paragraph after it).
+  function selectionBlockRole(range) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    if (BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
+    const blocks = Array.from(node.children || []).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
+    if (!blocks.length) return null;
+    const roles = new Set(blocks.map((el) => BLOCK_TAG_ROLES[el.tagName]));
+    return roles.size === 1 ? [...roles][0] : MIXED;
+  }
+
   // The size to show/step from when nothing at the selection has an
   // explicit inline override yet - the selection's own computed size
   // (which already reflects the page's per-role Customize Styles
@@ -757,23 +838,15 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // selection spanning more than one span - not wrong, but confusing
   // enough to read as the spinner not doing anything.
   function selectionFontSizePx(range, baseSizePx) {
-    const fragment = range.cloneContents();
-    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
-    let result = null;
-    let textNode;
-    while ((textNode = walker.nextNode())) {
-      if (!textNode.textContent) continue;
+    const result = selectionRunValue(range, (textNode) => {
       let el = textNode.parentElement;
-      let size = null;
-      while (el && el !== fragment) {
-        if (el.tagName === "SPAN" && el.style.fontSize) { size = parseInt(el.style.fontSize, 10); break; }
+      while (el && el !== editable) {
+        if (el.tagName === "SPAN" && el.style.fontSize) return parseInt(el.style.fontSize, 10);
         el = el.parentElement;
       }
-      if (size === null) size = baseSizePx;
-      if (result === null) result = size;
-      else if (result !== size) return null;
-    }
-    return result;
+      return baseSizePx;
+    });
+    return result === MIXED ? null : result;
   }
 
   // Reflects the current selection's actual style/font/size back into the
@@ -791,21 +864,28 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       const px = selectionFontSizePx(range, effectiveFontSizePx());
       sizeInput.value = px === null ? "" : px;
       sizeInput.placeholder = px === null ? "Mixed" : "";
+
+      const family = selectionFontFamily(range);
+      const fontOpt = family && family !== MIXED && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === family);
+      setDropdownLabel(fontBtn, family === MIXED ? "Mixed" : fontOpt ? fontOpt.label : "Font...");
+
+      const role = selectionBlockRole(range);
+      setDropdownLabel(styleBtn, role === MIXED ? "Mixed" : role ? ROLE_LABELS[role] : "Apply style...");
     } else {
       const sizeSpan = range && findWrappingSpan(range, "fontSize");
       sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();
       sizeInput.placeholder = "";
+
+      const fontSpan = range && findWrappingSpan(range, "fontFamily");
+      // Compared with quotes stripped on both sides - see htmlSanitizer.js's
+      // normalizeFontFamily() for why the browser's own fontFamily read-back
+      // never matches TEXT_FONT_OPTIONS' stack strings literally.
+      const fontOpt = fontSpan && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === normalizeFontFamily(fontSpan.style.fontFamily));
+      setDropdownLabel(fontBtn, fontOpt ? fontOpt.label : "Font...");
+
+      const role = currentBlockRole();
+      setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Apply style...");
     }
-
-    const fontSpan = range && findWrappingSpan(range, "fontFamily");
-    // Compared with quotes stripped on both sides - see htmlSanitizer.js's
-    // normalizeFontFamily() for why the browser's own fontFamily read-back
-    // never matches TEXT_FONT_OPTIONS' stack strings literally.
-    const fontOpt = fontSpan && TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === normalizeFontFamily(fontSpan.style.fontFamily));
-    setDropdownLabel(fontBtn, fontOpt ? fontOpt.label : "Font...");
-
-    const role = currentBlockRole();
-    setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Apply style...");
   }
 
   const fontBtn = createDropdownMenuButton("Font...");
