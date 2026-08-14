@@ -548,7 +548,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   let savedRange = null;
   function saveSelection() {
     const sel = window.getSelection();
-    if (sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode)) {
+    // Collapsed (just a caret, nothing highlighted) is saved too, not only
+    // an actual selection - applyInlineStyle() below needs it either way:
+    // a real editor's font/size/color controls don't just restyle already-
+    // typed text, they also set what you're about to type next when
+    // nothing's selected, the same as toggling Bold with an empty
+    // selection already does natively via execCommand.
+    if (sel.rangeCount && editable.contains(sel.anchorNode)) {
       savedRange = sel.getRangeAt(0).cloneRange();
     }
   }
@@ -570,38 +576,81 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return null;
   }
 
+  // A zero-width space, not a truly empty span - an empty inline element
+  // has nowhere for a caret to actually land in most browsers, so there'd
+  // be nothing to anchor "start typing here" to. commit() below strips
+  // this back out on save if the block is committed with it still
+  // unused (nothing was ever typed into it), so picking a size/font/color
+  // with nothing selected and then clicking away doesn't leave permanent
+  // invisible debris.
+  const CARET_PLACEHOLDER = "​";
+
   // Font/size/color all funnel through here rather than calling
   // wrapRangeInSpan() directly. Font's and Style's own menus never steal
   // the editable's live selection (preventFocusSteal), so the *live*
   // selection is preferred when it's still usable; Size (a real focusable
   // input) and Color (a Pickr popup) do steal it, so savedRange is the
-  // fallback for those. Either way: if the range is already fully inside a
-  // span with this exact property, mutate that span's style directly
-  // instead of nesting a fresh span around it - matters most for Size's
-  // repeatable +/- buttons, where nesting a new span per click would
-  // otherwise build up a deep chain of one-property spans on every click.
-  // On a fresh wrap, both the live selection and savedRange are pointed at
-  // the new span's contents afterward, so a second application (e.g. a
-  // second +/- click with no reselection in between) still has a live,
-  // non-collapsed range to work with - wrapRangeInSpan()'s
-  // range.extractContents() otherwise leaves the original range collapsed
-  // and unusable for a repeat call.
+  // fallback for those.
+  //
+  // Two cases, mirroring how a real editor's format controls behave:
+  // - An actual (non-collapsed) selection: restyle that text. If it's
+  //   already fully inside a span with this exact property, that span's
+  //   style is mutated directly instead of nesting a fresh span around it
+  //   - matters most for Size's repeatable +/- buttons, where nesting a
+  //   new span per click would otherwise build a deep chain of one-
+  //   property spans on every click. On a fresh wrap, both the live
+  //   selection and savedRange are pointed at the new span's contents
+  //   afterward, so a second application (e.g. a second +/- click with no
+  //   reselection in between) still has a live, non-collapsed range to
+  //   work with - wrapRangeInSpan()'s range.extractContents() otherwise
+  //   leaves the original range collapsed and unusable for a repeat call.
+  // - Just a caret, nothing selected: sets the format for whatever gets
+  //   typed *next*, the same as toggling Bold with an empty selection
+  //   already does natively via execCommand - contenteditable has no
+  //   built-in equivalent for arbitrary inline styles, so this reuses (or
+  //   creates) a caret-sized span at that position and leaves the cursor
+  //   inside it.
   function applyInlineStyle(prop, value) {
     const sel = window.getSelection();
-    const liveRange = sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
-    const range = liveRange || (savedRange && !savedRange.collapsed ? savedRange : null);
+    const liveRange = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    const range = liveRange || savedRange;
     if (!range) return;
 
-    const existing = findWrappingSpan(range, prop);
-    if (existing) {
-      existing.style[prop] = value;
+    if (!range.collapsed) {
+      const existing = findWrappingSpan(range, prop);
+      if (existing) {
+        existing.style[prop] = value;
+      } else {
+        const span = wrapRangeInSpan(range, { [prop]: value });
+        const newRange = document.createRange();
+        newRange.selectNodeContents(span);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedRange = newRange.cloneRange();
+      }
     } else {
-      const span = wrapRangeInSpan(range, { [prop]: value });
-      const newRange = document.createRange();
-      newRange.selectNodeContents(span);
-      sel.removeAllRanges();
-      sel.addRange(newRange);
-      savedRange = newRange.cloneRange();
+      const existing = findWrappingSpan(range, prop);
+      if (existing) {
+        // Caret's already inside a span with this property (e.g. picking a
+        // second format with nothing typed in between, or reopening a
+        // menu after moving the cursor back into already-styled text) -
+        // just update it in place. The caret's actual position is left
+        // untouched here deliberately: it may be anywhere inside this
+        // span's real content, not necessarily at the placeholder's
+        // offset the fresh-span branch below assumes.
+        existing.style[prop] = value;
+      } else {
+        const span = document.createElement("span");
+        span.style[prop] = value;
+        span.appendChild(document.createTextNode(CARET_PLACEHOLDER));
+        range.insertNode(span);
+        const newRange = document.createRange();
+        newRange.setStart(span.firstChild, span.firstChild.length);
+        newRange.collapse(true);
+        sel.removeAllRanges();
+        sel.addRange(newRange);
+        savedRange = newRange.cloneRange();
+      }
     }
     commit();
   }
@@ -637,11 +686,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // Reflects the current selection's actual style/font/size back into the
   // toolbar - called on every selection change (mouseup/keyup/click below)
   // and right after applying a change, the same idea as
-  // updateFormatButtonStates() for B/I/U.
+  // updateFormatButtonStates() for B/I/U. Also runs for a bare collapsed
+  // caret (not just a real selection), same as applyInlineStyle() - it
+  // should show what the *next* typed character will look like too.
   function updateInlineControlDisplays() {
     const sel = window.getSelection();
-    const hasSelection = sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode);
-    const range = hasSelection ? sel.getRangeAt(0) : null;
+    const hasRange = sel.rangeCount && editable.contains(sel.anchorNode);
+    const range = hasRange ? sel.getRangeAt(0) : null;
 
     const sizeSpan = range && findWrappingSpan(range, "fontSize");
     sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();

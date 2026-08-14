@@ -118,5 +118,15 @@ export function sanitizeHtml(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
   sanitizeNode(template.content);
-  return template.innerHTML;
+  // Strips the zero-width space js/modules/pageBlocksEditor.js's
+  // applyInlineStyle() plants as a caret anchor when a font/size/color
+  // choice is made with nothing selected (so the format applies to
+  // whatever's typed next, the same as toggling Bold with an empty
+  // selection) - live in the editable field so there's somewhere for the
+  // cursor to actually land, but never meant to end up in what's stored
+  // or rendered. If nothing was ever typed after it, its span is now
+  // simply empty rather than gone - inert, matches how sanitizeSpanStyle
+  // above already leaves an emptied element in place rather than special-
+  // casing removal.
+  return template.innerHTML.replace(/​/g, "");
 }
