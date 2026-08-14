@@ -1564,6 +1564,31 @@ input[type="range"]:focus::-moz-range-thumb {
   background: #444;
 }
 
+/* Builder-chrome-only additions on top of .page-block-text (css/page.css,
+   shared with the public page - see that file's own header comment on
+   why it can't have anything builder-specific in it). This just makes the
+   field read as an editable input (border/background/focus ring/min-
+   height) - the actual p/h1/h2/h3/strong/em/u typography comes from the
+   shared class, so this genuinely WYSIWYGs the final page styling rather
+   than showing generic browser bold/italic. */
+.page-block-text-editable {
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  min-height: 120px;
+  cursor: text;
+  outline: none;
+}
+
+.page-block-text-editable:focus {
+  border-color: var(--builder-accent);
+}
+
+.page-block-text-editable:empty::before {
+  content: attr(data-placeholder);
+  color: #888;
+}
+
 .page-block-row-preview {
   margin-top: 0.8rem;
   border: 1px solid #3a3a3a;

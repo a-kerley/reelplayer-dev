@@ -12,7 +12,8 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, applyTextStyles } from "./pageTextStyles.js";
+import { sanitizeHtml } from "./htmlSanitizer.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -47,7 +48,11 @@ function createEmptyBlock(type) {
     case "banner-image":
       return { blockId, type, imageUrl: "", altText: "", caption: "", maxHeight: 600 };
     case "text":
-      return { blockId, type, heading: "", body: "", alignment: "left" };
+      // bodyHtml (contenteditable WYSIWYG editor) is the live format now -
+      // heading/body were the pre-WYSIWYG Markdown fields, kept readable
+      // by pageBlockRenderer.js/pageBlocksEditor.js only for pages saved
+      // before this feature, never written by a brand new block.
+      return { blockId, type, bodyHtml: "", alignment: "left" };
     case "image":
       return { blockId, type, imageUrl: "", altText: "", widthPreset: "full" };
     case "player":
@@ -107,10 +112,17 @@ function createBlockRow(block, index, page, onChange) {
   });
   row.appendChild(configForm);
 
-  const preview = document.createElement("div");
-  preview.className = "page-block-row-preview";
-  preview.appendChild(renderBlock(block));
-  row.appendChild(preview);
+  // Text blocks skip this - their contenteditable editor (createTextConfig())
+  // shows the styled result directly, so a second, separate rendered
+  // preview underneath would just be a redundant duplicate view. Every
+  // other block type still gets one (banner image, image, player,
+  // embedded video - none of those have an in-place styled editing view).
+  if (block.type !== "text") {
+    const preview = document.createElement("div");
+    preview.className = "page-block-row-preview";
+    preview.appendChild(renderBlock(block));
+    row.appendChild(preview);
+  }
 
   if (collapsedBlockIds.has(block.blockId)) {
     row.classList.add("page-block-row-collapsed");
@@ -350,31 +362,36 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
   return wrap;
 }
 
-// A single textarea, not the old heading+body pair - "heading" is still
-// rendered for blocks saved before this change (see pageBlockRenderer.js's
-// renderText()), but there's no way to set one from here anymore. Bold/
-// italic/links/headings are typed inline (**bold**, *italic*, # heading,
-// plain URLs/emails/phone numbers auto-link), or applied to a selection
-// via the style selector below, rather than needing separate fields.
+// A true contenteditable WYSIWYG field, not a raw-markdown textarea - bold/
+// italic/underline/headings render live as you type/select, no visible
+// markup and no separate preview needed (createBlockRow() skips the usual
+// row preview for text blocks specifically, since this field doubles as
+// it). Content is serialized to sanitized HTML (block.bodyHtml) on blur,
+// not markdown - see js/modules/htmlSanitizer.js and
+// pageBlockRenderer.js's renderText() for the render-time half. A block
+// saved before this feature (legacy block.heading/block.body, Markdown)
+// is rendered once via the existing renderBlock() to seed this field's
+// initial content, then converts to bodyHtml the first time it's actually
+// edited - no forced bulk migration.
 function createTextConfig(block, page, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
-  // Single consolidated toolbar above the textarea (style menu, B/I/U,
-  // align - grouped and divided like a conventional rich-text toolbar,
-  // e.g. Google Docs'), rather than controls scattered above/below the
-  // field. Declared before bodyTextarea (referenced inside these
+  // Single consolidated toolbar above the field (style menu, B/I/U, align
+  // - grouped and divided like a conventional rich-text toolbar, e.g.
+  // Google Docs'). Declared before `editable` (referenced inside these
   // closures) since none of them actually run until later, by which point
   // it's assigned - same reasoning as every other field in this file.
   const toolbarRow = document.createElement("div");
   toolbarRow.className = "page-block-text-toolbar";
 
   // A menu button, not a <select> - a <select> unavoidably moves focus off
-  // the textarea the moment it's clicked, which loses its selection before
-  // the style can be applied to it (confirmed: this is exactly what a
-  // <select> here did). Both this button's own mousedown and each menu
-  // item's (via openContextMenu's preventFocusSteal option) preventDefault
-  // the focus change, so the textarea - and its selection highlight - never
-  // loses focus at all while picking a style.
+  // the editable field the moment it's clicked, which loses its selection
+  // before the style can be applied to it. Both this button's own
+  // mousedown and each menu item's (via openContextMenu's
+  // preventFocusSteal option) preventDefault the focus change, so the
+  // field - and its selection - never loses focus at all while picking a
+  // style, the same mechanism document.execCommand()-based toolbars
+  // always rely on.
   const styleBtn = document.createElement("button");
   styleBtn.type = "button";
   styleBtn.className = "page-block-add-btn";
@@ -387,24 +404,25 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     openContextMenu(styleBtn, BLOCK_STYLE_ROLES.map((role) => ({
       label: ROLE_LABELS[role],
       onClick: () => {
-        applyStyleToSelection(bodyTextarea, role);
-        block.body = bodyTextarea.value;
-        refreshPreview();
-        onChange();
+        editable.focus();
+        document.execCommand("formatBlock", false, FORMAT_BLOCK_TAGS[role]);
+        commit();
       },
     })), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(styleBtn);
   toolbarRow.appendChild(createToolbarDivider());
 
-  // Real toggles, not just apply-on-click: each button's pressed state
-  // reflects whether the current selection is already wrapped in that
-  // marker (detectActiveStyles()), and clicking a pressed button removes
-  // the marker instead of adding another layer (toggleInlineStyle()).
+  // Real toggles: each button's pressed state reflects
+  // document.queryCommandState() for the current selection - the browser's
+  // own accurate, native answer to "is this bold/italic/underlined,"
+  // unlike the old textarea implementation's from-scratch marker-position
+  // matching (that only existed because a plain textarea has no native
+  // concept of "is this bold"; contenteditable does).
   const formatGroup = document.createElement("span");
   formatGroup.className = "icon-toggle-group";
   const formatButtons = {};
-  [["bold", "format_bold", "Bold"], ["italic", "format_italic", "Italic"], ["underline", "format_underlined", "Underline"]].forEach(([role, glyph, title]) => {
+  [["bold", "format_bold", "Bold"], ["italic", "format_italic", "Italic"], ["underline", "format_underlined", "Underline"]].forEach(([command, glyph, title]) => {
     const btn = document.createElement("span");
     btn.className = "format-icon";
     btn.title = title;
@@ -412,28 +430,28 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     // Same focus-preserving mousedown trick as the style menu above.
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.onclick = () => {
-      toggleInlineStyle(bodyTextarea, role);
-      block.body = bodyTextarea.value;
+      editable.focus();
+      document.execCommand(command);
       updateFormatButtonStates();
-      refreshPreview();
-      onChange();
+      commit();
     };
-    formatButtons[role] = btn;
+    formatButtons[command] = btn;
     formatGroup.appendChild(btn);
   });
   toolbarRow.appendChild(formatGroup);
   toolbarRow.appendChild(createToolbarDivider());
 
   function updateFormatButtonStates() {
-    const active = detectActiveStyles(bodyTextarea);
-    formatButtons.bold.classList.toggle("active", active.bold);
-    formatButtons.italic.classList.toggle("active", active.italic);
-    formatButtons.underline.classList.toggle("active", active.underline);
+    formatButtons.bold.classList.toggle("active", document.queryCommandState("bold"));
+    formatButtons.italic.classList.toggle("active", document.queryCommandState("italic"));
+    formatButtons.underline.classList.toggle("active", document.queryCommandState("underline"));
   }
 
   // Icon toggle, matches titleAppearance.js's Reel Title Appearance align
   // control (same .align-icon class/material-symbols-outlined icon pair),
-  // so alignment reads the same way in both builders.
+  // so alignment reads the same way in both builders. Unrelated to
+  // contenteditable/execCommand - still just block.alignment, applied as
+  // text-align on the block's outer wrapper.
   const alignGroup = document.createElement("span");
   alignGroup.className = "icon-toggle-group";
   const alignIcons = {};
@@ -445,7 +463,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     icon.onclick = () => {
       block.alignment = value;
       updateAlignIcons();
-      refreshPreview();
+      editable.style.textAlign = value === "center" ? "center" : "left";
       onChange();
     };
     alignIcons[value] = icon;
@@ -470,28 +488,70 @@ function createTextConfig(block, page, onChange, refreshPreview) {
 
   wrap.appendChild(toolbarRow);
 
-  const bodyTextarea = document.createElement("textarea");
-  bodyTextarea.value = block.body || "";
-  bodyTextarea.rows = 6;
-  bodyTextarea.placeholder = "Type your text here...";
-  bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
-  bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
-  bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
-  // Keeps the B/I/U toggle states in sync with wherever the selection
-  // currently is - not just after a style is applied, but as the user
-  // selects/moves the cursor with the mouse or keyboard.
-  ["select", "keyup", "mouseup", "click"].forEach((evt) => {
-    bodyTextarea.addEventListener(evt, updateFormatButtonStates);
+  const editable = document.createElement("div");
+  editable.contentEditable = "true";
+  // .page-block-text reuses css/page.css's actual p/h1/h2/h3/strong/em/u
+  // rules (same ones the public page renders with) so this genuinely shows
+  // the final styling, not generic browser bold/italic - .page-block-
+  // text-editable layers the builder-chrome-only editing-field look
+  // (border/background/focus ring) on top, in css/builder.css.
+  editable.className = "page-block-text page-block-text-editable";
+  editable.setAttribute("data-placeholder", "Type your text here...");
+  editable.style.textAlign = block.alignment === "center" ? "center" : "left";
+  editable.innerHTML = initialEditableHtml(block);
+  // Reflects the page's actual per-role font/size/weight/color
+  // customization live inside the editor itself, not just in the preview
+  // panes - genuine WYSIWYG rather than generic browser bold/italic.
+  applyTextStyles(editable, page);
+
+  // Deliberately does NOT call refreshPreview() (the row-rebuild callback
+  // every other block type's config form uses) - that would tear down and
+  // recreate this exact `editable` element, killing its focus/selection on
+  // every single toolbar click. There's nothing left for a rebuild to
+  // refresh here anyway now that text blocks have no separate row preview
+  // to keep in sync (createBlockRow() skips it) - the field already shows
+  // its own result live. onChange() still runs the real page-level save
+  // and the full page live-preview-pane update, which don't touch this row.
+  function commit() {
+    block.bodyHtml = sanitizeHtml(editable.innerHTML);
+    delete block.body;
+    delete block.heading;
+    onChange();
+  }
+
+  // Forces all pasted content to plain text - keeps the editable's HTML
+  // surface entirely self-generated by our own execCommand calls above,
+  // never arbitrary external markup.
+  editable.addEventListener("paste", (e) => {
+    e.preventDefault();
+    const text = (e.clipboardData || window.clipboardData).getData("text/plain");
+    document.execCommand("insertText", false, text);
   });
-  wrap.appendChild(bodyTextarea);
+  editable.addEventListener("blur", commit);
+  ["keyup", "mouseup", "click"].forEach((evt) => {
+    editable.addEventListener(evt, updateFormatButtonStates);
+  });
+  wrap.appendChild(editable);
 
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
   hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
-  hint.textContent = "# Heading, **bold**, *italic*, __underline__ - URLs, emails, and phone numbers link automatically. Or select text and use the toolbar above.";
+  hint.textContent = "Select text and use the toolbar above to format it.";
   wrap.appendChild(hint);
 
   return wrap;
+}
+
+function initialEditableHtml(block) {
+  if (block.bodyHtml) return sanitizeHtml(block.bodyHtml);
+  if (!block.heading && !block.body) return "";
+  // One-time seed from the legacy heading/Markdown-body fields -
+  // renderBlock() builds this via safe DOM construction
+  // (createElement/createTextNode, see pageBlockRenderer.js), so reading
+  // its innerHTML back out here isn't a user-string-to-innerHTML step,
+  // unlike sanitizeHtml()'s job elsewhere in this file.
+  const rendered = renderBlock({ type: "text", heading: block.heading, body: block.body, alignment: block.alignment });
+  return rendered.innerHTML;
 }
 
 function createToolbarDivider() {
@@ -504,148 +564,7 @@ function createToolbarDivider() {
 // except bold/italic/underline, which get their own dedicated B/I/U icon
 // buttons instead (see createTextConfig() above).
 const BLOCK_STYLE_ROLES = ["h1", "h2", "h3", "body"];
-
-const HEADING_MARKERS = { h1: "#", h2: "##", h3: "###" };
-
-// Strips one layer of a leading/trailing marker (e.g. "**") if the whole
-// string is wrapped in it - used to unwrap bold/italic when clearing back
-// to "Body" style. No-op if the string isn't wrapped in that marker.
-function unwrapMarker(text, marker) {
-  if (text.startsWith(marker) && text.endsWith(marker) && text.length >= marker.length * 2) {
-    return text.slice(marker.length, text.length - marker.length);
-  }
-  return text;
-}
-
-// Deliberately simple textarea-splicing, not a toggle/undo-aware rich-text
-// model: headings replace any existing leading heading marker; bold/italic
-// wrap the text (guarded against double-wrapping the exact same marker,
-// but re-selecting the same style twice doesn't "un-apply" it); "Body"
-// strips a heading marker and one layer of **/* wrapping. Multi-line
-// selections only get a heading marker on their first line, same as
-// typing "# " at the start of a multi-line paragraph would.
-// "**" checked before "*" in both the unwrap chain and the double-wrap
-// guard below matters (a bare "*" is a prefix of "**"); "__" (underline)
-// never collides with either, so its position among them doesn't.
-// Bold/Italic/Underline apply via toggleInlineStyle() below instead (real
-// toggle, with active-state detection) - only headings/Body ever reach
-// here now, from the "Apply style..." menu.
-function styledText(text, role) {
-  const withoutHeading = text.replace(/^(#{1,3})\s+/, "");
-
-  if (role === "h1" || role === "h2" || role === "h3") {
-    return `${HEADING_MARKERS[role]} ${withoutHeading}`;
-  }
-  return unwrapMarker(unwrapMarker(unwrapMarker(withoutHeading, "**"), "__"), "*");
-}
-
-// Applies `role` to the textarea's current selection - or, with nothing
-// selected, the whole line the cursor is on - by rewriting the value in
-// place and dispatching a real "input" event so the existing oninput
-// handler picks up the change (matches how a real keystroke would flow).
-function applyStyleToSelection(textarea, role) {
-  const { value } = textarea;
-  let start = textarea.selectionStart;
-  let end = textarea.selectionEnd;
-  if (start === end) {
-    start = value.lastIndexOf("\n", start - 1) + 1;
-    end = value.indexOf("\n", end);
-    if (end === -1) end = value.length;
-  }
-
-  const replacement = styledText(value.slice(start, end), role);
-  textarea.value = value.slice(0, start) + replacement + value.slice(end);
-  textarea.selectionStart = start;
-  textarea.selectionEnd = start + replacement.length;
-  textarea.focus();
-  textarea.dispatchEvent(new Event("input", { bubbles: true }));
-}
-
-const INLINE_MARKERS = { bold: "**", italic: "*", underline: "__" };
-
-// True if `marker` sits exactly at `pos` in `value`, and isn't actually
-// part of a *longer* run of the same character - e.g. a bare "*" (italic)
-// must not match at the position of either "*" in "**" (bold), and "**"
-// itself must not match inside "***". Without this, italic detection
-// would false-positive on every bold span.
-function markerAt(value, pos, marker) {
-  if (pos < 0 || pos + marker.length > value.length) return false;
-  if (value.slice(pos, pos + marker.length) !== marker) return false;
-  const ch = marker[0];
-  if (value[pos - 1] === ch || value[pos + marker.length] === ch) return false;
-  return true;
-}
-
-// A selection is "active" for `marker` if it's wrapped by it either just
-// inside the selection bounds (selecting "**bold**" markers and all) or
-// just outside them (selecting only "bold" from within "**bold**"). Only
-// looks at markers directly touching the selection - a selection nested
-// inside a *wider*, non-adjacent span (e.g. selecting just "word" from
-// "**a whole bold sentence with word in it**") isn't detected as bold,
-// same "deliberately simple, not a full rich-text model" tradeoff as the
-// rest of this file's markdown handling.
-function isMarkerActive(value, start, end, marker) {
-  if (start === end) return false;
-  const innerWrapped = markerAt(value, start, marker) && markerAt(value, end - marker.length, marker) && (end - start) >= marker.length * 2;
-  const outerWrapped = markerAt(value, start - marker.length, marker) && markerAt(value, end, marker);
-  return innerWrapped || outerWrapped;
-}
-
-/** @returns {{bold: boolean, italic: boolean, underline: boolean}} */
-function detectActiveStyles(textarea) {
-  const { value, selectionStart: start, selectionEnd: end } = textarea;
-  return {
-    bold: isMarkerActive(value, start, end, INLINE_MARKERS.bold),
-    italic: isMarkerActive(value, start, end, INLINE_MARKERS.italic),
-    underline: isMarkerActive(value, start, end, INLINE_MARKERS.underline),
-  };
-}
-
-// Real toggle: removes the marker (from wherever it's actually sitting -
-// inside or just outside the selection, matching isMarkerActive() above)
-// if already active, adds it otherwise. Falls back to the current line
-// when nothing's selected, same as applyStyleToSelection().
-function toggleInlineStyle(textarea, role) {
-  const marker = INLINE_MARKERS[role];
-  const { value } = textarea;
-  let start = textarea.selectionStart;
-  let end = textarea.selectionEnd;
-  if (start === end) {
-    start = value.lastIndexOf("\n", start - 1) + 1;
-    end = value.indexOf("\n", end);
-    if (end === -1) end = value.length;
-  }
-
-  let newValue, newStart, newEnd;
-  if (isMarkerActive(value, start, end, marker)) {
-    if (markerAt(value, start, marker)) {
-      // Markers are inside the selection - drop them, keep the inner text selected.
-      const inner = value.slice(start + marker.length, end - marker.length);
-      newValue = value.slice(0, start) + inner + value.slice(end);
-      newStart = start;
-      newEnd = start + inner.length;
-    } else {
-      // Markers sit just outside the selection - remove those instead.
-      const outerStart = start - marker.length;
-      const outerEnd = end + marker.length;
-      const inner = value.slice(start, end);
-      newValue = value.slice(0, outerStart) + inner + value.slice(outerEnd);
-      newStart = outerStart;
-      newEnd = outerStart + inner.length;
-    }
-  } else {
-    const wrapped = `${marker}${value.slice(start, end)}${marker}`;
-    newValue = value.slice(0, start) + wrapped + value.slice(end);
-    newStart = start;
-    newEnd = start + wrapped.length;
-  }
-
-  textarea.value = newValue;
-  textarea.selectionStart = newStart;
-  textarea.selectionEnd = newEnd;
-  textarea.focus();
-  textarea.dispatchEvent(new Event("input", { bubbles: true }));
-}
+const FORMAT_BLOCK_TAGS = { h1: "H1", h2: "H2", h3: "H3", body: "P" };
 
 function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   if (!page.textStyleDefs) page.textStyleDefs = {};
@@ -674,7 +593,16 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     if (!page.textStyleDefs[role]) page.textStyleDefs[role] = {};
     const def = page.textStyleDefs[role];
 
-    const commit = () => { refreshPreview(); onChange(); };
+    // Also refreshes any text block editors currently open on screen, not
+    // just the row/page preview panes - a customization applies to every
+    // block using that role, and an open contenteditable field (see
+    // createTextConfig()) needs its own live CSS custom properties
+    // refreshed the same way to show the change immediately.
+    const commit = () => {
+      refreshPreview();
+      onChange();
+      document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
+    };
     const cellStyle = "padding:0.3rem;";
     const inputStyle = "width:100%;box-sizing:border-box;padding:0.3rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;";
 

@@ -13,6 +13,7 @@
 // `player?id=<reelId>` iframe markup embedExporter.js already generates for
 // third-party embeds, so a reel's rendering logic itself is never
 // duplicated a third time either.
+import { sanitizeHtml } from "./htmlSanitizer.js";
 
 const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
@@ -180,12 +181,28 @@ function renderText(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-text";
   el.style.textAlign = block.alignment === "center" ? "center" : "left";
+
+  // bodyHtml (contenteditable WYSIWYG editor, js/modules/pageBlocksEditor.js)
+  // takes priority over the legacy Markdown body below - a block only ever
+  // has one or the other; bodyHtml is written the first time an old
+  // Markdown block is opened and edited in the new editor. sanitizeHtml()
+  // is called again here even though js/modules/pageBlocksEditor.js
+  // already sanitizes before storing - this is the real security boundary
+  // (what anonymous visitors' browsers actually execute), so stored HTML
+  // is never trusted on the strength of "it was sanitized once already."
+  // The only innerHTML assignment of dynamic content in this whole file -
+  // legitimate here specifically because the content has just passed a
+  // strict allowlist sanitizer, not because it's been validated any other way.
+  if (block.bodyHtml) {
+    el.innerHTML = sanitizeHtml(block.bodyHtml);
+    return el;
+  }
+
   // heading is a legacy field from before the text block was simplified to
-  // a single body textarea (see pageBlocksEditor.js) - still rendered so
-  // pages saved before that change don't lose their heading, but the
-  // editor no longer offers a way to set one on new/edited blocks. It and
-  // an inline "## heading" in the body below both render as <h2> and both
-  // pick up the page's h2 style customization (js/modules/pageTextStyles.js).
+  // a single body textarea - still rendered so pages saved before that
+  // change don't lose their heading. It and an inline "## heading" in the
+  // body below both render as <h2> and both pick up the page's h2 style
+  // customization (js/modules/pageTextStyles.js).
   if (block.heading) {
     const h = document.createElement("h2");
     h.textContent = block.heading;
