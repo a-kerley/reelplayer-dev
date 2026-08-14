@@ -1332,9 +1332,60 @@ function wrapRangeInLink(range, href) {
 const BLOCK_STYLE_ROLES = ["h1", "h2", "h3", "body"];
 const FORMAT_BLOCK_TAGS = { h1: "H1", h2: "H2", h3: "H3", body: "P" };
 
+// Bold/Italic/Underline aren't shown as rows in the dialog below - the text
+// toolbar's own B/I/U toggles already cover them inline, and a second,
+// page-wide "role" path to the exact same idea (plus underline's role
+// styling not visibly applying to selected text - a real, unresolved gap
+// between the CSS var this dialog wrote and what actually painted) made
+// this a confusing, rarely-useful second control for the same thing.
+// ROLES/page.css still carry entries for all three, so a page that already
+// has one customized keeps rendering exactly as before - just no longer
+// editable from here.
+const CUSTOMIZE_DIALOG_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
+
+// What each role actually renders as when nothing's customized -
+// css/page.css's own literal fallback values for h1/h2/h3/body, and a
+// representative body-like default for link (which really falls back to
+// CSS "inherit" from context, not one fixed number - see page.css's
+// comment on .page-block-text a). Read as the dialog's initial value for
+// every field, so it always shows what the text actually looks like right
+// now instead of a blank "Default" placeholder that gives no indication
+// either way.
+const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16 };
+const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400 };
+const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def" };
+
 function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   destroyDialogPickrInstances();
   if (!page.textStyleDefs) page.textStyleDefs = {};
+
+  // Also refreshes any text block editors currently open on screen, not
+  // just the row/page preview panes - a customization applies to every
+  // block using that role, and an open contenteditable field (see
+  // createTextConfig()) needs its own live CSS custom properties
+  // refreshed the same way to show the change immediately. Shared by every
+  // row (and the font-link sync below) rather than rebuilt per-row - it
+  // never actually depended on which role/def triggered it.
+  function commitAll() {
+    refreshPreview();
+    onChange();
+    document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
+  }
+
+  // Font linking - session-only (not part of page.textStyleDefs, so it
+  // resets every time this dialog is reopened): while linked, changing any
+  // one row's font immediately applies the same choice to every other
+  // visible role too, for the common case of wanting one consistent
+  // typeface across the whole page rather than setting it role-by-role.
+  let fontsLinked = false;
+  const fontRows = [];
+  function syncLinkedFonts(value) {
+    fontRows.forEach(({ def, fontSelect }) => {
+      fontSelect.value = value;
+      def.fontFamily = value === "system" ? undefined : value;
+    });
+    commitAll();
+  }
 
   const content = document.createElement("div");
   content.style.cssText = "max-height:60vh;overflow-y:auto;";
@@ -1346,37 +1397,23 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   thead.innerHTML = `
     <tr>
       <th style="text-align:left;padding:0.3rem;">Style</th>
-      <th style="text-align:left;padding:0.3rem;">Font</th>
-      <th style="text-align:left;padding:0.3rem;">Size</th>
-      <th style="text-align:left;padding:0.3rem;">Weight</th>
-      <th style="text-align:left;padding:0.3rem;">Color</th>
+      <th style="text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
+      <th style="text-align:center;padding:0.3rem;">Size</th>
+      <th style="text-align:center;padding:0.3rem;">Weight</th>
+      <th style="text-align:center;padding:0.3rem;">Color</th>
       <th style="padding:0.3rem;"></th>
     </tr>
   `;
   table.appendChild(thead);
 
   const tbody = document.createElement("tbody");
-  ROLES.forEach((role) => {
+  CUSTOMIZE_DIALOG_ROLES.forEach((role) => {
     if (!page.textStyleDefs[role]) page.textStyleDefs[role] = {};
     const def = page.textStyleDefs[role];
-
-    // Also refreshes any text block editors currently open on screen, not
-    // just the row/page preview panes - a customization applies to every
-    // block using that role, and an open contenteditable field (see
-    // createTextConfig()) needs its own live CSS custom properties
-    // refreshed the same way to show the change immediately.
-    const commit = () => {
-      refreshPreview();
-      onChange();
-      document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
-    };
-    const cellStyle = "padding:0.3rem;";
-    // Only for the plain number input below - the two <select>s use the
-    // shared .builder-select class instead (no width:100% override), so
-    // they size to their widest option rather than a fixed cell width,
-    // which would otherwise truncate a label like "Merriweather (Google
-    // Font)".
-    const inputStyle = "width:100%;box-sizing:border-box;padding:0.3rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;";
+    // Center-aligned to sit under their (also center-aligned) column
+    // headers - Style and Reset (plain text/a button, not a field to line
+    // up with a header) are left as their default alignment.
+    const cellStyle = "padding:0.3rem;text-align:center;";
 
     const tr = document.createElement("tr");
     tr.style.borderTop = "1px solid #444";
@@ -1390,69 +1427,84 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     fontTd.style.cssText = cellStyle;
     const fontSelect = document.createElement("select");
     fontSelect.className = "builder-select";
-    const fontDefOpt = document.createElement("option");
-    fontDefOpt.value = "";
-    fontDefOpt.textContent = "Default";
-    fontSelect.appendChild(fontDefOpt);
+    // No blank "Default" option - every role always has a real, current
+    // font (TEXT_FONT_OPTIONS[0], "System Default," when nothing's
+    // explicitly overridden), so the select always shows it selected.
     TEXT_FONT_OPTIONS.forEach((f) => {
       const opt = document.createElement("option");
       opt.value = f.value;
       opt.textContent = f.label;
       fontSelect.appendChild(opt);
     });
-    fontSelect.value = def.fontFamily || "";
-    fontSelect.onchange = () => { def.fontFamily = fontSelect.value || undefined; commit(); };
+    fontSelect.value = def.fontFamily || "system";
+    fontSelect.onchange = () => {
+      if (fontsLinked) {
+        syncLinkedFonts(fontSelect.value);
+      } else {
+        def.fontFamily = fontSelect.value === "system" ? undefined : fontSelect.value;
+        commitAll();
+      }
+    };
     fontTd.appendChild(fontSelect);
     tr.appendChild(fontTd);
+    fontRows.push({ def, fontSelect });
 
     const sizeTd = document.createElement("td");
     sizeTd.style.cssText = cellStyle;
-    const sizeInput = document.createElement("input");
-    sizeInput.type = "number";
-    sizeInput.min = "10";
-    sizeInput.max = "72";
-    sizeInput.placeholder = "Default";
-    sizeInput.style.cssText = inputStyle;
-    if (def.fontSize) sizeInput.value = def.fontSize;
-    sizeInput.onchange = () => {
-      const val = parseInt(sizeInput.value, 10);
+    // Same segmented number+spin control as the text toolbar's own size
+    // field (css/builder.css's .value-control-number/.value-control-spin),
+    // not a plain <input type="number"> - consistent look, and a real
+    // typeable/steppable value instead of a blank field with a "Default"
+    // placeholder. The hover-reveal slider half of createValueControl()'s
+    // normal behavior is suppressed (.customize-styles-size-control below)
+    // - out of place in a compact table cell.
+    const sizeControl = createValueControl({
+      id: `${role}-customizeSize`,
+      label: "",
+      value: def.fontSize || ROLE_DEFAULT_SIZE_PX[role],
+      min: 8,
+      max: 96,
+      step: 1,
+      unit: "px",
+    });
+    sizeControl.control.classList.add("customize-styles-size-control");
+    sizeControl.input.addEventListener("input", () => {
+      const val = parseInt(sizeControl.input.value, 10);
       def.fontSize = !isNaN(val) ? val : undefined;
-      commit();
-    };
-    sizeTd.appendChild(sizeInput);
+      commitAll();
+    });
+    sizeTd.appendChild(sizeControl.control);
     tr.appendChild(sizeTd);
 
     const weightTd = document.createElement("td");
     weightTd.style.cssText = cellStyle;
     const weightSelect = document.createElement("select");
     weightSelect.className = "builder-select";
-    const weightDefOpt = document.createElement("option");
-    weightDefOpt.value = "";
-    weightDefOpt.textContent = "Default";
-    weightSelect.appendChild(weightDefOpt);
+    // No blank "Default" option here either - see the font select above.
     ["400", "500", "600", "700"].forEach((w) => {
       const opt = document.createElement("option");
       opt.value = w;
       opt.textContent = w;
       weightSelect.appendChild(opt);
     });
-    weightSelect.value = def.fontWeight || "";
-    weightSelect.onchange = () => { def.fontWeight = weightSelect.value || undefined; commit(); };
+    weightSelect.value = def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]);
+    weightSelect.onchange = () => { def.fontWeight = weightSelect.value; commitAll(); };
     weightTd.appendChild(weightSelect);
     tr.appendChild(weightTd);
 
     const colorTd = document.createElement("td");
     colorTd.style.cssText = cellStyle;
-    const colorPickr = createColorPickrButton(def.color || "#ffffff", (hex) => { def.color = hex; commit(); }, dialogPickrInstances);
+    const colorPickr = createColorPickrButton(def.color || ROLE_DEFAULT_COLOR[role], (hex) => { def.color = hex; commitAll(); }, dialogPickrInstances);
     colorTd.appendChild(colorPickr.btn);
     tr.appendChild(colorTd);
 
-    // A Pickr swatch always holds a concrete value, so there's no way to
-    // "unset" it back to the CSS default from the swatch alone - this
-    // clears all four fields for the row at once instead of adding a
-    // separate per-field reset control for just this one property.
+    // A Pickr swatch/select/spinner always holds a concrete value, so
+    // there's no way to "unset" any of them back to the CSS default from
+    // the field alone - this clears all four fields for the row at once
+    // instead of adding a separate per-field reset control for just one
+    // property.
     const resetTd = document.createElement("td");
-    resetTd.style.cssText = cellStyle;
+    resetTd.style.cssText = "padding:0.3rem;";
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.textContent = "Reset";
@@ -1465,11 +1517,11 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     resetBtn.style.cssText = "padding:0.3rem 0.6rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#ccc;cursor:pointer;font-size:var(--builder-text-base);";
     resetBtn.onclick = () => {
       page.textStyleDefs[role] = {};
-      fontSelect.value = "";
-      sizeInput.value = "";
-      weightSelect.value = "";
-      colorPickr.reset("#ffffff");
-      commit();
+      fontSelect.value = "system";
+      sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
+      weightSelect.value = String(ROLE_DEFAULT_WEIGHT[role]);
+      colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
+      commitAll();
     };
     resetTd.appendChild(resetBtn);
     tr.appendChild(resetTd);
@@ -1495,6 +1547,21 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   // filled with the real DOM built above once the dialog shell exists
   // (same technique as the block-presets manager dialog).
   document.getElementById("customizeStylesSlot")?.appendChild(content);
+
+  // Font link-toggle button - built after the dialog shell exists, same
+  // reason as the slot pattern just above: needs to be a real element with
+  // a real click handler, not part of thead's innerHTML string.
+  const fontLinkToggle = document.createElement("span");
+  fontLinkToggle.className = "format-icon";
+  fontLinkToggle.title = "Link font across all styles";
+  fontLinkToggle.innerHTML = `<span class="material-symbols-outlined">link</span>`;
+  fontLinkToggle.onclick = () => {
+    fontsLinked = !fontsLinked;
+    fontLinkToggle.classList.toggle("active", fontsLinked);
+    fontLinkToggle.title = fontsLinked ? "Unlink font per style" : "Link font across all styles";
+    if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].fontSelect.value);
+  };
+  document.getElementById("fontLinkToggleSlot")?.replaceWith(fontLinkToggle);
 }
 
 function createImageConfig(block, onChange, refreshPreview) {

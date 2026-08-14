@@ -186,7 +186,15 @@ body.page-body {
 }
 
 .page-block-text a {
-  color: var(--page-accent);
+  color: var(--page-text-link-color, var(--page-accent));
+  /* font-family/-weight fall back to inherit (not a literal default like
+     h1-h3/body get) - a link with nothing customized should keep reading
+     as whatever text it's embedded in (a link inside an <h1> stays h1-
+     sized/weighted), the same as it always has; only an explicit
+     Customize Styles override ever pins it to a fixed value instead. */
+  font-family: var(--page-text-link-font-family, inherit);
+  font-size: var(--page-text-link-font-size, inherit);
+  font-weight: var(--page-text-link-font-weight, inherit);
   text-decoration: underline;
 }
 

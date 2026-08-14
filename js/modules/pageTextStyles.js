@@ -14,8 +14,8 @@
 // before this feature (or before a given role was ever customized) renders
 // identically to before.
 
-export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body"];
-export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body" };
+export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link"];
+export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link" };
 
 // A curated pick, not an open text field - three system/web-safe stacks
 // (no network request) plus two Google Fonts, loaded on demand only for a

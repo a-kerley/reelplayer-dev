@@ -1583,6 +1583,15 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
+/* Customize Text Styles dialog's per-role Size field (js/modules/
+   pageBlocksEditor.js's openCustomizeStylesDialog()) - same reasoning as
+   .page-block-text-toolbar-size above: createValueControl()'s hover-reveal
+   slider has no room in a table cell this narrow, and would visually
+   collide with neighboring rows/columns on hover. */
+.customize-styles-size-control .value-control-slider-wrap {
+  display: none;
+}
+
 /* Pickr's own .pickr wrapper carries a bit of built-in vertical padding
    the other toolbar items don't have, which sits the 20px swatch a touch
    below their shared center line despite .page-block-text-toolbar's own
