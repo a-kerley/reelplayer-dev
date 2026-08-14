@@ -892,7 +892,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
   fontBtn.onclick = () => {
     saveSelection();
-    if (!savedRange || savedRange.collapsed) return;
+    // No "nothing to act on" guard here (unlike this used to bail on a
+    // collapsed savedRange) - applyInlineStyle() already handles a bare
+    // caret by setting the format for whatever's typed next, the same as
+    // Size's spinner does, and getWorkingRange() inside it already falls
+    // back sensibly even with no prior selection at all. Blocking the menu
+    // from opening in either case was the actual "Font... does nothing
+    // with nothing selected" bug - the menu itself never even appeared.
     openContextMenu(fontBtn, TEXT_FONT_OPTIONS.map((f) => ({
       label: f.label,
       onClick: () => {
