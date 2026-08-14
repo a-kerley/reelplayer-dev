@@ -718,6 +718,12 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // operates on whatever editable.focus() establishes, no live selection
   // required beforehand) - only the *display* was wrong, not the apply.
   const BLOCK_TAG_ROLES = { H1: "h1", H2: "h2", H3: "h3", P: "body" };
+  // "body" (not null) is the terminal fallback - reachable for a block
+  // that's completely empty (editable.firstChild is itself null, so the
+  // walk below never even starts). There's no real ambiguity to reflect
+  // in that case: a block with nothing in it yet reads exactly like plain
+  // body text once you do start typing, the same as an empty Google Docs
+  // paragraph shows "Normal text," never a blank/placeholder style.
   function currentBlockRole() {
     const sel = window.getSelection();
     let node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : editable.firstChild;
@@ -725,7 +731,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
       node = node.parentNode;
     }
-    return null;
+    return "body";
   }
 
   // Shared "the selection doesn't agree on one value" result for the
@@ -795,7 +801,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
     if (BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
     const blocks = Array.from(node.children || []).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
-    if (!blocks.length) return null;
+    // "body", not null - same terminal-default reasoning as
+    // currentBlockRole() above, for the (unusual) case of a real
+    // selection that somehow doesn't intersect any recognized block.
+    if (!blocks.length) return "body";
     const roles = new Set(blocks.map((el) => BLOCK_TAG_ROLES[el.tagName]));
     return roles.size === 1 ? [...roles][0] : MIXED;
   }
