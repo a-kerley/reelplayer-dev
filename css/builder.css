@@ -1058,39 +1058,46 @@ input.filename-display:focus {
   font-size: var(--builder-text-base);
 }
 
-.align-icon {
+/* Tight-packed row of icon-toggle buttons (align icons, B/I/U) - the
+   group owns the (small) spacing between its icons via `gap`, not the
+   icons themselves, so both titleAppearance.js's Reel Title Appearance
+   align control and js/modules/pageBlocksEditor.js's text block toolbar
+   (multiple groups on one row) stay visually consistent. */
+.icon-toggle-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.15rem;
+}
+
+.align-icon,
+.format-icon {
   opacity: 0.5;
   cursor: pointer;
   display: inline-flex;
   align-items: center;
-  transition: opacity 0.18s, color 0.18s;
-  margin-right: 0.25em;
+  justify-content: center;
+  width: 1.8em;
+  height: 1.8em;
+  border-radius: 4px;
+  transition: opacity 0.18s, color 0.18s, background 0.18s;
 }
 
-.align-icon.active,
-.align-icon:hover {
-  opacity: 1;
-  color: var(--builder-accent);
-}
-
-/* Classic B/I/U toolbar (js/modules/pageBlocksEditor.js's text block) -
-   same visual treatment as .align-icon, but a plain action button rather
-   than a persistent-state toggle (no .active variant - there's no cheap
-   way to know if the current textarea selection is already bold/italic/
-   underlined, same reasoning as the style menu next to it not tracking
-   "current style" either). */
-.format-icon {
-  opacity: 0.6;
-  cursor: pointer;
-  display: inline-flex;
-  align-items: center;
-  transition: opacity 0.18s, color 0.18s;
-  margin-right: 0.15em;
-}
-
+.align-icon:hover,
 .format-icon:hover {
   opacity: 1;
   color: var(--builder-accent);
+}
+
+/* A real pressed/toggled look (background fill), not just the hover
+   color change above - js/modules/pageBlocksEditor.js's format-icon
+   buttons reflect whether the current selection is actually
+   bold/italic/underlined (detectActiveStyles()), so this needs to read
+   as a distinct "on" state, not just "being hovered." */
+.align-icon.active,
+.format-icon.active {
+  opacity: 1;
+  color: #fff;
+  background: var(--builder-accent);
 }
 
 #reelTitleAppearanceSection.disabled .appearance-option,
@@ -1537,6 +1544,24 @@ input[type="range"]:focus::-moz-range-thumb {
 
 .page-block-config .color-row span:first-child {
   min-width: 5.5rem;
+}
+
+/* Text block's consolidated toolbar (style menu, B/I/U, align) - one row
+   above the textarea, groups separated by a thin divider rather than the
+   wide default .color-row gap between every child. */
+.page-block-text-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.page-block-toolbar-divider {
+  align-self: stretch;
+  width: 1px;
+  margin: 0.2rem 0;
+  background: #444;
 }
 
 .page-block-row-preview {

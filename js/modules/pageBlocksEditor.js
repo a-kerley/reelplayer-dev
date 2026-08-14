@@ -359,8 +359,14 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
 function createTextConfig(block, page, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
+  // Single consolidated toolbar above the textarea (style menu, B/I/U,
+  // align - grouped and divided like a conventional rich-text toolbar,
+  // e.g. Google Docs'), rather than controls scattered above/below the
+  // field. Declared before bodyTextarea (referenced inside these
+  // closures) since none of them actually run until later, by which point
+  // it's assigned - same reasoning as every other field in this file.
   const toolbarRow = document.createElement("div");
-  toolbarRow.className = "color-row";
+  toolbarRow.className = "page-block-text-toolbar";
 
   // A menu button, not a <select> - a <select> unavoidably moves focus off
   // the textarea the moment it's clicked, which loses its selection before
@@ -376,8 +382,8 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   styleBtn.addEventListener("mousedown", (e) => e.preventDefault());
   styleBtn.onclick = () => {
     // Block-level styles only (headings + plain body) - Bold/Italic/
-    // Underline get their own always-visible icon buttons just below,
-    // the classic B/I/U toolbar convention, instead of living in this menu.
+    // Underline get their own always-visible toggle buttons, the classic
+    // B/I/U toolbar convention, instead of living in this menu.
     openContextMenu(styleBtn, BLOCK_STYLE_ROLES.map((role) => ({
       label: ROLE_LABELS[role],
       onClick: () => {
@@ -389,60 +395,47 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     })), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(styleBtn);
+  toolbarRow.appendChild(createToolbarDivider());
 
-  // Same focus-preserving mousedown trick as the style menu above - these
-  // are direct-action buttons (no menu to open), so only their own
-  // mousedown needs guarding.
+  // Real toggles, not just apply-on-click: each button's pressed state
+  // reflects whether the current selection is already wrapped in that
+  // marker (detectActiveStyles()), and clicking a pressed button removes
+  // the marker instead of adding another layer (toggleInlineStyle()).
+  const formatGroup = document.createElement("span");
+  formatGroup.className = "icon-toggle-group";
+  const formatButtons = {};
   [["bold", "format_bold", "Bold"], ["italic", "format_italic", "Italic"], ["underline", "format_underlined", "Underline"]].forEach(([role, glyph, title]) => {
     const btn = document.createElement("span");
     btn.className = "format-icon";
     btn.title = title;
     btn.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
+    // Same focus-preserving mousedown trick as the style menu above.
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.onclick = () => {
-      applyStyleToSelection(bodyTextarea, role);
+      toggleInlineStyle(bodyTextarea, role);
       block.body = bodyTextarea.value;
+      updateFormatButtonStates();
       refreshPreview();
       onChange();
     };
-    toolbarRow.appendChild(btn);
+    formatButtons[role] = btn;
+    formatGroup.appendChild(btn);
   });
+  toolbarRow.appendChild(formatGroup);
+  toolbarRow.appendChild(createToolbarDivider());
 
-  const customizeBtn = document.createElement("button");
-  customizeBtn.type = "button";
-  customizeBtn.className = "page-block-add-btn";
-  customizeBtn.textContent = "Customize Styles...";
-  customizeBtn.onclick = () => openCustomizeStylesDialog(page, onChange, refreshPreview);
-  toolbarRow.appendChild(customizeBtn);
+  function updateFormatButtonStates() {
+    const active = detectActiveStyles(bodyTextarea);
+    formatButtons.bold.classList.toggle("active", active.bold);
+    formatButtons.italic.classList.toggle("active", active.italic);
+    formatButtons.underline.classList.toggle("active", active.underline);
+  }
 
-  wrap.appendChild(toolbarRow);
-
-  const bodyTextarea = document.createElement("textarea");
-  bodyTextarea.value = block.body || "";
-  bodyTextarea.rows = 6;
-  bodyTextarea.placeholder = "Type your text here...";
-  bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
-  bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
-  bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
-  wrap.appendChild(bodyTextarea);
-
-  const hint = document.createElement("p");
-  hint.className = "builder-empty-state";
-  hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
-  hint.textContent = "# Heading, **bold**, *italic*, __underline__ - URLs, emails, and phone numbers link automatically. Or select text and use the style menu/B I U buttons above.";
-  wrap.appendChild(hint);
-
-  // Icon toggle, not a <select> - matches titleAppearance.js's Reel Title
-  // Appearance align control exactly (same .align-icon class/material-
-  // symbols-outlined icon pair), so alignment reads the same way in both
-  // builders.
-  const alignRow = document.createElement("div");
-  alignRow.className = "color-row";
-  alignRow.style.marginTop = "0.5rem";
-  const alignLabel = document.createElement("span");
-  alignLabel.textContent = "Align:";
-  alignRow.appendChild(alignLabel);
-
+  // Icon toggle, matches titleAppearance.js's Reel Title Appearance align
+  // control (same .align-icon class/material-symbols-outlined icon pair),
+  // so alignment reads the same way in both builders.
+  const alignGroup = document.createElement("span");
+  alignGroup.className = "icon-toggle-group";
   const alignIcons = {};
   [["left", "format_align_left", "Left"], ["center", "format_align_center", "Center"]].forEach(([value, glyph, title]) => {
     const icon = document.createElement("span");
@@ -456,8 +449,9 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       onChange();
     };
     alignIcons[value] = icon;
-    alignRow.appendChild(icon);
+    alignGroup.appendChild(icon);
   });
+  toolbarRow.appendChild(alignGroup);
 
   function updateAlignIcons() {
     const align = block.alignment || "left";
@@ -466,9 +460,44 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   }
   updateAlignIcons();
 
-  wrap.appendChild(alignRow);
+  const customizeBtn = document.createElement("button");
+  customizeBtn.type = "button";
+  customizeBtn.className = "page-block-add-btn";
+  customizeBtn.textContent = "Customize Styles...";
+  customizeBtn.style.marginLeft = "auto";
+  customizeBtn.onclick = () => openCustomizeStylesDialog(page, onChange, refreshPreview);
+  toolbarRow.appendChild(customizeBtn);
+
+  wrap.appendChild(toolbarRow);
+
+  const bodyTextarea = document.createElement("textarea");
+  bodyTextarea.value = block.body || "";
+  bodyTextarea.rows = 6;
+  bodyTextarea.placeholder = "Type your text here...";
+  bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
+  bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
+  bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
+  // Keeps the B/I/U toggle states in sync with wherever the selection
+  // currently is - not just after a style is applied, but as the user
+  // selects/moves the cursor with the mouse or keyboard.
+  ["select", "keyup", "mouseup", "click"].forEach((evt) => {
+    bodyTextarea.addEventListener(evt, updateFormatButtonStates);
+  });
+  wrap.appendChild(bodyTextarea);
+
+  const hint = document.createElement("p");
+  hint.className = "builder-empty-state";
+  hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
+  hint.textContent = "# Heading, **bold**, *italic*, __underline__ - URLs, emails, and phone numbers link automatically. Or select text and use the toolbar above.";
+  wrap.appendChild(hint);
 
   return wrap;
+}
+
+function createToolbarDivider() {
+  const divider = document.createElement("span");
+  divider.className = "page-block-toolbar-divider";
+  return divider;
 }
 
 // The "Apply style..." menu's contents - everything in ROLES (pageTextStyles.js)
@@ -498,22 +527,16 @@ function unwrapMarker(text, marker) {
 // "**" checked before "*" in both the unwrap chain and the double-wrap
 // guard below matters (a bare "*" is a prefix of "**"); "__" (underline)
 // never collides with either, so its position among them doesn't.
-const INLINE_MARKERS = { bold: "**", italic: "*", underline: "__" };
-
+// Bold/Italic/Underline apply via toggleInlineStyle() below instead (real
+// toggle, with active-state detection) - only headings/Body ever reach
+// here now, from the "Apply style..." menu.
 function styledText(text, role) {
   const withoutHeading = text.replace(/^(#{1,3})\s+/, "");
 
   if (role === "h1" || role === "h2" || role === "h3") {
     return `${HEADING_MARKERS[role]} ${withoutHeading}`;
   }
-  if (role === "body") {
-    return unwrapMarker(unwrapMarker(unwrapMarker(withoutHeading, "**"), "__"), "*");
-  }
-  const marker = INLINE_MARKERS[role];
-  if (withoutHeading.startsWith(marker) && withoutHeading.endsWith(marker) && withoutHeading.length >= marker.length * 2) {
-    return withoutHeading;
-  }
-  return `${marker}${withoutHeading}${marker}`;
+  return unwrapMarker(unwrapMarker(unwrapMarker(withoutHeading, "**"), "__"), "*");
 }
 
 // Applies `role` to the textarea's current selection - or, with nothing
@@ -534,6 +557,92 @@ function applyStyleToSelection(textarea, role) {
   textarea.value = value.slice(0, start) + replacement + value.slice(end);
   textarea.selectionStart = start;
   textarea.selectionEnd = start + replacement.length;
+  textarea.focus();
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+const INLINE_MARKERS = { bold: "**", italic: "*", underline: "__" };
+
+// True if `marker` sits exactly at `pos` in `value`, and isn't actually
+// part of a *longer* run of the same character - e.g. a bare "*" (italic)
+// must not match at the position of either "*" in "**" (bold), and "**"
+// itself must not match inside "***". Without this, italic detection
+// would false-positive on every bold span.
+function markerAt(value, pos, marker) {
+  if (pos < 0 || pos + marker.length > value.length) return false;
+  if (value.slice(pos, pos + marker.length) !== marker) return false;
+  const ch = marker[0];
+  if (value[pos - 1] === ch || value[pos + marker.length] === ch) return false;
+  return true;
+}
+
+// A selection is "active" for `marker` if it's wrapped by it either just
+// inside the selection bounds (selecting "**bold**" markers and all) or
+// just outside them (selecting only "bold" from within "**bold**"). Only
+// looks at markers directly touching the selection - a selection nested
+// inside a *wider*, non-adjacent span (e.g. selecting just "word" from
+// "**a whole bold sentence with word in it**") isn't detected as bold,
+// same "deliberately simple, not a full rich-text model" tradeoff as the
+// rest of this file's markdown handling.
+function isMarkerActive(value, start, end, marker) {
+  if (start === end) return false;
+  const innerWrapped = markerAt(value, start, marker) && markerAt(value, end - marker.length, marker) && (end - start) >= marker.length * 2;
+  const outerWrapped = markerAt(value, start - marker.length, marker) && markerAt(value, end, marker);
+  return innerWrapped || outerWrapped;
+}
+
+/** @returns {{bold: boolean, italic: boolean, underline: boolean}} */
+function detectActiveStyles(textarea) {
+  const { value, selectionStart: start, selectionEnd: end } = textarea;
+  return {
+    bold: isMarkerActive(value, start, end, INLINE_MARKERS.bold),
+    italic: isMarkerActive(value, start, end, INLINE_MARKERS.italic),
+    underline: isMarkerActive(value, start, end, INLINE_MARKERS.underline),
+  };
+}
+
+// Real toggle: removes the marker (from wherever it's actually sitting -
+// inside or just outside the selection, matching isMarkerActive() above)
+// if already active, adds it otherwise. Falls back to the current line
+// when nothing's selected, same as applyStyleToSelection().
+function toggleInlineStyle(textarea, role) {
+  const marker = INLINE_MARKERS[role];
+  const { value } = textarea;
+  let start = textarea.selectionStart;
+  let end = textarea.selectionEnd;
+  if (start === end) {
+    start = value.lastIndexOf("\n", start - 1) + 1;
+    end = value.indexOf("\n", end);
+    if (end === -1) end = value.length;
+  }
+
+  let newValue, newStart, newEnd;
+  if (isMarkerActive(value, start, end, marker)) {
+    if (markerAt(value, start, marker)) {
+      // Markers are inside the selection - drop them, keep the inner text selected.
+      const inner = value.slice(start + marker.length, end - marker.length);
+      newValue = value.slice(0, start) + inner + value.slice(end);
+      newStart = start;
+      newEnd = start + inner.length;
+    } else {
+      // Markers sit just outside the selection - remove those instead.
+      const outerStart = start - marker.length;
+      const outerEnd = end + marker.length;
+      const inner = value.slice(start, end);
+      newValue = value.slice(0, outerStart) + inner + value.slice(outerEnd);
+      newStart = outerStart;
+      newEnd = outerStart + inner.length;
+    }
+  } else {
+    const wrapped = `${marker}${value.slice(start, end)}${marker}`;
+    newValue = value.slice(0, start) + wrapped + value.slice(end);
+    newStart = start;
+    newEnd = start + wrapped.length;
+  }
+
+  textarea.value = newValue;
+  textarea.selectionStart = newStart;
+  textarea.selectionEnd = newEnd;
   textarea.focus();
   textarea.dispatchEvent(new Event("input", { bubbles: true }));
 }

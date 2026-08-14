@@ -46,11 +46,13 @@ export function createTitleAppearanceSection(reel, onChange) {
       </label>
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Align:
-        <span id="reelTitleAlignLeft" class="align-icon" title="Left">
-          <span class="material-symbols-outlined">format_align_left</span>
-        </span>
-        <span id="reelTitleAlignCenter" class="align-icon" title="Center">
-          <span class="material-symbols-outlined">format_align_center</span>
+        <span class="icon-toggle-group">
+          <span id="reelTitleAlignLeft" class="align-icon" title="Left">
+            <span class="material-symbols-outlined">format_align_left</span>
+          </span>
+          <span id="reelTitleAlignCenter" class="align-icon" title="Center">
+            <span class="material-symbols-outlined">format_align_center</span>
+          </span>
         </span>
       </label>
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
