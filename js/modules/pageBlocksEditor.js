@@ -707,11 +707,20 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // anchorNode the same way findAncestorLink() does below - used to show
   // the active paragraph style in styleBtn, mirroring how a selection's
   // actual bold/italic/underline state already drives formatButtons.
+  //
+  // Falls back to editable's own first child when there's no live
+  // selection inside it at all (same idea as effectiveFontFamily()/
+  // effectiveFontSizePx()'s `editable` fallback) - without this, a
+  // freshly-loaded block that's never been clicked into always showed
+  // "Apply style..." instead of the block's real role (e.g. "Body"),
+  // even though picking a style and applying it already worked correctly
+  // from that exact same untouched state (document.execCommand()
+  // operates on whatever editable.focus() establishes, no live selection
+  // required beforehand) - only the *display* was wrong, not the apply.
   const BLOCK_TAG_ROLES = { H1: "h1", H2: "h2", H3: "h3", P: "body" };
   function currentBlockRole() {
     const sel = window.getSelection();
-    if (!sel.rangeCount || !editable.contains(sel.anchorNode)) return null;
-    let node = sel.anchorNode;
+    let node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : editable.firstChild;
     while (node && node !== editable) {
       if (node.nodeType === Node.ELEMENT_NODE && BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
       node = node.parentNode;
