@@ -48,6 +48,27 @@ function syncGoogleFonts(neededFontValues) {
   });
 }
 
+// Ad hoc, per-selection font choices (js/modules/pageBlocksEditor.js's
+// inline font toolbar control, applied via a <span style="font-family:...">
+// rather than a page-wide role) need the same Google Font loaded on
+// demand, but can't share syncGoogleFonts()'s link set above - that
+// function wipes and rebuilds its own links on every applyTextStyles()
+// call, which would silently rip out a font an inline span still needs the
+// next time any role is edited. Kept deliberately simple: additive only,
+// keyed by font value, never removed - a page that's ever used a Google
+// Font inline keeps that stylesheet loaded for the rest of the session,
+// which costs nothing further once fetched.
+export function ensureInlineGoogleFont(fontValue) {
+  const font = TEXT_FONT_OPTIONS.find((f) => f.value === fontValue);
+  if (!font?.googleFont) return;
+  if (document.querySelector(`link[data-inline-text-font="${font.googleFont}"]`)) return;
+  const link = document.createElement("link");
+  link.rel = "stylesheet";
+  link.dataset.inlineTextFont = font.googleFont;
+  link.href = `https://fonts.googleapis.com/css2?family=${font.googleFont}&display=swap`;
+  document.head.appendChild(link);
+}
+
 /**
  * @param {HTMLElement} scopeEl - element to set the CSS custom properties
  *   on; .page-block-text's per-role rules (css/page.css) read them via

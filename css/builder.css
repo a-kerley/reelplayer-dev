@@ -1564,6 +1564,26 @@ input[type="range"]:focus::-moz-range-thumb {
   background: #444;
 }
 
+.page-block-text-toolbar-number {
+  width: 4.2rem;
+  padding: 0.4rem;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  color: #fff;
+  font-size: var(--builder-text-base);
+}
+
+.page-block-text-toolbar-color {
+  width: 2.2rem;
+  height: 2.2rem;
+  padding: 0;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background: #1e1e1e;
+  cursor: pointer;
+}
+
 /* Builder-chrome-only additions on top of .page-block-text (css/page.css,
    shared with the public page - see that file's own header comment on
    why it can't have anything builder-specific in it). This just makes the

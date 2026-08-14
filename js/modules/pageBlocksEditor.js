@@ -12,7 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, applyTextStyles } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
 import { sanitizeHtml } from "./htmlSanitizer.js";
 
 const BLOCK_TYPE_LABELS = {
@@ -447,6 +447,114 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     formatButtons.underline.classList.toggle("active", document.queryCommandState("underline"));
   }
 
+  // Ad hoc font/size/color, applied via a real <span style="..."> (see
+  // wrapRangeInSpan() below), not execCommand - execCommand's foreColor/
+  // fontName/fontSize output is both inconsistent across browsers and (for
+  // fontSize) stuck on the legacy 1-7 HTML size scale rather than real px,
+  // so this codebase generates the markup itself for predictable,
+  // consistently-sanitizable output. Unlike B/I/U/headings above, the
+  // size and color controls are real <input>s that need actual focus to
+  // work - clicking into either necessarily loses the editable's live
+  // selection, the same problem preventFocusSteal solves for buttons/menus
+  // but can't for text entry. savedRange (continuously updated from
+  // mouseup/keyup/click on the editable, see below) is the workaround:
+  // operating on a cloned Range's own DOM node references works
+  // regardless of what currently has focus or what document.getSelection()
+  // currently holds.
+  let savedRange = null;
+  function saveSelection() {
+    const sel = window.getSelection();
+    if (sel.rangeCount && !sel.isCollapsed && editable.contains(sel.anchorNode)) {
+      savedRange = sel.getRangeAt(0).cloneRange();
+    }
+  }
+
+  const fontBtn = document.createElement("button");
+  fontBtn.type = "button";
+  fontBtn.className = "page-block-add-btn";
+  fontBtn.textContent = "Font...";
+  fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  fontBtn.onclick = () => {
+    saveSelection();
+    if (!savedRange || savedRange.collapsed) return;
+    openContextMenu(fontBtn, TEXT_FONT_OPTIONS.map((f) => ({
+      label: f.label,
+      onClick: () => {
+        ensureInlineGoogleFont(f.value);
+        wrapRangeInSpan(savedRange, { fontFamily: f.stack });
+        commit();
+      },
+    })), { preventFocusSteal: true });
+  };
+  toolbarRow.appendChild(fontBtn);
+
+  const sizeInput = document.createElement("input");
+  sizeInput.type = "number";
+  sizeInput.min = "8";
+  sizeInput.max = "96";
+  sizeInput.placeholder = "Size";
+  sizeInput.title = "Font size (px) for the selected text";
+  sizeInput.className = "page-block-text-toolbar-number";
+  sizeInput.addEventListener("change", () => {
+    const val = parseInt(sizeInput.value, 10);
+    sizeInput.value = "";
+    if (isNaN(val) || !savedRange || savedRange.collapsed) return;
+    wrapRangeInSpan(savedRange, { fontSize: `${val}px` });
+    commit();
+  });
+  toolbarRow.appendChild(sizeInput);
+
+  const colorInput = document.createElement("input");
+  colorInput.type = "color";
+  colorInput.title = "Text color for the selected text";
+  colorInput.className = "page-block-text-toolbar-color";
+  colorInput.value = "#ffffff";
+  colorInput.addEventListener("change", () => {
+    if (!savedRange || savedRange.collapsed) return;
+    wrapRangeInSpan(savedRange, { color: colorInput.value });
+    commit();
+  });
+  toolbarRow.appendChild(colorInput);
+  toolbarRow.appendChild(createToolbarDivider());
+
+  // Link/unlink toggle - unlike the styling controls above, this doesn't
+  // need savedRange for the "already a link" case, but does for creating
+  // a new one, since dialog.prompt() is a modal popup that definitely
+  // steals focus while the user types the URL.
+  const linkBtn = document.createElement("span");
+  linkBtn.className = "format-icon";
+  linkBtn.title = "Link";
+  linkBtn.innerHTML = `<span class="material-symbols-outlined">link</span>`;
+  linkBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  linkBtn.onclick = async () => {
+    saveSelection();
+    const existingLink = savedRange && findAncestorLink(savedRange.commonAncestorContainer);
+    if (existingLink) {
+      const parent = existingLink.parentNode;
+      while (existingLink.firstChild) parent.insertBefore(existingLink.firstChild, existingLink);
+      parent.removeChild(existingLink);
+      commit();
+      return;
+    }
+    if (!savedRange || savedRange.collapsed) return;
+    const range = savedRange;
+    const url = await dialog.prompt("Link URL:", "https://");
+    if (!url) return;
+    const href = /^[a-z][a-z0-9+.-]*:/i.test(url) ? url : `https://${url}`;
+    wrapRangeInLink(range, href);
+    commit();
+  };
+  toolbarRow.appendChild(linkBtn);
+  toolbarRow.appendChild(createToolbarDivider());
+
+  function findAncestorLink(node) {
+    while (node && node !== editable) {
+      if (node.nodeType === Node.ELEMENT_NODE && node.tagName === "A") return node;
+      node = node.parentNode;
+    }
+    return null;
+  }
+
   // Icon toggle, matches titleAppearance.js's Reel Title Appearance align
   // control (same .align-icon class/material-symbols-outlined icon pair),
   // so alignment reads the same way in both builders. Unrelated to
@@ -529,7 +637,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   });
   editable.addEventListener("blur", commit);
   ["keyup", "mouseup", "click"].forEach((evt) => {
-    editable.addEventListener(evt, updateFormatButtonStates);
+    editable.addEventListener(evt, () => {
+      updateFormatButtonStates();
+      saveSelection();
+    });
   });
   wrap.appendChild(editable);
 
@@ -558,6 +669,30 @@ function createToolbarDivider() {
   const divider = document.createElement("span");
   divider.className = "page-block-toolbar-divider";
   return divider;
+}
+
+// Operates directly on a Range's own DOM node references - works
+// regardless of what currently has focus or what
+// window.getSelection() currently holds, which is exactly why
+// createTextConfig()'s font/size/color controls pass in a saved
+// (cloned) Range rather than re-reading the live selection. Each
+// application nests a fresh span (no attempt to detect/merge into an
+// existing one at the same range) - simple, and CSS cascades correctly
+// through the nesting regardless.
+function wrapRangeInSpan(range, styleProps) {
+  const span = document.createElement("span");
+  Object.entries(styleProps).forEach(([prop, value]) => { span.style[prop] = value; });
+  span.appendChild(range.extractContents());
+  range.insertNode(span);
+  return span;
+}
+
+function wrapRangeInLink(range, href) {
+  const a = document.createElement("a");
+  a.href = href;
+  a.appendChild(range.extractContents());
+  range.insertNode(a);
+  return a;
 }
 
 // The "Apply style..." menu's contents - everything in ROLES (pageTextStyles.js)
