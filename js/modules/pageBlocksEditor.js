@@ -12,6 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS } from "./pageTextStyles.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -101,7 +102,7 @@ function createBlockRow(block, index, page, onChange) {
   // itself - each config field's own blur/change handler calls onChange()
   // separately, since a plain field edit shouldn't always force a full
   // list re-render the way add/remove/reorder do).
-  const configForm = createConfigForm(block, onChange, () => {
+  const configForm = createConfigForm(block, page, onChange, () => {
     updatePageBlocksEditor(page, onChange);
   });
   row.appendChild(configForm);
@@ -260,7 +261,7 @@ function setupDragAndDrop(row, index, page, onChange) {
 // full list re-render needed for plain field edits - only reorder/add/
 // remove touch the DOM structure via updatePageBlocksEditor()).
 
-function createConfigForm(block, onChange, refreshPreview) {
+function createConfigForm(block, page, onChange, refreshPreview) {
   const form = document.createElement("div");
   form.className = "page-block-config";
 
@@ -269,7 +270,7 @@ function createConfigForm(block, onChange, refreshPreview) {
       form.appendChild(createBannerImageConfig(block, onChange, refreshPreview));
       break;
     case "text":
-      form.appendChild(createTextConfig(block, onChange, refreshPreview));
+      form.appendChild(createTextConfig(block, page, onChange, refreshPreview));
       break;
     case "image":
       form.appendChild(createImageConfig(block, onChange, refreshPreview));
@@ -352,10 +353,37 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
 // A single textarea, not the old heading+body pair - "heading" is still
 // rendered for blocks saved before this change (see pageBlockRenderer.js's
 // renderText()), but there's no way to set one from here anymore. Bold/
-// italic/links are typed inline (**bold**, *italic*, plain URLs/emails/
-// phone numbers auto-link) rather than needing separate fields.
-function createTextConfig(block, onChange, refreshPreview) {
+// italic/links/headings are typed inline (**bold**, *italic*, # heading,
+// plain URLs/emails/phone numbers auto-link), or applied to a selection
+// via the style selector below, rather than needing separate fields.
+function createTextConfig(block, page, onChange, refreshPreview) {
   const wrap = document.createElement("div");
+
+  const toolbarRow = document.createElement("div");
+  toolbarRow.className = "color-row";
+
+  const styleSelect = document.createElement("select");
+  styleSelect.style.cssText = "flex:1;padding:0.4rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-base);background:#1e1e1e;color:#fff;";
+  const placeholderOpt = document.createElement("option");
+  placeholderOpt.value = "";
+  placeholderOpt.textContent = "Apply style...";
+  styleSelect.appendChild(placeholderOpt);
+  ROLES.forEach((role) => {
+    const opt = document.createElement("option");
+    opt.value = role;
+    opt.textContent = ROLE_LABELS[role];
+    styleSelect.appendChild(opt);
+  });
+  toolbarRow.appendChild(styleSelect);
+
+  const customizeBtn = document.createElement("button");
+  customizeBtn.type = "button";
+  customizeBtn.className = "page-block-add-btn";
+  customizeBtn.textContent = "Customize Styles...";
+  customizeBtn.onclick = () => openCustomizeStylesDialog(page, onChange, refreshPreview);
+  toolbarRow.appendChild(customizeBtn);
+
+  wrap.appendChild(toolbarRow);
 
   const bodyTextarea = document.createElement("textarea");
   bodyTextarea.value = block.body || "";
@@ -363,13 +391,28 @@ function createTextConfig(block, onChange, refreshPreview) {
   bodyTextarea.placeholder = "Type your text here...";
   bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
   bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
+
+  // The selector is an action trigger, not a persistent state indicator -
+  // a raw-markdown textarea has no cheap way to reliably show "what style
+  // is the cursor currently in," so it always resets to the placeholder
+  // right after applying. Nothing selected -> applies to the whole current
+  // line (mirrors Word/Docs' paragraph-style-with-no-selection behavior).
+  styleSelect.onchange = () => {
+    const role = styleSelect.value;
+    styleSelect.value = "";
+    if (!role) return;
+    applyStyleToSelection(bodyTextarea, role);
+    block.body = bodyTextarea.value;
+    refreshPreview();
+    onChange();
+  };
   bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
   wrap.appendChild(bodyTextarea);
 
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
   hint.style.cssText = "text-align:left;margin:0.3rem 0 0;font-size:0.8rem;";
-  hint.textContent = "**bold**, *italic* - URLs, emails, and phone numbers link automatically.";
+  hint.textContent = "# Heading, **bold**, *italic* - URLs, emails, and phone numbers link automatically. Or select text and use the style menu above.";
   wrap.appendChild(hint);
 
   // Icon toggle, not a <select> - matches titleAppearance.js's Reel Title
@@ -409,6 +452,207 @@ function createTextConfig(block, onChange, refreshPreview) {
   wrap.appendChild(alignRow);
 
   return wrap;
+}
+
+const HEADING_MARKERS = { h1: "#", h2: "##", h3: "###" };
+
+// Strips one layer of a leading/trailing marker (e.g. "**") if the whole
+// string is wrapped in it - used to unwrap bold/italic when clearing back
+// to "Body" style. No-op if the string isn't wrapped in that marker.
+function unwrapMarker(text, marker) {
+  if (text.startsWith(marker) && text.endsWith(marker) && text.length >= marker.length * 2) {
+    return text.slice(marker.length, text.length - marker.length);
+  }
+  return text;
+}
+
+// Deliberately simple textarea-splicing, not a toggle/undo-aware rich-text
+// model: headings replace any existing leading heading marker; bold/italic
+// wrap the text (guarded against double-wrapping the exact same marker,
+// but re-selecting the same style twice doesn't "un-apply" it); "Body"
+// strips a heading marker and one layer of **/* wrapping. Multi-line
+// selections only get a heading marker on their first line, same as
+// typing "# " at the start of a multi-line paragraph would.
+function styledText(text, role) {
+  const withoutHeading = text.replace(/^(#{1,3})\s+/, "");
+
+  if (role === "h1" || role === "h2" || role === "h3") {
+    return `${HEADING_MARKERS[role]} ${withoutHeading}`;
+  }
+  if (role === "body") {
+    return unwrapMarker(unwrapMarker(withoutHeading, "**"), "*");
+  }
+  const marker = role === "bold" ? "**" : "*";
+  if (withoutHeading.startsWith(marker) && withoutHeading.endsWith(marker) && withoutHeading.length >= marker.length * 2) {
+    return withoutHeading;
+  }
+  return `${marker}${withoutHeading}${marker}`;
+}
+
+// Applies `role` to the textarea's current selection - or, with nothing
+// selected, the whole line the cursor is on - by rewriting the value in
+// place and dispatching a real "input" event so the existing oninput
+// handler picks up the change (matches how a real keystroke would flow).
+function applyStyleToSelection(textarea, role) {
+  const { value } = textarea;
+  let start = textarea.selectionStart;
+  let end = textarea.selectionEnd;
+  if (start === end) {
+    start = value.lastIndexOf("\n", start - 1) + 1;
+    end = value.indexOf("\n", end);
+    if (end === -1) end = value.length;
+  }
+
+  const replacement = styledText(value.slice(start, end), role);
+  textarea.value = value.slice(0, start) + replacement + value.slice(end);
+  textarea.selectionStart = start;
+  textarea.selectionEnd = start + replacement.length;
+  textarea.focus();
+  textarea.dispatchEvent(new Event("input", { bubbles: true }));
+}
+
+function openCustomizeStylesDialog(page, onChange, refreshPreview) {
+  if (!page.textStyleDefs) page.textStyleDefs = {};
+
+  const content = document.createElement("div");
+  content.style.cssText = "max-height:60vh;overflow-y:auto;";
+
+  const table = document.createElement("table");
+  table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
+
+  const thead = document.createElement("thead");
+  thead.innerHTML = `
+    <tr>
+      <th style="text-align:left;padding:0.3rem;">Style</th>
+      <th style="text-align:left;padding:0.3rem;">Font</th>
+      <th style="text-align:left;padding:0.3rem;">Size</th>
+      <th style="text-align:left;padding:0.3rem;">Weight</th>
+      <th style="text-align:left;padding:0.3rem;">Color</th>
+      <th style="padding:0.3rem;"></th>
+    </tr>
+  `;
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  ROLES.forEach((role) => {
+    if (!page.textStyleDefs[role]) page.textStyleDefs[role] = {};
+    const def = page.textStyleDefs[role];
+
+    const commit = () => { refreshPreview(); onChange(); };
+    const cellStyle = "padding:0.3rem;";
+    const inputStyle = "width:100%;box-sizing:border-box;padding:0.3rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;";
+
+    const tr = document.createElement("tr");
+    tr.style.borderTop = "1px solid #444";
+
+    const labelTd = document.createElement("td");
+    labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
+    labelTd.textContent = ROLE_LABELS[role];
+    tr.appendChild(labelTd);
+
+    const fontTd = document.createElement("td");
+    fontTd.style.cssText = cellStyle;
+    const fontSelect = document.createElement("select");
+    fontSelect.style.cssText = inputStyle;
+    const fontDefOpt = document.createElement("option");
+    fontDefOpt.value = "";
+    fontDefOpt.textContent = "Default";
+    fontSelect.appendChild(fontDefOpt);
+    TEXT_FONT_OPTIONS.forEach((f) => {
+      const opt = document.createElement("option");
+      opt.value = f.value;
+      opt.textContent = f.label;
+      fontSelect.appendChild(opt);
+    });
+    fontSelect.value = def.fontFamily || "";
+    fontSelect.onchange = () => { def.fontFamily = fontSelect.value || undefined; commit(); };
+    fontTd.appendChild(fontSelect);
+    tr.appendChild(fontTd);
+
+    const sizeTd = document.createElement("td");
+    sizeTd.style.cssText = cellStyle;
+    const sizeInput = document.createElement("input");
+    sizeInput.type = "number";
+    sizeInput.min = "10";
+    sizeInput.max = "72";
+    sizeInput.placeholder = "Default";
+    sizeInput.style.cssText = inputStyle;
+    if (def.fontSize) sizeInput.value = def.fontSize;
+    sizeInput.onchange = () => {
+      const val = parseInt(sizeInput.value, 10);
+      def.fontSize = !isNaN(val) ? val : undefined;
+      commit();
+    };
+    sizeTd.appendChild(sizeInput);
+    tr.appendChild(sizeTd);
+
+    const weightTd = document.createElement("td");
+    weightTd.style.cssText = cellStyle;
+    const weightSelect = document.createElement("select");
+    weightSelect.style.cssText = inputStyle;
+    const weightDefOpt = document.createElement("option");
+    weightDefOpt.value = "";
+    weightDefOpt.textContent = "Default";
+    weightSelect.appendChild(weightDefOpt);
+    ["400", "500", "600", "700"].forEach((w) => {
+      const opt = document.createElement("option");
+      opt.value = w;
+      opt.textContent = w;
+      weightSelect.appendChild(opt);
+    });
+    weightSelect.value = def.fontWeight || "";
+    weightSelect.onchange = () => { def.fontWeight = weightSelect.value || undefined; commit(); };
+    weightTd.appendChild(weightSelect);
+    tr.appendChild(weightTd);
+
+    const colorTd = document.createElement("td");
+    colorTd.style.cssText = cellStyle;
+    const colorInput = document.createElement("input");
+    colorInput.type = "color";
+    colorInput.style.cssText = "width:2.4rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;";
+    colorInput.value = def.color || "#ffffff";
+    colorInput.onchange = () => { def.color = colorInput.value; commit(); };
+    colorTd.appendChild(colorInput);
+    tr.appendChild(colorTd);
+
+    // A native <input type=color> always holds a concrete value, so there's
+    // no way to "unset" it back to the CSS default from the swatch alone -
+    // this clears all four fields for the row at once instead of adding a
+    // separate per-field reset control for just this one property.
+    const resetTd = document.createElement("td");
+    resetTd.style.cssText = cellStyle;
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.textContent = "Reset";
+    resetBtn.className = "media-browser-delete-btn";
+    resetBtn.onclick = () => {
+      page.textStyleDefs[role] = {};
+      fontSelect.value = "";
+      sizeInput.value = "";
+      weightSelect.value = "";
+      colorInput.value = "#ffffff";
+      commit();
+    };
+    resetTd.appendChild(resetBtn);
+    tr.appendChild(resetTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  content.appendChild(table);
+
+  dialog.createDialog({
+    type: "custom",
+    message: "Customize Text Styles",
+    content: '<div id="customizeStylesSlot"></div>',
+    buttons: [{ text: "Done", type: "primary", onClick: () => dialog.closeDialog() }],
+    maxWidth: "560px",
+  });
+  // createDialog's `content` option only innerHTML's an HTML string - these
+  // rows need real onchange handlers, so an empty placeholder slot is
+  // filled with the real DOM built above once the dialog shell exists
+  // (same technique as the block-presets manager dialog).
+  document.getElementById("customizeStylesSlot")?.appendChild(content);
 }
 
 function createImageConfig(block, onChange, refreshPreview) {

@@ -1,18 +1,25 @@
-// pageTextStyles.js - Per-page text styling (font family/size/weight) for
-// a page's text blocks. Same "one apply function, two callers" shape as
+// pageTextStyles.js - Per-page, per-role text styling for a page's text
+// blocks - a fixed set of named styles mirroring Markdown's vocabulary
+// (Heading 1/2/3, Bold, Italic, Body; see ROLES below), each independently
+// customizable per page via js/modules/pageBlocksEditor.js's "Customize
+// Styles..." popup. Same "one apply function, two callers" shape as
 // pageBackground.js's applyPageBackground(): page.html and the builder's
 // own live preview pane (js/pagesController.js's renderPagePreview()) both
 // call applyTextStyles() rather than each hand-rolling the same CSS
 // custom-property/font-loading logic.
 //
-// Values live directly on the page object (page.textFontFamily/
-// textFontSize/textFontWeight) - null/unset means "use the page-block-text
-// default in css/page.css", so a page saved before this feature existed
-// renders identically to before.
+// Values live in page.textStyleDefs[role] = {fontFamily?, fontSize?,
+// fontWeight?, color?} - an unset role, or an unset property within one,
+// means "use the css/page.css default for that role", so a page saved
+// before this feature (or before a given role was ever customized) renders
+// identically to before.
+
+export const ROLES = ["h1", "h2", "h3", "bold", "italic", "body"];
+export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", body: "Body" };
 
 // A curated pick, not an open text field - three system/web-safe stacks
 // (no network request) plus two Google Fonts, loaded on demand only for a
-// page that actually selects one (see ensureGoogleFont() below), not
+// role that actually selects one (see syncGoogleFonts() below), not
 // unconditionally on every page.
 export const TEXT_FONT_OPTIONS = [
   { value: "system", label: "System Default", stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif" },
@@ -22,56 +29,65 @@ export const TEXT_FONT_OPTIONS = [
   { value: "merriweather", label: "Merriweather (Google Font)", stack: "'Merriweather', serif", googleFont: "Merriweather:wght@400;700" },
 ];
 
-const GOOGLE_FONT_LINK_ID = "pageTextGoogleFontLink";
-
-// One shared <link>, keyed by a fixed id - swapped (not duplicated) as the
-// selected font changes, whether that's the same page's font field being
-// edited live or the builder preview switching between different pages
-// with different fonts selected.
-function ensureGoogleFont(googleFont) {
-  const existing = document.getElementById(GOOGLE_FONT_LINK_ID);
-  if (!googleFont) {
-    existing?.remove();
-    return;
-  }
-  const href = `https://fonts.googleapis.com/css2?family=${googleFont}&display=swap`;
-  if (existing) {
-    if (existing.href !== href) existing.href = href;
-    return;
-  }
-  const link = document.createElement("link");
-  link.id = GOOGLE_FONT_LINK_ID;
-  link.rel = "stylesheet";
-  link.href = href;
-  document.head.appendChild(link);
+// Distinct roles can now pick distinct Google Fonts at once, so this is a
+// set of <link>s, not one - every apply call removes whichever of these
+// links it previously added, then re-adds exactly the current set. Simpler
+// and just as cheap as surgical diffing at this scale (at most 6 roles).
+function syncGoogleFonts(neededFontValues) {
+  document.querySelectorAll("link[data-page-text-font]").forEach((el) => el.remove());
+  const seen = new Set();
+  neededFontValues.forEach((fontValue) => {
+    const font = TEXT_FONT_OPTIONS.find((f) => f.value === fontValue);
+    if (!font?.googleFont || seen.has(font.googleFont)) return;
+    seen.add(font.googleFont);
+    const link = document.createElement("link");
+    link.rel = "stylesheet";
+    link.dataset.pageTextFont = font.googleFont;
+    link.href = `https://fonts.googleapis.com/css2?family=${font.googleFont}&display=swap`;
+    document.head.appendChild(link);
+  });
 }
 
 /**
  * @param {HTMLElement} scopeEl - element to set the CSS custom properties
- *   on; .page-block-text's font-family/size/weight (css/page.css) read
- *   them via var(...) with a fallback to the current default, so this is
- *   a no-op visually for a page with none of these fields set.
+ *   on; .page-block-text's per-role rules (css/page.css) read them via
+ *   var(...) with a fallback to that role's current default, so this is a
+ *   no-op visually for a page/role with nothing customized.
  * @param {Object} page
  */
 export function applyTextStyles(scopeEl, page) {
-  const font = TEXT_FONT_OPTIONS.find((f) => f.value === page.textFontFamily);
-  if (font) {
-    scopeEl.style.setProperty("--page-text-font-family", font.stack);
-    ensureGoogleFont(font.googleFont || null);
-  } else {
-    scopeEl.style.removeProperty("--page-text-font-family");
-    ensureGoogleFont(null);
-  }
+  const defs = page.textStyleDefs || {};
+  const neededFonts = [];
 
-  if (page.textFontSize) {
-    scopeEl.style.setProperty("--page-text-font-size", `${page.textFontSize}px`);
-  } else {
-    scopeEl.style.removeProperty("--page-text-font-size");
-  }
+  ROLES.forEach((role) => {
+    const def = defs[role] || {};
+    const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
 
-  if (page.textFontWeight) {
-    scopeEl.style.setProperty("--page-text-font-weight", String(page.textFontWeight));
-  } else {
-    scopeEl.style.removeProperty("--page-text-font-weight");
-  }
+    if (font) {
+      scopeEl.style.setProperty(`--page-text-${role}-font-family`, font.stack);
+      neededFonts.push(font.value);
+    } else {
+      scopeEl.style.removeProperty(`--page-text-${role}-font-family`);
+    }
+
+    if (def.fontSize) {
+      scopeEl.style.setProperty(`--page-text-${role}-font-size`, `${def.fontSize}px`);
+    } else {
+      scopeEl.style.removeProperty(`--page-text-${role}-font-size`);
+    }
+
+    if (def.fontWeight) {
+      scopeEl.style.setProperty(`--page-text-${role}-font-weight`, String(def.fontWeight));
+    } else {
+      scopeEl.style.removeProperty(`--page-text-${role}-font-weight`);
+    }
+
+    if (def.color) {
+      scopeEl.style.setProperty(`--page-text-${role}-color`, def.color);
+    } else {
+      scopeEl.style.removeProperty(`--page-text-${role}-color`);
+    }
+  });
+
+  syncGoogleFonts(neededFonts);
 }

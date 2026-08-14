@@ -120,29 +120,62 @@ body.page-body {
   text-align: center;
 }
 
+/* Per-page, per-role overrides (js/modules/pageTextStyles.js) set
+   --page-text-{role}-font-family/-font-size/-font-weight/-color as inline
+   custom properties on an ancestor - a page/role with none of them set
+   falls straight back to the literal default alongside each var() below,
+   so this is invisible/no-op for every page saved before this feature (or
+   any role within it) existed. */
+
 .page-block-text {
   padding: 1.5rem 1rem;
   color: var(--page-text);
-  /* Per-page overrides (js/modules/pageTextStyles.js) set these as inline
-     custom properties on an ancestor - a page with none of them set falls
-     straight back to the font-family already inherited from body and this
-     rule's own default size/weight, so this is invisible/no-op for every
-     page saved before this feature existed. */
-  font-family: var(--page-text-font-family, inherit);
+}
+
+.page-block-text h1 {
+  margin: 0 0 0.7rem;
+  color: var(--page-text-h1-color, #fff);
+  font-family: var(--page-text-h1-font-family, inherit);
+  font-size: var(--page-text-h1-font-size, 2rem);
+  font-weight: var(--page-text-h1-font-weight, 700);
 }
 
 .page-block-text h2 {
   margin: 0 0 0.6rem;
-  color: #fff;
-  font-size: 1.4rem;
+  color: var(--page-text-h2-color, #fff);
+  font-family: var(--page-text-h2-font-family, inherit);
+  font-size: var(--page-text-h2-font-size, 1.4rem);
+  font-weight: var(--page-text-h2-font-weight, 700);
+}
+
+.page-block-text h3 {
+  margin: 0 0 0.5rem;
+  color: var(--page-text-h3-color, #fff);
+  font-family: var(--page-text-h3-font-family, inherit);
+  font-size: var(--page-text-h3-font-size, 1.15rem);
+  font-weight: var(--page-text-h3-font-weight, 600);
 }
 
 .page-block-text p {
   margin: 0 0 0.7rem;
   line-height: 1.6;
-  color: var(--page-text-muted);
-  font-size: var(--page-text-font-size, 1rem);
-  font-weight: var(--page-text-font-weight, 400);
+  color: var(--page-text-body-color, var(--page-text-muted));
+  font-family: var(--page-text-body-font-family, inherit);
+  font-size: var(--page-text-body-font-size, 1rem);
+  font-weight: var(--page-text-body-font-weight, 400);
+}
+
+.page-block-text strong {
+  color: var(--page-text-bold-color, inherit);
+  font-family: var(--page-text-bold-font-family, inherit);
+  font-weight: var(--page-text-bold-font-weight, 700);
+}
+
+.page-block-text em {
+  color: var(--page-text-italic-color, inherit);
+  font-family: var(--page-text-italic-font-family, inherit);
+  font-weight: var(--page-text-italic-font-weight, inherit);
+  font-style: italic;
 }
 
 .page-block-text a {

@@ -130,6 +130,40 @@ function renderItalicAndLinks(text) {
   });
 }
 
+// Splits a text block's body into heading/paragraph blocks - a line
+// matching Markdown heading syntax (#/##/### + space) becomes a standalone
+// h1/h2/h3 block; consecutive non-heading lines accumulate into a
+// paragraph block exactly like the old body.split(/\n{2,}/) did (a blank
+// line ends the paragraph, single \n within it becomes <br> at render
+// time - see renderText() below).
+function parseBodyToBlocks(body) {
+  const blocks = [];
+  let paragraphLines = null;
+
+  function flushParagraph() {
+    if (paragraphLines && paragraphLines.length) blocks.push({ type: "p", lines: paragraphLines });
+    paragraphLines = null;
+  }
+
+  body.split("\n").forEach((line) => {
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      flushParagraph();
+      blocks.push({ type: `h${headingMatch[1].length}`, text: headingMatch[2] });
+      return;
+    }
+    if (line.trim() === "") {
+      flushParagraph();
+      return;
+    }
+    if (!paragraphLines) paragraphLines = [];
+    paragraphLines.push(line);
+  });
+  flushParagraph();
+
+  return blocks;
+}
+
 function renderText(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-text";
@@ -137,22 +171,28 @@ function renderText(block) {
   // heading is a legacy field from before the text block was simplified to
   // a single body textarea (see pageBlocksEditor.js) - still rendered so
   // pages saved before that change don't lose their heading, but the
-  // editor no longer offers a way to set one on new/edited blocks.
+  // editor no longer offers a way to set one on new/edited blocks. It and
+  // an inline "## heading" in the body below both render as <h2> and both
+  // pick up the page's h2 style customization (js/modules/pageTextStyles.js).
   if (block.heading) {
     const h = document.createElement("h2");
     h.textContent = block.heading;
     el.appendChild(h);
   }
   if (block.body) {
-    // Double line breaks start a new paragraph; single line breaks within
-    // one become <br>.
-    block.body.split(/\n{2,}/).forEach((paragraph) => {
-      const p = document.createElement("p");
-      paragraph.split("\n").forEach((line, i) => {
-        if (i > 0) p.appendChild(document.createElement("br"));
-        renderInlineMarkdown(line).forEach((n) => p.appendChild(n));
-      });
-      el.appendChild(p);
+    parseBodyToBlocks(block.body).forEach((b) => {
+      if (b.type === "p") {
+        const p = document.createElement("p");
+        b.lines.forEach((line, i) => {
+          if (i > 0) p.appendChild(document.createElement("br"));
+          renderInlineMarkdown(line).forEach((n) => p.appendChild(n));
+        });
+        el.appendChild(p);
+      } else {
+        const h = document.createElement(b.type);
+        renderInlineMarkdown(b.text).forEach((n) => h.appendChild(n));
+        el.appendChild(h);
+      }
     });
   }
   if (!block.heading && !block.body) {

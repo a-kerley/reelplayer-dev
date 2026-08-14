@@ -22,7 +22,7 @@ import { setupPageManagerButton } from "./modules/pageManager.js";
 import { createToggleSwitch, createUrlInputRow } from "./modules/domUtils.js";
 import { createValueControl } from "./modules/valueControl.js";
 import { applyPageBackground } from "./modules/pageBackground.js";
-import { applyTextStyles, TEXT_FONT_OPTIONS } from "./modules/pageTextStyles.js";
+import { applyTextStyles } from "./modules/pageTextStyles.js";
 
 function createEmptyPage() {
   return {
@@ -44,9 +44,7 @@ function createEmptyPage() {
     contentMaxWidth: 900,
     contentPaddingTop: 0,
     contentPaddingBottom: 0,
-    textFontFamily: null,
-    textFontSize: null,
-    textFontWeight: null,
+    textStyleDefs: {},
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -511,59 +509,6 @@ export function initPagesController() {
     }
   }
 
-  function setupTextStyleControls(page) {
-    const fontSelect = document.getElementById("pageTextFontFamily");
-    if (fontSelect) {
-      fontSelect.innerHTML = "";
-      const unsetOpt = document.createElement("option");
-      unsetOpt.value = "";
-      unsetOpt.textContent = "Default";
-      fontSelect.appendChild(unsetOpt);
-      TEXT_FONT_OPTIONS.forEach((f) => {
-        const opt = document.createElement("option");
-        opt.value = f.value;
-        opt.textContent = f.label;
-        fontSelect.appendChild(opt);
-      });
-      fontSelect.value = page.textFontFamily || "";
-      fontSelect.onchange = () => {
-        page.textFontFamily = fontSelect.value || null;
-        updateCurrentPage();
-      };
-    }
-
-    const fontSizeSlot = document.getElementById("pageTextFontSizeSlot");
-    if (fontSizeSlot) {
-      fontSizeSlot.innerHTML = "";
-      const { row, input } = createValueControl({
-        id: "pageTextFontSize",
-        label: "Size (px):",
-        value: page.textFontSize ?? 16,
-        min: 12,
-        max: 24,
-        step: 1,
-        unit: "px",
-      });
-      input.addEventListener("input", () => {
-        const val = parseInt(input.value, 10);
-        if (!isNaN(val)) page.textFontSize = val;
-      });
-      input.addEventListener("change", () => {
-        updateCurrentPage();
-      });
-      fontSizeSlot.appendChild(row);
-    }
-
-    const weightSelect = document.getElementById("pageTextFontWeight");
-    if (weightSelect) {
-      weightSelect.value = page.textFontWeight || "400";
-      weightSelect.onchange = () => {
-        page.textFontWeight = weightSelect.value;
-        updateCurrentPage();
-      };
-    }
-  }
-
   // Works before the page is ever published/saved, unlike a real GET
   // /pages/:slug fetch (password-gated, and there's no draft-preview route
   // on the Worker anyway - see worker/CLAUDE.md). Instead this writes the
@@ -698,23 +643,6 @@ export function initPagesController() {
           <div id="pageContentPaddingTopSlot" style="margin-top:0.6rem;"></div>
           <div id="pageContentPaddingBottomSlot" style="margin-top:0.6rem;"></div>
         </fieldset>
-        <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
-          <legend class="builder-section-legend">Text Styles</legend>
-          <div class="color-row">
-            <span>Font:</span>
-            <select id="pageTextFontFamily" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;"></select>
-          </div>
-          <div id="pageTextFontSizeSlot" style="margin-top:0.6rem;"></div>
-          <div class="color-row" style="margin-top:0.6rem;">
-            <span>Weight:</span>
-            <select id="pageTextFontWeight" style="max-width:180px;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
-              <option value="400">400</option>
-              <option value="500">500</option>
-              <option value="600">600</option>
-              <option value="700">700</option>
-            </select>
-          </div>
-        </fieldset>
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
     `;
@@ -744,7 +672,6 @@ export function initPagesController() {
     setupAnalyticsControls(page);
     setupBackgroundControls(page);
     setupLayoutControls(page);
-    setupTextStyleControls(page);
 
     if (!Array.isArray(page.blocks)) page.blocks = [];
     updatePageBlocksEditor(page, updateCurrentPage);

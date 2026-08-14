@@ -26,7 +26,7 @@
 //                               contentOverlayOpacity?, contentOverlayFullBleed?,
 //                               contentOverlayMarginVertical?, contentOverlayMarginHorizontal?,
 //                               contentMaxWidth?, contentPaddingTop?, contentPaddingBottom?,
-//                               textFontFamily?, textFontSize?, textFontWeight?}; 409
+//                               textStyleDefs?}; 409
 //                               if `slug` is already used by a different page's `id`. Deletes the
 //                               `previousSlug` entry first if renaming, so old slugs don't linger.
 //   GET    /pages             - password-gated, lists {id, slug, title, published} for every page
@@ -439,9 +439,7 @@ export default {
           contentMaxWidth: typeof body.contentMaxWidth === "number" ? body.contentMaxWidth : 900,
           contentPaddingTop: typeof body.contentPaddingTop === "number" ? body.contentPaddingTop : 0,
           contentPaddingBottom: typeof body.contentPaddingBottom === "number" ? body.contentPaddingBottom : 0,
-          textFontFamily: typeof body.textFontFamily === "string" ? body.textFontFamily : null,
-          textFontSize: typeof body.textFontSize === "number" ? body.textFontSize : null,
-          textFontWeight: typeof body.textFontWeight === "string" || typeof body.textFontWeight === "number" ? body.textFontWeight : null,
+          textStyleDefs: body.textStyleDefs && typeof body.textStyleDefs === "object" ? body.textStyleDefs : {},
           published: new Date().toISOString(),
         };
         await env.REELS.put(`page_${slug}`, JSON.stringify(published));
