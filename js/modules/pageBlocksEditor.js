@@ -598,6 +598,25 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // invisible debris.
   const CARET_PLACEHOLDER = "​";
 
+  // The range a font/size/color control should act on - the live
+  // selection if the editable currently owns one, else the last one
+  // saved before focus was stolen (Size's input, Color's Pickr popup).
+  // If neither exists - the editable has never actually been focused or
+  // clicked at all yet this session - falls back to a caret at the end of
+  // its content instead of leaving nothing to act on at all: a real
+  // editor's toolbar acts on "wherever you'd type next" rather than
+  // silently no-opping just because nothing's been selected yet.
+  function getWorkingRange() {
+    const sel = window.getSelection();
+    const liveRange = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    if (liveRange) return liveRange;
+    if (savedRange) return savedRange;
+    const range = document.createRange();
+    range.selectNodeContents(editable);
+    range.collapse(false);
+    return range;
+  }
+
   // Font/size/color all funnel through here. Font's and Style's own menus
   // never steal the editable's live selection (preventFocusSteal), so the
   // *live* selection is preferred when it's still usable; Size (a real
@@ -626,9 +645,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   //   inside it.
   function applyInlineStyle(prop, value) {
     const sel = window.getSelection();
-    const liveRange = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
-    const range = liveRange || savedRange;
-    if (!range) return;
+    const range = getWorkingRange();
 
     if (!range.collapsed) {
       const fragment = range.extractContents();
@@ -803,13 +820,12 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // range to work with, not a stale collapsed one.
   function applyFontSizeStep(delta) {
     const sel = window.getSelection();
-    const liveRange = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
-    const range = liveRange || savedRange;
-    if (!range) return;
+    const range = getWorkingRange();
 
     if (range.collapsed) {
       const current = parseInt(sizeInput.value, 10) || effectiveFontSizePx();
       applyInlineStyle("fontSize", `${clampSize(current + delta)}px`);
+      updateInlineControlDisplays();
       return;
     }
 
@@ -931,6 +947,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     const val = parseInt(sizeInput.value, 10);
     if (isNaN(val)) return;
     applyInlineStyle("fontSize", `${clampSize(val)}px`);
+    updateInlineControlDisplays();
   });
   toolbarRow.appendChild(sizeControl.control);
 

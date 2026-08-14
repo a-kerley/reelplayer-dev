@@ -139,20 +139,39 @@ function sanitizeNode(parent) {
   }
 }
 
+// Strips the zero-width space js/modules/pageBlocksEditor.js's
+// applyInlineStyle() plants as a caret anchor when a font/size/color
+// choice is made with nothing selected (so the format applies to
+// whatever's typed next, the same as toggling Bold with an empty
+// selection) - live in the editable field so there's somewhere for the
+// cursor to actually land, but never meant to end up in what's stored or
+// rendered. Removes the now-empty span entirely (not just the character)
+// if nothing was ever typed after it - a string-level character replace
+// alone left an empty <span style="..."></span> behind, invisible when
+// rendered but real, permanent clutter in what's actually saved: every
+// size/font/color picked with nothing selected/typed and then abandoned
+// (switched to a different block, navigated away) added one more, forever.
+function stripCaretPlaceholders(root) {
+  const walker = document.createTreeWalker(root, NodeFilter.SHOW_TEXT);
+  const toStrip = [];
+  let node;
+  while ((node = walker.nextNode())) {
+    if (node.textContent.includes("​")) toStrip.push(node);
+  }
+  toStrip.forEach((textNode) => {
+    textNode.textContent = textNode.textContent.replace(/​/g, "");
+    if (!textNode.textContent) textNode.remove();
+  });
+  root.querySelectorAll("span").forEach((span) => {
+    if (!span.hasChildNodes()) span.remove();
+  });
+}
+
 /** @param {string} html @returns {string} sanitized HTML, allowlisted to P/BR/STRONG/EM/U/H1-3/A/SPAN[style] */
 export function sanitizeHtml(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
   sanitizeNode(template.content);
-  // Strips the zero-width space js/modules/pageBlocksEditor.js's
-  // applyInlineStyle() plants as a caret anchor when a font/size/color
-  // choice is made with nothing selected (so the format applies to
-  // whatever's typed next, the same as toggling Bold with an empty
-  // selection) - live in the editable field so there's somewhere for the
-  // cursor to actually land, but never meant to end up in what's stored
-  // or rendered. If nothing was ever typed after it, its span is now
-  // simply empty rather than gone - inert, matches how sanitizeSpanStyle
-  // above already leaves an emptied element in place rather than special-
-  // casing removal.
-  return template.innerHTML.replace(/​/g, "");
+  stripCaretPlaceholders(template.content);
+  return template.innerHTML;
 }
