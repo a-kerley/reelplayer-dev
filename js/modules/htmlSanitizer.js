@@ -65,13 +65,36 @@ function sanitizeSpanStyle(node) {
   return node.style.length > 0;
 }
 
+// Walks parent's children with a plain live-DOM `nextSibling` loop, not a
+// pre-snapshotted Array.from(parent.childNodes).forEach() - an unwrap
+// (disallowed tag or a SPAN whose style didn't survive validation) mutates
+// `parent`'s own child list mid-walk, and a forEach's snapshot goes stale
+// the moment that happens: two unwrappable siblings back-to-back is enough
+// to make it try to remove a node that's no longer parent's child at all
+// (each call used to re-run sanitizeNode(parent) from scratch, from
+// *inside* the very forEach whose snapshot that recursion had just
+// invalidated). `next` is captured before any mutation of `node` itself,
+// so the walk stays valid regardless of what unwrapping does to it.
+//
+// Every unwrap sanitizes `node`'s own subtree *before* promoting its
+// children into `parent` (bottom-up) - promoted children need to already
+// be fully clean, since nothing will revisit them at `parent`'s level
+// afterward the way the old recursive re-scan used to (accidentally)
+// guarantee.
 function sanitizeNode(parent) {
-  Array.from(parent.childNodes).forEach((node) => {
-    if (node.nodeType === Node.TEXT_NODE) return;
+  let node = parent.firstChild;
+  while (node) {
+    const next = node.nextSibling;
+
+    if (node.nodeType === Node.TEXT_NODE) {
+      node = next;
+      continue;
+    }
 
     if (node.nodeType !== Node.ELEMENT_NODE) {
       parent.removeChild(node);
-      return;
+      node = next;
+      continue;
     }
 
     const alias = TAG_ALIASES[node.tagName];
@@ -80,15 +103,17 @@ function sanitizeNode(parent) {
       while (node.firstChild) replacement.appendChild(node.firstChild);
       parent.replaceChild(replacement, node);
       sanitizeNode(replacement);
-      return;
+      node = next;
+      continue;
     }
 
     if (!ALLOWED_TAGS.has(node.tagName)) {
       // Unwrap, not delete - keep the text content, drop just the tag.
+      sanitizeNode(node);
       while (node.firstChild) parent.insertBefore(node.firstChild, node);
       parent.removeChild(node);
-      sanitizeNode(parent);
-      return;
+      node = next;
+      continue;
     }
 
     Array.from(node.attributes).forEach((attr) => {
@@ -100,17 +125,18 @@ function sanitizeNode(parent) {
       const href = node.getAttribute("href") || "";
       if (!/^(https?:|mailto:|tel:)/i.test(href)) node.removeAttribute("href");
     }
+
+    sanitizeNode(node);
+
     if (node.tagName === "SPAN" && !sanitizeSpanStyle(node)) {
       // Nothing about this span survived validation - it's now a bare,
       // pointless wrapper, so drop it the same way a disallowed tag would be.
       while (node.firstChild) parent.insertBefore(node.firstChild, node);
       parent.removeChild(node);
-      sanitizeNode(parent);
-      return;
     }
 
-    sanitizeNode(node);
-  });
+    node = next;
+  }
 }
 
 /** @param {string} html @returns {string} sanitized HTML, allowlisted to P/BR/STRONG/EM/U/H1-3/A/SPAN[style] */

@@ -6,7 +6,7 @@
 // specific config forms here vs. fixed title/url fields there) that forcing
 // a shared component would add more indirection than it'd save.
 import { createUrlInputRow } from "./domUtils.js";
-import { createValueControl, buildValueControl, wireValueControl } from "./valueControl.js";
+import { createValueControl, buildValueControl } from "./valueControl.js";
 import { renderBlock, parseVideoEmbedUrl } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
@@ -532,7 +532,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   }
 
   // Ad hoc font/size/color, applied via a real <span style="..."> (see
-  // wrapRangeInSpan() below), not execCommand - execCommand's foreColor/
+  // applyInlineStyle() below), not execCommand - execCommand's foreColor/
   // fontName/fontSize output is both inconsistent across browsers and (for
   // fontSize) stuck on the legacy 1-7 HTML size scale rather than real px,
   // so this codebase generates the markup itself for predictable,
@@ -557,6 +557,19 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     if (sel.rangeCount && editable.contains(sel.anchorNode)) {
       savedRange = sel.getRangeAt(0).cloneRange();
     }
+  }
+
+  // Range.extractContents() clones/splits whatever span(s) sit at the
+  // range's exact start/end boundaries to preserve DOM structure, even
+  // when that leaves an empty shell behind on one side (e.g. a range that
+  // starts precisely at a span's first character splits that span into an
+  // empty "before" clone plus the real content) - harmless once rendered
+  // (invisible, no text), but needless clutter in what's actually stored.
+  // Run after every applyInlineStyle()/applyFontSizeStep() DOM edit.
+  function removeEmptySpans() {
+    editable.querySelectorAll("span").forEach((s) => {
+      if (!s.textContent) s.remove();
+    });
   }
 
   // The nearest SPAN ancestor of `range` (walking up from its
@@ -585,25 +598,26 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // invisible debris.
   const CARET_PLACEHOLDER = "​";
 
-  // Font/size/color all funnel through here rather than calling
-  // wrapRangeInSpan() directly. Font's and Style's own menus never steal
-  // the editable's live selection (preventFocusSteal), so the *live*
-  // selection is preferred when it's still usable; Size (a real focusable
-  // input) and Color (a Pickr popup) do steal it, so savedRange is the
-  // fallback for those.
+  // Font/size/color all funnel through here. Font's and Style's own menus
+  // never steal the editable's live selection (preventFocusSteal), so the
+  // *live* selection is preferred when it's still usable; Size (a real
+  // focusable input) and Color (a Pickr popup) do steal it, so savedRange
+  // is the fallback for those.
   //
   // Two cases, mirroring how a real editor's format controls behave:
-  // - An actual (non-collapsed) selection: restyle that text. If it's
-  //   already fully inside a span with this exact property, that span's
-  //   style is mutated directly instead of nesting a fresh span around it
-  //   - matters most for Size's repeatable +/- buttons, where nesting a
-  //   new span per click would otherwise build a deep chain of one-
-  //   property spans on every click. On a fresh wrap, both the live
-  //   selection and savedRange are pointed at the new span's contents
-  //   afterward, so a second application (e.g. a second +/- click with no
-  //   reselection in between) still has a live, non-collapsed range to
-  //   work with - wrapRangeInSpan()'s range.extractContents() otherwise
-  //   leaves the original range collapsed and unusable for a repeat call.
+  // - An actual (non-collapsed) selection, possibly spanning text that
+  //   already has several different values for this property (e.g. two
+  //   different font sizes) - the whole selection is extracted, any
+  //   descendant's own value for this exact property is stripped (inline
+  //   style on a descendant always wins over an ancestor's for the same
+  //   property, so leaving it would silently shadow the new one), and the
+  //   cleaned content is wrapped in one fresh span carrying the new value -
+  //   applying one value uniformly regardless of what was there before.
+  //   Font-size's own relative +/- stepping (applyFontSizeStep() below)
+  //   needs the opposite behavior - each differently-sized run stepping
+  //   from *its own* current size rather than collapsing to one shared
+  //   value - so it doesn't call this at all for a real selection, only
+  //   for its collapsed-caret fallback.
   // - Just a caret, nothing selected: sets the format for whatever gets
   //   typed *next*, the same as toggling Bold with an empty selection
   //   already does natively via execCommand - contenteditable has no
@@ -617,17 +631,20 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     if (!range) return;
 
     if (!range.collapsed) {
-      const existing = findWrappingSpan(range, prop);
-      if (existing) {
-        existing.style[prop] = value;
-      } else {
-        const span = wrapRangeInSpan(range, { [prop]: value });
-        const newRange = document.createRange();
-        newRange.selectNodeContents(span);
-        sel.removeAllRanges();
-        sel.addRange(newRange);
-        savedRange = newRange.cloneRange();
-      }
+      const fragment = range.extractContents();
+      fragment.querySelectorAll("span").forEach((el) => {
+        if (el.style[prop]) el.style[prop] = "";
+      });
+      const span = document.createElement("span");
+      span.style[prop] = value;
+      span.appendChild(fragment);
+      range.insertNode(span);
+      removeEmptySpans();
+      const newRange = document.createRange();
+      newRange.selectNodeContents(span);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedRange = newRange.cloneRange();
     } else {
       const existing = findWrappingSpan(range, prop);
       // Only reused if it's still just the placeholder - i.e. it was
@@ -728,6 +745,89 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   };
   toolbarRow.appendChild(fontBtn);
 
+  const SIZE_MIN = 8;
+  const SIZE_MAX = 96;
+  const SIZE_STEP = 1;
+  const clampSize = (px) => Math.max(SIZE_MIN, Math.min(SIZE_MAX, px));
+
+  // Steps every run of text in the selection *relative to its own current
+  // size*, instead of collapsing the whole selection to one shared value -
+  // selecting text that already has several different sizes in it and
+  // clicking +/- should scale each of them up/down from where it already
+  // was, not flatten them all to one size (that's what typing an exact
+  // value into the field does instead - see applyInlineStyle(), used for
+  // that case since "replace whatever's there with this one value" is
+  // exactly what it already does for font/color).
+  //
+  // Reselecting the modified range afterward mirrors applyInlineStyle():
+  // extractContents() collapses the original range, so a second call (a
+  // second +/- click with no reselection in between) needs a fresh live
+  // range to work with, not a stale collapsed one.
+  function applyFontSizeStep(delta) {
+    const sel = window.getSelection();
+    const liveRange = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+    const range = liveRange || savedRange;
+    if (!range) return;
+
+    if (range.collapsed) {
+      const current = parseInt(sizeInput.value, 10) || effectiveFontSizePx();
+      applyInlineStyle("fontSize", `${clampSize(current + delta)}px`);
+      return;
+    }
+
+    // Read before extracting - a bare (unstyled) run's size comes from
+    // page.css's per-role defaults via inheritance, which can't be
+    // resolved by getComputedStyle() once its nodes are detached into a
+    // fragment below. Every plain-text run in the same selection shares
+    // this one base size regardless: ad hoc spans are the only thing that
+    // ever gives inline text its own size in this editor, and block-level
+    // roles (H1/H2/H3/Body) don't change mid-selection within one block.
+    const baseSizePx = effectiveFontSizePx();
+    const fragment = range.extractContents();
+    const walker = document.createTreeWalker(fragment, NodeFilter.SHOW_TEXT);
+    const textNodes = [];
+    let node;
+    while ((node = walker.nextNode())) textNodes.push(node);
+
+    const steppedSpans = new Set();
+    textNodes.forEach((textNode) => {
+      if (!textNode.textContent) return;
+      let el = textNode.parentElement;
+      let ownSpan = null;
+      while (el && el !== fragment) {
+        if (el.tagName === "SPAN" && el.style.fontSize) { ownSpan = el; break; }
+        el = el.parentElement;
+      }
+      if (ownSpan) {
+        // A span can hold more than one text node - only step it once
+        // regardless of how many of its text nodes this walk visits.
+        if (steppedSpans.has(ownSpan)) return;
+        steppedSpans.add(ownSpan);
+        ownSpan.style.fontSize = `${clampSize(parseInt(ownSpan.style.fontSize, 10) + delta)}px`;
+      } else {
+        const span = document.createElement("span");
+        span.style.fontSize = `${clampSize(baseSizePx + delta)}px`;
+        textNode.parentNode.insertBefore(span, textNode);
+        span.appendChild(textNode);
+      }
+    });
+
+    const firstChild = fragment.firstChild;
+    const lastChild = fragment.lastChild;
+    range.insertNode(fragment);
+    if (firstChild && lastChild) {
+      const newRange = document.createRange();
+      newRange.setStartBefore(firstChild);
+      newRange.setEndAfter(lastChild);
+      sel.removeAllRanges();
+      sel.addRange(newRange);
+      savedRange = newRange.cloneRange();
+    }
+    removeEmptySpans();
+    commit();
+    updateInlineControlDisplays();
+  }
+
   // Segmented number+spin control (css/builder.css's .value-control-number/
   // .value-control-spin, see valueControl.js) instead of a plain
   // <input type="number"> - discrete +/- buttons for stepping the size up/
@@ -736,25 +836,63 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // of valueControl.js's normal hover-reveal behavior is suppressed via
   // CSS (.page-block-text-toolbar-size) - out of place in a compact
   // toolbar - but the slider element itself is still built and mounted
-  // (just hidden), since wireValueControl() requires one to be present to
-  // wire the number input and spin buttons up at all.
+  // (just hidden), since buildValueControl() always includes one.
+  //
+  // Deliberately NOT wired with valueControl.js's own wireValueControl() -
+  // that assumes a single "set to this value" operation, but this field
+  // needs two different ones depending on how a value arrives: the +/-
+  // buttons and arrow keys scale each run relative to its own current size
+  // (applyFontSizeStep()), while typing an exact value and committing it
+  // unifies the whole selection to that one value (applyInlineStyle(),
+  // on blur/Enter - not per-keystroke, so an in-progress "2" while typing
+  // "24" never gets applied as a real size).
   const sizeControl = buildValueControl({
     id: `${block.blockId}-toolbarFontSize`,
     label: "",
     value: 16,
-    min: 8,
-    max: 96,
-    step: 1,
+    min: SIZE_MIN,
+    max: SIZE_MAX,
+    step: SIZE_STEP,
     unit: "px",
   });
   sizeControl.control.classList.add("page-block-text-toolbar-size");
   sizeControl.input.title = "Font size (px) for the selected text";
-  wireValueControl(sizeControl.control);
   const sizeInput = sizeControl.input;
-  sizeInput.addEventListener("input", () => {
+
+  const spinUp = sizeControl.control.querySelector(".value-control-spin-up");
+  const spinDown = sizeControl.control.querySelector(".value-control-spin-down");
+  [[spinUp, 1], [spinDown, -1]].forEach(([btn, dir]) => {
+    if (!btn) return;
+    btn.addEventListener("mousedown", (e) => {
+      e.preventDefault(); // don't steal focus off the number input
+      applyFontSizeStep(dir * SIZE_STEP);
+    });
+  });
+
+  // Typing (not a step) marks the field dirty, so blur only commits an
+  // actual edit - without this, simply clicking into the field to look at
+  // it and then clicking away would silently overwrite the selection with
+  // whatever number happened to be displayed.
+  let sizeInputDirty = false;
+  sizeInput.addEventListener("input", () => { sizeInputDirty = true; });
+  sizeInput.addEventListener("keydown", (e) => {
+    if (e.key === "ArrowUp") {
+      e.preventDefault();
+      applyFontSizeStep(SIZE_STEP);
+    } else if (e.key === "ArrowDown") {
+      e.preventDefault();
+      applyFontSizeStep(-SIZE_STEP);
+    } else if (e.key === "Enter") {
+      e.preventDefault();
+      sizeInput.blur();
+    }
+  });
+  sizeInput.addEventListener("blur", () => {
+    if (!sizeInputDirty) return;
+    sizeInputDirty = false;
     const val = parseInt(sizeInput.value, 10);
     if (isNaN(val)) return;
-    applyInlineStyle("fontSize", `${val}px`);
+    applyInlineStyle("fontSize", `${clampSize(val)}px`);
   });
   toolbarRow.appendChild(sizeControl.control);
 
@@ -951,22 +1089,6 @@ function createDropdownMenuButton(label, icon = "") {
 function setDropdownLabel(btn, text) {
   const labelText = btn.querySelector(".dropdown-menu-btn-label-text");
   if (labelText) labelText.textContent = text;
-}
-
-// Operates directly on a Range's own DOM node references - works
-// regardless of what currently has focus or what
-// window.getSelection() currently holds, which is exactly why
-// createTextConfig()'s font/size/color controls pass in a saved
-// (cloned) Range rather than re-reading the live selection. Each
-// application nests a fresh span (no attempt to detect/merge into an
-// existing one at the same range) - simple, and CSS cascades correctly
-// through the nesting regardless.
-function wrapRangeInSpan(range, styleProps) {
-  const span = document.createElement("span");
-  Object.entries(styleProps).forEach(([prop, value]) => { span.style[prop] = value; });
-  span.appendChild(range.extractContents());
-  range.insertNode(span);
-  return span;
 }
 
 function wrapRangeInLink(range, href) {
