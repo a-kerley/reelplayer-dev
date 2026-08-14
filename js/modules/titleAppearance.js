@@ -37,7 +37,7 @@ export function createTitleAppearanceSection(reel, onChange) {
       </label>
       <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
         Font Weight:
-        <select id="reelTitleFontWeight">
+        <select id="reelTitleFontWeight" class="builder-select">
           <option value="400">400</option>
           <option value="600">600</option>
           <option value="700">700</option>

@@ -493,6 +493,12 @@
   border-radius: 4px;
   cursor: pointer;
   font-size: var(--builder-text-base);
+  /* No max-width on the menu itself and no ellipsis here - a long item
+     label (e.g. "Merriweather (Google Font)") should widen the menu
+     rather than wrap or truncate; openContextMenu() already clamps the
+     menu's on-screen position to stay within the viewport regardless of
+     how wide it ends up. */
+  white-space: nowrap;
 }
 
 .app-context-menu button svg {

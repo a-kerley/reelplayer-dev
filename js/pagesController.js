@@ -616,7 +616,7 @@ export function initPagesController() {
           <div id="pageBackgroundUrlRowSlot"></div>
           <div class="color-row" style="margin-top:0.6rem;">
             <span>Scroll behavior:</span>
-            <select id="pageBackgroundParallaxMode" style="max-width:180px;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;">
+            <select id="pageBackgroundParallaxMode" class="builder-select">
               <option value="fixed">Fixed</option>
               <option value="scroll">Scroll (parallax)</option>
             </select>

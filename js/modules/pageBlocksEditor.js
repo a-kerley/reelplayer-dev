@@ -673,12 +673,12 @@ function createToolbarDivider() {
 // dropdown-shaped controls do. Used for the text block toolbar's "Apply
 // style..."/"Font..." menu buttons (js/modules/contextMenu.js still
 // supplies the actual menu popup - this only changes the trigger's look).
-function createDropdownMenuButton(label) {
+function createDropdownMenuButton(label, icon = "") {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "dropdown-menu-btn";
   btn.innerHTML = `
-    <span class="dropdown-menu-btn-label">${label}</span>
+    <span class="dropdown-menu-btn-label">${icon}<span>${label}</span></span>
     <span class="dropdown-menu-btn-arrow">
       <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
         <path d="M6 9L12 15L18 9" stroke-linecap="round" stroke-linejoin="round"/>
@@ -756,6 +756,11 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
       document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
     };
     const cellStyle = "padding:0.3rem;";
+    // Only for the plain number input below - the two <select>s use the
+    // shared .builder-select class instead (no width:100% override), so
+    // they size to their widest option rather than a fixed cell width,
+    // which would otherwise truncate a label like "Merriweather (Google
+    // Font)".
     const inputStyle = "width:100%;box-sizing:border-box;padding:0.3rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;";
 
     const tr = document.createElement("tr");
@@ -769,7 +774,7 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     const fontTd = document.createElement("td");
     fontTd.style.cssText = cellStyle;
     const fontSelect = document.createElement("select");
-    fontSelect.style.cssText = inputStyle;
+    fontSelect.className = "builder-select";
     const fontDefOpt = document.createElement("option");
     fontDefOpt.value = "";
     fontDefOpt.textContent = "Default";
@@ -805,7 +810,7 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     const weightTd = document.createElement("td");
     weightTd.style.cssText = cellStyle;
     const weightSelect = document.createElement("select");
-    weightSelect.style.cssText = inputStyle;
+    weightSelect.className = "builder-select";
     const weightDefOpt = document.createElement("option");
     weightDefOpt.value = "";
     weightDefOpt.textContent = "Default";
@@ -862,7 +867,11 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     message: "Customize Text Styles",
     content: '<div id="customizeStylesSlot"></div>',
     buttons: [{ text: "Done", type: "primary", onClick: () => dialog.closeDialog() }],
-    maxWidth: "560px",
+    // Widened from 560px - the Font column's <select> now sizes to fit
+    // its widest option ("Merriweather (Google Font)") rather than being
+    // squeezed into a narrow fixed-width cell, so the dialog needs more
+    // room for the full table to lay out without wrapping/overflowing.
+    maxWidth: "720px",
   });
   // createDialog's `content` option only innerHTML's an HTML string - these
   // rows need real onchange handlers, so an empty placeholder slot is
@@ -899,6 +908,7 @@ function createImageConfig(block, onChange, refreshPreview) {
   const widthLabel = document.createElement("span");
   widthLabel.textContent = "Width:";
   const widthSelect = document.createElement("select");
+  widthSelect.className = "builder-select";
   ["full", "medium", "small"].forEach((v) => {
     const opt = document.createElement("option");
     opt.value = v;
@@ -1021,6 +1031,7 @@ function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
   const aspectLabel = document.createElement("span");
   aspectLabel.textContent = "Aspect ratio:";
   const aspectSelect = document.createElement("select");
+  aspectSelect.className = "builder-select";
   [["16:9", "Widescreen (16:9)"], ["4:3", "Standard (4:3)"], ["1:1", "Square (1:1)"], ["9:16", "Vertical (9:16)"]].forEach(([v, text]) => {
     const opt = document.createElement("option");
     opt.value = v;
@@ -1047,10 +1058,7 @@ function createAddBlockRow(page, onChange) {
   const addRow = document.createElement("div");
   addRow.className = "page-block-add-row";
 
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "page-block-add-btn";
-  btn.innerHTML = `${ICONS.plus}<span>Add Block</span>`;
+  const btn = createDropdownMenuButton("Add Block", ICONS.plus);
   btn.onclick = () => {
     const typeItems = Object.entries(BLOCK_TYPE_LABELS).map(([type, typeLabel]) => ({
       label: typeLabel,

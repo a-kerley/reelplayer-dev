@@ -1679,10 +1679,19 @@ input[type="range"]:focus::-moz-range-thumb {
 }
 
 .dropdown-menu-btn-label {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
   padding: 0.35rem 0.6rem;
   color: #fff;
   font-size: var(--builder-text-base);
   white-space: nowrap;
+}
+
+.dropdown-menu-btn-label svg {
+  width: 16px;
+  height: 16px;
+  flex-shrink: 0;
 }
 
 .dropdown-menu-btn-arrow {
@@ -1690,6 +1699,7 @@ input[type="range"]:focus::-moz-range-thumb {
   align-items: center;
   justify-content: center;
   width: 1.6rem;
+  flex-shrink: 0;
   border-left: 1px solid #444;
   background: #2a2a2a;
   color: #999;
@@ -1699,6 +1709,40 @@ input[type="range"]:focus::-moz-range-thumb {
 .dropdown-menu-btn:hover .dropdown-menu-btn-arrow {
   background: #333;
   color: var(--builder-accent);
+}
+
+/* Native <select> counterpart of .dropdown-menu-btn above - same
+   segmented look (dark bordered box, distinct shaded arrow segment)
+   applied via layered backgrounds instead of child elements, since a
+   <select>'s own rendering can't be split into separate label/arrow
+   nodes. Deliberately no width rule here - every consumer should size to
+   its own content (width:auto, the browser default) rather than a fixed
+   pixel value, so a long option value is never truncated. */
+.builder-select {
+  appearance: none;
+  -webkit-appearance: none;
+  -moz-appearance: none;
+  display: inline-block;
+  border: 1px solid #444;
+  border-radius: 4px;
+  background-color: #1e1e1e;
+  color: #fff;
+  font-size: var(--builder-text-base);
+  padding: 0.35rem 2.1rem 0.35rem 0.6rem;
+  cursor: pointer;
+  transition: border-color 0.15s;
+  background-image:
+    linear-gradient(#2a2a2a, #2a2a2a),
+    linear-gradient(#444, #444),
+    url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 24 24' fill='none' stroke='%23999' stroke-width='2.5'%3E%3Cpath d='M6 9L12 15L18 9' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 0 top 0, right 1.6rem top 0, right 0.55rem center;
+  background-size: 1.6rem 100%, 1px 100%, 10px 10px;
+}
+
+.builder-select:hover,
+.builder-select:focus {
+  border-color: var(--builder-accent);
 }
 
 .page-block-add-btn:hover {
