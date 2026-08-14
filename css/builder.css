@@ -1565,10 +1565,6 @@ input[type="range"]:focus::-moz-range-thumb {
   min-width: 9rem;
 }
 
-.page-block-text-toolbar .dropdown-menu-btn-label {
-  justify-content: flex-start;
-}
-
 /* Same segmented number+spin look as every other value control
    (valueControl.js), but without its normal hover-reveal slider - out of
    place in a compact toolbar, and would otherwise auto-expand on hover per
@@ -1699,6 +1695,12 @@ input[type="range"]:focus::-moz-range-thumb {
 .dropdown-menu-btn-label {
   display: flex;
   align-items: center;
+  /* Grows to fill any extra width .dropdown-menu-btn is given (e.g. the
+     text toolbar's min-width on "Apply style..."/"Font..." below) -
+     without this, the fixed-width .dropdown-menu-btn-arrow next to it
+     doesn't reach the button's right edge, leaving it floating with a gap
+     after it instead of glued to the right as it should be. */
+  flex: 1;
   gap: 0.4rem;
   padding: 0.35rem 0.6rem;
   color: #fff;
