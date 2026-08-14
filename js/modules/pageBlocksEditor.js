@@ -630,14 +630,18 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       }
     } else {
       const existing = findWrappingSpan(range, prop);
-      if (existing) {
-        // Caret's already inside a span with this property (e.g. picking a
-        // second format with nothing typed in between, or reopening a
-        // menu after moving the cursor back into already-styled text) -
-        // just update it in place. The caret's actual position is left
-        // untouched here deliberately: it may be anywhere inside this
-        // span's real content, not necessarily at the placeholder's
-        // offset the fresh-span branch below assumes.
+      // Only reused if it's still just the placeholder - i.e. it was
+      // created for this exact "nothing selected" gesture a moment ago and
+      // nothing's been typed into it yet (e.g. picking a second format
+      // before typing anything). If the caret instead just happens to be
+      // resting inside a span with *real* already-typed content - no
+      // selection, just the cursor parked there - that's not something the
+      // user selected to change, so it's left alone and a fresh, separate
+      // placeholder is inserted (splitting the existing span at that
+      // point) instead of silently resizing/restyling text they never
+      // highlighted.
+      const isReusablePlaceholder = existing && existing.textContent === CARET_PLACEHOLDER;
+      if (isReusablePlaceholder) {
         existing.style[prop] = value;
       } else {
         const span = document.createElement("span");
