@@ -18,8 +18,17 @@ export function closeContextMenu() {
  * @param {HTMLElement} anchorEl - element the menu is positioned relative to
  * @param {Array<{label: string, icon?: string, danger?: boolean, onClick: () => void}>} items
  *   `icon`, if given, is raw inline SVG markup shown before the label.
+ * @param {Object} [opts]
+ * @param {boolean} [opts.preventFocusSteal] - keeps whatever element was
+ *   focused (e.g. a textarea mid-selection) focused when an item is
+ *   clicked, instead of the click handing focus to the menu button - see
+ *   js/modules/pageBlocksEditor.js's text-block style menu, which needs
+ *   the textarea's selection to survive picking a style from this menu.
+ *   The caller is still responsible for guarding its own *anchor* button's
+ *   mousedown the same way (this can only cover the item buttons this
+ *   function creates, not the trigger that opened it).
  */
-export function openContextMenu(anchorEl, items) {
+export function openContextMenu(anchorEl, items, opts = {}) {
   closeContextMenu();
 
   const menu = document.createElement("div");
@@ -29,6 +38,9 @@ export function openContextMenu(anchorEl, items) {
     btn.type = "button";
     btn.className = item.danger ? "danger" : "";
     btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
+    if (opts.preventFocusSteal) {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+    }
     btn.onclick = () => {
       closeContextMenu();
       item.onClick();

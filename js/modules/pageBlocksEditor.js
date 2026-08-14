@@ -362,19 +362,30 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   const toolbarRow = document.createElement("div");
   toolbarRow.className = "color-row";
 
-  const styleSelect = document.createElement("select");
-  styleSelect.style.cssText = "flex:1;padding:0.4rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-base);background:#1e1e1e;color:#fff;";
-  const placeholderOpt = document.createElement("option");
-  placeholderOpt.value = "";
-  placeholderOpt.textContent = "Apply style...";
-  styleSelect.appendChild(placeholderOpt);
-  ROLES.forEach((role) => {
-    const opt = document.createElement("option");
-    opt.value = role;
-    opt.textContent = ROLE_LABELS[role];
-    styleSelect.appendChild(opt);
-  });
-  toolbarRow.appendChild(styleSelect);
+  // A menu button, not a <select> - a <select> unavoidably moves focus off
+  // the textarea the moment it's clicked, which loses its selection before
+  // the style can be applied to it (confirmed: this is exactly what a
+  // <select> here did). Both this button's own mousedown and each menu
+  // item's (via openContextMenu's preventFocusSteal option) preventDefault
+  // the focus change, so the textarea - and its selection highlight - never
+  // loses focus at all while picking a style.
+  const styleBtn = document.createElement("button");
+  styleBtn.type = "button";
+  styleBtn.className = "page-block-add-btn";
+  styleBtn.textContent = "Apply style...";
+  styleBtn.addEventListener("mousedown", (e) => e.preventDefault());
+  styleBtn.onclick = () => {
+    openContextMenu(styleBtn, ROLES.map((role) => ({
+      label: ROLE_LABELS[role],
+      onClick: () => {
+        applyStyleToSelection(bodyTextarea, role);
+        block.body = bodyTextarea.value;
+        refreshPreview();
+        onChange();
+      },
+    })), { preventFocusSteal: true });
+  };
+  toolbarRow.appendChild(styleBtn);
 
   const customizeBtn = document.createElement("button");
   customizeBtn.type = "button";
@@ -391,21 +402,6 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   bodyTextarea.placeholder = "Type your text here...";
   bodyTextarea.style.cssText = "width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;font-family:inherit;resize:vertical;";
   bodyTextarea.oninput = () => { block.body = bodyTextarea.value; };
-
-  // The selector is an action trigger, not a persistent state indicator -
-  // a raw-markdown textarea has no cheap way to reliably show "what style
-  // is the cursor currently in," so it always resets to the placeholder
-  // right after applying. Nothing selected -> applies to the whole current
-  // line (mirrors Word/Docs' paragraph-style-with-no-selection behavior).
-  styleSelect.onchange = () => {
-    const role = styleSelect.value;
-    styleSelect.value = "";
-    if (!role) return;
-    applyStyleToSelection(bodyTextarea, role);
-    block.body = bodyTextarea.value;
-    refreshPreview();
-    onChange();
-  };
   bodyTextarea.onblur = () => { refreshPreview(); onChange(); };
   wrap.appendChild(bodyTextarea);
 
