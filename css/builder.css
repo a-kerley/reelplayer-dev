@@ -1607,6 +1607,16 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
+/* createWeightControl()'s free-typing spinner (js/modules/
+   styleToolbarWidgets.js) - same hover-reveal-slider suppression as the
+   Size fields above, needed in both of its contexts (the Customize Text
+   Styles dialog's narrow table cell, and the compact Text Style toolbar
+   row), so it's a rule on the control's own class rather than duplicated
+   per call site. */
+.weight-control-spinner .value-control-slider-wrap {
+  display: none;
+}
+
 /* Customize Text Styles dialog's per-role label (js/modules/
    pageBlocksEditor.js's openCustomizeStylesDialog(), toggled by
    updateLabelStates()) - dimmed only to signal "still at the page

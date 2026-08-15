@@ -12,9 +12,9 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
-import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar } from "./styleToolbarWidgets.js";
+import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, createWeightControl } from "./styleToolbarWidgets.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -1507,9 +1507,10 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     return (TEXT_FONT_OPTIONS.find((f) => f.value === (value || "system")) || TEXT_FONT_OPTIONS[0]).label;
   }
   function syncLinkedFonts(value) {
-    fontRows.forEach(({ def, fontBtn }) => {
+    fontRows.forEach(({ def, fontBtn, weightControl }) => {
       setDropdownLabel(fontBtn, fontLabelForValue(value));
       def.fontFamily = value === "system" ? undefined : value;
+      weightControl.refresh();
     });
     commitAll();
   }
@@ -1568,13 +1569,15 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
         } else {
           def.fontFamily = f.value === "system" ? undefined : f.value;
           setDropdownLabel(fontBtn, f.label);
+          // Which weights are even offered depends on the font just
+          // picked - see createWeightControl()'s own comment.
+          weightControl.refresh();
           commitAll();
         }
       }));
     };
     fontTd.appendChild(fontBtn);
     tr.appendChild(fontTd);
-    fontRows.push({ def, fontBtn });
 
     const sizeTd = document.createElement("td");
     sizeTd.style.cssText = cellStyle;
@@ -1605,20 +1608,20 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
 
     const weightTd = document.createElement("td");
     weightTd.style.cssText = cellStyle;
-    const weightSelect = document.createElement("select");
-    weightSelect.className = "builder-select";
-    // No blank "Default" option here either - see the font select above.
-    FONT_WEIGHT_OPTIONS.forEach((w) => {
-      const opt = document.createElement("option");
-      opt.value = w;
-      opt.textContent = w;
-      opt.style.fontWeight = w;
-      weightSelect.appendChild(opt);
+    // Adapts to this row's own font - a fixed dropdown of just that font's
+    // real static weights, or a free-typing spinner for system/serif/mono
+    // (no fixed list at all) - see createWeightControl()'s own comment
+    // (js/modules/styleToolbarWidgets.js).
+    const weightControl = createWeightControl({
+      idPrefix: `customizeStyles-${role}`,
+      getFontFamily: () => def.fontFamily,
+      getWeight: () => def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]),
+      setWeight: (value) => { def.fontWeight = value; },
+      onCommit: commitAll,
     });
-    weightSelect.value = def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]);
-    weightSelect.onchange = () => { def.fontWeight = weightSelect.value; commitAll(); };
-    weightTd.appendChild(weightSelect);
+    weightTd.appendChild(weightControl.control);
     tr.appendChild(weightTd);
+    fontRows.push({ def, fontBtn, weightControl });
 
     const colorTd = document.createElement("td");
     colorTd.style.cssText = cellStyle;
@@ -1651,7 +1654,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
       Object.keys(def).forEach((key) => delete def[key]);
       setDropdownLabel(fontBtn, fontLabelForValue(undefined));
       sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
-      weightSelect.value = String(ROLE_DEFAULT_WEIGHT[role]);
+      weightControl.refresh();
       colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
       commitAll();
     };

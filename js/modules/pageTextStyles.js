@@ -55,35 +55,57 @@ export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff",
 // (no network request) plus a spread of Google Fonts across sans/serif/
 // display/mono, loaded on demand only for a role that actually selects one
 // (see syncGoogleFonts() below), not unconditionally on every page. Each
-// googleFont weight list is the actual set that family ships (not just
-// FONT_WEIGHT_OPTIONS wholesale) - requesting a weight a family doesn't
-// have wastes a byte or two of query string for nothing, since Google
-// Fonts just serves the nearest one it does have instead.
+// entry's own `weights` is the exact static set that family was requested
+// from Google Fonts with (its googleFont query string's own "wght@..."
+// list) - not just some shared scale every font gets offered regardless of
+// whether it actually ships that weight. `weights` is absent for
+// system/serif/mono (no Google Fonts request at all - see
+// createWeightControl()'s own comment, js/modules/styleToolbarWidgets.js,
+// for why that's exactly the "let them type any value" signal).
 export const TEXT_FONT_OPTIONS = [
   { value: "system", label: "System Default", stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif" },
   { value: "serif", label: "Serif", stack: "Georgia, 'Times New Roman', serif" },
   { value: "mono", label: "Monospace", stack: "'SF Mono', Menlo, Consolas, monospace" },
-  { value: "inter", label: "Inter", stack: "'Inter', sans-serif", googleFont: "Inter:wght@300;400;500;600;700;800" },
-  { value: "roboto", label: "Roboto", stack: "'Roboto', sans-serif", googleFont: "Roboto:wght@300;400;500;700" },
-  { value: "opensans", label: "Open Sans", stack: "'Open Sans', sans-serif", googleFont: "Open+Sans:wght@300;400;500;600;700;800" },
-  { value: "lato", label: "Lato", stack: "'Lato', sans-serif", googleFont: "Lato:wght@300;400;700" },
-  { value: "montserrat", label: "Montserrat", stack: "'Montserrat', sans-serif", googleFont: "Montserrat:wght@300;400;500;600;700;800" },
-  { value: "poppins", label: "Poppins", stack: "'Poppins', sans-serif", googleFont: "Poppins:wght@300;400;500;600;700;800" },
-  { value: "oswald", label: "Oswald", stack: "'Oswald', sans-serif", googleFont: "Oswald:wght@300;400;500;600;700" },
-  { value: "merriweather", label: "Merriweather", stack: "'Merriweather', serif", googleFont: "Merriweather:wght@300;400;700" },
-  { value: "playfair", label: "Playfair Display", stack: "'Playfair Display', serif", googleFont: "Playfair+Display:wght@400;500;600;700;800" },
-  { value: "lora", label: "Lora", stack: "'Lora', serif", googleFont: "Lora:wght@400;500;600;700" },
-  { value: "jetbrainsmono", label: "JetBrains Mono", stack: "'JetBrains Mono', monospace", googleFont: "JetBrains+Mono:wght@300;400;500;600;700;800" },
+  { value: "inter", label: "Inter", stack: "'Inter', sans-serif", googleFont: "Inter:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
+  { value: "roboto", label: "Roboto", stack: "'Roboto', sans-serif", googleFont: "Roboto:wght@300;400;500;700", weights: ["300", "400", "500", "700"] },
+  { value: "opensans", label: "Open Sans", stack: "'Open Sans', sans-serif", googleFont: "Open+Sans:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
+  { value: "lato", label: "Lato", stack: "'Lato', sans-serif", googleFont: "Lato:wght@300;400;700", weights: ["300", "400", "700"] },
+  { value: "montserrat", label: "Montserrat", stack: "'Montserrat', sans-serif", googleFont: "Montserrat:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
+  { value: "poppins", label: "Poppins", stack: "'Poppins', sans-serif", googleFont: "Poppins:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
+  { value: "oswald", label: "Oswald", stack: "'Oswald', sans-serif", googleFont: "Oswald:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
+  { value: "merriweather", label: "Merriweather", stack: "'Merriweather', serif", googleFont: "Merriweather:wght@300;400;700", weights: ["300", "400", "700"] },
+  { value: "playfair", label: "Playfair Display", stack: "'Playfair Display', serif", googleFont: "Playfair+Display:wght@400;500;600;700;800", weights: ["400", "500", "600", "700", "800"] },
+  { value: "lora", label: "Lora", stack: "'Lora', serif", googleFont: "Lora:wght@400;500;600;700", weights: ["400", "500", "600", "700"] },
+  { value: "jetbrainsmono", label: "JetBrains Mono", stack: "'JetBrains Mono', monospace", googleFont: "JetBrains+Mono:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
 ];
 
-// Shared by the Customize Text Styles dialog's per-role Weight <select>
-// and the button block's own Weight dropdown (js/modules/
-// pageBlocksEditor.js) - one definition rather than two copies of the
-// same scale drifting independently. Runs lighter than before (down to
-// 300, "Light") as well as a touch heavier (800, "Extra Bold") - most of
-// TEXT_FONT_OPTIONS' Google Fonts above actually ship these weights, not
-// just 400-700.
-export const FONT_WEIGHT_OPTIONS = ["300", "400", "500", "600", "700", "800"];
+// Standard OpenType weight-class names, purely for display (e.g. "700
+// Bold" in the Weight dropdown) - createWeightControl() below is the only
+// consumer.
+export const WEIGHT_LABELS = {
+  "100": "Thin",
+  "200": "Extra Light",
+  "300": "Light",
+  "400": "Regular",
+  "500": "Medium",
+  "600": "SemiBold",
+  "700": "Bold",
+  "800": "Extra Bold",
+  "900": "Black",
+};
+
+// The Weight control (createWeightControl(), js/modules/
+// styleToolbarWidgets.js) needs to know, for whatever font is currently
+// selected, whether to offer a dropdown of just that font's real static
+// weights or let the user type any value - this is the single source of
+// truth both the Customize Text Styles dialog and the shared Text Style
+// toolbar read it from, rather than each re-deriving it. Falls back to
+// TEXT_FONT_OPTIONS[0] (System Default) for an unset/"system" value, same
+// convention as fontLabelFor()-style lookups elsewhere in this codebase.
+export function fontWeightsFor(fontValue) {
+  const font = TEXT_FONT_OPTIONS.find((f) => f.value === (fontValue || "system"));
+  return font?.weights || null;
+}
 
 // Distinct roles can now pick distinct Google Fonts at once, so this is a
 // set of <link>s, not one - every apply call removes whichever of these

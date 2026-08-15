@@ -9,7 +9,7 @@
 // or third time.
 import { createValueControl } from "./valueControl.js";
 import { openContextMenu } from "./contextMenu.js";
-import { ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ensureInlineGoogleFont } from "./pageTextStyles.js";
 
 const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
 
@@ -134,6 +134,87 @@ function fontLabelFor(value) {
   return (TEXT_FONT_OPTIONS.find((f) => f.value === value) || TEXT_FONT_OPTIONS[0]).label;
 }
 
+function weightLabelFor(weight) {
+  const w = weight || "400";
+  return WEIGHT_LABELS[w] ? `${w} ${WEIGHT_LABELS[w]}` : w;
+}
+
+// A Weight control that adapts to whatever font is currently selected -
+// system/serif/mono have no fixed weight list (no Google Fonts request at
+// all backs them - see fontWeightsFor()/TEXT_FONT_OPTIONS' own comment,
+// pageTextStyles.js), so the browser will render, or synthetically bold,
+// whatever numeric value it's given; a free-typing spinner (same
+// createValueControl() widget Size uses) fits that. A Google Font, though,
+// was only ever actually requested at specific static weights - anything
+// else either silently falls back to Google's own nearest match or (for a
+// weight the family doesn't ship at all) fails to apply - so those get a
+// dropdown restricted to exactly that font's real list instead, each
+// labeled with its standard OpenType name (WEIGHT_LABELS).
+//
+// Returned as {control, refresh} rather than a single static element -
+// which mode applies depends on getFontFamily(), which this control has
+// no way to be notified of changing on its own; the caller (e.g.
+// createTextStyleToolbar()'s Font menu onPick below) calls refresh()
+// itself right after a font change, rebuilding control's contents in
+// place so the wrapper element callers already appended stays valid.
+export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWeight, onCommit }) {
+  const wrap = document.createElement("span");
+  wrap.className = "weight-control-wrap";
+
+  function render() {
+    wrap.innerHTML = "";
+    const weights = fontWeightsFor(getFontFamily());
+    let current = getWeight() || "400";
+
+    // A weight stored while a *different* font was selected (or before
+    // switching to one with a narrower list - e.g. Lato only ships 300/
+    // 400/700) may no longer be one this font actually has. Snapping to
+    // the closest real value here - not just displaying a fallback label -
+    // keeps what's stored in sync with what the dropdown shows, the same
+    // "don't let it silently drift" reasoning behind this whole control.
+    if (weights && !weights.includes(current)) {
+      current = weights.reduce((closest, w) => (Math.abs(w - current) < Math.abs(closest - current) ? w : closest));
+      setWeight(current);
+      onCommit();
+    }
+
+    if (weights) {
+      const btn = createDropdownMenuButton(weightLabelFor(current));
+      btn.onclick = () => {
+        openContextMenu(btn, weights.map((w) => ({
+          label: weightLabelFor(w),
+          style: `font-weight: ${w};`,
+          onClick: () => {
+            setWeight(w);
+            setDropdownLabel(btn, weightLabelFor(w));
+            onCommit();
+          },
+        })));
+      };
+      wrap.appendChild(btn);
+    } else {
+      const control = createValueControl({
+        id: `${idPrefix}-fontWeight`,
+        label: "",
+        value: parseInt(current, 10) || 400,
+        min: 100,
+        max: 900,
+        step: 100,
+      });
+      control.control.classList.add("weight-control-spinner");
+      control.input.addEventListener("input", () => {
+        const val = parseInt(control.input.value, 10);
+        setWeight(!isNaN(val) ? String(val) : undefined);
+        onCommit();
+      });
+      wrap.appendChild(control.control);
+    }
+  }
+
+  render();
+  return { control: wrap, refresh: render };
+}
+
 // createTextStyleToolbar()'s own role menu, same preview treatment as
 // fontMenuItems() above (js/modules/pageBlocksEditor.js's text block
 // "Apply style..." menu does the identical thing for its own, separate
@@ -219,6 +300,9 @@ export function createTextStyleToolbar({
     openContextMenu(fontBtn, fontMenuItems((f) => {
       setFontFamily(f.value === "system" ? undefined : f.value);
       setDropdownLabel(fontBtn, f.label);
+      // Which weights are even offered depends on the font just picked -
+      // see createWeightControl()'s own comment below.
+      weightControl.refresh();
       onCommit();
     }));
   };
@@ -246,20 +330,15 @@ export function createTextStyleToolbar({
   toolbar.appendChild(sizeControl.control);
   customControls.push(sizeControl.control);
 
-  const weightBtn = createDropdownMenuButton(getFontWeight() || "600");
-  weightBtn.onclick = () => {
-    openContextMenu(weightBtn, FONT_WEIGHT_OPTIONS.map((w) => ({
-      label: w,
-      style: `font-weight: ${w};`,
-      onClick: () => {
-        setFontWeight(w);
-        setDropdownLabel(weightBtn, w);
-        onCommit();
-      },
-    })));
-  };
-  toolbar.appendChild(weightBtn);
-  customControls.push(weightBtn);
+  const weightControl = createWeightControl({
+    idPrefix,
+    getFontFamily,
+    getWeight: getFontWeight,
+    setWeight: setFontWeight,
+    onCommit,
+  });
+  toolbar.appendChild(weightControl.control);
+  customControls.push(weightControl.control);
 
   // Wrapped in a persistent <span>, and visibility toggled on THAT rather
   // than on colorPickr.btn directly - createColorPickrButton() returns btn
