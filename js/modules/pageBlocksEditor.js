@@ -12,7 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar } from "./styleToolbarWidgets.js";
 
@@ -359,7 +359,7 @@ function createConfigForm(block, page, onChange, refreshPreview) {
       form.appendChild(createEmbeddedVideoConfig(block, onChange, refreshPreview));
       break;
     case "button":
-      form.appendChild(createButtonConfig(block, onChange, refreshPreview));
+      form.appendChild(createButtonConfig(block, page, onChange, refreshPreview));
       break;
     default:
       form.textContent = `Unknown block type: ${block.type}`;
@@ -1435,23 +1435,6 @@ function styleMenuItems(page, onPick) {
 // editable from here.
 const CUSTOMIZE_DIALOG_ROLES = ASSIGNABLE_TEXT_ROLES;
 
-// What each role actually renders as when nothing's customized -
-// css/page.css's own literal fallback values for h1/h2/h3/body, and a
-// representative body-like default for link (which really falls back to
-// CSS "inherit" from context, not one fixed number - see page.css's
-// comment on .page-block-text a). Read as the dialog's initial value for
-// every field, so it always shows what the text actually looks like right
-// now instead of a blank "Default" placeholder that gives no indication
-// either way.
-// playlistItem has no fixed page.css look to mirror (see pageTextStyles.js's
-// comment on the role) - these are just a reasonable starting point, same
-// as css/playlist.css's own un-customized .playlist-item (16px/400) plus a
-// representative accent-ish color standing in for the reel's own
-// per-reel --ui-accent, which this dialog has no single value for.
-const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playlistItem: 16 };
-const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
-const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def", playlistItem: "#5b8def" };
-
 export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   destroyDialogPickrInstances();
   if (!page.textStyleDefs) page.textStyleDefs = {};
@@ -1870,7 +1853,7 @@ function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
   return wrap;
 }
 
-function createButtonConfig(block, onChange, refreshPreview) {
+function createButtonConfig(block, page, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
   const labelRow = document.createElement("div");
@@ -1962,6 +1945,7 @@ function createButtonConfig(block, onChange, refreshPreview) {
   // those four controls are meaningless (and hidden) once a role's chosen.
   const { toolbar: styleToolbar } = createTextStyleToolbar({
     idPrefix: `${block.blockId}-button`,
+    page,
     getRole: () => block.textStyleRole,
     setRole: (role) => { block.textStyleRole = role; },
     getFontFamily: () => block.fontFamily,

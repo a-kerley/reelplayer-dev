@@ -9,7 +9,7 @@
 // or third time.
 import { createValueControl } from "./valueControl.js";
 import { openContextMenu } from "./contextMenu.js";
-import { ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ensureInlineGoogleFont } from "./pageTextStyles.js";
 
 const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
 
@@ -134,6 +134,36 @@ function fontLabelFor(value) {
   return (TEXT_FONT_OPTIONS.find((f) => f.value === value) || TEXT_FONT_OPTIONS[0]).label;
 }
 
+// createTextStyleToolbar()'s own role menu, same preview treatment as
+// fontMenuItems() above (js/modules/pageBlocksEditor.js's text block
+// "Apply style..." menu does the identical thing for its own, separate
+// role picker - see that file's styleMenuItems()). "Custom" has no role
+// to preview (it means "use the Font/Size/Weight/Color controls below
+// instead"), so it's left as a plain label.
+//
+// `page` is optional - the button block (js/modules/pageBlocksEditor.js's
+// createButtonConfig()) has a real page.textStyleDefs to preview against,
+// but a reel's Title/Track Name/Playlist toolbar (js/modules/
+// playerTextStyles.js) has no page context at all (a reel isn't tied to
+// any one page - see that file's own header comment), so it's simply
+// omitted there and every role preview falls back to ROLE_DEFAULT_*.
+export function roleMenuItems(page, onPick) {
+  return [
+    { label: "Custom", onClick: () => onPick(undefined) },
+    ...ASSIGNABLE_TEXT_ROLES.map((role) => {
+      const def = page?.textStyleDefs?.[role] || {};
+      const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
+      const styleParts = [
+        `font-size:${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`,
+        `font-weight:${def.fontWeight || ROLE_DEFAULT_WEIGHT[role]}`,
+        `color:${def.color || ROLE_DEFAULT_COLOR[role]}`,
+      ];
+      if (font) styleParts.push(`font-family:${font.stack}`);
+      return { label: ROLE_LABELS[role], style: styleParts.join(";"), onClick: () => onPick(role) };
+    }),
+  ];
+}
+
 /**
  * The full "Text Style" toolbar row: a role dropdown (Custom + every
  * ASSIGNABLE_TEXT_ROLES entry) plus, only when "Custom", Font/Size/
@@ -153,6 +183,7 @@ function fontLabelFor(value) {
  */
 export function createTextStyleToolbar({
   idPrefix,
+  page,
   getRole, setRole,
   getFontFamily, setFontFamily,
   getFontSize, setFontSize,
@@ -166,13 +197,7 @@ export function createTextStyleToolbar({
 
   const styleBtn = createDropdownMenuButton(getRole() ? ROLE_LABELS[getRole()] : "Custom");
   styleBtn.onclick = () => {
-    openContextMenu(styleBtn, [
-      { label: "Custom", onClick: () => selectRole(undefined) },
-      ...ASSIGNABLE_TEXT_ROLES.map((role) => ({
-        label: ROLE_LABELS[role],
-        onClick: () => selectRole(role),
-      })),
-    ]);
+    openContextMenu(styleBtn, roleMenuItems(page, selectRole));
   };
   toolbar.appendChild(styleBtn);
   toolbar.appendChild(createToolbarDivider());

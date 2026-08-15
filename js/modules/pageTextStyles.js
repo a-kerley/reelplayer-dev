@@ -32,6 +32,25 @@ export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", 
 // whole block/button can "be" the way h1/h2/h3/body/link can.
 export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
 
+// What each role actually renders as when nothing's customized -
+// css/page.css's own literal fallback values for h1/h2/h3/body, and a
+// representative body-like default for link (which really falls back to
+// CSS "inherit" from context, not one fixed number - see page.css's
+// comment on .page-block-text a). Read as the Customize Text Styles
+// dialog's initial value for every field (js/modules/pageBlocksEditor.js)
+// and as the fallback for both its own and styleToolbarWidgets.js's
+// createTextStyleToolbar()'s role-menu previews, so a role always shows
+// what it actually currently looks like instead of a blank placeholder.
+// playlistItem has no fixed page.css look to mirror (see this file's own
+// comment on the role, above) - these are just a reasonable starting
+// point, same as css/playlist.css's own un-customized .playlist-item
+// (16px/400) plus a representative accent-ish color standing in for the
+// reel's own per-reel --ui-accent, which neither of those callers has a
+// single value for.
+export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playlistItem: 16 };
+export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
+export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def", playlistItem: "#5b8def" };
+
 // A curated pick, not an open text field - three system/web-safe stacks
 // (no network request) plus a spread of Google Fonts across sans/serif/
 // display/mono, loaded on demand only for a role that actually selects one
