@@ -1289,9 +1289,14 @@ const CUSTOMIZE_DIALOG_ROLES = ASSIGNABLE_TEXT_ROLES;
 // every field, so it always shows what the text actually looks like right
 // now instead of a blank "Default" placeholder that gives no indication
 // either way.
-const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16 };
-const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400 };
-const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def" };
+// playlistItem has no fixed page.css look to mirror (see pageTextStyles.js's
+// comment on the role) - these are just a reasonable starting point, same
+// as css/playlist.css's own un-customized .playlist-item (16px/400) plus a
+// representative accent-ish color standing in for the reel's own
+// per-reel --ui-accent, which this dialog has no single value for.
+const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playlistItem: 16 };
+const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
+const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def", playlistItem: "#5b8def" };
 
 function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   destroyDialogPickrInstances();

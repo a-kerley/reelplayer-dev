@@ -217,13 +217,12 @@
     function getPlayerTextStyles(settings) {
       if (settings.playerTextStyles) {
         const pts = settings.playerTextStyles;
-        // Back-fill for a reel published under an earlier version of this
-        // feature: either no playlist unit at all, or the older combined
-        // `.playlist` (before it split into item/duration) - see
-        // js/modules/playerTextStyles.js's ensurePlayerTextStyles() for
-        // the identical (mutating) version of this same back-fill.
-        if (!pts.playlistItem) pts.playlistItem = pts.playlist || {};
-        if (!pts.playlistDuration) pts.playlistDuration = {};
+        // Back-fill for a reel published while this feature briefly had a
+        // split playlistItem/playlistDuration (instead of one combined
+        // `.playlist` unit) - see js/modules/playerTextStyles.js's
+        // ensurePlayerTextStyles() for the identical (mutating) version of
+        // this same back-fill.
+        if (!pts.playlist) pts.playlist = pts.playlistItem || {};
         return pts;
       }
 
@@ -243,8 +242,7 @@
           paddingBottom: parsePx(ta.paddingBottom),
         },
         trackName: {},
-        playlistItem: {},
-        playlistDuration: {},
+        playlist: {},
       };
     }
 
@@ -355,8 +353,7 @@
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
       applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles));
       applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles));
-      applyTextUnitStyleVars(root, 'reel-playlist-item', resolveTextUnit(pts.playlistItem, pageRoleStyles));
-      applyTextUnitStyleVars(root, 'reel-playlist-duration', resolveTextUnit(pts.playlistDuration, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles));
 
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');

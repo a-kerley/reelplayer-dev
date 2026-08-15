@@ -14,8 +14,14 @@
 // before this feature (or before a given role was ever customized) renders
 // identically to before.
 
-export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link"];
-export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link" };
+// "playlistItem" has no page-block CSS of its own (unlike h1/h2/h3/body/
+// link, it styles nothing directly on the page) - it exists purely as an
+// inherit target for a reel's playlist row text style
+// (js/modules/playerTextStyles.js) when that reel sits in a Player block on
+// this page. applyTextStyles() below still writes its --page-text-* vars
+// like any other role; they're just unread by css/page.css itself.
+export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link", "playlistItem"];
+export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link", playlistItem: "Playlist Item" };
 
 // Every role that can be assigned wholesale to something other than
 // inline-selected text - the Customize Text Styles dialog's rows

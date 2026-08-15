@@ -140,7 +140,7 @@ export class PreviewManager {
   }
 
   generateStyleConfig(reel) {
-    const pts = reel.playerTextStyles || { title: {}, trackName: {}, playlistItem: {}, playlistDuration: {} };
+    const pts = reel.playerTextStyles || { title: {}, trackName: {}, playlist: {} };
 
     // Process padding value - a plain px number (or undefined) in the new
     // data model, unlike the old reel.titleAppearance.paddingBottom's
@@ -154,8 +154,7 @@ export class PreviewManager {
 
     const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null));
     const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null));
-    const playlistItemVars = textUnitStyleVars("reel-playlist-item", resolveTextUnit(pts.playlistItem, null));
-    const playlistDurationVars = textUnitStyleVars("reel-playlist-duration", resolveTextUnit(pts.playlistDuration, null));
+    const playlistVars = textUnitStyleVars("reel-playlist", resolveTextUnit(pts.playlist, null));
 
     // Process background image - only if enabled
     const backgroundImage = (reel.backgroundImageEnabled && reel.backgroundImage && reel.backgroundImage.trim()) 
@@ -214,8 +213,7 @@ export class PreviewManager {
       "--reel-title-padding-bottom": paddingBottom,
       ...titleVars,
       ...trackNameVars,
-      ...playlistItemVars,
-      ...playlistDurationVars,
+      ...playlistVars,
 
       // Background effects variables
       "--background-image": backgroundImage,

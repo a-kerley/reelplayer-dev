@@ -135,17 +135,17 @@
   cursor: pointer;
   border-bottom: 0px solid rgba(221, 221, 221, 0.6);
   user-select: none;
-  /* js/modules/playerTextStyles.js's "Playlist Item" row (this element,
-     via inheritance into .playlist-item-title below, which sets no font
-     properties of its own) - independent of .playlist-duration's own
-     "Playlist Duration" row. Each fallback here is "inherit" (this
+  /* js/modules/playerTextStyles.js's "Playlist" row (this element, via
+     inheritance into .playlist-item-title below, which sets no font
+     properties of its own, and .playlist-duration below, which layers its
+     own font-size fallback on top). Each fallback here is "inherit" (this
      component never had its own explicit font-family/size/weight before
      this feature), so an uncustomized reel looks exactly as it always
      has. */
-  font-family: var(--reel-playlist-item-font-family, inherit);
-  font-size: var(--reel-playlist-item-size, inherit);
-  font-weight: var(--reel-playlist-item-weight, inherit);
-  color: var(--reel-playlist-item-color, var(--ui-accent));
+  font-family: var(--reel-playlist-font-family, inherit);
+  font-size: var(--reel-playlist-size, inherit);
+  font-weight: var(--reel-playlist-weight, inherit);
+  color: var(--reel-playlist-color, var(--ui-accent));
   transition: transform var(--expandable-transition-duration) var(--expandable-transition-easing), opacity var(--expandable-transition-duration) var(--expandable-transition-easing), background-color var(--expandable-transition-duration) var(--expandable-transition-easing), box-shadow var(--expandable-transition-duration) var(--expandable-transition-easing);
   transform: scale(0.95);
   opacity: 0.7;
@@ -184,21 +184,21 @@
 
 .playlist-duration {
   margin-left: 1rem;
-  /* js/modules/playerTextStyles.js's own, independent "Playlist Duration"
-     row - font-size's fallback is this element's own pre-existing
-     0.85rem (not "inherit" like .playlist-item's), preserving the
-     duration's smaller-than-the-name look when nothing's customized. */
-  font-family: var(--reel-playlist-duration-font-family, inherit);
-  font-size: var(--reel-playlist-duration-size, 0.85rem);
-  font-weight: var(--reel-playlist-duration-weight, inherit);
-  color: var(--reel-playlist-duration-color, var(--ui-accent));
+  /* Shares js/modules/playerTextStyles.js's "Playlist" row with
+     .playlist-item above - font-size's fallback is this element's own
+     pre-existing 0.85rem (not "inherit" like .playlist-item's), preserving
+     the duration's smaller-than-the-name look when nothing's customized. */
+  font-family: var(--reel-playlist-font-family, inherit);
+  font-size: var(--reel-playlist-size, 0.85rem);
+  font-weight: var(--reel-playlist-weight, inherit);
+  color: var(--reel-playlist-color, var(--ui-accent));
   flex-shrink: 0;
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing), color var(--expandable-transition-duration) var(--expandable-transition-easing), font-weight var(--expandable-transition-duration) var(--expandable-transition-easing);
   opacity: 0.8;
 }
 
 .playlist-item.active .playlist-duration {
-  color: var(--reel-playlist-duration-color, var(--ui-accent));
+  color: var(--reel-playlist-color, var(--ui-accent));
   font-weight: 600;
   opacity: 1;
 }
