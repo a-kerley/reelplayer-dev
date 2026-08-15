@@ -69,6 +69,29 @@ a reel's own per-reel light/dark appearance — never add builder-chrome-only
 styling there. Builder-only chrome styling belongs in `css/builder.css`,
 scoped under `.builder-app` (see below).
 
+## A second, separate duplication pair: Player Text Styles' resolution logic
+
+`js/modules/previewManager.js`'s `resolveTextUnit()`/`textUnitStyleVars()`
+(the Reels tab's own live preview) and `player.html`'s inline `<script>`
+copies of the same two functions are a **second instance** of the
+`player.html`/`player.js` drift problem above — a completely different
+file pair, so fixing that one doesn't touch this one. Any change to how a
+reel's Title/Track Name/Playlist text resolves (a new fallback tier, a new
+field) needs the identical edit in both places, verified by actually
+testing an embed, or the builder preview will show something a real embed
+doesn't.
+
+Resolution order, most to least specific: the embedding page's own
+Customize Text Styles role definition (`page.textStyleDefs`, present only
+when this reel is actually inside a page's Player block) → this reel's
+own "Edit Fallback Text Styles" role definitions
+(`reel.playerTextStyles.roleFallbacks`, edited from the Reels tab) → the
+text unit's own custom fields (reachable only when its `role` is unset,
+i.e. "Custom" mode) → `css/player.css`'s hardcoded default. A reel isn't
+tied to any one page, so the fallback tier exists specifically for the
+Reels tab's own preview and any third-party embed with no page context at
+all.
+
 ## Builder dark theme — scope boundary
 
 The builder chrome (sidebar, forms, buttons, dialogs) is dark-themed,
@@ -110,11 +133,24 @@ work around this padding (see `.builder-main.media-library-active` for the
 pattern of overriding it just for that view) or don't nest inside
 `.builder-main` at all.
 
-## Media browsing and Cloudflare backend
+## Gotcha: a `<td>`'s `width` alone doesn't constrain a column
+
+The default `table-layout: auto` treats a cell's `width` as only a
+starting suggestion — a cell whose content wants to be wider (e.g. a
+Customize/Fallback Text Styles row previewing a large font-size) still
+grows the whole column past it, silently defeating any `overflow:hidden`/
+`text-overflow:ellipsis` set on that cell. `table-layout: fixed` — with
+widths set on the *header* row's cells, since fixed layout derives every
+column's width from the first row and ignores content afterward — is what
+actually enforces a cap; see `js/modules/styleToolbarWidgets.js`'s
+`openTextStyleDefsDialog()`.
+
+## Media browsing, text-style toolkit, and Cloudflare backend
 
 See `js/modules/CLAUDE.md` for the shared media-browser component
-(`mediaBrowser.js`/`mediaLibrary.js`/`filePicker.js`) and `worker/CLAUDE.md`
-for the Cloudflare Worker + KV + R2 backend.
+(`mediaBrowser.js`/`mediaLibrary.js`/`filePicker.js`) and the shared
+text-style toolbar/dialog toolkit (`styleToolbarWidgets.js`), and
+`worker/CLAUDE.md` for the Cloudflare Worker + KV + R2 backend.
 
 ## Verification workflow
 
