@@ -822,10 +822,15 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // it spans more than one kind (e.g. the end of a heading through the
   // start of the paragraph after it).
   function selectionBlockRole(range) {
+    // Walks every ancestor level (see blocksInRange()'s identical climb
+    // below) - a selection sitting entirely inside an override SPAN (e.g.
+    // the whole paragraph has one covering it) resolves its common
+    // ancestor to that span, not the P/H1-3 it's inside; a single text-
+    // node-to-parent step stops one level too early there.
     let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-    if (BLOCK_TAG_ROLES[node.tagName]) return BLOCK_TAG_ROLES[node.tagName];
-    const blocks = Array.from(node.children || []).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
+    while (node !== editable && !BLOCK_TAG_ROLES[node.tagName]) node = node.parentNode;
+    if (node !== editable) return BLOCK_TAG_ROLES[node.tagName];
+    const blocks = Array.from(editable.children).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
     // "body", not null - same terminal-default reasoning as
     // currentBlockRole() above, for the (unusual) case of a real
     // selection that somehow doesn't intersect any recognized block.
@@ -843,10 +848,18 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // above) has by then been wrapped into a real P/H1/H2/H3 the same way
   // formatBlock always leaves its target.
   function blocksInRange(range) {
+    // Walks every ancestor level, not just one - a selection that sits
+    // entirely inside an override SPAN (the common case: the override
+    // covers the whole paragraph, so the selection's common ancestor
+    // resolves to the span itself, not the P it's inside) needs to keep
+    // climbing past that span to find the real block. A single text-node-
+    // to-parent step (selectionBlockRole()'s own shallower version of this
+    // same walk) stops one level too early there and silently finds
+    // nothing to return.
     let node = range.commonAncestorContainer;
-    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
-    if (BLOCK_TAG_ROLES[node.tagName]) return [node];
-    return Array.from(node.children || []).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
+    while (node !== editable && !BLOCK_TAG_ROLES[node.tagName]) node = node.parentNode;
+    if (node !== editable) return [node];
+    return Array.from(editable.children).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
   }
 
   // Unwraps (keeps the text, drops the wrapper) any ad hoc Font/Size/Color
