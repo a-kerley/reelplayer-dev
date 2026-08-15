@@ -90,11 +90,28 @@ function createEmptyBlock(type) {
   }
 }
 
+// Player blocks' own row preview is an <iframe> whose src bakes in a
+// snapshot of page.textStyleDefs at render time (js/modules/
+// pageBlockRenderer.js's renderPlayer()) - unlike every other block type,
+// which reads page.textStyleDefs live via CSS custom properties
+// (applyTextStyles() below), so an edit elsewhere (e.g. the Customize
+// Text Styles dialog, opened from a completely different block) can't
+// reach it just by refreshing CSS vars. Tracked here, keyed by blockId,
+// so openCustomizeStylesDialog()'s commitAll() can explicitly re-render
+// just the player rows' own previews - not every row, and not a full
+// updatePageBlocksEditor() rebuild (which would tear down every other
+// row's DOM/Pickr instances/focus for an edit that, for those rows,
+// nothing but a CSS var refresh was ever needed for anyway). Rebuilt
+// fresh on every updatePageBlocksEditor() call below, so it can never
+// reference a detached row from a previous render.
+let playerBlockRefreshers = new Map();
+
 export function updatePageBlocksEditor(page, onChange) {
   const container = document.getElementById("pageBlocksEditor");
   if (!container) return;
   destroyToolbarPickrInstances();
   container.innerHTML = "";
+  playerBlockRefreshers = new Map();
 
   page.blocks.forEach((block, i) => {
     container.appendChild(createBlockRow(block, i, page, onChange));
@@ -164,6 +181,7 @@ function createBlockRow(block, index, page, onChange) {
     preview.appendChild(renderBlock(block, page));
   }
   refreshPreview();
+  if (block.type === "player") playerBlockRefreshers.set(block.blockId, refreshPreview);
 
   const configForm = createConfigForm(block, page, onChange, refreshPreview);
   row.appendChild(configForm);
@@ -1300,6 +1318,12 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // add/remove/reorder rebuild (updatePageBlocksEditor() below).
     const container = document.getElementById("pageBlocksEditor");
     if (container) applyTextStyles(container, page);
+    // Player blocks don't pick up the CSS-var refresh above at all (see
+    // playerBlockRefreshers' own comment) - explicitly re-render just
+    // their own row previews so an inherited title/track-name/playlist
+    // role reflects this edit immediately, not just on the next add/
+    // remove/reorder.
+    playerBlockRefreshers.forEach((refresh) => refresh());
   }
 
   // Font linking - session-only (not part of page.textStyleDefs, so it
