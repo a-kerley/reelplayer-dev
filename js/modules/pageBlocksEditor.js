@@ -1716,7 +1716,7 @@ function createButtonConfig(block, page, onChange, refreshPreview) {
   // those four controls are meaningless (and hidden) once a role's chosen.
   const { toolbar: styleToolbar } = createTextStyleToolbar({
     idPrefix: `${block.blockId}-button`,
-    page,
+    roleDefs: page?.textStyleDefs,
     getRole: () => block.textStyleRole,
     setRole: (role) => { block.textStyleRole = role; },
     getFontFamily: () => block.fontFamily,

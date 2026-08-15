@@ -223,17 +223,20 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
 // to preview (it means "use the Font/Size/Weight/Color controls below
 // instead"), so it's left as a plain label.
 //
-// `page` is optional - the button block (js/modules/pageBlocksEditor.js's
-// createButtonConfig()) has a real page.textStyleDefs to preview against,
-// but a reel's Title/Track Name/Playlist toolbar (js/modules/
-// playerTextStyles.js) has no page context at all (a reel isn't tied to
-// any one page - see that file's own header comment), so it's simply
-// omitted there and every role preview falls back to ROLE_DEFAULT_*.
-export function roleMenuItems(page, onPick) {
+// `defs` is optional and, when given, a plain per-role bag like
+// page.textStyleDefs or reel.playerTextStyles.roleFallbacks - the button
+// block (js/modules/pageBlocksEditor.js's createButtonConfig()) passes the
+// former, the reel builder's Title/Track Name/Playlist toolbar (js/modules/
+// playerTextStyles.js) passes the latter (a reel isn't tied to any one
+// page, so it has no page.textStyleDefs to preview against at all - see
+// that file's own header comment), so each preview reflects whichever
+// defs object actually governs that toolbar's own "inherit" resolution.
+// Omitted entirely falls back to ROLE_DEFAULT_* for every role.
+export function roleMenuItems(defs, onPick) {
   return [
     { label: "Custom", onClick: () => onPick(undefined) },
     ...ASSIGNABLE_TEXT_ROLES.map((role) => {
-      const def = page?.textStyleDefs?.[role] || {};
+      const def = defs?.[role] || {};
       const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
       const styleParts = [
         `font-size:${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`,
@@ -261,11 +264,15 @@ export function roleMenuItems(page, onPick) {
  * trackName} - so this stays agnostic to both. `onCommit` is called after
  * every change (the caller's own refreshPreview()+onChange() combo).
  *
+ * `roleDefs` (optional) is whatever per-role bag this toolbar's own role
+ * menu should preview against - see roleMenuItems()'s own comment above
+ * for what each caller actually passes.
+ *
  * @returns {{toolbar: HTMLElement}}
  */
 export function createTextStyleToolbar({
   idPrefix,
-  page,
+  roleDefs,
   getRole, setRole,
   getFontFamily, setFontFamily,
   getFontSize, setFontSize,
@@ -279,7 +286,7 @@ export function createTextStyleToolbar({
 
   const styleBtn = createDropdownMenuButton(getRole() ? ROLE_LABELS[getRole()] : "Custom");
   styleBtn.onclick = () => {
-    openContextMenu(styleBtn, roleMenuItems(page, selectRole));
+    openContextMenu(styleBtn, roleMenuItems(roleDefs, selectRole));
   };
   toolbar.appendChild(styleBtn);
   toolbar.appendChild(createToolbarDivider());

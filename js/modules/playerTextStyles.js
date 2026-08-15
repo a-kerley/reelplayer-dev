@@ -190,6 +190,7 @@ export function createPlayerTextStylesSection(reel, onChange) {
 
   const { toolbar: titleToolbar } = createTextStyleToolbar({
     idPrefix: "reelTitle",
+    roleDefs: reel.playerTextStyles.roleFallbacks,
     getRole: () => reel.playerTextStyles.title.role,
     setRole: (role) => { reel.playerTextStyles.title.role = role; },
     getFontFamily: () => reel.playerTextStyles.title.fontFamily,
@@ -207,6 +208,7 @@ export function createPlayerTextStylesSection(reel, onChange) {
 
   const { toolbar: trackNameToolbar } = createTextStyleToolbar({
     idPrefix: "reelTrackName",
+    roleDefs: reel.playerTextStyles.roleFallbacks,
     getRole: () => reel.playerTextStyles.trackName.role,
     setRole: (role) => { reel.playerTextStyles.trackName.role = role; },
     getFontFamily: () => reel.playerTextStyles.trackName.fontFamily,
@@ -228,6 +230,7 @@ export function createPlayerTextStylesSection(reel, onChange) {
   // section.
   const { toolbar: playlistToolbar } = createTextStyleToolbar({
     idPrefix: "reelPlaylist",
+    roleDefs: reel.playerTextStyles.roleFallbacks,
     getRole: () => reel.playerTextStyles.playlist.role,
     setRole: (role) => { reel.playerTextStyles.playlist.role = role; },
     getFontFamily: () => reel.playerTextStyles.playlist.fontFamily,
