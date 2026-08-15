@@ -469,6 +469,11 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     openContextMenu(styleBtn, styleMenuItems(page, (role) => {
       editable.focus();
       document.execCommand("formatBlock", false, FORMAT_BLOCK_TAGS[role]);
+      // Reset, not layer - see stripOverrideSpans()'s comment.
+      const sel = window.getSelection();
+      if (sel.rangeCount && editable.contains(sel.anchorNode)) {
+        blocksInRange(sel.getRangeAt(0)).forEach(stripOverrideSpans);
+      }
       commit();
       updateInlineControlDisplays();
     }), { preventFocusSteal: true });
@@ -827,6 +832,37 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     if (!blocks.length) return "body";
     const roles = new Set(blocks.map((el) => BLOCK_TAG_ROLES[el.tagName]));
     return roles.size === 1 ? [...roles][0] : MIXED;
+  }
+
+  // Same traversal as selectionBlockRole() above, but returns the actual
+  // block element(s) rather than their agreed-on role - used by
+  // styleMenuItems()'s onPick below to know exactly which paragraph(s) to
+  // clean up after re-applying a role. Called *after* execCommand
+  // ("formatBlock") has already run, so a bare top-level text node (no
+  // wrapping element yet - see the defaultParagraphSeparator comment
+  // above) has by then been wrapped into a real P/H1/H2/H3 the same way
+  // formatBlock always leaves its target.
+  function blocksInRange(range) {
+    let node = range.commonAncestorContainer;
+    if (node.nodeType === Node.TEXT_NODE) node = node.parentNode;
+    if (BLOCK_TAG_ROLES[node.tagName]) return [node];
+    return Array.from(node.children || []).filter((el) => BLOCK_TAG_ROLES[el.tagName] && range.intersectsNode(el));
+  }
+
+  // Unwraps (keeps the text, drops the wrapper) any ad hoc Font/Size/Color
+  // span (applyInlineStyle() above) inside `root`. Re-applying a role is
+  // meant to reset text back to *only* that role's styling - the same
+  // "start clean" a real editor's paragraph-style picker gives - not
+  // leave the role's own definition permanently shadowed underneath
+  // whatever override was already there (exactly the drift
+  // selectionHasOverride()/the styleBtn "•" marker exists to flag).
+  function stripOverrideSpans(root) {
+    root.querySelectorAll("span").forEach((span) => {
+      if (span.style.fontFamily || span.style.fontSize || span.style.color) {
+        while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
+        span.remove();
+      }
+    });
   }
 
   // The size to show/step from when nothing at the selection has an
