@@ -3,6 +3,7 @@
 import { playerApp } from "./player.js";
 import { getDefaultColourPreset } from "./modules/colorPresets.js";
 import { destroyPickrInstances, createColorPickers, getCurrentPickrValues, eyedropButtonHTML } from "./modules/colorPicker.js";
+import { REEL_COLOR_DEFAULTS } from "./modules/colorUtils.js";
 import { createPresetModal, renderColourPresetModal } from "./modules/presetModal.js";
 import { updateTracksEditor } from "./modules/tracksEditor.js";
 import { createPlayerTextStylesSection, setupPlayerTextStylesControls } from "./modules/playerTextStyles.js";
@@ -36,7 +37,7 @@ export function createEmptyReel() {
     playlist: [{ title: "", url: "" }],
     createdAt: Date.now(),
     // Background effects
-    backgroundColor: "rgba(255, 255, 255, 1)",
+    backgroundColor: REEL_COLOR_DEFAULTS.backgroundColor,
     backgroundImage: "",
     backgroundImageEnabled: false,
     backgroundVideo: "",

@@ -9,6 +9,7 @@
 // js/modules/pageDraftStore.js for the page-draft equivalent, which shares
 // the exact same factory rather than a second hand-copy of this logic.
 import { createDraftStore } from "./draftStoreFactory.js";
+import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 
 // Fills in fields that didn't exist when a reel was first saved under an
 // older schema - same normalization js/main.js used to do once, at
@@ -17,7 +18,7 @@ import { createDraftStore } from "./draftStoreFactory.js";
 // (initial list, on-demand select, or migration).
 function normalizeReel(reel) {
   if (!reel.backgroundColor) {
-    reel.backgroundColor = "rgba(255, 255, 255, 1)";
+    reel.backgroundColor = REEL_COLOR_DEFAULTS.backgroundColor;
   }
   return reel;
 }

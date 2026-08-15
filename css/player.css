@@ -313,10 +313,14 @@ button {
   font-size: var(--reel-track-size, 0.9rem);
   font-weight: var(--reel-track-weight, 600);
   /* --reel-track-color, when set, is either a Custom color picked in
-     js/modules/playerTextStyles.js or a resolved page-role color - falls
-     back to the reel's own accent color, today's actual look, when
-     neither is set. Same pattern as .reel-title's color above. */
-  color: var(--reel-track-color, var(--ui-accent));
+     js/modules/playerTextStyles.js or a resolved page-role color.
+     js/modules/previewManager.js's resolveTextUnit() (and player.html's
+     identical copy) never actually leave this unresolved - they fall back
+     to pageTextStyles.js's own ROLE_DEFAULT_COLOR first - so the var(...)
+     fallback below is only a safety net matching that same default, not
+     the thing actually doing the work. Same pattern as .reel-title's color
+     above. */
+  color: var(--reel-track-color, #ffffff);
   font-style: normal;
   white-space: nowrap;
   overflow: hidden;
@@ -335,8 +339,10 @@ button {
   min-height: 120px;
   display: flex;
   flex-direction: column;
-  /* Background color - static color fallback when no background image */
-  background-color: var(--background-color, rgba(255, 255, 255, 1));
+  /* Background color - static color fallback when no background image.
+     Black, not white - matches --background-color's own default in
+     css/variables.css (see that comment for why). */
+  background-color: var(--background-color, rgba(0, 0, 0, 1));
   border-radius: 8px;
   overflow: hidden;
   padding: 0;
@@ -750,10 +756,12 @@ button {
   margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
   /* --reel-title-color, when set, is either a Custom color picked in
      js/modules/playerTextStyles.js or a resolved page-role color (see
-     previewManager.js's/player.html's resolveTextUnit()) - falls back to
-     the reel's own accent color, today's actual look, when neither is
-     set. */
-  color: var(--reel-title-color, var(--ui-accent));
+     previewManager.js's/player.html's resolveTextUnit()) - resolveTextUnit()
+     never actually leaves this unresolved (falls back to pageTextStyles.js's
+     own ROLE_DEFAULT_COLOR first), so the var(...) fallback here is only a
+     safety net matching that same default, not the thing actually doing
+     the work. */
+  color: var(--reel-title-color, #ffffff);
 }
 
 /* Add extra padding at the top when reel title is hidden */

@@ -80,11 +80,11 @@
     
     // Import actual player module and utilities
     import { playerApp } from './js/player.js';
-    import { getColorFilters } from './js/modules/colorUtils.js';
+    import { getColorFilters, REEL_COLOR_DEFAULTS } from './js/modules/colorUtils.js';
     import { WORKER_BASE_URL } from './js/config.js';
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
-    import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from './js/modules/pageTextStyles.js';
+    import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './js/modules/pageTextStyles.js';
 
     // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
     // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
@@ -265,7 +265,10 @@
         fontFamily: source.fontFamily,
         fontSize: source.fontSize,
         fontWeight: source.fontWeight,
-        color: source.color,
+        // Falls back to the same ROLE_DEFAULT_COLOR the fallback-styles
+        // dialog's own preview already shows for an untouched role - see
+        // js/modules/previewManager.js's identical copy for the full comment.
+        color: source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body,
       };
     }
 
@@ -311,7 +314,7 @@
       // (defaults to enabled - matches previewManager.js's generateStyleConfig()).
       const backgroundColorEnabled = settings.backgroundColorEnabled !== false;
       const backgroundColor = backgroundColorEnabled
-        ? (reelData.backgroundColor || settings.backgroundColor || "rgba(255, 255, 255, 1)")
+        ? (reelData.backgroundColor || settings.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor)
         : "transparent";
       
       // overlayColor is ALWAYS applied to ::before (transparent by default)

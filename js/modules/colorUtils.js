@@ -13,7 +13,11 @@ export const REEL_COLOR_DEFAULTS = {
   waveformUnplayed: "#929292",
   waveformHoverHex: "#001f67",
   waveformHoverRgba: "rgba(0, 31, 103, 0.13)",
-  backgroundColor: "rgba(255, 255, 255, 1)",
+  // Black, not white - Title/Track Name/Playlist text falls back to white
+  // (pageTextStyles.js's ROLE_DEFAULT_COLOR) when uncustomized, and needs a
+  // dark background to stay legible against. See css/variables.css's
+  // --background-color for the CSS-side twin of this default.
+  backgroundColor: "rgba(0, 0, 0, 1)",
   overlayColor: "rgba(255, 255, 255, 0.5)",
   playerClosedIdleOverlayColor: "rgba(0, 0, 0, 0.7)",
   outlineColor: "#ffffff",

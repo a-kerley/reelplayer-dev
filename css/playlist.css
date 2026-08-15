@@ -145,7 +145,11 @@
   font-family: var(--reel-playlist-font-family, inherit);
   font-size: var(--reel-playlist-size, inherit);
   font-weight: var(--reel-playlist-weight, inherit);
-  color: var(--reel-playlist-color, var(--ui-accent));
+  /* resolveTextUnit() (js/modules/previewManager.js, player.html) never
+     actually leaves this unresolved - falls back to pageTextStyles.js's
+     own ROLE_DEFAULT_COLOR first - so this var(...) fallback is only a
+     safety net matching that same default. */
+  color: var(--reel-playlist-color, #ffffff);
   transition: transform var(--expandable-transition-duration) var(--expandable-transition-easing), opacity var(--expandable-transition-duration) var(--expandable-transition-easing), background-color var(--expandable-transition-duration) var(--expandable-transition-easing), box-shadow var(--expandable-transition-duration) var(--expandable-transition-easing);
   transform: scale(0.95);
   opacity: 0.7;
@@ -191,14 +195,14 @@
   font-family: var(--reel-playlist-font-family, inherit);
   font-size: var(--reel-playlist-size, 0.85rem);
   font-weight: var(--reel-playlist-weight, inherit);
-  color: var(--reel-playlist-color, var(--ui-accent));
+  color: var(--reel-playlist-color, #ffffff);
   flex-shrink: 0;
   transition: opacity var(--expandable-transition-duration) var(--expandable-transition-easing), color var(--expandable-transition-duration) var(--expandable-transition-easing), font-weight var(--expandable-transition-duration) var(--expandable-transition-easing);
   opacity: 0.8;
 }
 
 .playlist-item.active .playlist-duration {
-  color: var(--reel-playlist-color, var(--ui-accent));
+  color: var(--reel-playlist-color, #ffffff);
   font-weight: 600;
   opacity: 1;
 }

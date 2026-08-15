@@ -1,6 +1,6 @@
 // previewManager.js - Handles preview functionality with template-based approach
 import { getColorFilters, REEL_COLOR_DEFAULTS } from './colorUtils.js';
-import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from './pageTextStyles.js';
+import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './pageTextStyles.js';
 
 // Shared by generateStyleConfig() below and player.html's identical copy
 // (applyReelStyles()) - the one real duplication this feature couldn't
@@ -43,7 +43,16 @@ function resolveTextUnit(unit, pageRoleStyles, reelRoleFallbacks) {
     fontFamily: source.fontFamily,
     fontSize: source.fontSize,
     fontWeight: source.fontWeight,
-    color: source.color,
+    // Falls back to the same ROLE_DEFAULT_COLOR the "Edit Fallback Text
+    // Styles"/"Customize Text Styles" dialog's own preview table already
+    // shows for an untouched role (styleToolbarWidgets.js's
+    // openTextStyleDefsDialog()) - previously this stayed undefined here,
+    // letting css/player.css's own var(--reel-title-color, var(--ui-accent))
+    // fallback apply instead, which silently rendered a DIFFERENT color
+    // (whatever UI Accent Colour happened to be) than what the dialog had
+    // shown the user. ROLE_DEFAULT_COLOR.body covers "Custom" mode (role
+    // left unset, so no role key to look up at all).
+    color: source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body,
   };
 }
 
@@ -55,7 +64,9 @@ function resolveTextUnit(unit, pageRoleStyles, reelRoleFallbacks) {
 // (which only visits keys actually present in the object it's given)
 // still sees, and clears, a var that was previously set but should now
 // fall back to CSS's own default (e.g. switching a unit from a role back
-// to an empty "Custom").
+// to an empty "Custom"). color is the one field resolveTextUnit() never
+// actually leaves undefined (it has its own ROLE_DEFAULT_COLOR fallback),
+// but this stays generic rather than special-casing it.
 function textUnitStyleVars(varPrefix, resolved) {
   let fontFamily;
   if (resolved.fontFamily) {
