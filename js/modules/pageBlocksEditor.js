@@ -1478,8 +1478,20 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   // again, and un-dims the moment any of its fields first gets a value.
   const labelRows = [];
   function updateLabelStates() {
-    labelRows.forEach(({ def, labelTd }) => {
+    labelRows.forEach(({ role, def, labelTd }) => {
       labelTd.classList.toggle("customize-styles-label-default", Object.keys(def).length === 0);
+      // Same resolved-preview computation as styleMenuItems() (the text
+      // block's own "Apply style..." menu) and roleMenuItems()
+      // (styleToolbarWidgets.js) - "Heading 1" reads as an actual heading,
+      // "Body" as actual body text, not identical plain rows that only
+      // differ by name. Rechecked here (not just at row creation) so
+      // editing a role's own Size/Weight/Color/Font updates its label to
+      // match immediately, same as the dimming above.
+      const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
+      labelTd.style.fontSize = `${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`;
+      labelTd.style.fontWeight = def.fontWeight || ROLE_DEFAULT_WEIGHT[role];
+      labelTd.style.color = def.color || ROLE_DEFAULT_COLOR[role];
+      labelTd.style.fontFamily = font ? font.stack : "";
     });
   }
 
@@ -1536,7 +1548,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
     labelTd.textContent = ROLE_LABELS[role];
     tr.appendChild(labelTd);
-    labelRows.push({ def, labelTd });
+    labelRows.push({ role, def, labelTd });
 
     const fontTd = document.createElement("td");
     fontTd.style.cssText = cellStyle;
@@ -1547,6 +1559,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // renders in its own typeface, not just named, unlike a native
     // <select>'s <option> styling (which this used to rely on instead).
     const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
+    fontBtn.classList.add("customize-styles-font-btn");
     fontBtn.onclick = () => {
       openContextMenu(fontBtn, fontMenuItems((f) => {
         if (fontsLinked) {

@@ -1802,6 +1802,24 @@ input[type="range"]:focus::-moz-range-thumb {
   color: var(--builder-accent);
 }
 
+/* Customize Text Styles dialog's per-role Font button (js/modules/
+   pageBlocksEditor.js's openCustomizeStylesDialog()) - fixed width rather
+   than .dropdown-menu-btn's usual shrink-to-fit, so picking a longer or
+   shorter font name doesn't resize the button (and, with it, the whole
+   column/table/dialog) on every change. Comfortably fits every current
+   TEXT_FONT_OPTIONS label (pageTextStyles.js) without truncating; a
+   longer one in the future just ellipsizes instead of growing the dialog
+   again the way it used to. */
+.customize-styles-font-btn {
+  width: 170px;
+}
+
+.customize-styles-font-btn .dropdown-menu-btn-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
 /* Native <select> counterpart of .dropdown-menu-btn above - same
    segmented look (dark bordered box, distinct shaded arrow segment)
    applied via layered backgrounds instead of child elements, since a
