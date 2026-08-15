@@ -1630,6 +1630,15 @@ input[type="range"]:focus::-moz-range-thumb {
   flex: 1;
 }
 
+/* .value-control-input's base rule right-aligns its digits (the usual
+   convention for a numeric field) - overridden here to match the
+   dropdown-menu-btn mode's own left-aligned text label, so a row's Weight
+   value starts from the same edge regardless of which of the two modes
+   is currently showing. */
+.weight-control-spinner .value-control-input {
+  text-align: left;
+}
+
 /* Customize Text Styles dialog's per-role label (js/modules/
    pageBlocksEditor.js's openCustomizeStylesDialog(), toggled by
    updateLabelStates()) - dimmed only to signal "still at the page
