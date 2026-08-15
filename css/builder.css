@@ -1617,6 +1617,19 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
+/* .value-control-number/-input default to flex:0 0 auto (intrinsic,
+   digit-count-sized) - fine for a normal Size field sharing a row with
+   other controls, but left the spinner sitting small and left-aligned
+   inside .weight-control-wrap's fixed box, with a visible gap of empty
+   space the dropdown-menu-btn mode doesn't have. flex:1 on both makes the
+   actual visible control - not just its invisible container - genuinely
+   fill that same width, matching the dropdown's fully-filled look
+   regardless of which of the two modes is showing. */
+.weight-control-spinner .value-control-number,
+.weight-control-spinner .value-control-input {
+  flex: 1;
+}
+
 /* Customize Text Styles dialog's per-role label (js/modules/
    pageBlocksEditor.js's openCustomizeStylesDialog(), toggled by
    updateLabelStates()) - dimmed only to signal "still at the page

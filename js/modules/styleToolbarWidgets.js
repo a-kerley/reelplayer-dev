@@ -217,6 +217,12 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
         step: 100,
       });
       control.control.classList.add("weight-control-spinner");
+      // createValueControl() sizes the input to its own digit count
+      // (measureWidth() in valueControl.js) via an inline style - cleared
+      // here so css/builder.css's .weight-control-spinner rules can size
+      // it to fill .weight-control-wrap's fixed width instead, the same
+      // full-width look the dropdown-menu-btn mode above already has.
+      control.input.style.width = "";
       control.input.addEventListener("input", () => {
         const val = parseInt(control.input.value, 10);
         setWeight(!isNaN(val) ? String(val) : undefined);
@@ -430,45 +436,9 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     });
   }
 
-  // A role's Style-column preview renders at its own real font-size (see
-  // updateLabelStates() above), so its row - and with it, the scrollable
-  // table wrapper below - genuinely needs to grow/shrink as that size
-  // changes; there's no way around that without either capping the
-  // preview (losing the actual size comparison it exists to show) or
-  // resizing (breaking the "compact settings table" feel of a dialog).
-  // What IS avoidable is that resize happening as an instant, jarring
-  // snap - so it's animated via the classic FLIP technique: capture the
-  // wrapper's height *before* this edit's DOM changes land, apply them,
-  // then explicitly transition from the old height to the new one rather
-  // than jumping straight to `height:auto` and letting the height change
-  // happen invisibly in a single frame.
-  let heightResetTimer = null;
   function commitAll() {
-    const startHeight = content.getBoundingClientRect().height;
     onCommit();
     updateLabelStates();
-    clearTimeout(heightResetTimer);
-    const endHeight = content.scrollHeight;
-    // Suppressed for the animation's duration, not left on - the explicit
-    // `height` below is, for most of the transition, deliberately smaller
-    // than the table's actual (already fully updated) content height, so
-    // overflow-y:auto would otherwise flash a scrollbar in and back out
-    // every single edit, on top of the resize itself. Clipping instead of
-    // scrolling for that brief window is the smoother trade.
-    content.style.overflowY = "hidden";
-    content.style.height = `${startHeight}px`;
-    content.offsetHeight; // force layout so the browser commits startHeight before animating away from it
-    requestAnimationFrame(() => {
-      content.style.height = `${endHeight}px`;
-    });
-    // Reverts to auto (both height and the real scrollbar) once the
-    // transition's done, so a later change in circumstance this animation
-    // doesn't know about (e.g. the window being resized, or a table tall
-    // enough to need its own internal scroll again) isn't stuck without it.
-    heightResetTimer = setTimeout(() => {
-      content.style.height = "auto";
-      content.style.overflowY = "auto";
-    }, 260);
   }
 
   // Font linking - session-only (not part of `defs`, so it resets every
@@ -491,7 +461,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
   }
 
   const content = document.createElement("div");
-  content.style.cssText = "max-height:60vh;overflow-y:auto;transition:height 0.25s ease;";
+  content.style.cssText = "max-height:60vh;overflow-y:auto;";
 
   const table = document.createElement("table");
   table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
