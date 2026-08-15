@@ -216,11 +216,15 @@
        ============================================ */
     function getPlayerTextStyles(settings) {
       if (settings.playerTextStyles) {
+        const pts = settings.playerTextStyles;
         // Back-fill for a reel published under an earlier version of this
-        // feature (before the Playlist row existed) - title/trackName but
-        // no playlist key yet.
-        if (!settings.playerTextStyles.playlist) settings.playerTextStyles.playlist = {};
-        return settings.playerTextStyles;
+        // feature: either no playlist unit at all, or the older combined
+        // `.playlist` (before it split into item/duration) - see
+        // js/modules/playerTextStyles.js's ensurePlayerTextStyles() for
+        // the identical (mutating) version of this same back-fill.
+        if (!pts.playlistItem) pts.playlistItem = pts.playlist || {};
+        if (!pts.playlistDuration) pts.playlistDuration = {};
+        return pts;
       }
 
       const ta = settings.titleAppearance || {};
@@ -239,7 +243,8 @@
           paddingBottom: parsePx(ta.paddingBottom),
         },
         trackName: {},
-        playlist: {},
+        playlistItem: {},
+        playlistDuration: {},
       };
     }
 
@@ -350,7 +355,8 @@
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
       applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles));
       applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles));
-      applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-playlist-item', resolveTextUnit(pts.playlistItem, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-playlist-duration', resolveTextUnit(pts.playlistDuration, pageRoleStyles));
 
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');

@@ -1,12 +1,13 @@
 // playerTextStyles.js - "Player Text Styles" builder section: the reel
-// title and current-track-name text, each independently either "Custom"
-// (its own font/size/weight/color, via the same createTextStyleToolbar()
-// widget the page button block uses - js/modules/styleToolbarWidgets.js)
-// or set to inherit one of the page's named text-style roles
-// (h1/h2/h3/body/link). Replaces the older, title-only "Reel Title
-// Appearance" section - see reel.playerTextStyles below for the data
-// model and ensurePlayerTextStyles() for the one-time migration off the
-// old reel.titleAppearance field.
+// title, current-track-name, and playlist row (item + duration,
+// independently) text, each independently either "Custom" (its own font/
+// size/weight/color, via the same createTextStyleToolbar() widget the
+// page button block uses - js/modules/styleToolbarWidgets.js) or set to
+// inherit one of the page's named text-style roles (h1/h2/h3/body/link).
+// Replaces the older, title-only "Reel Title Appearance" section - see
+// reel.playerTextStyles below for the data model and
+// ensurePlayerTextStyles() for the one-time migration off the old
+// reel.titleAppearance field.
 //
 // "Inherit" only ever resolves to real values when this reel is actually
 // embedded via a page's Player block (js/modules/pageBlockRenderer.js's
@@ -30,7 +31,8 @@ import { createTextStyleToolbar } from "./styleToolbarWidgets.js";
 // text actually currently looks like, never a blank/generic placeholder.
 const TITLE_DEFAULTS = { fontSize: 21, fontWeight: "700" };
 const TRACK_NAME_DEFAULTS = { fontSize: 14, fontWeight: "600" };
-const PLAYLIST_DEFAULTS = { fontSize: 16, fontWeight: "400" };
+const PLAYLIST_ITEM_DEFAULTS = { fontSize: 16, fontWeight: "400" };
+const PLAYLIST_DURATION_DEFAULTS = { fontSize: 14, fontWeight: "400" };
 
 let toolbarPickrInstances = [];
 function destroyToolbarPickrInstances() {
@@ -49,10 +51,16 @@ function destroyToolbarPickrInstances() {
 // migration (pageBlockRenderer.js's renderText()).
 function ensurePlayerTextStyles(reel) {
   if (reel.playerTextStyles) {
+    const pts = reel.playerTextStyles;
     // A reel migrated under an earlier version of this feature (before
-    // the Playlist row existed) has title/trackName but not playlist yet -
-    // back-fill it rather than re-running the whole migration below.
-    if (!reel.playerTextStyles.playlist) reel.playerTextStyles.playlist = {};
+    // the Playlist Item/Duration split existed) has a single combined
+    // `.playlist` unit, or none at all - back-fill rather than re-running
+    // the whole migration below. The combined unit's values become
+    // Playlist Item's (the split preserves what was actually visible -
+    // track names - over duration, which had no separate values to lose).
+    if (!pts.playlistItem) pts.playlistItem = pts.playlist || {};
+    if (!pts.playlistDuration) pts.playlistDuration = {};
+    delete pts.playlist;
     return;
   }
 
@@ -73,7 +81,8 @@ function ensurePlayerTextStyles(reel) {
       paddingBottom: parsePx(ta.paddingBottom),
     },
     trackName: {},
-    playlist: {},
+    playlistItem: {},
+    playlistDuration: {},
   };
   delete reel.titleAppearance;
 }
@@ -132,8 +141,11 @@ export function createPlayerTextStylesSection(reel, onChange) {
     <div class="builder-section-legend" style="margin-top:1.2rem;">Track Name</div>
     <div id="trackNameStyleToolbarSlot" style="margin-top:0.4rem;"></div>
 
-    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist (track names &amp; lengths)</div>
-    <div id="playlistStyleToolbarSlot" style="margin-top:0.4rem;"></div>
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist Item</div>
+    <div id="playlistItemStyleToolbarSlot" style="margin-top:0.4rem;"></div>
+
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist Duration</div>
+    <div id="playlistDurationStyleToolbarSlot" style="margin-top:0.4rem;"></div>
   `;
 
   const showTitleToggle = createToggleSwitch({ id: "reelShowTitle", checked: !!reel.showTitle });
@@ -186,26 +198,45 @@ export function createPlayerTextStylesSection(reel, onChange) {
   });
   section.querySelector("#trackNameStyleToolbarSlot").appendChild(trackNameToolbar);
 
-  // One shared style for both the track name and duration text in every
-  // playlist row (css/playlist.css's .playlist-item/.playlist-duration) -
-  // a single control, not one each, since they're read together as one
-  // row of playlist content rather than two independently-styled pieces.
-  const { toolbar: playlistToolbar } = createTextStyleToolbar({
-    idPrefix: "reelPlaylist",
-    getRole: () => reel.playerTextStyles.playlist.role,
-    setRole: (role) => { reel.playerTextStyles.playlist.role = role; },
-    getFontFamily: () => reel.playerTextStyles.playlist.fontFamily,
-    setFontFamily: (value) => { reel.playerTextStyles.playlist.fontFamily = value; },
-    getFontSize: () => reel.playerTextStyles.playlist.fontSize || PLAYLIST_DEFAULTS.fontSize,
-    setFontSize: (value) => { reel.playerTextStyles.playlist.fontSize = value; },
-    getFontWeight: () => reel.playerTextStyles.playlist.fontWeight || PLAYLIST_DEFAULTS.fontWeight,
-    setFontWeight: (value) => { reel.playerTextStyles.playlist.fontWeight = value; },
-    getColor: () => reel.playerTextStyles.playlist.color || defaultColor(),
-    setColor: (value) => { reel.playerTextStyles.playlist.color = value; },
+  // Discrete controls for the playlist row's track name
+  // (css/playlist.css's .playlist-item/.playlist-item-title) and its
+  // duration (.playlist-duration) - independently styleable, not one
+  // shared control, since they're visually distinct pieces (the duration
+  // is deliberately smaller/lighter by default) that someone may well
+  // want to style differently.
+  const { toolbar: playlistItemToolbar } = createTextStyleToolbar({
+    idPrefix: "reelPlaylistItem",
+    getRole: () => reel.playerTextStyles.playlistItem.role,
+    setRole: (role) => { reel.playerTextStyles.playlistItem.role = role; },
+    getFontFamily: () => reel.playerTextStyles.playlistItem.fontFamily,
+    setFontFamily: (value) => { reel.playerTextStyles.playlistItem.fontFamily = value; },
+    getFontSize: () => reel.playerTextStyles.playlistItem.fontSize || PLAYLIST_ITEM_DEFAULTS.fontSize,
+    setFontSize: (value) => { reel.playerTextStyles.playlistItem.fontSize = value; },
+    getFontWeight: () => reel.playerTextStyles.playlistItem.fontWeight || PLAYLIST_ITEM_DEFAULTS.fontWeight,
+    setFontWeight: (value) => { reel.playerTextStyles.playlistItem.fontWeight = value; },
+    getColor: () => reel.playerTextStyles.playlistItem.color || defaultColor(),
+    setColor: (value) => { reel.playerTextStyles.playlistItem.color = value; },
     pickrInstances: toolbarPickrInstances,
     onCommit: onChange,
   });
-  section.querySelector("#playlistStyleToolbarSlot").appendChild(playlistToolbar);
+  section.querySelector("#playlistItemStyleToolbarSlot").appendChild(playlistItemToolbar);
+
+  const { toolbar: playlistDurationToolbar } = createTextStyleToolbar({
+    idPrefix: "reelPlaylistDuration",
+    getRole: () => reel.playerTextStyles.playlistDuration.role,
+    setRole: (role) => { reel.playerTextStyles.playlistDuration.role = role; },
+    getFontFamily: () => reel.playerTextStyles.playlistDuration.fontFamily,
+    setFontFamily: (value) => { reel.playerTextStyles.playlistDuration.fontFamily = value; },
+    getFontSize: () => reel.playerTextStyles.playlistDuration.fontSize || PLAYLIST_DURATION_DEFAULTS.fontSize,
+    setFontSize: (value) => { reel.playerTextStyles.playlistDuration.fontSize = value; },
+    getFontWeight: () => reel.playerTextStyles.playlistDuration.fontWeight || PLAYLIST_DURATION_DEFAULTS.fontWeight,
+    setFontWeight: (value) => { reel.playerTextStyles.playlistDuration.fontWeight = value; },
+    getColor: () => reel.playerTextStyles.playlistDuration.color || defaultColor(),
+    setColor: (value) => { reel.playerTextStyles.playlistDuration.color = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: onChange,
+  });
+  section.querySelector("#playlistDurationStyleToolbarSlot").appendChild(playlistDurationToolbar);
 
   return section;
 }

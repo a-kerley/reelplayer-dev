@@ -12,7 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar } from "./styleToolbarWidgets.js";
 
@@ -1333,9 +1333,12 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   // typeface across the whole page rather than setting it role-by-role.
   let fontsLinked = false;
   const fontRows = [];
+  function fontLabelForValue(value) {
+    return (TEXT_FONT_OPTIONS.find((f) => f.value === (value || "system")) || TEXT_FONT_OPTIONS[0]).label;
+  }
   function syncLinkedFonts(value) {
-    fontRows.forEach(({ def, fontSelect }) => {
-      fontSelect.value = value;
+    fontRows.forEach(({ def, fontBtn }) => {
+      setDropdownLabel(fontBtn, fontLabelForValue(value));
       def.fontFamily = value === "system" ? undefined : value;
     });
     commitAll();
@@ -1379,36 +1382,27 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
 
     const fontTd = document.createElement("td");
     fontTd.style.cssText = cellStyle;
-    const fontSelect = document.createElement("select");
-    fontSelect.className = "builder-select";
-    // No blank "Default" option - every role always has a real, current
-    // font (TEXT_FONT_OPTIONS[0], "System Default," when nothing's
-    // explicitly overridden), so the select always shows it selected.
-    // Each <option> is styled in its own actual typeface (widely supported
-    // for native <option> elements) and its Google Font preloaded, same as
-    // the toolbar Font dropdowns' own fontMenuItems() - see that function's
-    // comment for why preloading every option up front, not just the
-    // eventually-picked one, is cheap here.
-    TEXT_FONT_OPTIONS.forEach((f) => {
-      ensureInlineGoogleFont(f.value);
-      const opt = document.createElement("option");
-      opt.value = f.value;
-      opt.textContent = f.label;
-      opt.style.fontFamily = f.stack;
-      fontSelect.appendChild(opt);
-    });
-    fontSelect.value = def.fontFamily || "system";
-    fontSelect.onchange = () => {
-      if (fontsLinked) {
-        syncLinkedFonts(fontSelect.value);
-      } else {
-        def.fontFamily = fontSelect.value === "system" ? undefined : fontSelect.value;
-        commitAll();
-      }
+    // Same dropdown-menu-btn + font-previewed context menu
+    // (js/modules/styleToolbarWidgets.js's fontMenuItems()) as every
+    // other Font control in the app (text block toolbar, button block,
+    // reel player Title/Track Name/Playlist) - each entry actually
+    // renders in its own typeface, not just named, unlike a native
+    // <select>'s <option> styling (which this used to rely on instead).
+    const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
+    fontBtn.onclick = () => {
+      openContextMenu(fontBtn, fontMenuItems((f) => {
+        if (fontsLinked) {
+          syncLinkedFonts(f.value);
+        } else {
+          def.fontFamily = f.value === "system" ? undefined : f.value;
+          setDropdownLabel(fontBtn, f.label);
+          commitAll();
+        }
+      }));
     };
-    fontTd.appendChild(fontSelect);
+    fontTd.appendChild(fontBtn);
     tr.appendChild(fontTd);
-    fontRows.push({ def, fontSelect });
+    fontRows.push({ def, fontBtn });
 
     const sizeTd = document.createElement("td");
     sizeTd.style.cssText = cellStyle;
@@ -1478,8 +1472,12 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // exact failure mode for unstyled buttons under color-scheme:dark.
     resetBtn.style.cssText = "padding:0.3rem 0.6rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#ccc;cursor:pointer;font-size:var(--builder-text-base);";
     resetBtn.onclick = () => {
-      page.textStyleDefs[role] = {};
-      fontSelect.value = "system";
+      // Mutate `def` in place rather than replacing
+      // page.textStyleDefs[role] with a new object - every control's
+      // onchange closure above captured this exact `def` reference, so
+      // reassigning would silently orphan them from then on.
+      Object.keys(def).forEach((key) => delete def[key]);
+      setDropdownLabel(fontBtn, fontLabelForValue(undefined));
       sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
       weightSelect.value = String(ROLE_DEFAULT_WEIGHT[role]);
       colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
@@ -1521,7 +1519,7 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     fontsLinked = !fontsLinked;
     fontLinkToggle.classList.toggle("active", fontsLinked);
     fontLinkToggle.title = fontsLinked ? "Unlink font per style" : "Link font across all styles";
-    if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].fontSelect.value);
+    if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].def.fontFamily || "system");
   };
   document.getElementById("fontLinkToggleSlot")?.replaceWith(fontLinkToggle);
 }
