@@ -1245,7 +1245,12 @@ input[type="range"]:focus::-moz-range-thumb {
   background: transparent;
   color: #fff;
   font-size: var(--builder-text-base);
-  text-align: right;
+  /* Center, not right - now that every field shares one fixed width
+     (valueControl.js's measureWidth()) rather than each sizing itself to
+     its own value's digit count, right-aligning would leave a field with
+     a short value (e.g. "8" in a box sized for 4 digits) looking
+     disconnected from its spin arrows, with a big gap in between. */
+  text-align: center;
 }
 
 /* Native spin buttons are tiny and inconsistent across browsers - replaced
@@ -1630,11 +1635,13 @@ input[type="range"]:focus::-moz-range-thumb {
   flex: 1;
 }
 
-/* .value-control-input's base rule right-aligns its digits (the usual
-   convention for a numeric field) - overridden here to match the
-   dropdown-menu-btn mode's own left-aligned text label, so a row's Weight
-   value starts from the same edge regardless of which of the two modes
-   is currently showing. */
+/* .value-control-input's base rule center-aligns its digits (every other
+   plain-number field in the app) - overridden here to match the
+   dropdown-menu-btn mode's own left-aligned text label instead, so a
+   row's Weight value starts from the same edge regardless of which of
+   the two modes is currently showing. A deliberate exception, not an
+   oversight - this is the one spinner in the app paired with a sibling
+   dropdown it needs to visually match, rather than standing alone. */
 .weight-control-spinner .value-control-input {
   text-align: left;
 }

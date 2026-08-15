@@ -38,14 +38,17 @@ function effectiveStep(baseStep, e) {
 const CHEVRON_UP = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M4.5 15.75l7.5-7.5 7.5 7.5" /></svg>';
 const CHEVRON_DOWN = '<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="2.5" stroke="currentColor"><path stroke-linecap="round" stroke-linejoin="round" d="M19.5 8.25l-7.5 7.5-7.5-7.5" /></svg>';
 
-// Width just wide enough for the widest possible value + the native spinner
-// arrows, so number boxes stop eating a full input's worth of row space.
-function measureWidth(min, max, step) {
-  const widest = Math.max(Math.abs(min), Math.abs(max));
-  const intDigits = String(Math.trunc(widest)).length;
-  const decimals = stepDecimals(step);
-  const chars = intDigits + (decimals > 0 ? decimals + 1 : 0) + (min < 0 ? 1 : 0);
-  return `${chars + 2.5}ch`;
+// One uniform width for every plain-number field in the app, not sized
+// per-field to its own min/max/step - previously a field's box grew or
+// shrank with however many digits its own range could reach, so no two
+// fields necessarily lined up even when sitting in adjacent rows. Fixed
+// at 4 digits' worth of room (every field in this codebase maxes out at
+// 4 digits or fewer - nothing here actually needs more), center-aligned
+// via .value-control-input in css/builder.css; a 5th digit just scrolls
+// within the field like any input whose content exceeds its width,
+// rather than growing the box to fit it.
+function measureWidth() {
+  return "6.5ch";
 }
 
 /**
@@ -76,7 +79,7 @@ export function buildValueControl({ id, label, value, min, max, step = 1, unit =
   input.step = String(step);
   input.setAttribute('value', String(value));
   input.className = 'value-control-input';
-  input.style.width = measureWidth(min, max, step);
+  input.style.width = measureWidth();
 
   const numberWrap = document.createElement('div');
   numberWrap.className = 'value-control-number';
