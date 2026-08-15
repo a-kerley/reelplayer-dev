@@ -14,6 +14,7 @@
 // third-party embeds, so a reel's rendering logic itself is never
 // duplicated a third time either.
 import { sanitizeHtml } from "./htmlSanitizer.js";
+import { ASSIGNABLE_TEXT_ROLES } from "./pageTextStyles.js";
 
 const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
@@ -385,7 +386,19 @@ function renderButtonBlock(block) {
   a.rel = "noopener noreferrer";
   a.textContent = block.label;
   a.style.backgroundColor = block.backgroundColor || "#4a90e2";
-  a.style.color = block.textColor || "#ffffff";
+  // A Text Style role (js/modules/pageBlocksEditor.js's createButtonConfig())
+  // drives font-family/-size/-weight/color together via the
+  // [data-text-role="..."] rules in page.css, which read the exact same
+  // --page-text-{role}-* custom properties as .page-block-text's own
+  // h1/h2/h3/p/a - so the button tracks page-wide Customize Styles edits
+  // to that role. Set as a data attribute (a CSS class rule), not inline
+  // styles, specifically so it CAN be overridden by an inline style - the
+  // "Custom" (no role) case below sets color inline, which needs to win.
+  if (block.textStyleRole && ASSIGNABLE_TEXT_ROLES.includes(block.textStyleRole)) {
+    a.dataset.textRole = block.textStyleRole;
+  } else {
+    a.style.color = block.textColor || "#ffffff";
+  }
   wrapper.appendChild(a);
   return wrapper;
 }

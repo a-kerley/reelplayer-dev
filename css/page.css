@@ -203,8 +203,11 @@ body.page-body {
 }
 
 /* Button block (js/modules/pageBlockRenderer.js's renderButtonBlock()) -
-   background-color/color are set inline per-block (block.backgroundColor/
-   .textColor), so only layout/shape lives here. */
+   background-color is always set inline per-block (block.backgroundColor).
+   Text color/font either come inline from block.textColor ("Custom", the
+   default) or from a [data-text-role] rule below (an assigned Text Style) -
+   see renderButtonBlock()'s comment for why those two are mutually
+   exclusive rather than layered. */
 .page-block-button {
   padding: 1rem;
 }
@@ -220,6 +223,50 @@ body.page-body {
 
 .page-block-button-link:hover {
   opacity: 0.85;
+}
+
+/* Text Style role assignment (js/modules/pageBlocksEditor.js's
+   createButtonConfig() "Text Style:" dropdown) - reuses the exact same
+   --page-text-{role}-* custom properties, with the exact same fallback
+   defaults, as the corresponding .page-block-text rule above, so a button
+   assigned e.g. "Heading 1" looks and behaves like one, and tracks the
+   same page-wide Customize Styles edits a real <h1> would. Higher
+   specificity than .page-block-button-link's own base font-weight:600
+   above (an attribute selector beats a plain class), so a role always
+   wins over that default once assigned. */
+.page-block-button-link[data-text-role="h1"] {
+  font-family: var(--page-text-h1-font-family, inherit);
+  font-size: var(--page-text-h1-font-size, 2rem);
+  font-weight: var(--page-text-h1-font-weight, 700);
+  color: var(--page-text-h1-color, #fff);
+}
+
+.page-block-button-link[data-text-role="h2"] {
+  font-family: var(--page-text-h2-font-family, inherit);
+  font-size: var(--page-text-h2-font-size, 1.4rem);
+  font-weight: var(--page-text-h2-font-weight, 700);
+  color: var(--page-text-h2-color, #fff);
+}
+
+.page-block-button-link[data-text-role="h3"] {
+  font-family: var(--page-text-h3-font-family, inherit);
+  font-size: var(--page-text-h3-font-size, 1.15rem);
+  font-weight: var(--page-text-h3-font-weight, 600);
+  color: var(--page-text-h3-color, #fff);
+}
+
+.page-block-button-link[data-text-role="body"] {
+  font-family: var(--page-text-body-font-family, inherit);
+  font-size: var(--page-text-body-font-size, 1rem);
+  font-weight: var(--page-text-body-font-weight, 400);
+  color: var(--page-text-body-color, var(--page-text-muted));
+}
+
+.page-block-button-link[data-text-role="link"] {
+  font-family: var(--page-text-link-font-family, inherit);
+  font-size: var(--page-text-link-font-size, inherit);
+  font-weight: var(--page-text-link-font-weight, inherit);
+  color: var(--page-text-link-color, var(--page-accent));
 }
 
 .page-block-image {

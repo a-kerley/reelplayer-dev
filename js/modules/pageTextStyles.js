@@ -17,6 +17,15 @@
 export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link"];
 export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link" };
 
+// Every role that can be assigned wholesale to something other than
+// inline-selected text - the Customize Text Styles dialog's rows
+// (js/modules/pageBlocksEditor.js) and the button block's own "Text
+// Style" picker both use exactly this set. bold/italic/underline are
+// excluded: those are inline toggles applied to a run of selected text
+// within a text block (createTextConfig()'s B/I/U buttons), not a style a
+// whole block/button can "be" the way h1/h2/h3/body/link can.
+export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
+
 // A curated pick, not an open text field - three system/web-safe stacks
 // (no network request) plus two Google Fonts, loaded on demand only for a
 // role that actually selects one (see syncGoogleFonts() below), not

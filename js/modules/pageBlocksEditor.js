@@ -12,7 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 
 const BLOCK_TYPE_LABELS = {
@@ -164,6 +164,14 @@ export function updatePageBlocksEditor(page, onChange) {
   });
 
   container.appendChild(createAddBlockRow(page, onChange));
+
+  // Every block row's own .page-block-row-preview inherits the page's
+  // --page-text-{role}-* custom properties from this container (e.g. a
+  // button block's label rendered with an assigned Text Style role) - set
+  // once here, at the whole editor's own scope, rather than re-deriving
+  // it per block type the way each text block's own editable already does
+  // for itself (createTextConfig() below).
+  applyTextStyles(container, page);
 }
 
 function createBlockRow(block, index, page, onChange) {
@@ -1348,7 +1356,7 @@ const FORMAT_BLOCK_TAGS = { h1: "H1", h2: "H2", h3: "H3", body: "P" };
 // ROLES/page.css still carry entries for all three, so a page that already
 // has one customized keeps rendering exactly as before - just no longer
 // editable from here.
-const CUSTOMIZE_DIALOG_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
+const CUSTOMIZE_DIALOG_ROLES = ASSIGNABLE_TEXT_ROLES;
 
 // What each role actually renders as when nothing's customized -
 // css/page.css's own literal fallback values for h1/h2/h3/body, and a
@@ -1377,6 +1385,16 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     refreshPreview();
     onChange();
     document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
+    // Every other block row's own .page-block-row-preview (e.g. a button
+    // assigned a Text Style role) reads these same --page-text-{role}-*
+    // vars too, but has no per-instance applyTextStyles() call of its own
+    // the way each text block's editable does above - it only inherits
+    // whatever's set on an ancestor. Re-applied here at the whole editor's
+    // container level so an edit made in this dialog is reflected in
+    // every row's preview immediately, not just on the next full
+    // add/remove/reorder rebuild (updatePageBlocksEditor() below).
+    const container = document.getElementById("pageBlocksEditor");
+    if (container) applyTextStyles(container, page);
   }
 
   // Font linking - session-only (not part of page.textStyleDefs, so it
@@ -1821,6 +1839,42 @@ function createButtonConfig(block, onChange, refreshPreview) {
   }
   updateAlignIcons();
 
+  // Assigns one of the page's own named text styles (js/modules/
+  // pageTextStyles.js's ASSIGNABLE_TEXT_ROLES - the same h1/h2/h3/body/link
+  // set the Customize Text Styles dialog edits) to the button's label,
+  // instead of - or as well as - the block's own one-off Background/Text
+  // colors below. Font family/size/weight AND color all come from the
+  // chosen role (renderButtonBlock()/page.css), so a button assigned
+  // "Body" tracks the same page-wide edits as the text block's own
+  // paragraphs, and stays in sync if that role is customized later.
+  const styleRoleRow = document.createElement("div");
+  styleRoleRow.className = "color-row";
+  styleRoleRow.style.marginTop = "0.5rem";
+  const styleRoleLabel = document.createElement("span");
+  styleRoleLabel.textContent = "Text Style:";
+  styleRoleRow.appendChild(styleRoleLabel);
+  const styleRoleSelect = document.createElement("select");
+  styleRoleSelect.className = "builder-select";
+  const customOpt = document.createElement("option");
+  customOpt.value = "";
+  customOpt.textContent = "Custom";
+  styleRoleSelect.appendChild(customOpt);
+  ASSIGNABLE_TEXT_ROLES.forEach((role) => {
+    const opt = document.createElement("option");
+    opt.value = role;
+    opt.textContent = ROLE_LABELS[role];
+    styleRoleSelect.appendChild(opt);
+  });
+  styleRoleSelect.value = block.textStyleRole || "";
+  styleRoleSelect.onchange = () => {
+    block.textStyleRole = styleRoleSelect.value || undefined;
+    updateTextColorRowVisibility();
+    refreshPreview();
+    onChange();
+  };
+  styleRoleRow.appendChild(styleRoleSelect);
+  wrap.appendChild(styleRoleRow);
+
   const colorRow = document.createElement("div");
   colorRow.className = "color-row";
   colorRow.style.marginTop = "0.5rem";
@@ -1850,6 +1904,16 @@ function createButtonConfig(block, onChange, refreshPreview) {
   colorRow.appendChild(textPickr.btn);
 
   wrap.appendChild(colorRow);
+
+  // A Text Style role drives the label's color itself (see above) - the
+  // block's own Text swatch would silently do nothing while a role's
+  // assigned, so it's hidden rather than left visible-but-inert.
+  function updateTextColorRowVisibility() {
+    const hasRole = !!block.textStyleRole;
+    textLabel.style.display = hasRole ? "none" : "";
+    textPickr.btn.style.display = hasRole ? "none" : "";
+  }
+  updateTextColorRowVisibility();
 
   return wrap;
 }
