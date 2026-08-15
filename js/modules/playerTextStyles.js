@@ -10,21 +10,26 @@
 // ensurePlayerTextStyles() for the one-time migration off the old
 // reel.titleAppearance field.
 //
-// "Inherit" only ever resolves to real values when this reel is actually
-// embedded via a page's Player block (js/modules/pageBlockRenderer.js's
-// renderPlayer() forwards the embedding page's current role styles as a
-// URL param - see js/modules/previewManager.js's resolveTextUnit() and
-// player.html's identical copy for the resolution/fallback logic) - a
-// reel isn't tied to any one page, so there's no page context here in
-// the Reels tab itself, and inherit mode simply falls back to this unit's
-// own custom fields (or, if those are unset too, today's hardcoded CSS
-// defaults) - the same "still looks good with nothing configured"
-// fallback used everywhere else in this feature.
+// "Inherit" only ever resolves to a real *page's* role styles when this
+// reel is actually embedded via a page's Player block (js/modules/
+// pageBlockRenderer.js's renderPlayer() forwards the embedding page's
+// current role styles as a URL param - see js/modules/previewManager.js's
+// resolveTextUnit() and player.html's identical copy for the resolution
+// logic) - a reel isn't tied to any one page, so there's no page context
+// here in the Reels tab itself. Absent that, "inherit" instead resolves
+// against this reel's OWN per-role fallback definitions
+// (reel.playerTextStyles.roleFallbacks, edited via this section's "Edit
+// Fallback Text Styles..." button, reusing js/modules/
+// styleToolbarWidgets.js's openTextStyleDefsDialog() - the same table the
+// page builder's own Customize Text Styles dialog uses, just bound to a
+// different object) - and only once that's *also* unset does it fall
+// through to today's hardcoded CSS defaults, the same "still looks good
+// with nothing configured" fallback used everywhere else in this feature.
 import { ValidationUtils } from "./validation.js";
 import { createValueControl } from "./valueControl.js";
 import { createToggleSwitch } from "./domUtils.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
-import { createTextStyleToolbar } from "./styleToolbarWidgets.js";
+import { createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 
 // Per-unit effective defaults shown in the toolbar when nothing's been
 // set - matches css/player.css's own hardcoded fallback values for
@@ -60,6 +65,11 @@ function ensurePlayerTextStyles(reel) {
     if (!pts.playlist) pts.playlist = pts.playlistItem || {};
     delete pts.playlistItem;
     delete pts.playlistDuration;
+    // A reel saved before "Edit Fallback Text Styles" existed has no
+    // roleFallbacks at all yet - see this file's own header comment and
+    // resolveTextUnit() (previewManager.js/player.html) for what this
+    // actually does.
+    if (!pts.roleFallbacks) pts.roleFallbacks = {};
     return;
   }
 
@@ -81,6 +91,7 @@ function ensurePlayerTextStyles(reel) {
     },
     trackName: {},
     playlist: {},
+    roleFallbacks: {},
   };
   delete reel.titleAppearance;
 }
@@ -109,7 +120,8 @@ export function createPlayerTextStylesSection(reel, onChange) {
 
   section.innerHTML = `
     <legend class="builder-section-legend">Player Text Styles</legend>
-    <div class="color-row">
+    <button type="button" id="editFallbackTextStylesBtn" class="page-block-add-btn">Edit Fallback Text Styles...</button>
+    <div class="color-row" style="margin-top:0.8rem;">
       <label for="reelShowTitle" style="cursor:pointer;">Display Reel Title in Player</label>
       <span id="reelShowTitleToggleSlot"></span>
     </div>
@@ -142,6 +154,23 @@ export function createPlayerTextStylesSection(reel, onChange) {
     <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist (track names &amp; lengths)</div>
     <div id="playlistStyleToolbarSlot" style="margin-top:0.4rem;"></div>
   `;
+
+  // Reuses the exact same Style/Font/Size/Weight/Color/Reset table as the
+  // page builder's own "Customize Text Styles..." dialog
+  // (js/modules/pageBlocksEditor.js), just bound to
+  // reel.playerTextStyles.roleFallbacks instead of page.textStyleDefs -
+  // see this file's own header comment for how that fits into "inherit"
+  // resolution. `onCommit` only needs onChange() here (no page-block
+  // machinery to re-run) - the reel builder's own preview pipeline
+  // (previewManager.js's applyPreviewStyles(), called from onChange())
+  // reads roleFallbacks itself.
+  section.querySelector("#editFallbackTextStylesBtn").onclick = () => {
+    openTextStyleDefsDialog({
+      title: "Edit Fallback Text Styles",
+      defs: reel.playerTextStyles.roleFallbacks,
+      onCommit: onChange,
+    });
+  };
 
   const showTitleToggle = createToggleSwitch({ id: "reelShowTitle", checked: !!reel.showTitle });
   section.querySelector("#reelShowTitleToggleSlot").replaceWith(showTitleToggle);

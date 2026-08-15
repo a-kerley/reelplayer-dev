@@ -223,6 +223,10 @@
         // ensurePlayerTextStyles() for the identical (mutating) version of
         // this same back-fill.
         if (!pts.playlist) pts.playlist = pts.playlistItem || {};
+        // Back-fill for a reel saved before "Edit Fallback Text Styles"
+        // existed - see js/modules/playerTextStyles.js's
+        // ensurePlayerTextStyles() for the identical (mutating) version.
+        if (!pts.roleFallbacks) pts.roleFallbacks = {};
         return pts;
       }
 
@@ -243,16 +247,20 @@
         },
         trackName: {},
         playlist: {},
+        roleFallbacks: {},
       };
     }
 
-    function resolveTextUnit(unit, pageRoleStyles) {
+    function resolveTextUnit(unit, pageRoleStyles, reelRoleFallbacks) {
       // A defined `role` IS "inherit mode" - no separate mode flag, same
       // convention the page button block uses. See js/modules/
-      // previewManager.js's identical copy for the full comment.
+      // previewManager.js's identical copy for the full comment, including
+      // why reelRoleFallbacks is only consulted when the page didn't
+      // resolve this role.
       const role = unit?.role;
       const fromPage = role && pageRoleStyles?.[role];
-      const source = fromPage || unit || {};
+      const fromReelFallback = role && reelRoleFallbacks?.[role];
+      const source = fromPage || fromReelFallback || unit || {};
       return {
         fontFamily: source.fontFamily,
         fontSize: source.fontSize,
@@ -351,9 +359,9 @@
       // resolveTextUnit()/applyTextUnitStyleVars() above.
       root.style.setProperty('--reel-title-align', pts.title.align || 'center');
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
-      applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles));
-      applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles));
-      applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles, pts.roleFallbacks));
+      applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles, pts.roleFallbacks));
+      applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles, pts.roleFallbacks));
 
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');

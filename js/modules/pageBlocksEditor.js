@@ -12,9 +12,9 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
-import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, createWeightControl } from "./styleToolbarWidgets.js";
+import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -26,25 +26,19 @@ const BLOCK_TYPE_LABELS = {
 };
 
 // Same Pickr library the reel builder's own color controls use (see
-// js/modules/colorPicker.js) - two separate instance arrays here rather
-// than reusing that module's, since these swatches are for page
-// text-block content colors, not reel appearance CSS variables, and
-// colorPicker.js's helper is hardcoded to a fixed set of reel-only fields.
-// Split in two because the two call sites rebuild on different lifecycles:
-// toolbarPickrInstances alongside the rest of a text block's toolbar
-// (destroyed whenever updatePageBlocksEditor() rebuilds the whole editor),
-// dialogPickrInstances alongside the Customize Styles dialog's rows
-// (destroyed whenever that dialog is opened or closed) - destroying one
-// array must never tear down a Pickr button still live in the other spot.
+// js/modules/colorPicker.js) - a separate instance array here rather than
+// reusing that module's, since these swatches are for page text-block
+// content colors, not reel appearance CSS variables, and colorPicker.js's
+// helper is hardcoded to a fixed set of reel-only fields. The Customize
+// Text Styles dialog's own Pickr instances (openTextStyleDefsDialog(),
+// js/modules/styleToolbarWidgets.js) are tracked separately there, since
+// that dialog can now open with a completely different `defs` object (the
+// reel builder's own "Edit Fallback Text Styles" - see
+// js/modules/playerTextStyles.js) that this module knows nothing about.
 let toolbarPickrInstances = [];
-let dialogPickrInstances = [];
 function destroyToolbarPickrInstances() {
   toolbarPickrInstances.forEach((p) => p.destroy());
   toolbarPickrInstances = [];
-}
-function destroyDialogPickrInstances() {
-  dialogPickrInstances.forEach((p) => p.destroy());
-  dialogPickrInstances = [];
 }
 // Iconoir (MIT license, iconoir.com) icons, inlined per this codebase's
 // existing convention of embedding raw SVG markup directly rather than
@@ -1425,279 +1419,39 @@ function styleMenuItems(page, onPick) {
   });
 }
 
-// Bold/Italic/Underline aren't shown as rows in the dialog below - the text
-// toolbar's own B/I/U toggles already cover them inline, and a second,
-// page-wide "role" path to the exact same idea (plus underline's role
-// styling not visibly applying to selected text - a real, unresolved gap
-// between the CSS var this dialog wrote and what actually painted) made
-// this a confusing, rarely-useful second control for the same thing.
-// ROLES/page.css still carry entries for all three, so a page that already
-// has one customized keeps rendering exactly as before - just no longer
-// editable from here.
-const CUSTOMIZE_DIALOG_ROLES = ASSIGNABLE_TEXT_ROLES;
-
 export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
-  destroyDialogPickrInstances();
   if (!page.textStyleDefs) page.textStyleDefs = {};
 
-  // Also refreshes any text block editors currently open on screen, not
-  // just the row/page preview panes - a customization applies to every
-  // block using that role, and an open contenteditable field (see
-  // createTextConfig()) needs its own live CSS custom properties
-  // refreshed the same way to show the change immediately. Shared by every
-  // row (and the font-link sync below) rather than rebuilt per-row - it
-  // never actually depended on which role/def triggered it.
-  function commitAll() {
-    refreshPreview();
-    onChange();
-    updateLabelStates();
-    document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
-    // Every other block row's own .page-block-row-preview (e.g. a button
-    // assigned a Text Style role) reads these same --page-text-{role}-*
-    // vars too, but has no per-instance applyTextStyles() call of its own
-    // the way each text block's editable does above - it only inherits
-    // whatever's set on an ancestor. Re-applied here at the whole editor's
-    // container level so an edit made in this dialog is reflected in
-    // every row's preview immediately, not just on the next full
-    // add/remove/reorder rebuild (updatePageBlocksEditor() below).
-    const container = document.getElementById("pageBlocksEditor");
-    if (container) applyTextStyles(container, page);
-    // Player blocks don't pick up the CSS-var refresh above at all (see
-    // playerBlockRefreshers' own comment) - explicitly re-render just
-    // their own row previews so an inherited title/track-name/playlist
-    // role reflects this edit immediately, not just on the next add/
-    // remove/reorder.
-    playerBlockRefreshers.forEach((refresh) => refresh());
-  }
-
-  // Rows whose def is still `{}` (nothing customized for this role yet)
-  // get a dimmed label - purely a "you haven't touched this one" cue, not
-  // a disabled state; every control on a dimmed row is exactly as live as
-  // any other (see css/builder.css's .customize-styles-label-default).
-  // Rechecked in commitAll() after every edit in the dialog, not just once
-  // at open, so a row dims back out the moment its own Reset empties it
-  // again, and un-dims the moment any of its fields first gets a value.
-  const labelRows = [];
-  function updateLabelStates() {
-    labelRows.forEach(({ role, def, labelTd }) => {
-      labelTd.classList.toggle("customize-styles-label-default", Object.keys(def).length === 0);
-      // Same resolved-preview computation as styleMenuItems() (the text
-      // block's own "Apply style..." menu) and roleMenuItems()
-      // (styleToolbarWidgets.js) - "Heading 1" reads as an actual heading,
-      // "Body" as actual body text, not identical plain rows that only
-      // differ by name. Rechecked here (not just at row creation) so
-      // editing a role's own Size/Weight/Color/Font updates its label to
-      // match immediately, same as the dimming above.
-      const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
-      labelTd.style.fontSize = `${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`;
-      labelTd.style.fontWeight = def.fontWeight || ROLE_DEFAULT_WEIGHT[role];
-      labelTd.style.color = def.color || ROLE_DEFAULT_COLOR[role];
-      labelTd.style.fontFamily = font ? font.stack : "";
-    });
-  }
-
-  // Font linking - session-only (not part of page.textStyleDefs, so it
-  // resets every time this dialog is reopened): while linked, changing any
-  // one row's font immediately applies the same choice to every other
-  // visible role too, for the common case of wanting one consistent
-  // typeface across the whole page rather than setting it role-by-role.
-  let fontsLinked = false;
-  const fontRows = [];
-  function fontLabelForValue(value) {
-    return (TEXT_FONT_OPTIONS.find((f) => f.value === (value || "system")) || TEXT_FONT_OPTIONS[0]).label;
-  }
-  function syncLinkedFonts(value) {
-    fontRows.forEach(({ def, fontBtn, weightControl }) => {
-      setDropdownLabel(fontBtn, fontLabelForValue(value));
-      def.fontFamily = value === "system" ? undefined : value;
-      weightControl.refresh();
-    });
-    commitAll();
-  }
-
-  const content = document.createElement("div");
-  content.style.cssText = "max-height:60vh;overflow-y:auto;";
-
-  const table = document.createElement("table");
-  table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
-
-  const thead = document.createElement("thead");
-  thead.innerHTML = `
-    <tr>
-      <th style="text-align:left;padding:0.3rem;">Style</th>
-      <th style="text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
-      <th style="text-align:center;padding:0.3rem;">Size</th>
-      <th style="text-align:center;padding:0.3rem;">Weight</th>
-      <th style="text-align:center;padding:0.3rem;">Color</th>
-      <th style="padding:0.3rem;"></th>
-    </tr>
-  `;
-  table.appendChild(thead);
-
-  const tbody = document.createElement("tbody");
-  CUSTOMIZE_DIALOG_ROLES.forEach((role) => {
-    if (!page.textStyleDefs[role]) page.textStyleDefs[role] = {};
-    const def = page.textStyleDefs[role];
-    // Center-aligned to sit under their (also center-aligned) column
-    // headers - Style and Reset (plain text/a button, not a field to line
-    // up with a header) are left as their default alignment.
-    const cellStyle = "padding:0.3rem;text-align:center;";
-
-    const tr = document.createElement("tr");
-    tr.style.borderTop = "1px solid #444";
-
-    const labelTd = document.createElement("td");
-    labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
-    labelTd.textContent = ROLE_LABELS[role];
-    tr.appendChild(labelTd);
-    labelRows.push({ role, def, labelTd });
-
-    const fontTd = document.createElement("td");
-    fontTd.style.cssText = cellStyle;
-    // Same dropdown-menu-btn + font-previewed context menu
-    // (js/modules/styleToolbarWidgets.js's fontMenuItems()) as every
-    // other Font control in the app (text block toolbar, button block,
-    // reel player Title/Track Name/Playlist) - each entry actually
-    // renders in its own typeface, not just named, unlike a native
-    // <select>'s <option> styling (which this used to rely on instead).
-    const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
-    fontBtn.classList.add("font-picker-btn");
-    fontBtn.onclick = () => {
-      openContextMenu(fontBtn, fontMenuItems((f) => {
-        if (fontsLinked) {
-          syncLinkedFonts(f.value);
-        } else {
-          def.fontFamily = f.value === "system" ? undefined : f.value;
-          setDropdownLabel(fontBtn, f.label);
-          // Which weights are even offered depends on the font just
-          // picked - see createWeightControl()'s own comment.
-          weightControl.refresh();
-          commitAll();
-        }
-      }));
-    };
-    fontTd.appendChild(fontBtn);
-    tr.appendChild(fontTd);
-
-    const sizeTd = document.createElement("td");
-    sizeTd.style.cssText = cellStyle;
-    // Same segmented number+spin control as the text toolbar's own size
-    // field (css/builder.css's .value-control-number/.value-control-spin),
-    // not a plain <input type="number"> - consistent look, and a real
-    // typeable/steppable value instead of a blank field with a "Default"
-    // placeholder. The hover-reveal slider half of createValueControl()'s
-    // normal behavior is suppressed (.customize-styles-size-control below)
-    // - out of place in a compact table cell.
-    const sizeControl = createValueControl({
-      id: `${role}-customizeSize`,
-      label: "",
-      value: def.fontSize || ROLE_DEFAULT_SIZE_PX[role],
-      min: 8,
-      max: 96,
-      step: 1,
-      unit: "px",
-    });
-    sizeControl.control.classList.add("customize-styles-size-control");
-    sizeControl.input.addEventListener("input", () => {
-      const val = parseInt(sizeControl.input.value, 10);
-      def.fontSize = !isNaN(val) ? val : undefined;
-      commitAll();
-    });
-    sizeTd.appendChild(sizeControl.control);
-    tr.appendChild(sizeTd);
-
-    const weightTd = document.createElement("td");
-    weightTd.style.cssText = cellStyle;
-    // Adapts to this row's own font - a fixed dropdown of just that font's
-    // real static weights, or a free-typing spinner for system/serif/mono
-    // (no fixed list at all) - see createWeightControl()'s own comment
-    // (js/modules/styleToolbarWidgets.js).
-    const weightControl = createWeightControl({
-      idPrefix: `customizeStyles-${role}`,
-      getFontFamily: () => def.fontFamily,
-      getWeight: () => def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]),
-      setWeight: (value) => { def.fontWeight = value; },
-      onCommit: commitAll,
-    });
-    weightTd.appendChild(weightControl.control);
-    tr.appendChild(weightTd);
-    fontRows.push({ def, fontBtn, weightControl });
-
-    const colorTd = document.createElement("td");
-    colorTd.style.cssText = cellStyle;
-    const colorPickr = createColorPickrButton(def.color || ROLE_DEFAULT_COLOR[role], (hex) => { def.color = hex; commitAll(); }, dialogPickrInstances);
-    colorTd.appendChild(colorPickr.btn);
-    tr.appendChild(colorTd);
-
-    // A Pickr swatch/select/spinner always holds a concrete value, so
-    // there's no way to "unset" any of them back to the CSS default from
-    // the field alone - this clears all four fields for the row at once
-    // instead of adding a separate per-field reset control for just one
-    // property.
-    const resetTd = document.createElement("td");
-    resetTd.style.cssText = "padding:0.3rem;";
-    const resetBtn = document.createElement("button");
-    resetBtn.type = "button";
-    resetBtn.textContent = "Reset";
-    // Not .media-browser-delete-btn - that class only has a background
-    // rule scoped under .media-browser-bulk-bar (css/file-picker.css), so
-    // used bare here it fell through to native dark-mode button chrome
-    // (inherited from the dialog overlay's color-scheme:dark), rendering
-    // as an unreadable white-on-white box - see CLAUDE.md's note on this
-    // exact failure mode for unstyled buttons under color-scheme:dark.
-    resetBtn.style.cssText = "padding:0.3rem 0.6rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#ccc;cursor:pointer;font-size:var(--builder-text-base);";
-    resetBtn.onclick = () => {
-      // Mutate `def` in place rather than replacing
-      // page.textStyleDefs[role] with a new object - every control's
-      // onchange closure above captured this exact `def` reference, so
-      // reassigning would silently orphan them from then on.
-      Object.keys(def).forEach((key) => delete def[key]);
-      setDropdownLabel(fontBtn, fontLabelForValue(undefined));
-      sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
-      weightControl.refresh();
-      colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
-      commitAll();
-    };
-    resetTd.appendChild(resetBtn);
-    tr.appendChild(resetTd);
-
-    tbody.appendChild(tr);
+  openTextStyleDefsDialog({
+    title: "Customize Text Styles",
+    defs: page.textStyleDefs,
+    // Also refreshes any text block editors currently open on screen, not
+    // just the row/page preview panes - a customization applies to every
+    // block using that role, and an open contenteditable field (see
+    // createTextConfig()) needs its own live CSS custom properties
+    // refreshed the same way to show the change immediately.
+    onCommit: () => {
+      refreshPreview();
+      onChange();
+      document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
+      // Every other block row's own .page-block-row-preview (e.g. a button
+      // assigned a Text Style role) reads these same --page-text-{role}-*
+      // vars too, but has no per-instance applyTextStyles() call of its own
+      // the way each text block's editable does above - it only inherits
+      // whatever's set on an ancestor. Re-applied here at the whole editor's
+      // container level so an edit made in this dialog is reflected in
+      // every row's preview immediately, not just on the next full
+      // add/remove/reorder rebuild (updatePageBlocksEditor() below).
+      const container = document.getElementById("pageBlocksEditor");
+      if (container) applyTextStyles(container, page);
+      // Player blocks don't pick up the CSS-var refresh above at all (see
+      // playerBlockRefreshers' own comment) - explicitly re-render just
+      // their own row previews so an inherited title/track-name/playlist
+      // role reflects this edit immediately, not just on the next add/
+      // remove/reorder.
+      playerBlockRefreshers.forEach((refresh) => refresh());
+    },
   });
-  table.appendChild(tbody);
-  content.appendChild(table);
-  updateLabelStates();
-
-  dialog.createDialog({
-    type: "custom",
-    message: "Customize Text Styles",
-    content: '<div id="customizeStylesSlot"></div>',
-    buttons: [{ text: "Done", type: "primary", onClick: () => { destroyDialogPickrInstances(); dialog.closeDialog(); } }],
-    // Widened from 560px - the Font column's <select> now sizes to fit
-    // its widest option ("Merriweather (Google Font)") rather than being
-    // squeezed into a narrow fixed-width cell, so the dialog needs more
-    // room for the full table to lay out without wrapping/overflowing.
-    maxWidth: "720px",
-  });
-  // createDialog's `content` option only innerHTML's an HTML string - these
-  // rows need real onchange handlers, so an empty placeholder slot is
-  // filled with the real DOM built above once the dialog shell exists
-  // (same technique as the block-presets manager dialog).
-  document.getElementById("customizeStylesSlot")?.appendChild(content);
-
-  // Font link-toggle button - built after the dialog shell exists, same
-  // reason as the slot pattern just above: needs to be a real element with
-  // a real click handler, not part of thead's innerHTML string.
-  const fontLinkToggle = document.createElement("span");
-  fontLinkToggle.className = "format-icon";
-  fontLinkToggle.title = "Link font across all styles";
-  fontLinkToggle.innerHTML = `<span class="material-symbols-outlined">link</span>`;
-  fontLinkToggle.onclick = () => {
-    fontsLinked = !fontsLinked;
-    fontLinkToggle.classList.toggle("active", fontsLinked);
-    fontLinkToggle.title = fontsLinked ? "Unlink font per style" : "Link font across all styles";
-    if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].def.fontFamily || "system");
-  };
-  document.getElementById("fontLinkToggleSlot")?.replaceWith(fontLinkToggle);
 }
 
 function createImageConfig(block, onChange, refreshPreview) {

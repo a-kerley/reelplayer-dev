@@ -18,18 +18,27 @@ import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from './pageTextStyles.js';
 // only when this reel is actually inside a page's Player block
 // (js/modules/pageBlockRenderer.js's renderPlayer()) - null/undefined
 // here in the builder's own preview, since a reel has no fixed page to
-// inherit from at edit time.
+// inherit from at edit time. `reelRoleFallbacks` is this reel's own
+// per-role definitions (reel.playerTextStyles.roleFallbacks, edited via
+// the Reels tab's "Edit Fallback Text Styles..." button - see
+// js/modules/playerTextStyles.js) - consulted only when the page didn't
+// resolve this role, so a page's own customization always wins when one
+// actually exists, and this reel-level fallback exists purely for
+// whenever there isn't one (no page context at all - the builder's own
+// preview, or a raw third-party embed - or a page that hasn't customized
+// this particular role).
 //
 // Returns font-family/-size/-weight/color, each possibly undefined -
 // callers must OMIT (not set-to-"undefined") any undefined key, letting
 // the corresponding css/player.css var(--x, <today's-current-look>)
 // fallback apply instead. That's the whole fallback story for this
-// feature: no page context, or a page that hasn't customized this
-// particular role, both just look exactly like they always have.
-function resolveTextUnit(unit, pageRoleStyles) {
+// feature: nothing resolved at any level still just looks exactly like it
+// always has.
+function resolveTextUnit(unit, pageRoleStyles, reelRoleFallbacks) {
   const role = unit?.role;
   const fromPage = role && pageRoleStyles?.[role];
-  const source = fromPage || unit || {};
+  const fromReelFallback = role && reelRoleFallbacks?.[role];
+  const source = fromPage || fromReelFallback || unit || {};
   return {
     fontFamily: source.fontFamily,
     fontSize: source.fontSize,
@@ -140,7 +149,7 @@ export class PreviewManager {
   }
 
   generateStyleConfig(reel) {
-    const pts = reel.playerTextStyles || { title: {}, trackName: {}, playlist: {} };
+    const pts = reel.playerTextStyles || { title: {}, trackName: {}, playlist: {}, roleFallbacks: {} };
 
     // Process padding value - a plain px number (or undefined) in the new
     // data model, unlike the old reel.titleAppearance.paddingBottom's
@@ -152,9 +161,9 @@ export class PreviewManager {
       ? `${pts.title.paddingBottom}px`
       : "13px";
 
-    const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null));
-    const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null));
-    const playlistVars = textUnitStyleVars("reel-playlist", resolveTextUnit(pts.playlist, null));
+    const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null, pts.roleFallbacks));
+    const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null, pts.roleFallbacks));
+    const playlistVars = textUnitStyleVars("reel-playlist", resolveTextUnit(pts.playlist, null, pts.roleFallbacks));
 
     // Process background image - only if enabled
     const backgroundImage = (reel.backgroundImageEnabled && reel.backgroundImage && reel.backgroundImage.trim()) 

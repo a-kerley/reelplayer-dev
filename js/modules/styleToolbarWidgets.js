@@ -9,6 +9,7 @@
 // or third time.
 import { createValueControl } from "./valueControl.js";
 import { openContextMenu } from "./contextMenu.js";
+import { dialog } from "./dialogSystem.js";
 import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ensureInlineGoogleFont } from "./pageTextStyles.js";
 
 const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
@@ -369,4 +370,231 @@ export function createTextStyleToolbar({
   updateVisibility();
 
   return { toolbar };
+}
+
+// The "Style / Font / Size / Weight / Color / Reset" table shared by
+// js/modules/pageBlocksEditor.js's "Customize Text Styles" dialog
+// (page.textStyleDefs) and js/modules/playerTextStyles.js's "Edit
+// Fallback Text Styles" dialog (reel.playerTextStyles.roleFallbacks) -
+// both edit the exact same shape (one {fontFamily?,fontSize?,fontWeight?,
+// color?} bag per ASSIGNABLE_TEXT_ROLES entry), just stored on a
+// different object, so this only ever touches `defs` itself and never
+// needs to know which of the two it's holding.
+//
+// `onCommit()` is called after every field edit - each caller supplies
+// its own (refreshPreview()+onChange(), plus whatever else that specific
+// context needs re-applied, e.g. the page dialog's open text-block
+// editors/player-block row previews, which this shared function has no
+// business knowing about).
+export function openTextStyleDefsDialog({ title, defs, onCommit }) {
+  const pickrInstances = [];
+  function destroyPickrInstances() {
+    pickrInstances.forEach((p) => p.destroy());
+    pickrInstances.length = 0;
+  }
+
+  // Same "you haven't touched this one" dimming + real resolved-style
+  // preview as the label itself - see updateLabelStates()'s original
+  // comment (pageBlocksEditor.js's git history) for the reasoning; kept
+  // here now that both dialogs share this exact behavior.
+  const labelRows = [];
+  function updateLabelStates() {
+    labelRows.forEach(({ role, def, labelTd }) => {
+      labelTd.classList.toggle("customize-styles-label-default", Object.keys(def).length === 0);
+      const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
+      labelTd.style.fontSize = `${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`;
+      labelTd.style.fontWeight = def.fontWeight || ROLE_DEFAULT_WEIGHT[role];
+      labelTd.style.color = def.color || ROLE_DEFAULT_COLOR[role];
+      labelTd.style.fontFamily = font ? font.stack : "";
+    });
+  }
+
+  function commitAll() {
+    onCommit();
+    updateLabelStates();
+  }
+
+  // Font linking - session-only (not part of `defs`, so it resets every
+  // time this dialog is reopened): while linked, changing any one row's
+  // font immediately applies the same choice to every other visible role
+  // too, for the common case of wanting one consistent typeface across
+  // everything rather than setting it role-by-role.
+  let fontsLinked = false;
+  const fontRows = [];
+  function fontLabelForValue(value) {
+    return (TEXT_FONT_OPTIONS.find((f) => f.value === (value || "system")) || TEXT_FONT_OPTIONS[0]).label;
+  }
+  function syncLinkedFonts(value) {
+    fontRows.forEach(({ def, fontBtn, weightControl }) => {
+      setDropdownLabel(fontBtn, fontLabelForValue(value));
+      def.fontFamily = value === "system" ? undefined : value;
+      weightControl.refresh();
+    });
+    commitAll();
+  }
+
+  const content = document.createElement("div");
+  content.style.cssText = "max-height:60vh;overflow-y:auto;";
+
+  const table = document.createElement("table");
+  table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
+
+  const thead = document.createElement("thead");
+  thead.innerHTML = `
+    <tr>
+      <th style="text-align:left;padding:0.3rem;">Style</th>
+      <th style="text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
+      <th style="text-align:center;padding:0.3rem;">Size</th>
+      <th style="text-align:center;padding:0.3rem;">Weight</th>
+      <th style="text-align:center;padding:0.3rem;">Color</th>
+      <th style="padding:0.3rem;"></th>
+    </tr>
+  `;
+  table.appendChild(thead);
+
+  const tbody = document.createElement("tbody");
+  ASSIGNABLE_TEXT_ROLES.forEach((role) => {
+    if (!defs[role]) defs[role] = {};
+    const def = defs[role];
+    // Center-aligned to sit under their (also center-aligned) column
+    // headers - Style and Reset (plain text/a button, not a field to line
+    // up with a header) are left as their default alignment.
+    const cellStyle = "padding:0.3rem;text-align:center;";
+
+    const tr = document.createElement("tr");
+    tr.style.borderTop = "1px solid #444";
+
+    const labelTd = document.createElement("td");
+    labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
+    labelTd.textContent = ROLE_LABELS[role];
+    tr.appendChild(labelTd);
+    labelRows.push({ role, def, labelTd });
+
+    const fontTd = document.createElement("td");
+    fontTd.style.cssText = cellStyle;
+    const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
+    fontBtn.classList.add("font-picker-btn");
+    fontBtn.onclick = () => {
+      openContextMenu(fontBtn, fontMenuItems((f) => {
+        if (fontsLinked) {
+          syncLinkedFonts(f.value);
+        } else {
+          def.fontFamily = f.value === "system" ? undefined : f.value;
+          setDropdownLabel(fontBtn, f.label);
+          // Which weights are even offered depends on the font just
+          // picked - see createWeightControl()'s own comment.
+          weightControl.refresh();
+          commitAll();
+        }
+      }));
+    };
+    fontTd.appendChild(fontBtn);
+    tr.appendChild(fontTd);
+
+    const sizeTd = document.createElement("td");
+    sizeTd.style.cssText = cellStyle;
+    const sizeControl = createValueControl({
+      id: `${role}-textStyleDefsSize`,
+      label: "",
+      value: def.fontSize || ROLE_DEFAULT_SIZE_PX[role],
+      min: 8,
+      max: 96,
+      step: 1,
+      unit: "px",
+    });
+    sizeControl.control.classList.add("customize-styles-size-control");
+    sizeControl.input.addEventListener("input", () => {
+      const val = parseInt(sizeControl.input.value, 10);
+      def.fontSize = !isNaN(val) ? val : undefined;
+      commitAll();
+    });
+    sizeTd.appendChild(sizeControl.control);
+    tr.appendChild(sizeTd);
+
+    const weightTd = document.createElement("td");
+    weightTd.style.cssText = cellStyle;
+    const weightControl = createWeightControl({
+      idPrefix: `textStyleDefs-${role}`,
+      getFontFamily: () => def.fontFamily,
+      getWeight: () => def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]),
+      setWeight: (value) => { def.fontWeight = value; },
+      onCommit: commitAll,
+    });
+    weightTd.appendChild(weightControl.control);
+    tr.appendChild(weightTd);
+    fontRows.push({ def, fontBtn, weightControl });
+
+    const colorTd = document.createElement("td");
+    colorTd.style.cssText = cellStyle;
+    const colorPickr = createColorPickrButton(def.color || ROLE_DEFAULT_COLOR[role], (hex) => { def.color = hex; commitAll(); }, pickrInstances);
+    colorTd.appendChild(colorPickr.btn);
+    tr.appendChild(colorTd);
+
+    // A Pickr swatch/select/spinner always holds a concrete value, so
+    // there's no way to "unset" any of them back to the CSS default from
+    // the field alone - this clears all four fields for the row at once
+    // instead of adding a separate per-field reset control for just one
+    // property.
+    const resetTd = document.createElement("td");
+    resetTd.style.cssText = "padding:0.3rem;";
+    const resetBtn = document.createElement("button");
+    resetBtn.type = "button";
+    resetBtn.textContent = "Reset";
+    // Not .media-browser-delete-btn - that class only has a background
+    // rule scoped under .media-browser-bulk-bar (css/file-picker.css), so
+    // used bare here it fell through to native dark-mode button chrome
+    // (inherited from the dialog overlay's color-scheme:dark), rendering
+    // as an unreadable white-on-white box - see CLAUDE.md's note on this
+    // exact failure mode for unstyled buttons under color-scheme:dark.
+    resetBtn.style.cssText = "padding:0.3rem 0.6rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#ccc;cursor:pointer;font-size:var(--builder-text-base);";
+    resetBtn.onclick = () => {
+      // Mutate `def` in place rather than replacing defs[role] with a new
+      // object - every control's onchange closure above captured this
+      // exact `def` reference, so reassigning would silently orphan them
+      // from then on.
+      Object.keys(def).forEach((key) => delete def[key]);
+      setDropdownLabel(fontBtn, fontLabelForValue(undefined));
+      sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
+      weightControl.refresh();
+      colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
+      commitAll();
+    };
+    resetTd.appendChild(resetBtn);
+    tr.appendChild(resetTd);
+
+    tbody.appendChild(tr);
+  });
+  table.appendChild(tbody);
+  content.appendChild(table);
+  updateLabelStates();
+
+  dialog.createDialog({
+    type: "custom",
+    message: title,
+    content: '<div id="textStyleDefsSlot"></div>',
+    buttons: [{ text: "Done", type: "primary", onClick: () => { destroyPickrInstances(); dialog.closeDialog(); } }],
+    // Wide enough for the fixed-width Font column (see .font-picker-btn)
+    // plus Style/Size/Weight/Color/Reset without wrapping.
+    maxWidth: "720px",
+  });
+  // createDialog's `content` option only innerHTML's an HTML string - these
+  // rows need real onchange handlers, so an empty placeholder slot is
+  // filled with the real DOM built above once the dialog shell exists
+  // (same technique as the block-presets manager dialog).
+  document.getElementById("textStyleDefsSlot")?.appendChild(content);
+
+  // Font link-toggle button - built after the dialog shell exists, same
+  // reason as the slot pattern just above: needs to be a real element with
+  // a real click handler, not part of thead's innerHTML string.
+  const fontLinkToggle = document.createElement("span");
+  fontLinkToggle.className = "format-icon";
+  fontLinkToggle.title = "Link font across all styles";
+  fontLinkToggle.innerHTML = `<span class="material-symbols-outlined">link</span>`;
+  fontLinkToggle.onclick = () => {
+    fontsLinked = !fontsLinked;
+    fontLinkToggle.classList.toggle("active", fontsLinked);
+    fontLinkToggle.title = fontsLinked ? "Unlink font per style" : "Link font across all styles";
+    if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].def.fontFamily || "system");
+  };
+  document.getElementById("fontLinkToggleSlot")?.replaceWith(fontLinkToggle);
 }
