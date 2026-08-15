@@ -759,6 +759,38 @@ body {
   margin-right: 0.8rem;
 }
 
+/* Eyedropper button - sits next to every Pickr swatch (js/modules/
+   colorPicker.js's eyedropButtonHTML()), hidden via inline style on
+   browsers without the native EyeDropper API (Firefox, Safari). */
+.eyedrop-button {
+  width: 20px;
+  height: 20px;
+  min-width: 20px;
+  min-height: 20px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 3px;
+  cursor: pointer;
+  padding: 0;
+  color: #ccc;
+  box-sizing: border-box;
+  transition: border-color 0.16s, color 0.16s;
+}
+.eyedrop-button svg {
+  width: 12px;
+  height: 12px;
+}
+.eyedrop-button:hover {
+  border-color: var(--builder-accent);
+  color: var(--builder-accent);
+}
+.color-row .eyedrop-button:not(:last-child) {
+  margin-right: 0.8rem;
+}
+
 /* ==============================================
    TOGGLE SWITCHES
    ============================================== */

@@ -2,6 +2,7 @@
 
 import { createUrlInputRow, createToggleSwitch } from "./domUtils.js";
 import { createValueControl } from "./valueControl.js";
+import { eyedropButtonHTML } from "./colorPicker.js";
 
 /**
  * Creates the Player Mode section with Static/Expandable toggle
@@ -474,6 +475,7 @@ function createColorPickerRow(label, buttonId, tooltip) {
 
   row.appendChild(labelEl);
   row.appendChild(button);
+  row.insertAdjacentHTML('beforeend', eyedropButtonHTML(buttonId));
 
   return row;
 }

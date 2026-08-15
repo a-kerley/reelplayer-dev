@@ -3,6 +3,21 @@ import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 
 let pickrInstances = [];
 
+// Markup for the small eyedropper button placed next to every Pickr swatch
+// (see createColorPickers() below for the click wiring). A SIBLING of the
+// swatch button, not a child of it and not sharing its id - Pickr.create()
+// strips/replaces attributes on the element it's initialized on (the swatch
+// button itself loses its own id once Pickr runs), so this button needs its
+// own stable id to stay find-able afterward.
+export function eyedropButtonHTML(pickrId) {
+  const id = pickrId.replace(/^pickr-/, "eyedrop-");
+  return `<button id="${id}" class="eyedrop-button" type="button" title="Pick color from screen" aria-label="Pick color from screen">
+    <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+      <path stroke-linecap="round" stroke-linejoin="round" d="m15 11.25 1.5 1.5.75-.75V8.758l2.276-.61a3 3 0 1 0-3.675-3.675l-.61 2.277H12l-.75.75 1.5 1.5M15 11.25l-8.47 8.47c-.34.34-.8.53-1.28.53s-.94.19-1.28.53l-.97.97-.75-.75.97-.97c.34-.34.53-.8.53-1.28s.19-.94.53-1.28L12.75 9M15 11.25 12.75 9"/>
+    </svg>
+  </button>`;
+}
+
 export function destroyPickrInstances() {
   if (pickrInstances.length) {
     pickrInstances.forEach((p) => p.destroy());
@@ -132,6 +147,33 @@ export function createColorPickers(reel, onChange) {
           const value = color.toRGBA().toString();
           btn.style.background = value;
         });
+
+        // Eyedropper - only available in Chromium browsers (no Firefox/Safari
+        // support as of writing); hide the button entirely rather than leave
+        // a dead control on unsupported browsers. Picking a color is treated
+        // as an immediate commit (same persistence as the "save" handler
+        // above), not a live-preview-only drag like Pickr's own "change"
+        // event - there's no popup/save-button step to confirm through here.
+        const eyedropBtn = document.getElementById(cfg.id.replace(/^pickr-/, "eyedrop-"));
+        if (eyedropBtn) {
+          if (typeof window.EyeDropper !== "function") {
+            eyedropBtn.style.display = "none";
+          } else {
+            eyedropBtn.addEventListener("click", async () => {
+              try {
+                const result = await new window.EyeDropper().open();
+                pickr.setColor(result.sRGBHex);
+                const value = pickr.getColor().toRGBA().toString();
+                btn.style.background = value;
+                reel[cfg.reelKey] = value;
+                onChange();
+              } catch (e) {
+                // User pressed Escape or otherwise cancelled the sampler -
+                // EyeDropper rejects the promise for that, not an actual error.
+              }
+            });
+          }
+        }
       } catch (e) {
         console.error(`Error creating Pickr for ${cfg.id}:`, e);
       }

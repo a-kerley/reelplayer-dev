@@ -2,7 +2,7 @@
 
 import { playerApp } from "./player.js";
 import { getDefaultColourPreset } from "./modules/colorPresets.js";
-import { destroyPickrInstances, createColorPickers, getCurrentPickrValues } from "./modules/colorPicker.js";
+import { destroyPickrInstances, createColorPickers, getCurrentPickrValues, eyedropButtonHTML } from "./modules/colorPicker.js";
 import { createPresetModal, renderColourPresetModal } from "./modules/presetModal.js";
 import { updateTracksEditor } from "./modules/tracksEditor.js";
 import { createPlayerTextStylesSection, setupPlayerTextStylesControls } from "./modules/playerTextStyles.js";
@@ -256,14 +256,17 @@ function createColorPickersSection() {
     <div class="color-row">
       <span>UI Accent Colour:</span>
       <button id="pickr-ui-accent" class="pickr-button" type="button"></button>
+      ${eyedropButtonHTML('pickr-ui-accent')}
     </div>
     <div class="color-row">
       <span>Waveform Unplayed Colour:</span>
       <button id="pickr-waveform-unplayed" class="pickr-button" type="button"></button>
+      ${eyedropButtonHTML('pickr-waveform-unplayed')}
     </div>
     <div class="color-row">
       <span>Waveform Hover Colour:</span>
       <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
+      ${eyedropButtonHTML('pickr-waveform-hover')}
     </div>
     <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #444;">
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Player Outline</h4>
@@ -274,6 +277,7 @@ function createColorPickersSection() {
           <span class="toggle-slider"></span>
         </label>
         <button id="pickr-outline-color" class="pickr-button" type="button" disabled style="opacity:0.5;"></button>
+        ${eyedropButtonHTML('pickr-outline-color')}
         ${outlineWidthControl}
       </div>
     </div>
@@ -286,6 +290,7 @@ function createColorPickersSection() {
           <span class="toggle-slider"></span>
         </label>
         <button id="pickr-background-color" class="pickr-button" type="button"></button>
+        ${eyedropButtonHTML('pickr-background-color')}
       </div>
       <div id="backgroundImageRowWrapper">
         <div class="color-row" id="backgroundImageRow">
@@ -342,6 +347,7 @@ function createColorPickersSection() {
           <span class="toggle-slider"></span>
         </label>
         <button id="pickr-overlay-color" class="pickr-button" type="button" disabled style="opacity:0.5;"></button>
+        ${eyedropButtonHTML('pickr-overlay-color')}
       </div>
       <div class="color-row">
         <span>Darken on Hover:</span>
