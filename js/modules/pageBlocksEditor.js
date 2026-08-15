@@ -578,6 +578,40 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return null;
   }
 
+  // Whether any ad hoc Font/Size/Color span (applyInlineStyle() above)
+  // touches `range` - i.e. this text's actual rendered style has drifted
+  // away from whatever its role (H1/H2/H3/Body/Link/Playlist Item) alone
+  // would produce, the same override an edit in Customize Text Styles
+  // would silently fail to reach. Pure display signal for styleBtn's label
+  // below - never consulted by applyInlineStyle()/execCommand("formatBlock")
+  // themselves, only by what's shown back about their result.
+  //
+  // A collapsed caret only has one position to check (findWrappingSpan(),
+  // same as the size/font display fallbacks above); a real selection can
+  // straddle overridden and un-overridden text, so it's "any run in range
+  // sits inside such a span" rather than "do they all agree" - unlike
+  // selectionRunValue() above, one overridden run anywhere is enough to
+  // call the whole selection customized.
+  function selectionHasOverride(range) {
+    if (!range) return false;
+    if (range.collapsed) {
+      return !!(findWrappingSpan(range, "fontFamily") || findWrappingSpan(range, "fontSize") || findWrappingSpan(range, "color"));
+    }
+    const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, {
+      acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
+    });
+    let node;
+    while ((node = walker.nextNode())) {
+      if (!node.textContent) continue;
+      let el = node.parentElement;
+      while (el && el !== editable) {
+        if (el.tagName === "SPAN" && (el.style.fontFamily || el.style.fontSize || el.style.color)) return true;
+        el = el.parentElement;
+      }
+    }
+    return false;
+  }
+
   // A zero-width space, not a truly empty span - an empty inline element
   // has nowhere for a caret to actually land in most browsers, so there'd
   // be nothing to anchor "start typing here" to. commit() below strips
@@ -908,7 +942,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       setDropdownLabel(fontBtn, family === MIXED ? "Mixed" : fontOpt ? fontOpt.label : "Font...");
 
       const role = selectionBlockRole(range);
-      setDropdownLabel(styleBtn, role === MIXED ? "Mixed" : role ? ROLE_LABELS[role] : "Apply style...");
+      setStyleBtnLabel(role, selectionHasOverride(range));
     } else {
       const sizeSpan = range && findWrappingSpan(range, "fontSize");
       sizeInput.value = sizeSpan ? parseInt(sizeSpan.style.fontSize, 10) : effectiveFontSizePx();
@@ -925,8 +959,27 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       setDropdownLabel(fontBtn, fontOpt ? fontOpt.label : "Font...");
 
       const role = currentBlockRole();
-      setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Apply style...");
+      setStyleBtnLabel(role, selectionHasOverride(range));
     }
+  }
+
+  // Shared by both updateInlineControlDisplays() branches above - appends
+  // a "•" + explanatory title when this role also carries an ad hoc
+  // override (selectionHasOverride()), so the button doesn't just say
+  // "Body" while some of that text quietly no longer looks like Body at
+  // all. MIXED is left alone (it's already an unambiguous "more than one
+  // thing going on" signal on its own).
+  function setStyleBtnLabel(role, overridden) {
+    if (role === MIXED) {
+      setDropdownLabel(styleBtn, "Mixed");
+      styleBtn.title = "";
+      return;
+    }
+    const label = role ? ROLE_LABELS[role] : "Apply style...";
+    setDropdownLabel(styleBtn, role && overridden ? `${label} •` : label);
+    styleBtn.title = role && overridden
+      ? `This text has custom formatting on top of its ${label} style - editing ${label} in Customize Text Styles won't change it.`
+      : "";
   }
 
   const fontBtn = createDropdownMenuButton("Font...");
@@ -1339,6 +1392,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   function commitAll() {
     refreshPreview();
     onChange();
+    updateLabelStates();
     document.querySelectorAll(".page-block-text-editable").forEach((el) => applyTextStyles(el, page));
     // Every other block row's own .page-block-row-preview (e.g. a button
     // assigned a Text Style role) reads these same --page-text-{role}-*
@@ -1356,6 +1410,20 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // role reflects this edit immediately, not just on the next add/
     // remove/reorder.
     playerBlockRefreshers.forEach((refresh) => refresh());
+  }
+
+  // Rows whose def is still `{}` (nothing customized for this role yet)
+  // get a dimmed label - purely a "you haven't touched this one" cue, not
+  // a disabled state; every control on a dimmed row is exactly as live as
+  // any other (see css/builder.css's .customize-styles-label-default).
+  // Rechecked in commitAll() after every edit in the dialog, not just once
+  // at open, so a row dims back out the moment its own Reset empties it
+  // again, and un-dims the moment any of its fields first gets a value.
+  const labelRows = [];
+  function updateLabelStates() {
+    labelRows.forEach(({ def, labelTd }) => {
+      labelTd.classList.toggle("customize-styles-label-default", Object.keys(def).length === 0);
+    });
   }
 
   // Font linking - session-only (not part of page.textStyleDefs, so it
@@ -1411,6 +1479,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
     labelTd.textContent = ROLE_LABELS[role];
     tr.appendChild(labelTd);
+    labelRows.push({ def, labelTd });
 
     const fontTd = document.createElement("td");
     fontTd.style.cssText = cellStyle;
@@ -1522,6 +1591,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   });
   table.appendChild(tbody);
   content.appendChild(table);
+  updateLabelStates();
 
   dialog.createDialog({
     type: "custom",

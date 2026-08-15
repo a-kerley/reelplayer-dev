@@ -1607,6 +1607,15 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
+/* Customize Text Styles dialog's per-role label (js/modules/
+   pageBlocksEditor.js's openCustomizeStylesDialog(), toggled by
+   updateLabelStates()) - dimmed only to signal "still at the page
+   default, never touched," not to suggest the row is disabled. Every
+   control on a dimmed row stays exactly as clickable as any other. */
+.customize-styles-label-default {
+  color: #777;
+}
+
 /* Shared "Text Style" toolbar (js/modules/styleToolbarWidgets.js's
    createTextStyleToolbar()) - role dropdown + conditional Font/Size/
    Weight/Color, used by both the page button block
