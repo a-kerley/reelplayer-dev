@@ -201,26 +201,37 @@ function createBlockRow(block, index, page, onChange) {
 
   row.appendChild(header);
 
-  // Re-renders just this row's own preview/type-label (not a save trigger
-  // itself - each config field's own blur/change handler calls onChange()
-  // separately, since a plain field edit shouldn't always force a full
-  // list re-render the way add/remove/reorder do).
-  const configForm = createConfigForm(block, page, onChange, () => {
-    updatePageBlocksEditor(page, onChange);
-  });
-  row.appendChild(configForm);
-
   // Text blocks skip this - their contenteditable editor (createTextConfig())
   // shows the styled result directly, so a second, separate rendered
   // preview underneath would just be a redundant duplicate view. Every
   // other block type still gets one (banner image, image, player,
-  // embedded video - none of those have an in-place styled editing view).
-  if (block.type !== "text") {
-    const preview = document.createElement("div");
-    preview.className = "page-block-row-preview";
+  // embedded video, button - none of those have an in-place styled
+  // editing view). Created before configForm (rather than inline further
+  // down) so refreshPreview below has something to close over regardless
+  // of block type - actually appended to `row` later, preserving the
+  // original header/config-form/preview visual order.
+  const preview = block.type !== "text" ? document.createElement("div") : null;
+  if (preview) preview.className = "page-block-row-preview";
+
+  // Re-renders just THIS row's own preview - not a save trigger itself
+  // (each config field's own blur/change handler calls onChange()
+  // separately for that), and not a full block-list rebuild either: only
+  // `preview`'s own contents are replaced, so every other row's DOM (and
+  // its live Pickr instances, focus state, etc.) is left completely
+  // alone. A no-op for text blocks, which have no `preview` element to
+  // refresh in the first place (see above) - mirrors createTextConfig()'s
+  // own comment on why it never calls this at all.
+  function refreshPreview() {
+    if (!preview) return;
+    preview.innerHTML = "";
     preview.appendChild(renderBlock(block));
-    row.appendChild(preview);
   }
+  refreshPreview();
+
+  const configForm = createConfigForm(block, page, onChange, refreshPreview);
+  row.appendChild(configForm);
+
+  if (preview) row.appendChild(preview);
 
   if (collapsedBlockIds.has(block.blockId)) {
     row.classList.add("page-block-row-collapsed");
@@ -367,9 +378,10 @@ function setupDragAndDrop(row, index, page, onChange) {
 
 // ---- Per-block-type config forms ----
 // Each returns a container element wired to mutate `block` in place.
-// `refreshPreview` re-renders just this row's own preview + type label (no
-// full list re-render needed for plain field edits - only reorder/add/
-// remove touch the DOM structure via updatePageBlocksEditor()).
+// `refreshPreview` (createBlockRow() above) re-renders just this row's own
+// .page-block-row-preview - no full list re-render needed for plain field
+// edits; only reorder/add/remove touch the whole block list's DOM, via
+// updatePageBlocksEditor().
 
 function createConfigForm(block, page, onChange, refreshPreview) {
   const form = document.createElement("div");
@@ -1230,14 +1242,12 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // panes - genuine WYSIWYG rather than generic browser bold/italic.
   applyTextStyles(editable, page);
 
-  // Deliberately does NOT call refreshPreview() (the row-rebuild callback
-  // every other block type's config form uses) - that would tear down and
-  // recreate this exact `editable` element, killing its focus/selection on
-  // every single toolbar click. There's nothing left for a rebuild to
-  // refresh here anyway now that text blocks have no separate row preview
-  // to keep in sync (createBlockRow() skips it) - the field already shows
-  // its own result live. onChange() still runs the real page-level save
-  // and the full page live-preview-pane update, which don't touch this row.
+  // Deliberately does NOT call refreshPreview() - harmless either way now
+  // (it's a no-op for text blocks, which have no separate
+  // .page-block-row-preview to refresh; createBlockRow() skips it since
+  // this field already shows its own result live), but skipped anyway
+  // since there's nothing for it to do here. onChange() still runs the
+  // real page-level save and the page's own live-preview-pane update.
   function commit() {
     block.bodyHtml = sanitizeHtml(editable.innerHTML);
     delete block.body;
