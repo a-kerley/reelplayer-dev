@@ -12,7 +12,7 @@ import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 
 const BLOCK_TYPE_LABELS = {
@@ -978,14 +978,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     // back sensibly even with no prior selection at all. Blocking the menu
     // from opening in either case was the actual "Font... does nothing
     // with nothing selected" bug - the menu itself never even appeared.
-    openContextMenu(fontBtn, TEXT_FONT_OPTIONS.map((f) => ({
-      label: f.label,
-      onClick: () => {
-        ensureInlineGoogleFont(f.value);
-        applyInlineStyle("fontFamily", f.stack);
-        updateInlineControlDisplays();
-      },
-    })), { preventFocusSteal: true });
+    openContextMenu(fontBtn, fontMenuItems((f) => {
+      applyInlineStyle("fontFamily", f.stack);
+      updateInlineControlDisplays();
+    }), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(fontBtn);
 
@@ -1343,6 +1339,25 @@ function setDropdownLabel(btn, text) {
   if (labelText) labelText.textContent = text;
 }
 
+// Shared by the text block's and button block's Font dropdown menus
+// (createTextConfig()/createButtonConfig() below) - each item previews in
+// its own actual typeface (openContextMenu()'s optional `style`), so
+// picking a font is a real visual choice, not just reading a name off a
+// list. Preloads every option's Google Font stylesheet up front (not just
+// the one eventually picked) so those previews render correctly the
+// moment the menu opens rather than reflowing into place as each
+// stylesheet finishes loading; ensureInlineGoogleFont() is additive/
+// idempotent (see pageTextStyles.js), so calling it for every option on
+// every menu open is cheap and never re-fetches an already-loaded font.
+function fontMenuItems(onPick) {
+  TEXT_FONT_OPTIONS.forEach((f) => ensureInlineGoogleFont(f.value));
+  return TEXT_FONT_OPTIONS.map((f) => ({
+    label: f.label,
+    style: `font-family: ${f.stack};`,
+    onClick: () => onPick(f),
+  }));
+}
+
 function wrapRangeInLink(range, href) {
   const a = document.createElement("a");
   a.href = href;
@@ -1465,10 +1480,17 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // No blank "Default" option - every role always has a real, current
     // font (TEXT_FONT_OPTIONS[0], "System Default," when nothing's
     // explicitly overridden), so the select always shows it selected.
+    // Each <option> is styled in its own actual typeface (widely supported
+    // for native <option> elements) and its Google Font preloaded, same as
+    // the toolbar Font dropdowns' own fontMenuItems() - see that function's
+    // comment for why preloading every option up front, not just the
+    // eventually-picked one, is cheap here.
     TEXT_FONT_OPTIONS.forEach((f) => {
+      ensureInlineGoogleFont(f.value);
       const opt = document.createElement("option");
       opt.value = f.value;
       opt.textContent = f.label;
+      opt.style.fontFamily = f.stack;
       fontSelect.appendChild(opt);
     });
     fontSelect.value = def.fontFamily || "system";
@@ -1516,10 +1538,11 @@ function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     const weightSelect = document.createElement("select");
     weightSelect.className = "builder-select";
     // No blank "Default" option here either - see the font select above.
-    ["400", "500", "600", "700"].forEach((w) => {
+    FONT_WEIGHT_OPTIONS.forEach((w) => {
       const opt = document.createElement("option");
       opt.value = w;
       opt.textContent = w;
+      opt.style.fontWeight = w;
       weightSelect.appendChild(opt);
     });
     weightSelect.value = def.fontWeight || String(ROLE_DEFAULT_WEIGHT[role]);
@@ -1891,15 +1914,12 @@ function createButtonConfig(block, onChange, refreshPreview) {
 
   const fontBtn = createDropdownMenuButton(fontLabelFor(block.fontFamily));
   fontBtn.onclick = () => {
-    openContextMenu(fontBtn, TEXT_FONT_OPTIONS.map((f) => ({
-      label: f.label,
-      onClick: () => {
-        block.fontFamily = f.value === "system" ? undefined : f.value;
-        setDropdownLabel(fontBtn, f.label);
-        refreshPreview();
-        onChange();
-      },
-    })));
+    openContextMenu(fontBtn, fontMenuItems((f) => {
+      block.fontFamily = f.value === "system" ? undefined : f.value;
+      setDropdownLabel(fontBtn, f.label);
+      refreshPreview();
+      onChange();
+    }));
   };
   styleToolbar.appendChild(fontBtn);
   customStyleControls.push(fontBtn);
@@ -1932,8 +1952,9 @@ function createButtonConfig(block, onChange, refreshPreview) {
 
   const weightBtn = createDropdownMenuButton(block.fontWeight || "600");
   weightBtn.onclick = () => {
-    openContextMenu(weightBtn, ["400", "500", "600", "700"].map((w) => ({
+    openContextMenu(weightBtn, FONT_WEIGHT_OPTIONS.map((w) => ({
       label: w,
+      style: `font-weight: ${w};`,
       onClick: () => {
         block.fontWeight = w;
         setDropdownLabel(weightBtn, w);

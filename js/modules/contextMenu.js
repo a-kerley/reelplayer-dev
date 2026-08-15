@@ -16,8 +16,12 @@ export function closeContextMenu() {
 
 /**
  * @param {HTMLElement} anchorEl - element the menu is positioned relative to
- * @param {Array<{label: string, icon?: string, danger?: boolean, onClick: () => void}>} items
+ * @param {Array<{label: string, icon?: string, danger?: boolean, style?: string, onClick: () => void}>} items
  *   `icon`, if given, is raw inline SVG markup shown before the label.
+ *   `style`, if given, is a CSS text string applied to the item's own
+ *   button (e.g. `font-family: 'Merriweather', serif` for a font picker
+ *   menu, so each entry previews in its own typeface) - see
+ *   js/modules/pageBlocksEditor.js's Font/Text Style dropdowns.
  * @param {Object} [opts]
  * @param {boolean} [opts.preventFocusSteal] - keeps whatever element was
  *   focused (e.g. a textarea mid-selection) focused when an item is
@@ -37,6 +41,7 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = item.danger ? "danger" : "";
+    if (item.style) btn.style.cssText = item.style;
     btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
     if (opts.preventFocusSteal) {
       btn.addEventListener("mousedown", (e) => e.preventDefault());

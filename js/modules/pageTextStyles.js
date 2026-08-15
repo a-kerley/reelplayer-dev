@@ -27,16 +27,38 @@ export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", 
 export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
 
 // A curated pick, not an open text field - three system/web-safe stacks
-// (no network request) plus two Google Fonts, loaded on demand only for a
-// role that actually selects one (see syncGoogleFonts() below), not
-// unconditionally on every page.
+// (no network request) plus a spread of Google Fonts across sans/serif/
+// display/mono, loaded on demand only for a role that actually selects one
+// (see syncGoogleFonts() below), not unconditionally on every page. Each
+// googleFont weight list is the actual set that family ships (not just
+// FONT_WEIGHT_OPTIONS wholesale) - requesting a weight a family doesn't
+// have wastes a byte or two of query string for nothing, since Google
+// Fonts just serves the nearest one it does have instead.
 export const TEXT_FONT_OPTIONS = [
   { value: "system", label: "System Default", stack: "-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif" },
   { value: "serif", label: "Serif", stack: "Georgia, 'Times New Roman', serif" },
   { value: "mono", label: "Monospace", stack: "'SF Mono', Menlo, Consolas, monospace" },
-  { value: "inter", label: "Inter (Google Font)", stack: "'Inter', sans-serif", googleFont: "Inter:wght@400;500;600;700" },
-  { value: "merriweather", label: "Merriweather (Google Font)", stack: "'Merriweather', serif", googleFont: "Merriweather:wght@400;700" },
+  { value: "inter", label: "Inter (Google Font)", stack: "'Inter', sans-serif", googleFont: "Inter:wght@300;400;500;600;700;800" },
+  { value: "roboto", label: "Roboto (Google Font)", stack: "'Roboto', sans-serif", googleFont: "Roboto:wght@300;400;500;700" },
+  { value: "opensans", label: "Open Sans (Google Font)", stack: "'Open Sans', sans-serif", googleFont: "Open+Sans:wght@300;400;500;600;700;800" },
+  { value: "lato", label: "Lato (Google Font)", stack: "'Lato', sans-serif", googleFont: "Lato:wght@300;400;700" },
+  { value: "montserrat", label: "Montserrat (Google Font)", stack: "'Montserrat', sans-serif", googleFont: "Montserrat:wght@300;400;500;600;700;800" },
+  { value: "poppins", label: "Poppins (Google Font)", stack: "'Poppins', sans-serif", googleFont: "Poppins:wght@300;400;500;600;700;800" },
+  { value: "oswald", label: "Oswald (Google Font)", stack: "'Oswald', sans-serif", googleFont: "Oswald:wght@300;400;500;600;700" },
+  { value: "merriweather", label: "Merriweather (Google Font)", stack: "'Merriweather', serif", googleFont: "Merriweather:wght@300;400;700" },
+  { value: "playfair", label: "Playfair Display (Google Font)", stack: "'Playfair Display', serif", googleFont: "Playfair+Display:wght@400;500;600;700;800" },
+  { value: "lora", label: "Lora (Google Font)", stack: "'Lora', serif", googleFont: "Lora:wght@400;500;600;700" },
+  { value: "jetbrainsmono", label: "JetBrains Mono (Google Font)", stack: "'JetBrains Mono', monospace", googleFont: "JetBrains+Mono:wght@300;400;500;600;700;800" },
 ];
+
+// Shared by the Customize Text Styles dialog's per-role Weight <select>
+// and the button block's own Weight dropdown (js/modules/
+// pageBlocksEditor.js) - one definition rather than two copies of the
+// same scale drifting independently. Runs lighter than before (down to
+// 300, "Light") as well as a touch heavier (800, "Extra Bold") - most of
+// TEXT_FONT_OPTIONS' Google Fonts above actually ship these weights, not
+// just 400-700.
+export const FONT_WEIGHT_OPTIONS = ["300", "400", "500", "600", "700", "800"];
 
 // Distinct roles can now pick distinct Google Fonts at once, so this is a
 // set of <link>s, not one - every apply call removes whichever of these
