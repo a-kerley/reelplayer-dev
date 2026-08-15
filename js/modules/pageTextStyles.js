@@ -80,6 +80,12 @@ export const TEXT_FONT_OPTIONS = [
   { value: "playfair", label: "Playfair Display", stack: "'Playfair Display', serif", googleFont: "Playfair+Display:wght@400;500;600;700;800", weights: ["400", "500", "600", "700", "800"] },
   { value: "lora", label: "Lora", stack: "'Lora', serif", googleFont: "Lora:wght@400;500;600;700", weights: ["400", "500", "600", "700"] },
   { value: "jetbrainsmono", label: "JetBrains Mono", stack: "'JetBrains Mono', monospace", googleFont: "JetBrains+Mono:wght@300;400;500;600;700;800", weights: ["300", "400", "500", "600", "700", "800"] },
+  { value: "khand", label: "Khand", stack: "'Khand', sans-serif", googleFont: "Khand:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
+  { value: "hindsiliguri", label: "Hind Siliguri", stack: "'Hind Siliguri', sans-serif", googleFont: "Hind+Siliguri:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
+  { value: "kalam", label: "Kalam", stack: "'Kalam', cursive", googleFont: "Kalam:wght@300;400;700", weights: ["300", "400", "700"] },
+  { value: "karma", label: "Karma", stack: "'Karma', serif", googleFont: "Karma:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
+  { value: "rajdhani", label: "Rajdhani", stack: "'Rajdhani', sans-serif", googleFont: "Rajdhani:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
+  { value: "teko", label: "Teko", stack: "'Teko', sans-serif", googleFont: "Teko:wght@300;400;500;600;700", weights: ["300", "400", "500", "600", "700"] },
 ];
 
 // Standard OpenType weight-class names, purely for display (e.g. "700
