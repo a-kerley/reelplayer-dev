@@ -196,7 +196,7 @@ export function initPagesController() {
     } else {
       const list = document.createElement("div");
       list.className = "page-blocks-list";
-      blocks.forEach((block) => list.appendChild(renderBlock(block)));
+      blocks.forEach((block) => list.appendChild(renderBlock(block, page)));
       pagePreviewPane.innerHTML = "";
       pagePreviewPane.appendChild(list);
     }

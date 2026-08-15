@@ -309,9 +309,14 @@ button {
   margin-bottom: var(--expandable-track-info-bottom);
   margin-left: var(--expandable-track-info-left);
   padding-left: var(--expandable-track-info-padding);
-  font-size: 0.9rem;
-  font-weight: 600;
-  color: var(--ui-accent);
+  font-family: var(--reel-track-font-family, inherit);
+  font-size: var(--reel-track-size, 0.9rem);
+  font-weight: var(--reel-track-weight, 600);
+  /* --reel-track-color, when set, is either a Custom color picked in
+     js/modules/playerTextStyles.js or a resolved page-role color - falls
+     back to the reel's own accent color, today's actual look, when
+     neither is set. Same pattern as .reel-title's color above. */
+  color: var(--reel-track-color, var(--ui-accent));
   font-style: normal;
   white-space: nowrap;
   overflow: hidden;
@@ -697,11 +702,17 @@ button {
 
 .reel-title {
   text-align: var(--reel-title-align, center);
+  font-family: var(--reel-title-font-family, inherit);
   font-size: var(--reel-title-size, 1.3rem);
   font-weight: var(--reel-title-weight, 700);
   margin-top: 0; /* Consistent with expandable mode */
   margin-bottom: var(--reel-title-padding-bottom, 0.8rem);
-  color: var(--ui-accent);
+  /* --reel-title-color, when set, is either a Custom color picked in
+     js/modules/playerTextStyles.js or a resolved page-role color (see
+     previewManager.js's/player.html's resolveTextUnit()) - falls back to
+     the reel's own accent color, today's actual look, when neither is
+     set. */
+  color: var(--reel-title-color, var(--ui-accent));
 }
 
 /* Add extra padding at the top when reel title is hidden */

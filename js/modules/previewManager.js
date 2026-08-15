@@ -1,5 +1,68 @@
 // previewManager.js - Handles preview functionality with template-based approach
 import { getColorFilters, REEL_COLOR_DEFAULTS } from './colorUtils.js';
+import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from './pageTextStyles.js';
+
+// Shared by generateStyleConfig() below and player.html's identical copy
+// (applyReelStyles()) - the one real duplication this feature couldn't
+// avoid, since the builder app and the standalone embed bootstrap don't
+// share a module loading path. Kept textually identical between the two;
+// if you change one, change the other.
+//
+// `unit` is a { role, fontFamily, fontSize, fontWeight, color } object
+// (reel.playerTextStyles.title/.trackName - see
+// js/modules/playerTextStyles.js). A defined `role` IS "inherit mode" -
+// there's no separate mode flag, same convention the page button block
+// already uses (block.textStyleRole itself is the custom/inherit
+// switch - see pageBlocksEditor.js's createButtonConfig()).
+// `pageRoleStyles` is the embedding page's page.textStyleDefs, forwarded
+// only when this reel is actually inside a page's Player block
+// (js/modules/pageBlockRenderer.js's renderPlayer()) - null/undefined
+// here in the builder's own preview, since a reel has no fixed page to
+// inherit from at edit time.
+//
+// Returns font-family/-size/-weight/color, each possibly undefined -
+// callers must OMIT (not set-to-"undefined") any undefined key, letting
+// the corresponding css/player.css var(--x, <today's-current-look>)
+// fallback apply instead. That's the whole fallback story for this
+// feature: no page context, or a page that hasn't customized this
+// particular role, both just look exactly like they always have.
+function resolveTextUnit(unit, pageRoleStyles) {
+  const role = unit?.role;
+  const fromPage = role && pageRoleStyles?.[role];
+  const source = fromPage || unit || {};
+  return {
+    fontFamily: source.fontFamily,
+    fontSize: source.fontSize,
+    fontWeight: source.fontWeight,
+    color: source.color,
+  };
+}
+
+// Turns a resolved { fontFamily, fontSize, fontWeight, color } (see
+// resolveTextUnit() above) into the actual --{varPrefix}-* CSS custom
+// properties, loading the Google Font stylesheet if the resolved family
+// needs one. Always returns all four keys, with value `undefined` for
+// anything unresolved - NOT omitted - so applyPreviewStyles()'s diff loop
+// (which only visits keys actually present in the object it's given)
+// still sees, and clears, a var that was previously set but should now
+// fall back to CSS's own default (e.g. switching a unit from a role back
+// to an empty "Custom").
+function textUnitStyleVars(varPrefix, resolved) {
+  let fontFamily;
+  if (resolved.fontFamily) {
+    const font = TEXT_FONT_OPTIONS.find((f) => f.value === resolved.fontFamily);
+    if (font) {
+      fontFamily = font.stack;
+      ensureInlineGoogleFont(font.value);
+    }
+  }
+  return {
+    [`--${varPrefix}-font-family`]: fontFamily,
+    [`--${varPrefix}-size`]: resolved.fontSize ? `${resolved.fontSize}px` : undefined,
+    [`--${varPrefix}-weight`]: resolved.fontWeight,
+    [`--${varPrefix}-color`]: resolved.color,
+  };
+}
 
 export class PreviewManager {
   constructor() {
@@ -55,26 +118,42 @@ export class PreviewManager {
 
   applyPreviewStyles(reel) {
     const newStyles = this.generateStyleConfig(reel);
-    
-    // Only update CSS properties that have changed
+
+    // Only update CSS properties that have changed. A value of undefined
+    // (title/track-name font-family/size/weight/color when nothing's
+    // resolved - see resolveTextUnit()) means "unset this override, let
+    // the CSS fallback apply" - explicitly removeProperty rather than
+    // setProperty(..., undefined), which would otherwise write the
+    // literal string "undefined" as the property's value. Needed because
+    // this object is long-lived across re-renders (this.currentStyles) -
+    // a property that WAS set (e.g. switched to a role) and now resolves
+    // to nothing must actually be cleared, not just skipped.
     Object.entries(newStyles).forEach(([property, value]) => {
-      if (this.currentStyles[property] !== value) {
+      if (this.currentStyles[property] === value) return;
+      if (value === undefined) {
+        document.documentElement.style.removeProperty(property);
+      } else {
         document.documentElement.style.setProperty(property, value);
-        this.currentStyles[property] = value;
       }
+      this.currentStyles[property] = value;
     });
   }
 
   generateStyleConfig(reel) {
-    const ta = reel.titleAppearance || {};
-    
-    // Process padding value
-    let paddingBottom = ta.paddingBottom;
-    if (!paddingBottom || paddingBottom === "") {
-      paddingBottom = "1.5rem";
-    } else if (typeof paddingBottom === "string" && !paddingBottom.match(/[a-z%]+$/)) {
-      paddingBottom = paddingBottom + "px";
-    }
+    const pts = reel.playerTextStyles || { title: {}, trackName: {} };
+
+    // Process padding value - a plain px number (or undefined) in the new
+    // data model, unlike the old reel.titleAppearance.paddingBottom's
+    // unit-suffixed string. 13px (not the previous, inconsistent 1.5rem
+    // fallback here) matches css/player.css's own --reel-title-padding-
+    // bottom default (0.8rem) and js/modules/playerTextStyles.js's own
+    // padding control default - the three were quietly out of sync before.
+    const paddingBottom = pts.title.paddingBottom !== undefined
+      ? `${pts.title.paddingBottom}px`
+      : "13px";
+
+    const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null));
+    const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null));
 
     // Process background image - only if enabled
     const backgroundImage = (reel.backgroundImageEnabled && reel.backgroundImage && reel.backgroundImage.trim()) 
@@ -125,12 +204,15 @@ export class PreviewManager {
       "--waveform-unplayed": reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
       "--waveform-hover": reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverRgba,
 
-      // Title appearance variables
-      "--reel-title-size": ta.fontSize || "1.3rem",
-      "--reel-title-weight": ta.fontWeight || "700",
-      "--reel-title-align": ta.align || "center",
+      // Title/Track Name text style variables (js/modules/playerTextStyles.js)
+      // - font-family/size/weight/color are omitted entirely (not set to
+      // "undefined") when unresolved, so css/player.css's own var(...,
+      // <default>) fallback applies; see resolveTextUnit()'s comment above.
+      "--reel-title-align": pts.title.align || "center",
       "--reel-title-padding-bottom": paddingBottom,
-      
+      ...titleVars,
+      ...trackNameVars,
+
       // Background effects variables
       "--background-image": backgroundImage,
       "--background-color": backgroundColor,

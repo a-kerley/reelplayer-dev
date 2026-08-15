@@ -725,7 +725,7 @@ body {
 
 /* Shared fieldset/section-heading style - consolidates three previously
    separate inline idioms (expandableMode.js's var(--builder-text-md)+bold,
-   titleAppearance.js/pagesController.js's hardcoded 1.05rem/600, and a
+   playerTextStyles.js/pagesController.js's hardcoded 1.05rem/600, and a
    third 0.95rem/600 variant) that all rendered the same visual role
    across the reel and page builders. */
 .builder-section-legend {
@@ -1060,8 +1060,8 @@ input.filename-display:focus {
 
 /* Tight-packed row of icon-toggle buttons (align icons, B/I/U) - the
    group owns the (small) spacing between its icons via `gap`, not the
-   icons themselves, so both titleAppearance.js's Reel Title Appearance
-   align control and js/modules/pageBlocksEditor.js's text block toolbar
+   icons themselves, so both playerTextStyles.js's Title align control
+   and js/modules/pageBlocksEditor.js's text block toolbar
    (multiple groups on one row) stay visually consistent. */
 .icon-toggle-group {
   display: inline-flex;
@@ -1100,8 +1100,13 @@ input.filename-display:focus {
   background: var(--builder-accent);
 }
 
-#reelTitleAppearanceSection.disabled .appearance-option,
-#reelTitleAppearanceSection.disabled .align-icon {
+/* js/modules/playerTextStyles.js's Title controls, greyed out while
+   "Display Reel Title in Player" is off - scoped to #titleStyleControls
+   (just the Title sub-section), not the whole #playerTextStylesSection
+   fieldset, since Track Name's own controls are unrelated to whether the
+   title is shown. */
+#titleStyleControls.disabled .appearance-option,
+#titleStyleControls.disabled .align-icon {
   opacity: 0.5;
   pointer-events: none;
 }
@@ -1599,12 +1604,15 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
-/* Button block's own Text Style toolbar (js/modules/pageBlocksEditor.js's
-   createButtonConfig()) - same layout as .page-block-text-toolbar above,
-   separately named (rather than shared via multiple classes) to match
-   this file's existing convention of one class per call site even where
-   the rules are identical. */
-.page-block-button-toolbar {
+/* Shared "Text Style" toolbar (js/modules/styleToolbarWidgets.js's
+   createTextStyleToolbar()) - role dropdown + conditional Font/Size/
+   Weight/Color, used by both the page button block
+   (pageBlocksEditor.js's createButtonConfig()) and the reel player's
+   Title/Track Name config (playerTextStyles.js). Same layout as
+   .page-block-text-toolbar above, separately named (rather than shared
+   via multiple classes) to match this file's existing convention of one
+   class per call site even where the rules are identical. */
+.text-style-toolbar {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
@@ -1612,25 +1620,25 @@ input[type="range"]:focus::-moz-range-thumb {
   margin-bottom: 0.5rem;
 }
 
-.page-block-button-toolbar .dropdown-menu-btn {
+.text-style-toolbar .dropdown-menu-btn {
   min-width: 7rem;
 }
 
-/* Button block's own "Custom" Size field - same reasoning as
+/* The toolbar's "Custom" Size field - same reasoning as
    .page-block-text-toolbar-size above: no room for the hover-reveal
    slider in a compact toolbar, and .value-control's own default
    flex:1;min-width:0 would otherwise stretch this to fill the toolbar
    row, crowding out the Weight/Color controls after it. */
-.page-block-button-size-control {
+.text-style-toolbar-size-control {
   flex: 0 0 auto;
   min-width: 0;
 }
 
-.page-block-button-size-control .value-control-slider-wrap {
+.text-style-toolbar-size-control .value-control-slider-wrap {
   display: none;
 }
 
-.page-block-button-toolbar .pickr {
+.text-style-toolbar .pickr {
   margin-top: -1px;
 }
 

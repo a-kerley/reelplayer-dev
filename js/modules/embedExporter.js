@@ -160,8 +160,13 @@ export class EmbedExporter {
         idleUnblurEnabled: reel.idleUnblurEnabled === true,
         idleUnblurAmount: reel.idleUnblurAmount ?? 50,
 
-        // Title appearance
-        titleAppearance: reel.titleAppearance || {},
+        // Player text styles (title + track name) - js/modules/
+        // playerTextStyles.js. Always populated by the time this runs:
+        // "Export Embed Code" only exists inside the reel builder form
+        // itself, and createPlayerTextStylesSection() (part of that same
+        // form) migrates any legacy reel.titleAppearance into this field
+        // the moment the reel's opened, before publish is even reachable.
+        playerTextStyles: reel.playerTextStyles || {},
 
         // Expandable mode settings
         expandableCollapsedHeight: reel.expandableCollapsedHeight || 120,

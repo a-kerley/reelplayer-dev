@@ -124,7 +124,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     // Analytics toggle - reuses the same createToggleSwitch component
-    // titleAppearance.js already uses for "Display Reel Title in Player".
+    // playerTextStyles.js already uses for "Display Reel Title in Player".
     // Stats themselves are viewed via a "Stats" button on each row of the
     // "Manage Published Embeds" modal (js/modules/embedManager.js), not a
     // dedicated button here - that works for any published reel, not just

@@ -5,7 +5,7 @@ import { getDefaultColourPreset } from "./modules/colorPresets.js";
 import { destroyPickrInstances, createColorPickers, getCurrentPickrValues } from "./modules/colorPicker.js";
 import { createPresetModal, renderColourPresetModal } from "./modules/presetModal.js";
 import { updateTracksEditor } from "./modules/tracksEditor.js";
-import { createTitleAppearanceSection, setupTitleAppearanceControls } from "./modules/titleAppearance.js";
+import { createPlayerTextStylesSection, setupPlayerTextStylesControls } from "./modules/playerTextStyles.js";
 import { initTooltips } from "./modules/tooltips.js";
 import { ValidationUtils } from "./modules/validation.js";
 import { 
@@ -94,7 +94,7 @@ export function renderBuilder(reel, onChange) {
     { create: createPlayerModeSection, setup: setupPlayerModeControls },
     { create: createStaticModeSettings, setup: setupStaticModeSettings },
     { create: createExpandableModeSettings, setup: setupExpandableModeSettings },
-    { create: createTitleAppearanceSection, setup: setupTitleAppearanceControls },
+    { create: createPlayerTextStylesSection, setup: setupPlayerTextStylesControls },
   ];
 
   const sectionElements = [];
@@ -152,7 +152,7 @@ function removeOldSections() {
     "playerModeSection",
     "staticModeSettings",
     "expandableModeSettings",
-    "reelTitleAppearanceSection",
+    "playerTextStylesSection",
     "tracksSection",
     "playerColoursSection"
   ]);

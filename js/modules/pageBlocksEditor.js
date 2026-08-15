@@ -14,6 +14,7 @@ import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
 import { ROLES, ROLE_LABELS, TEXT_FONT_OPTIONS, FONT_WEIGHT_OPTIONS, ASSIGNABLE_TEXT_ROLES, applyTextStyles, ensureInlineGoogleFont } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
+import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar } from "./styleToolbarWidgets.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -45,70 +46,6 @@ function destroyDialogPickrInstances() {
   dialogPickrInstances.forEach((p) => p.destroy());
   dialogPickrInstances = [];
 }
-const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
-
-// Renders as the same small square .pickr-button used throughout the reel
-// builder (css/builder.css), opening the same nano-themed Pickr popup -
-// instead of a plain native <input type="color">. Pickr needs the button
-// actually attached to the DOM to position/measure its popup, so creation
-// is deferred a tick (same setTimeout(...,0) "DOM readiness" pattern
-// colorPicker.js uses), after the caller has synchronously appended the
-// returned .btn to the document.
-function createColorPickrButton(initialColor, onApply, instanceList) {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "pickr-button";
-  let pickrRef = null;
-  setTimeout(() => {
-    const pickr = Pickr.create({
-      el: btn,
-      theme: "nano",
-      default: initialColor || "#ffffff",
-      swatches: TEXT_COLOR_SWATCHES,
-      // No opacity component - text color has no use for alpha here, and
-      // htmlSanitizer.js's COLOR_RE only accepts a plain 6-digit #rrggbb/
-      // rgb(), not an alpha channel, so keeping this off means the value
-      // this button ever hands to onApply is always something the
-      // sanitizer will actually keep.
-      components: {
-        preview: true,
-        opacity: false,
-        hue: true,
-        interaction: { hex: true, input: true, save: true },
-      },
-    });
-    pickrRef = pickr;
-    instanceList.push(pickr);
-    // Built from the raw RGB channels rather than color.toHEXA().toString()
-    // - Pickr's own HEXA stringification includes an alpha suffix (e.g.
-    // "#dc3545ff") that htmlSanitizer.js's 6-digit COLOR_RE rejects
-    // outright, which silently dropped every applied color until this was
-    // switched to always emit exactly #rrggbb.
-    const toSanitizableHex = (color) => {
-      const [r, g, b] = color.toRGBA();
-      return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
-    };
-    pickr.on("init", () => {
-      btn.style.background = toSanitizableHex(pickr.getColor());
-    });
-    pickr.on("change", (color) => {
-      btn.style.background = toSanitizableHex(color);
-    });
-    pickr.on("save", (color) => {
-      const hex = toSanitizableHex(color);
-      btn.style.background = hex;
-      onApply(hex);
-      pickr.hide();
-    });
-  }, 0);
-  return {
-    btn,
-    reset(hex) {
-      if (pickrRef) pickrRef.setColor(hex);
-    },
-  };
-}
-
 // Iconoir (MIT license, iconoir.com) icons, inlined per this codebase's
 // existing convention of embedding raw SVG markup directly rather than
 // loading an icon font/library - see e.g. js/modules/domUtils.js,
@@ -224,7 +161,7 @@ function createBlockRow(block, index, page, onChange) {
   function refreshPreview() {
     if (!preview) return;
     preview.innerHTML = "";
-    preview.appendChild(renderBlock(block));
+    preview.appendChild(renderBlock(block, page));
   }
   refreshPreview();
 
@@ -1181,8 +1118,8 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return null;
   }
 
-  // Icon toggle, matches titleAppearance.js's Reel Title Appearance align
-  // control (same .align-icon class/material-symbols-outlined icon pair),
+  // Icon toggle, matches playerTextStyles.js's Title align control (same
+  // .align-icon class/material-symbols-outlined icon pair),
   // so alignment reads the same way in both builders. Unrelated to
   // contenteditable/execCommand - still just block.alignment, applied as
   // text-align on the block's outer wrapper.
@@ -1299,63 +1236,6 @@ function initialEditableHtml(block) {
   // unlike sanitizeHtml()'s job elsewhere in this file.
   const rendered = renderBlock({ type: "text", heading: block.heading, body: block.body, alignment: block.alignment });
   return rendered.innerHTML;
-}
-
-function createToolbarDivider() {
-  const divider = document.createElement("span");
-  divider.className = "page-block-toolbar-divider";
-  return divider;
-}
-
-// A menu-trigger button styled like the builder's segmented value-control
-// spinners (css/builder.css's .value-control-number/.value-control-spin) -
-// a bordered, dark label segment plus a distinct chevron segment on the
-// right - rather than a plain solid-accent action button, so it visually
-// reads as "opens a dropdown" the same way the rest of the builder's
-// dropdown-shaped controls do. Used for the text block toolbar's "Apply
-// style..."/"Font..." menu buttons (js/modules/contextMenu.js still
-// supplies the actual menu popup - this only changes the trigger's look).
-function createDropdownMenuButton(label, icon = "") {
-  const btn = document.createElement("button");
-  btn.type = "button";
-  btn.className = "dropdown-menu-btn";
-  btn.innerHTML = `
-    <span class="dropdown-menu-btn-label">${icon}<span class="dropdown-menu-btn-label-text">${label}</span></span>
-    <span class="dropdown-menu-btn-arrow">
-      <svg xmlns="http://www.w3.org/2000/svg" width="10" height="10" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5">
-        <path d="M6 9L12 15L18 9" stroke-linecap="round" stroke-linejoin="round"/>
-      </svg>
-    </span>
-  `;
-  return btn;
-}
-
-// Updates a createDropdownMenuButton()'s visible text in place - used to
-// reflect the current selection's actual style/font back into the "Apply
-// style..."/"Font..." buttons (see updateInlineControlDisplays() below),
-// the same way updateFormatButtonStates() reflects it into B/I/U.
-function setDropdownLabel(btn, text) {
-  const labelText = btn.querySelector(".dropdown-menu-btn-label-text");
-  if (labelText) labelText.textContent = text;
-}
-
-// Shared by the text block's and button block's Font dropdown menus
-// (createTextConfig()/createButtonConfig() below) - each item previews in
-// its own actual typeface (openContextMenu()'s optional `style`), so
-// picking a font is a real visual choice, not just reading a name off a
-// list. Preloads every option's Google Font stylesheet up front (not just
-// the one eventually picked) so those previews render correctly the
-// moment the menu opens rather than reflowing into place as each
-// stylesheet finishes loading; ensureInlineGoogleFont() is additive/
-// idempotent (see pageTextStyles.js), so calling it for every option on
-// every menu open is cheap and never re-fetches an already-loaded font.
-function fontMenuItems(onPick) {
-  TEXT_FONT_OPTIONS.forEach((f) => ensureInlineGoogleFont(f.value));
-  return TEXT_FONT_OPTIONS.map((f) => ({
-    label: f.label,
-    style: `font-family: ${f.stack};`,
-    onClick: () => onPick(f),
-  }));
 }
 
 function wrapRangeInLink(range, href) {
@@ -1875,125 +1755,29 @@ function createButtonConfig(block, onChange, refreshPreview) {
   // Text Style (js/modules/pageTextStyles.js's ASSIGNABLE_TEXT_ROLES, the
   // same h1/h2/h3/body/link set the Customize Text Styles dialog edits)
   // plus - only when "Custom" - Font/Size/Weight/Color, laid out as one
-  // compact toolbar row using the exact same building blocks (dropdown-
-  // menu-btn + openContextMenu, segmented number+spin control, pickr
-  // swatch, divider) the text block's own toolbar uses (createTextConfig()
-  // above), rather than a stack of full-width labeled rows like the rest
-  // of this block's config. Assigning a role drives Font/Size/Weight/Color
-  // all together via renderButtonBlock()/page.css, tracking the same page-
-  // wide edits a real h1/h2/h3/p/a would - so those four controls are
-  // meaningless (and hidden) once a role's chosen.
-  const styleToolbar = document.createElement("div");
-  styleToolbar.className = "page-block-button-toolbar";
+  // compact toolbar row via the shared createTextStyleToolbar()
+  // (js/modules/styleToolbarWidgets.js - also used by the reel player's
+  // Title/Track Name config), rather than a stack of full-width labeled
+  // rows like the rest of this block's config. Assigning a role drives
+  // Font/Size/Weight/Color all together via renderButtonBlock()/page.css,
+  // tracking the same page-wide edits a real h1/h2/h3/p/a would - so
+  // those four controls are meaningless (and hidden) once a role's chosen.
+  const { toolbar: styleToolbar } = createTextStyleToolbar({
+    idPrefix: `${block.blockId}-button`,
+    getRole: () => block.textStyleRole,
+    setRole: (role) => { block.textStyleRole = role; },
+    getFontFamily: () => block.fontFamily,
+    setFontFamily: (value) => { block.fontFamily = value; },
+    getFontSize: () => block.fontSize,
+    setFontSize: (value) => { block.fontSize = value; },
+    getFontWeight: () => block.fontWeight,
+    setFontWeight: (value) => { block.fontWeight = value; },
+    getColor: () => block.textColor,
+    setColor: (value) => { block.textColor = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: () => { refreshPreview(); onChange(); },
+  });
   wrap.appendChild(styleToolbar);
-
-  const styleBtn = createDropdownMenuButton(block.textStyleRole ? ROLE_LABELS[block.textStyleRole] : "Custom");
-  styleBtn.onclick = () => {
-    openContextMenu(styleBtn, [
-      { label: "Custom", onClick: () => selectTextStyleRole(undefined) },
-      ...ASSIGNABLE_TEXT_ROLES.map((role) => ({
-        label: ROLE_LABELS[role],
-        onClick: () => selectTextStyleRole(role),
-      })),
-    ]);
-  };
-  styleToolbar.appendChild(styleBtn);
-  styleToolbar.appendChild(createToolbarDivider());
-
-  function selectTextStyleRole(role) {
-    block.textStyleRole = role;
-    setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Custom");
-    updateCustomStyleControlsVisibility();
-    refreshPreview();
-    onChange();
-  }
-
-  // Only meaningful (and only shown) when Text Style is "Custom" - see
-  // above for why a role makes these redundant.
-  const customStyleControls = [];
-
-  const fontBtn = createDropdownMenuButton(fontLabelFor(block.fontFamily));
-  fontBtn.onclick = () => {
-    openContextMenu(fontBtn, fontMenuItems((f) => {
-      block.fontFamily = f.value === "system" ? undefined : f.value;
-      setDropdownLabel(fontBtn, f.label);
-      refreshPreview();
-      onChange();
-    }));
-  };
-  styleToolbar.appendChild(fontBtn);
-  customStyleControls.push(fontBtn);
-
-  function fontLabelFor(value) {
-    return (TEXT_FONT_OPTIONS.find((f) => f.value === value) || TEXT_FONT_OPTIONS[0]).label;
-  }
-
-  // Same segmented number+spin control (and slider-suppression, see
-  // .page-block-button-size-control in builder.css) as the Customize
-  // Text Styles dialog's own per-role Size field.
-  const sizeControl = createValueControl({
-    id: `${block.blockId}-buttonFontSize`,
-    label: "",
-    value: block.fontSize || 16,
-    min: 8,
-    max: 96,
-    step: 1,
-    unit: "px",
-  });
-  sizeControl.control.classList.add("page-block-button-size-control");
-  sizeControl.input.addEventListener("input", () => {
-    const val = parseInt(sizeControl.input.value, 10);
-    block.fontSize = !isNaN(val) ? val : undefined;
-    refreshPreview();
-    onChange();
-  });
-  styleToolbar.appendChild(sizeControl.control);
-  customStyleControls.push(sizeControl.control);
-
-  const weightBtn = createDropdownMenuButton(block.fontWeight || "600");
-  weightBtn.onclick = () => {
-    openContextMenu(weightBtn, FONT_WEIGHT_OPTIONS.map((w) => ({
-      label: w,
-      style: `font-weight: ${w};`,
-      onClick: () => {
-        block.fontWeight = w;
-        setDropdownLabel(weightBtn, w);
-        refreshPreview();
-        onChange();
-      },
-    })));
-  };
-  styleToolbar.appendChild(weightBtn);
-  customStyleControls.push(weightBtn);
-
-  // Wrapped in a persistent <span>, and visibility toggled on THAT rather
-  // than on textPickr.btn directly - createColorPickrButton() returns btn
-  // synchronously, but Pickr.create() (inside it) runs one tick later
-  // (setTimeout(...,0)) and, once it does, replaces btn in the live DOM
-  // with its own new .pickr wrapper - see that function's own comment.
-  // Toggling display on the original btn reference raced that swap: if a
-  // role was already selected before Pickr's callback fired (e.g. on
-  // initial render of an already-configured button), display:none landed
-  // on the soon-to-be-discarded original element, and Pickr's replacement
-  // - a brand new element with no such style - stayed visibly showing
-  // regardless. A wrapper span survives the swap since Pickr only ever
-  // touches its child, not the wrapper itself.
-  const textColorWrap = document.createElement("span");
-  const textPickr = createColorPickrButton(block.textColor || "#ffffff", (hex) => {
-    block.textColor = hex;
-    refreshPreview();
-    onChange();
-  }, toolbarPickrInstances);
-  textPickr.btn.title = "Text color";
-  textColorWrap.appendChild(textPickr.btn);
-  styleToolbar.appendChild(textColorWrap);
-  customStyleControls.push(textColorWrap);
-
-  function updateCustomStyleControlsVisibility() {
-    const hasRole = !!block.textStyleRole;
-    customStyleControls.forEach((el) => { el.style.display = hasRole ? "none" : ""; });
-  }
-  updateCustomStyleControlsVisibility();
 
   // Independent of the label's own text styling (role or custom) - a
   // button's fill color isn't part of any text role, so this stays

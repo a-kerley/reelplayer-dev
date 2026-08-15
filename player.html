@@ -84,6 +84,7 @@
     import { WORKER_BASE_URL } from './js/config.js';
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
+    import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from './js/modules/pageTextStyles.js';
 
     // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
     // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
@@ -111,7 +112,22 @@
     // Get reel ID from URL parameter
     const urlParams = new URLSearchParams(window.location.search);
     const reelId = urlParams.get('id');
-    
+
+    // Only present when this embed came from a page's Player block whose
+    // page had at least one text-style role customized
+    // (js/modules/pageBlockRenderer.js's renderPlayer()) - a plain
+    // player?id=<reelId> link (raw third-party embed, no page context)
+    // never has this, and pageRoleStyles below just stays null.
+    let pageRoleStyles = null;
+    const pageTextStylesParam = urlParams.get('pageTextStyles');
+    if (pageTextStylesParam) {
+      try {
+        pageRoleStyles = JSON.parse(pageTextStylesParam);
+      } catch (e) {
+        console.error('Failed to parse pageTextStyles param:', e);
+      }
+    }
+
     if (!reelId) {
       showError('No reel ID provided');
     } else {
@@ -188,19 +204,80 @@
     }
     
     /* ============================================
+       PLAYER TEXT STYLES - read-only mirror of
+       js/modules/playerTextStyles.js's migration + js/modules/
+       previewManager.js's resolveTextUnit()/textUnitStyleVars(), kept
+       textually identical to those - see this repo's CLAUDE.md on why
+       player.html duplicates player.js/its builder counterparts by hand.
+       Read-only here (no persistence, no `delete`) since this is just
+       rendering a fetched reel, not editing/saving one - a reel that's
+       never been reopened in the builder since this feature shipped
+       still only has the old settings.titleAppearance server-side.
+       ============================================ */
+    function getPlayerTextStyles(settings) {
+      if (settings.playerTextStyles) return settings.playerTextStyles;
+
+      const ta = settings.titleAppearance || {};
+      const parsePx = (value) => {
+        if (typeof value !== 'string') return undefined;
+        if (value.endsWith('px')) return Math.round(parseFloat(value));
+        if (value.endsWith('pt')) return Math.round(parseFloat(value) * 1.333);
+        if (value.endsWith('rem')) return Math.round(parseFloat(value) * 16);
+        return undefined;
+      };
+      return {
+        title: {
+          fontSize: parsePx(ta.fontSize),
+          fontWeight: ta.fontWeight,
+          align: ta.align,
+          paddingBottom: parsePx(ta.paddingBottom),
+        },
+        trackName: {},
+      };
+    }
+
+    function resolveTextUnit(unit, pageRoleStyles) {
+      // A defined `role` IS "inherit mode" - no separate mode flag, same
+      // convention the page button block uses. See js/modules/
+      // previewManager.js's identical copy for the full comment.
+      const role = unit?.role;
+      const fromPage = role && pageRoleStyles?.[role];
+      const source = fromPage || unit || {};
+      return {
+        fontFamily: source.fontFamily,
+        fontSize: source.fontSize,
+        fontWeight: source.fontWeight,
+        color: source.color,
+      };
+    }
+
+    function applyTextUnitStyleVars(root, varPrefix, resolved) {
+      if (resolved.fontFamily) {
+        const font = TEXT_FONT_OPTIONS.find((f) => f.value === resolved.fontFamily);
+        if (font) {
+          root.style.setProperty(`--${varPrefix}-font-family`, font.stack);
+          ensureInlineGoogleFont(font.value);
+        }
+      }
+      if (resolved.fontSize) root.style.setProperty(`--${varPrefix}-size`, `${resolved.fontSize}px`);
+      if (resolved.fontWeight) root.style.setProperty(`--${varPrefix}-weight`, resolved.fontWeight);
+      if (resolved.color) root.style.setProperty(`--${varPrefix}-color`, resolved.color);
+    }
+
+    /* ============================================
        APPLY REEL STYLES
        Sets CSS variables and container styles
        Matches PreviewManager behavior exactly
        ============================================ */
     function applyReelStyles(reelData) {
       const settings = reelData.settings || {};
-      const ta = settings.titleAppearance || {};
-      
-      // Process padding
-      let paddingBottom = ta.paddingBottom || "1.5rem";
-      if (typeof paddingBottom === "string" && !paddingBottom.match(/[a-z%]+$/)) {
-        paddingBottom = paddingBottom + "px";
-      }
+      const pts = getPlayerTextStyles(settings);
+
+      // Process padding - see js/modules/previewManager.js's identical
+      // comment on why 13px (not the previous, inconsistent 1.5rem here).
+      const paddingBottom = pts.title.paddingBottom !== undefined
+        ? `${pts.title.paddingBottom}px`
+        : "13px";
       
       // Process background configuration
       // NEW IMPLEMENTATION (matches PreviewManager exactly):
@@ -257,12 +334,16 @@
       root.style.setProperty('--waveform-unplayed', settings.varWaveformUnplayed || '#929292');
       root.style.setProperty('--waveform-hover', settings.varWaveformHover || 'rgba(0, 31, 103, 0.13)');
 
-      // Title appearance variables
-      root.style.setProperty('--reel-title-size', ta.fontSize || '1.3rem');
-      root.style.setProperty('--reel-title-weight', ta.fontWeight || '700');
-      root.style.setProperty('--reel-title-align', ta.align || 'center');
+      // Title/Track Name text style variables (js/modules/
+      // playerTextStyles.js) - font-family/size/weight/color are left
+      // unset entirely when unresolved, so css/player.css's own
+      // var(..., <default>) fallback applies; see this file's
+      // resolveTextUnit()/applyTextUnitStyleVars() above.
+      root.style.setProperty('--reel-title-align', pts.title.align || 'center');
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
-      
+      applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles));
+
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');
       root.style.setProperty('--background-color', backgroundColor);
