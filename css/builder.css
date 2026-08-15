@@ -1847,13 +1847,28 @@ input[type="range"]:focus::-moz-range-thumb {
   min-width: 0;
 }
 
-/* Same fixed-width/ellipsis treatment as .font-picker-btn above, for every
-   Weight dropdown that has one (createWeightControl()'s fixed-list mode,
-   js/modules/styleToolbarWidgets.js - a Google Font with a real static
-   weight list, as opposed to the free-typing spinner system/serif/mono
-   get instead). Narrower than the Font button - weightLabelFor() shows
-   just the OpenType name now ("Bold", not "700 Bold"), and the longest of
-   those ("Extra Light"/"Extra Bold") comfortably fits well under 170px. */
+/* createWeightControl()'s outer wrapper (js/modules/
+   styleToolbarWidgets.js) - fixed width regardless of which of its two
+   modes is currently mounted inside it (the dropdown-menu-btn below for a
+   Google Font's real static weight list, or a free-typing number spinner
+   for system/serif/mono, which has no such list). Without this, switching
+   a row's Font between those two kinds of font resized the Weight column
+   right along with it, on top of everything else already animating.
+   display:inline-block so `width` actually applies to a bare <span>;
+   .value-control itself is a block-level flex container (display:flex,
+   not inline-flex), so the spinner mode stretches to fill this box on its
+   own with no separate override needed. */
+.weight-control-wrap {
+  display: inline-block;
+  width: 110px;
+}
+
+/* Narrower than the Font button - weightLabelFor() shows just the
+   OpenType name now ("Bold", not "700 Bold"), and the longest of those
+   ("Extra Light"/"Extra Bold") comfortably fits well under 170px. Width
+   here is redundant with .weight-control-wrap above (belt and braces,
+   not load-bearing on its own) - kept in case this button is ever used
+   outside that wrapper. */
 .weight-picker-btn {
   width: 110px;
 }

@@ -449,17 +449,25 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     updateLabelStates();
     clearTimeout(heightResetTimer);
     const endHeight = content.scrollHeight;
+    // Suppressed for the animation's duration, not left on - the explicit
+    // `height` below is, for most of the transition, deliberately smaller
+    // than the table's actual (already fully updated) content height, so
+    // overflow-y:auto would otherwise flash a scrollbar in and back out
+    // every single edit, on top of the resize itself. Clipping instead of
+    // scrolling for that brief window is the smoother trade.
+    content.style.overflowY = "hidden";
     content.style.height = `${startHeight}px`;
     content.offsetHeight; // force layout so the browser commits startHeight before animating away from it
     requestAnimationFrame(() => {
       content.style.height = `${endHeight}px`;
     });
-    // Reverts to auto once the transition's done, so a later change in
-    // circumstance this animation doesn't know about (e.g. the window
-    // being resized) doesn't leave the wrapper stuck at a stale pixel
-    // height.
+    // Reverts to auto (both height and the real scrollbar) once the
+    // transition's done, so a later change in circumstance this animation
+    // doesn't know about (e.g. the window being resized, or a table tall
+    // enough to need its own internal scroll again) isn't stuck without it.
     heightResetTimer = setTimeout(() => {
       content.style.height = "auto";
+      content.style.overflowY = "auto";
     }, 260);
   }
 
