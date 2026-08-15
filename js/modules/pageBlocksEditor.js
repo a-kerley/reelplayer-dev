@@ -466,15 +466,12 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     // Block-level styles only (headings + plain body) - Bold/Italic/
     // Underline get their own always-visible toggle buttons, the classic
     // B/I/U toolbar convention, instead of living in this menu.
-    openContextMenu(styleBtn, BLOCK_STYLE_ROLES.map((role) => ({
-      label: ROLE_LABELS[role],
-      onClick: () => {
-        editable.focus();
-        document.execCommand("formatBlock", false, FORMAT_BLOCK_TAGS[role]);
-        commit();
-        updateInlineControlDisplays();
-      },
-    })), { preventFocusSteal: true });
+    openContextMenu(styleBtn, styleMenuItems(page, (role) => {
+      editable.focus();
+      document.execCommand("formatBlock", false, FORMAT_BLOCK_TAGS[role]);
+      commit();
+      updateInlineControlDisplays();
+    }), { preventFocusSteal: true });
   };
   toolbarRow.appendChild(styleBtn);
   toolbarRow.appendChild(createToolbarDivider());
@@ -1349,6 +1346,34 @@ function wrapRangeInLink(range, href) {
 // buttons instead (see createTextConfig() above).
 const BLOCK_STYLE_ROLES = ["h1", "h2", "h3", "body"];
 const FORMAT_BLOCK_TAGS = { h1: "H1", h2: "H2", h3: "H3", body: "P" };
+
+// Resolves each BLOCK_STYLE_ROLES entry into real preview styling for its
+// "Apply style..." menu item - same idea as styleToolbarWidgets.js's
+// fontMenuItems() previewing each font option in its own typeface, just
+// covering size/weight/color too, since a role is more than a font choice.
+// Reads this page's own Customize Text Styles override
+// (page.textStyleDefs[role]) with the same ROLE_DEFAULT_* fallback the
+// dialog itself uses (below), so "Heading 1" in the menu always looks like
+// this page's actual current Heading 1 - including after a Customize
+// Styles edit, since the menu is rebuilt fresh on every click rather than
+// cached.
+function styleMenuItems(page, onPick) {
+  return BLOCK_STYLE_ROLES.map((role) => {
+    const def = page.textStyleDefs?.[role] || {};
+    const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
+    const styleParts = [
+      `font-size:${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`,
+      `font-weight:${def.fontWeight || ROLE_DEFAULT_WEIGHT[role]}`,
+      `color:${def.color || ROLE_DEFAULT_COLOR[role]}`,
+    ];
+    if (font) styleParts.push(`font-family:${font.stack}`);
+    return {
+      label: ROLE_LABELS[role],
+      style: styleParts.join(";"),
+      onClick: () => onPick(role),
+    };
+  });
+}
 
 // Bold/Italic/Underline aren't shown as rows in the dialog below - the text
 // toolbar's own B/I/U toggles already cover them inline, and a second,
