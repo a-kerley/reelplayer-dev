@@ -464,17 +464,26 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
   content.style.cssText = "max-height:60vh;overflow-y:auto;";
 
   const table = document.createElement("table");
-  table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
+  // table-layout:fixed, not the default auto - auto sizes each column to
+  // fit whatever its widest cell currently needs, which treats a <td>'s
+  // own `width` (.text-style-defs-label's 220px, see below) as only a
+  // starting suggestion it'll happily exceed for a large font-size
+  // preview - exactly the "column keeps growing anyway" symptom that
+  // defeated the fix. Fixed layout takes column widths from this first
+  // row's <th> widths instead and holds every cell in every row to them
+  // regardless of content, which is what actually makes overflow:hidden/
+  // text-overflow:ellipsis below take effect.
+  table.style.cssText = "width:100%;table-layout:fixed;border-collapse:collapse;font-size:var(--builder-text-base);";
 
   const thead = document.createElement("thead");
   thead.innerHTML = `
     <tr>
-      <th style="text-align:left;padding:0.3rem;">Style</th>
-      <th style="text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
-      <th style="text-align:center;padding:0.3rem;">Size</th>
-      <th style="text-align:center;padding:0.3rem;">Weight</th>
-      <th style="text-align:center;padding:0.3rem;">Color</th>
-      <th style="padding:0.3rem;"></th>
+      <th style="width:220px;text-align:left;padding:0.3rem;">Style</th>
+      <th style="width:170px;text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
+      <th style="width:90px;text-align:center;padding:0.3rem;">Size</th>
+      <th style="width:110px;text-align:center;padding:0.3rem;">Weight</th>
+      <th style="width:60px;text-align:center;padding:0.3rem;">Color</th>
+      <th style="width:80px;padding:0.3rem;"></th>
     </tr>
   `;
   table.appendChild(thead);
@@ -601,10 +610,14 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     message: title,
     content: '<div id="textStyleDefsSlot"></div>',
     buttons: [{ text: "Done", type: "primary", onClick: () => { destroyPickrInstances(); dialog.closeDialog(); } }],
-    // Wide enough for the fixed-width Style (.text-style-defs-label) and
-    // Font (.font-picker-btn) columns plus Size/Weight/Color/Reset without
-    // wrapping.
-    maxWidth: "820px",
+    // Wide enough for the table's own fixed column widths (thead's own
+    // inline widths above, table-layout:fixed) plus dialogSystem.js's 24px
+    // content padding on each side, with a little headroom - too tight a
+    // match here is exactly what forced a horizontal scrollbar in past
+    // the table's real rendered width (each column's padding adds to its
+    // th's declared width, so the table always ends up a bit wider than
+    // the raw column-width sum).
+    maxWidth: "860px",
   });
   // createDialog's `content` option only innerHTML's an HTML string - these
   // rows need real onchange handlers, so an empty placeholder slot is
