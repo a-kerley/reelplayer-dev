@@ -1599,6 +1599,12 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
+/* Button block's own "Custom" Size field (js/modules/pageBlocksEditor.js's
+   createButtonConfig()) - same reasoning as the two rules above. */
+.page-block-button-size-control .value-control-slider-wrap {
+  display: none;
+}
+
 /* Pickr's own .pickr wrapper carries a bit of built-in vertical padding
    the other toolbar items don't have, which sits the 20px swatch a touch
    below their shared center line despite .page-block-text-toolbar's own

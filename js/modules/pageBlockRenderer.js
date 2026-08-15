@@ -14,7 +14,7 @@
 // third-party embeds, so a reel's rendering logic itself is never
 // duplicated a third time either.
 import { sanitizeHtml } from "./htmlSanitizer.js";
-import { ASSIGNABLE_TEXT_ROLES } from "./pageTextStyles.js";
+import { ASSIGNABLE_TEXT_ROLES, TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from "./pageTextStyles.js";
 
 const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
@@ -397,7 +397,20 @@ function renderButtonBlock(block) {
   if (block.textStyleRole && ASSIGNABLE_TEXT_ROLES.includes(block.textStyleRole)) {
     a.dataset.textRole = block.textStyleRole;
   } else {
+    // "Custom" - the button's own private font/size/weight/color, set
+    // individually (only when actually chosen) rather than as a group,
+    // so a button saved before this feature (none of these fields exist)
+    // renders exactly as it always has: page.css's own
+    // .page-block-button-link base font-weight:600 and ambient inherited
+    // font-family/-size.
     a.style.color = block.textColor || "#ffffff";
+    const font = TEXT_FONT_OPTIONS.find((f) => f.value === block.fontFamily);
+    if (font) {
+      a.style.fontFamily = font.stack;
+      ensureInlineGoogleFont(font.value);
+    }
+    if (block.fontSize) a.style.fontSize = `${block.fontSize}px`;
+    if (block.fontWeight) a.style.fontWeight = block.fontWeight;
   }
   wrapper.appendChild(a);
   return wrapper;
