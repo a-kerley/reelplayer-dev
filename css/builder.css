@@ -1599,10 +1599,39 @@ input[type="range"]:focus::-moz-range-thumb {
   display: none;
 }
 
-/* Button block's own "Custom" Size field (js/modules/pageBlocksEditor.js's
-   createButtonConfig()) - same reasoning as the two rules above. */
+/* Button block's own Text Style toolbar (js/modules/pageBlocksEditor.js's
+   createButtonConfig()) - same layout as .page-block-text-toolbar above,
+   separately named (rather than shared via multiple classes) to match
+   this file's existing convention of one class per call site even where
+   the rules are identical. */
+.page-block-button-toolbar {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 0.5rem;
+}
+
+.page-block-button-toolbar .dropdown-menu-btn {
+  min-width: 7rem;
+}
+
+/* Button block's own "Custom" Size field - same reasoning as
+   .page-block-text-toolbar-size above: no room for the hover-reveal
+   slider in a compact toolbar, and .value-control's own default
+   flex:1;min-width:0 would otherwise stretch this to fill the toolbar
+   row, crowding out the Weight/Color controls after it. */
+.page-block-button-size-control {
+  flex: 0 0 auto;
+  min-width: 0;
+}
+
 .page-block-button-size-control .value-control-slider-wrap {
   display: none;
+}
+
+.page-block-button-toolbar .pickr {
+  margin-top: -1px;
 }
 
 /* Pickr's own .pickr wrapper carries a bit of built-in vertical padding

@@ -1839,84 +1839,68 @@ function createButtonConfig(block, onChange, refreshPreview) {
   }
   updateAlignIcons();
 
-  // Assigns one of the page's own named text styles (js/modules/
-  // pageTextStyles.js's ASSIGNABLE_TEXT_ROLES - the same h1/h2/h3/body/link
-  // set the Customize Text Styles dialog edits) to the button's label,
-  // instead of the Font/Size/Weight/Color fields below. Font family/size/
-  // weight AND color all come from the chosen role
-  // (renderButtonBlock()/page.css), so a button assigned "Body" tracks
-  // the same page-wide edits as the text block's own paragraphs, and
-  // stays in sync if that role is customized later.
-  const styleRoleRow = document.createElement("div");
-  styleRoleRow.className = "color-row";
-  styleRoleRow.style.marginTop = "0.5rem";
-  const styleRoleLabel = document.createElement("span");
-  styleRoleLabel.textContent = "Text Style:";
-  styleRoleRow.appendChild(styleRoleLabel);
-  const styleRoleSelect = document.createElement("select");
-  styleRoleSelect.className = "builder-select";
-  const customOpt = document.createElement("option");
-  customOpt.value = "";
-  customOpt.textContent = "Custom";
-  styleRoleSelect.appendChild(customOpt);
-  ASSIGNABLE_TEXT_ROLES.forEach((role) => {
-    const opt = document.createElement("option");
-    opt.value = role;
-    opt.textContent = ROLE_LABELS[role];
-    styleRoleSelect.appendChild(opt);
-  });
-  styleRoleSelect.value = block.textStyleRole || "";
-  styleRoleSelect.onchange = () => {
-    block.textStyleRole = styleRoleSelect.value || undefined;
-    updateCustomStyleRowsVisibility();
+  // Text Style (js/modules/pageTextStyles.js's ASSIGNABLE_TEXT_ROLES, the
+  // same h1/h2/h3/body/link set the Customize Text Styles dialog edits)
+  // plus - only when "Custom" - Font/Size/Weight/Color, laid out as one
+  // compact toolbar row using the exact same building blocks (dropdown-
+  // menu-btn + openContextMenu, segmented number+spin control, pickr
+  // swatch, divider) the text block's own toolbar uses (createTextConfig()
+  // above), rather than a stack of full-width labeled rows like the rest
+  // of this block's config. Assigning a role drives Font/Size/Weight/Color
+  // all together via renderButtonBlock()/page.css, tracking the same page-
+  // wide edits a real h1/h2/h3/p/a would - so those four controls are
+  // meaningless (and hidden) once a role's chosen.
+  const styleToolbar = document.createElement("div");
+  styleToolbar.className = "page-block-button-toolbar";
+  wrap.appendChild(styleToolbar);
+
+  const styleBtn = createDropdownMenuButton(block.textStyleRole ? ROLE_LABELS[block.textStyleRole] : "Custom");
+  styleBtn.onclick = () => {
+    openContextMenu(styleBtn, [
+      { label: "Custom", onClick: () => selectTextStyleRole(undefined) },
+      ...ASSIGNABLE_TEXT_ROLES.map((role) => ({
+        label: ROLE_LABELS[role],
+        onClick: () => selectTextStyleRole(role),
+      })),
+    ]);
+  };
+  styleToolbar.appendChild(styleBtn);
+  styleToolbar.appendChild(createToolbarDivider());
+
+  function selectTextStyleRole(role) {
+    block.textStyleRole = role;
+    setDropdownLabel(styleBtn, role ? ROLE_LABELS[role] : "Custom");
+    updateCustomStyleControlsVisibility();
     refreshPreview();
     onChange();
-  };
-  styleRoleRow.appendChild(styleRoleSelect);
-  wrap.appendChild(styleRoleRow);
+  }
 
-  // Font/Size/Weight/Color for the "Custom" case - the same four
-  // properties, and the same TEXT_FONT_OPTIONS/weight scale, the
-  // Customize Text Styles dialog uses per role (openCustomizeStylesDialog()
-  // below); this is effectively the button's own private, unnamed "role."
-  // Only meaningful (and only shown) when Text Style is "Custom" - a role
-  // instead drives all four together, so showing them then would just be
-  // inert duplicate controls.
-  const customStyleRows = [];
+  // Only meaningful (and only shown) when Text Style is "Custom" - see
+  // above for why a role makes these redundant.
+  const customStyleControls = [];
 
-  const fontRow = document.createElement("div");
-  fontRow.className = "color-row";
-  fontRow.style.marginTop = "0.5rem";
-  const fontLabel = document.createElement("span");
-  fontLabel.textContent = "Font:";
-  fontRow.appendChild(fontLabel);
-  const fontSelect = document.createElement("select");
-  fontSelect.className = "builder-select";
-  TEXT_FONT_OPTIONS.forEach((f) => {
-    const opt = document.createElement("option");
-    opt.value = f.value;
-    opt.textContent = f.label;
-    fontSelect.appendChild(opt);
-  });
-  fontSelect.value = block.fontFamily || "system";
-  fontSelect.onchange = () => {
-    block.fontFamily = fontSelect.value === "system" ? undefined : fontSelect.value;
-    refreshPreview();
-    onChange();
+  const fontBtn = createDropdownMenuButton(fontLabelFor(block.fontFamily));
+  fontBtn.onclick = () => {
+    openContextMenu(fontBtn, TEXT_FONT_OPTIONS.map((f) => ({
+      label: f.label,
+      onClick: () => {
+        block.fontFamily = f.value === "system" ? undefined : f.value;
+        setDropdownLabel(fontBtn, f.label);
+        refreshPreview();
+        onChange();
+      },
+    })));
   };
-  fontRow.appendChild(fontSelect);
-  wrap.appendChild(fontRow);
-  customStyleRows.push(fontRow);
+  styleToolbar.appendChild(fontBtn);
+  customStyleControls.push(fontBtn);
+
+  function fontLabelFor(value) {
+    return (TEXT_FONT_OPTIONS.find((f) => f.value === value) || TEXT_FONT_OPTIONS[0]).label;
+  }
 
   // Same segmented number+spin control (and slider-suppression, see
   // .page-block-button-size-control in builder.css) as the Customize
   // Text Styles dialog's own per-role Size field.
-  const sizeRow = document.createElement("div");
-  sizeRow.className = "color-row";
-  sizeRow.style.marginTop = "0.5rem";
-  const sizeLabel = document.createElement("span");
-  sizeLabel.textContent = "Size:";
-  sizeRow.appendChild(sizeLabel);
   const sizeControl = createValueControl({
     id: `${block.blockId}-buttonFontSize`,
     label: "",
@@ -1933,58 +1917,52 @@ function createButtonConfig(block, onChange, refreshPreview) {
     refreshPreview();
     onChange();
   });
-  sizeRow.appendChild(sizeControl.control);
-  wrap.appendChild(sizeRow);
-  customStyleRows.push(sizeRow);
+  styleToolbar.appendChild(sizeControl.control);
+  customStyleControls.push(sizeControl.control);
 
-  const weightRow = document.createElement("div");
-  weightRow.className = "color-row";
-  weightRow.style.marginTop = "0.5rem";
-  const weightLabel = document.createElement("span");
-  weightLabel.textContent = "Weight:";
-  weightRow.appendChild(weightLabel);
-  const weightSelect = document.createElement("select");
-  weightSelect.className = "builder-select";
-  ["400", "500", "600", "700"].forEach((w) => {
-    const opt = document.createElement("option");
-    opt.value = w;
-    opt.textContent = w;
-    weightSelect.appendChild(opt);
-  });
-  // "600" (not "400") is the effective default here specifically because
-  // it matches .page-block-button-link's own base font-weight:600 in
-  // page.css - the actual current look of an unconfigured button, not an
-  // arbitrary Customize-dialog-style default.
-  weightSelect.value = block.fontWeight || "600";
-  weightSelect.onchange = () => {
-    block.fontWeight = weightSelect.value;
-    refreshPreview();
-    onChange();
+  const weightBtn = createDropdownMenuButton(block.fontWeight || "600");
+  weightBtn.onclick = () => {
+    openContextMenu(weightBtn, ["400", "500", "600", "700"].map((w) => ({
+      label: w,
+      onClick: () => {
+        block.fontWeight = w;
+        setDropdownLabel(weightBtn, w);
+        refreshPreview();
+        onChange();
+      },
+    })));
   };
-  weightRow.appendChild(weightSelect);
-  wrap.appendChild(weightRow);
-  customStyleRows.push(weightRow);
+  styleToolbar.appendChild(weightBtn);
+  customStyleControls.push(weightBtn);
 
-  const textColorRow = document.createElement("div");
-  textColorRow.className = "color-row";
-  textColorRow.style.marginTop = "0.5rem";
-  const textColorLabel = document.createElement("span");
-  textColorLabel.textContent = "Color:";
-  textColorRow.appendChild(textColorLabel);
+  // Wrapped in a persistent <span>, and visibility toggled on THAT rather
+  // than on textPickr.btn directly - createColorPickrButton() returns btn
+  // synchronously, but Pickr.create() (inside it) runs one tick later
+  // (setTimeout(...,0)) and, once it does, replaces btn in the live DOM
+  // with its own new .pickr wrapper - see that function's own comment.
+  // Toggling display on the original btn reference raced that swap: if a
+  // role was already selected before Pickr's callback fired (e.g. on
+  // initial render of an already-configured button), display:none landed
+  // on the soon-to-be-discarded original element, and Pickr's replacement
+  // - a brand new element with no such style - stayed visibly showing
+  // regardless. A wrapper span survives the swap since Pickr only ever
+  // touches its child, not the wrapper itself.
+  const textColorWrap = document.createElement("span");
   const textPickr = createColorPickrButton(block.textColor || "#ffffff", (hex) => {
     block.textColor = hex;
     refreshPreview();
     onChange();
   }, toolbarPickrInstances);
-  textColorRow.appendChild(textPickr.btn);
-  wrap.appendChild(textColorRow);
-  customStyleRows.push(textColorRow);
+  textPickr.btn.title = "Text color";
+  textColorWrap.appendChild(textPickr.btn);
+  styleToolbar.appendChild(textColorWrap);
+  customStyleControls.push(textColorWrap);
 
-  function updateCustomStyleRowsVisibility() {
+  function updateCustomStyleControlsVisibility() {
     const hasRole = !!block.textStyleRole;
-    customStyleRows.forEach((row) => { row.style.display = hasRole ? "none" : ""; });
+    customStyleControls.forEach((el) => { el.style.display = hasRole ? "none" : ""; });
   }
-  updateCustomStyleRowsVisibility();
+  updateCustomStyleControlsVisibility();
 
   // Independent of the label's own text styling (role or custom) - a
   // button's fill color isn't part of any text role, so this stays
