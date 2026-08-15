@@ -15,7 +15,7 @@ import {
 } from "./modules/pageDraftStore.js";
 import { renderPagesSidebar } from "./pagesSidebar.js";
 import { ICONS } from "./modules/sidebarList.js";
-import { updatePageBlocksEditor } from "./modules/pageBlocksEditor.js";
+import { updatePageBlocksEditor, openCustomizeStylesDialog } from "./modules/pageBlocksEditor.js";
 import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
@@ -603,6 +603,7 @@ export function initPagesController() {
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
         <button type="button" id="previewPageBtn">Preview Page</button>
         <button type="button" id="managePagesBtn">Manage Published Pages</button>
+        <button type="button" id="customizeTextStylesBtn">Customize Text Styles...</button>
         <div class="color-row" style="margin-top:0.6rem;">
           <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
@@ -667,6 +668,13 @@ export function initPagesController() {
 
     document.getElementById("publishPageBtn").onclick = () => handlePublish(page);
     document.getElementById("previewPageBtn").onclick = () => handlePreview(page);
+    // Same dialog createTextConfig()'s per-block "Customize Styles..."
+    // button opens (js/modules/pageBlocksEditor.js) - having it here too
+    // means it's reachable even on a page with no text block yet, or once
+    // the last one's been removed. onChange (updateCurrentPage) already
+    // calls renderPagePreview() itself, so there's no separate row preview
+    // to refresh from this call site - refreshPreview is a no-op.
+    document.getElementById("customizeTextStylesBtn").onclick = () => openCustomizeStylesDialog(page, updateCurrentPage, () => {});
     updatePublishStatus(page);
     setupPageManagerButton(() => page);
     setupAnalyticsControls(page);

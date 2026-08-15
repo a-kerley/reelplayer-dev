@@ -1298,7 +1298,7 @@ const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playl
 const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
 const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#9a9aa2", link: "#5b8def", playlistItem: "#5b8def" };
 
-function openCustomizeStylesDialog(page, onChange, refreshPreview) {
+export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   destroyDialogPickrInstances();
   if (!page.textStyleDefs) page.textStyleDefs = {};
 

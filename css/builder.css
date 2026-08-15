@@ -617,6 +617,7 @@ body {
 #manageEmbedsBtn,
 #managePagesBtn,
 #previewPageBtn,
+#customizeTextStylesBtn,
 #refreshPreviewBtn {
   background: var(--builder-accent);
   color: white;
@@ -633,7 +634,8 @@ body {
 #exportEmbedBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
-#previewPageBtn {
+#previewPageBtn,
+#customizeTextStylesBtn {
   font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
@@ -644,6 +646,7 @@ body {
 #manageEmbedsBtn:hover,
 #managePagesBtn:hover,
 #previewPageBtn:hover,
+#customizeTextStylesBtn:hover,
 #refreshPreviewBtn:hover {
   background: var(--builder-hover);
 }
