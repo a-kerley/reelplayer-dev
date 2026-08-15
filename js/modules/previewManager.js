@@ -206,9 +206,13 @@ export class PreviewManager {
     const overlayBaseColor = `${overlayRGBA.r}, ${overlayRGBA.g}, ${overlayRGBA.b}`;
     const overlayOpacity = overlayRGBA.a;
 
+    // Defaults to enabled - always applied unconditionally before this
+    // toggle existed (see createColorPickerRow()'s toggle param in
+    // expandableMode.js, same backward-compat reasoning as backgroundColor).
+    const closedIdleOverlayEnabled = reel.playerClosedIdleOverlayColorEnabled !== false;
     const closedIdleOverlayRGBA = parseRGBA(reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor);
     const closedIdleOverlayBaseColor = `${closedIdleOverlayRGBA.r}, ${closedIdleOverlayRGBA.g}, ${closedIdleOverlayRGBA.b}`;
-    const closedIdleOverlayOpacity = closedIdleOverlayRGBA.a;
+    const closedIdleOverlayOpacity = closedIdleOverlayEnabled ? closedIdleOverlayRGBA.a : 0;
 
     const uiAccentColor = reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent;
 

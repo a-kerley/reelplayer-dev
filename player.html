@@ -337,9 +337,13 @@
       const closedIdleOverlayBaseColor = closedIdleOverlayRGBAMatch
         ? `${closedIdleOverlayRGBAMatch[1]}, ${closedIdleOverlayRGBAMatch[2]}, ${closedIdleOverlayRGBAMatch[3]}`
         : "0, 0, 0";
-      const closedIdleOverlayOpacity = closedIdleOverlayRGBAMatch && closedIdleOverlayRGBAMatch[4] !== undefined
-        ? parseFloat(closedIdleOverlayRGBAMatch[4])
-        : 0.7;
+      // Defaults to enabled - matches previewManager.js's generateStyleConfig()
+      const closedIdleOverlayEnabled = settings.playerClosedIdleOverlayColorEnabled !== false;
+      const closedIdleOverlayOpacity = !closedIdleOverlayEnabled ? 0 : (
+        closedIdleOverlayRGBAMatch && closedIdleOverlayRGBAMatch[4] !== undefined
+          ? parseFloat(closedIdleOverlayRGBAMatch[4])
+          : 0.7
+      );
 
       const uiAccentColor = settings.varUiAccent || '#2a0026';
       

@@ -262,40 +262,28 @@ export function createExpandableModeSettings(reel, onChange) {
   );
   settingsContainer.appendChild(waveformRow);
 
-  // Enable Player Closed Idle toggle - reads as a heading for the idle
-  // video/overlay/blur controls below it, since it gates all three.
-  const closedIdleRow = createToggleRow(
-    'Fade to idle video when paused & collapsed',
-    'enablePlayerClosedIdle',
-    reel.enablePlayerClosedIdle === true, // Default to false
-    'When playback stops and the player is collapsed, fade in the idle video below instead of the normal collapsed banner',
-    { heading: true }
-  );
-  settingsContainer.appendChild(closedIdleRow);
-
-  // Player Closed Idle Video input
+  // Enable Player Closed Idle + Idle Video URL/picker, combined onto one row -
+  // the toggle gates this field AND the overlay/blur rows below it, so it
+  // keeps the heading styling createToggleRow()'s own { heading: true } used
+  // (see toggle.heading below).
   const { row: closedIdleVideoRow } = createUrlInputRow({
     id: 'playerClosedIdleVideo',
-    label: 'Idle Background Video:',
+    label: 'Fade to idle video when paused & collapsed',
     value: reel.playerClosedIdleVideo || '',
     placeholder: 'https://example.com/idle-video.mp4',
-    tooltip: 'Plays during the idle state above. Fallback order: this video, then the collapsed banner image, then the current track\'s background',
+    tooltip: 'When playback stops and the player is collapsed, fade in the idle video below instead of the normal collapsed banner. Fallback order: this video, then the collapsed banner image, then the current track\'s background',
     pickerOptions: {
       directory: 'assets/video',
       extensions: ['.mp4', '.webm', '.mov', '.avi', '.mkv'],
       title: 'Select Idle Background Video'
+    },
+    toggle: {
+      id: 'enablePlayerClosedIdle',
+      checked: reel.enablePlayerClosedIdle === true, // Default to false
+      heading: true
     }
   });
   settingsContainer.appendChild(closedIdleVideoRow);
-
-  // Player Closed Idle Overlay Colour (matches the Background Image & Effects
-  // section's .color-row / .pickr-button pattern - wired up by colorPicker.js)
-  const closedIdleOverlayRow = createColorPickerRow(
-    'Idle Overlay Colour:',
-    'pickr-player-closed-idle-overlay-color',
-    'Tint (color + opacity) applied over the idle video/background'
-  );
-  settingsContainer.appendChild(closedIdleOverlayRow);
 
   // Player Closed Idle Blur
   const { row: closedIdleBlurRow } = createValueControl({
@@ -309,6 +297,26 @@ export function createExpandableModeSettings(reel, onChange) {
     tooltip: 'Backdrop blur strength applied over the idle video/background'
   });
   settingsContainer.appendChild(closedIdleBlurRow);
+
+  // Player Closed Idle Overlay Colour (matches the Background Image & Effects
+  // section's .color-row / .pickr-button pattern - wired up by colorPicker.js).
+  // Its own toggle defaults to on (reel.playerClosedIdleOverlayColorEnabled
+  // !== false) since this tint always applied unconditionally before this
+  // toggle existed - same backward-compat reasoning as
+  // setupBackgroundColorControls() in blendModeControls.js. On top of that,
+  // the whole row is further gated by the parent "Fade to idle video..."
+  // toggle above (see setupExpandableModeSettings() below) - the tint has
+  // nothing to apply itself over when that's off.
+  const closedIdleOverlayRow = createColorPickerRow(
+    'Idle Overlay Colour:',
+    'pickr-player-closed-idle-overlay-color',
+    'Tint (color + opacity) applied over the idle video/background',
+    {
+      id: 'playerClosedIdleOverlayColorEnabled',
+      checked: reel.playerClosedIdleOverlayColorEnabled !== false
+    }
+  );
+  settingsContainer.appendChild(closedIdleOverlayRow);
 
   section.appendChild(settingsContainer);
 
@@ -393,8 +401,43 @@ export function setupExpandableModeSettings(section, reel, onChange) {
     });
   }
 
-  // Player Closed Idle Overlay Colour is wired up by colorPicker.js
-  // (pickr-player-closed-idle-overlay-color, saved to reel.playerClosedIdleOverlayColor)
+  // Player Closed Idle Overlay Colour - the swatch color itself is wired up
+  // by colorPicker.js (pickr-player-closed-idle-overlay-color, saved to
+  // reel.playerClosedIdleOverlayColor); this only wires its own enable
+  // toggle, plus greys the whole row out whenever the parent "Fade to idle
+  // video..." toggle above is off (the tint has nothing to apply itself
+  // over in that state, regardless of its own toggle's checked value).
+  const closedIdleOverlayEnabled = section.querySelector('#playerClosedIdleOverlayColorEnabled');
+  if (closedIdleOverlayEnabled) {
+    const closedIdleOverlayRow = closedIdleOverlayEnabled.closest('.color-row');
+    const closedIdleOverlayButton = section.querySelector('#pickr-player-closed-idle-overlay-color');
+
+    const updateOverlayEnabledState = () => {
+      const parentEnabled = enableClosedIdle ? enableClosedIdle.checked : true;
+      const ownEnabled = closedIdleOverlayEnabled.checked;
+
+      closedIdleOverlayEnabled.disabled = !parentEnabled;
+      if (closedIdleOverlayRow) closedIdleOverlayRow.style.opacity = parentEnabled ? '1' : '0.5';
+
+      if (closedIdleOverlayButton) {
+        const swatchEnabled = parentEnabled && ownEnabled;
+        closedIdleOverlayButton.disabled = !swatchEnabled;
+        closedIdleOverlayButton.style.opacity = swatchEnabled ? '1' : '0.5';
+      }
+    };
+
+    updateOverlayEnabledState();
+
+    closedIdleOverlayEnabled.addEventListener('change', () => {
+      reel.playerClosedIdleOverlayColorEnabled = closedIdleOverlayEnabled.checked;
+      updateOverlayEnabledState();
+      onChange();
+    });
+
+    if (enableClosedIdle) {
+      enableClosedIdle.addEventListener('change', updateOverlayEnabledState);
+    }
+  }
 
   // Player Closed Idle Blur
   const closedIdleBlur = section.querySelector('#playerClosedIdleBlur');
@@ -456,24 +499,38 @@ function validateHeightSettings(reel, changedInput, section) {
 /**
  * Helper: Create a Pickr color-swatch row, matching the Background Image &
  * Effects section's styling (.color-row / .pickr-button). The Pickr instance
- * itself is created by colorPicker.js, keyed off the button's id.
+ * itself is created by colorPicker.js, keyed off the button's id. Pass
+ * `toggle: { id, checked }` for a row whose swatch is itself optional
+ * (matches Overlay Colour's own toggle+disabled-swatch pattern) - the
+ * swatch starts disabled/dimmed until enabled, and the caller wires the
+ * checkbox's actual behavior (this helper only builds the markup).
  */
-function createColorPickerRow(label, buttonId, tooltip) {
+function createColorPickerRow(label, buttonId, tooltip, toggle = null) {
   const row = document.createElement('div');
   row.className = 'color-row';
 
-  const labelEl = document.createElement('span');
+  const labelEl = document.createElement(toggle ? 'label' : 'span');
   labelEl.textContent = label;
   if (tooltip) {
     labelEl.dataset.tooltip = tooltip;
+  }
+  row.appendChild(labelEl);
+
+  if (toggle) {
+    labelEl.htmlFor = toggle.id;
+    labelEl.style.cursor = 'pointer';
+    row.appendChild(createToggleSwitch({ id: toggle.id, checked: toggle.checked }));
   }
 
   const button = document.createElement('button');
   button.id = buttonId;
   button.className = 'pickr-button';
   button.type = 'button';
+  if (toggle && !toggle.checked) {
+    button.disabled = true;
+    button.style.opacity = '0.5';
+  }
 
-  row.appendChild(labelEl);
   row.appendChild(button);
   row.insertAdjacentHTML('beforeend', eyedropButtonHTML(buttonId));
 

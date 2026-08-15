@@ -180,6 +180,7 @@ export class EmbedExporter {
         enablePlayerClosedIdle: reel.enablePlayerClosedIdle === true,
         playerClosedIdleVideo: reel.playerClosedIdleVideo || "",
         playerClosedIdleOverlayColor: reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor,
+        playerClosedIdleOverlayColorEnabled: reel.playerClosedIdleOverlayColorEnabled !== false,
         playerClosedIdleBlur: reel.playerClosedIdleBlur ?? 8
       },
       created: new Date().toISOString()

@@ -218,14 +218,35 @@ export function createClearButton({ onClick }) {
  * @param {Function} options.onInput - Input event handler
  * @returns {{row: HTMLDivElement, input: HTMLInputElement}}
  */
-export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onInput = null }) {
+export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onInput = null, toggle = null }) {
   const row = document.createElement("div");
   row.className = "color-row";
 
-  const labelSpan = document.createElement("span");
+  // With a `toggle`, the row's own enable/disable switch sits on the same
+  // line as its URL field/picker instead of on a separate row above it
+  // (matches js/builder.js's Background Image/Video row pattern) - the
+  // label becomes a <label for> pointing at the toggle rather than a bare
+  // <span>, same distinction createToggleRow() draws in expandableMode.js.
+  const labelSpan = document.createElement(toggle ? "label" : "span");
   labelSpan.textContent = label;
   if (tooltip) {
     labelSpan.dataset.tooltip = tooltip;
+  }
+  row.appendChild(labelSpan);
+
+  let toggleEl = null;
+  if (toggle) {
+    labelSpan.htmlFor = toggle.id;
+    labelSpan.style.cursor = "pointer";
+    // Matches createToggleRow()'s own { heading: true } in expandableMode.js -
+    // for a toggle whose row also gates OTHER rows below it (not just this
+    // one's own URL field), not merely a visual preference.
+    if (toggle.heading) {
+      labelSpan.style.color = "var(--builder-accent)";
+      labelSpan.style.fontWeight = "var(--builder-weight-bold)";
+    }
+    toggleEl = createToggleSwitch({ id: toggle.id, checked: toggle.checked, onChange: toggle.onChange });
+    row.appendChild(toggleEl);
   }
 
   const input = document.createElement("input");
@@ -235,15 +256,15 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   input.placeholder = placeholder;
   input.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
 
-  row.appendChild(labelSpan);
   row.appendChild(input);
 
   if (onInput) {
     input.addEventListener("input", onInput);
   }
 
+  let pickerBtn = null;
   if (pickerOptions) {
-    const pickerBtn = createFilePickerButton({
+    pickerBtn = createFilePickerButton({
       id: `${id}FilePicker`,
       ariaLabel: pickerOptions.ariaLabel || `Browse ${label}`,
       title: pickerOptions.title || `Browse ${label}`
@@ -262,7 +283,22 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
     row.appendChild(pickerBtn);
   }
 
-  return { row, input };
+  // Dim the URL input/picker (not the row - the toggle itself must stay at
+  // full opacity regardless of its own checked state) to match every other
+  // toggle-gated row in the builder (js/builder.js's Background Image/Video,
+  // js/modules/blendModeControls.js's setupBackgroundColorControls()).
+  if (toggleEl) {
+    const toggleInput = toggleEl.querySelector("input");
+    const applyDimState = () => {
+      const isEnabled = toggleInput.checked;
+      input.style.opacity = isEnabled ? "1" : "0.5";
+      if (pickerBtn) pickerBtn.style.opacity = isEnabled ? "1" : "0.5";
+    };
+    applyDimState();
+    toggleInput.addEventListener("change", applyDimState);
+  }
+
+  return { row, input, toggle: toggleEl };
 }
 
 // Range-slider-with-value-display row (formerly createRangeSlider here) is
