@@ -2033,6 +2033,7 @@ const playerAppCore = {
       </div>
       <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
       ${this.expandable.enabled ? '<div class="expandable-tap-bar"></div>' : ''}
+      <div class="player-outline-ring"></div>
     </div>
   `;
     this.elements = {};

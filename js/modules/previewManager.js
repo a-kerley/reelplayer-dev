@@ -171,8 +171,15 @@ export class PreviewManager {
       : "none";
 
     // Process overlay color and background color
-    // backgroundColor is ALWAYS the base solid color behind everything
-    let backgroundColor = reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor;
+    // backgroundColor is the base solid color behind everything, unless
+    // explicitly disabled (defaults to enabled - see setupBackgroundColorControls()
+    // in blendModeControls.js) in which case it's transparent, letting
+    // whatever's behind the player (page background, embedding site) show
+    // through the rounded corners instead of bleeding a solid color there.
+    const backgroundColorEnabled = reel.backgroundColorEnabled !== false;
+    let backgroundColor = backgroundColorEnabled
+      ? (reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor)
+      : "transparent";
     
     // overlayColor is ALWAYS applied to the ::before pseudo-element (with blur)
     // It works whether background image is on or off
@@ -233,7 +240,12 @@ export class PreviewManager {
       "--overlay-color": overlayColor, // Keep for backward compatibility
       "--overlay-base-color": overlayBaseColor,
       "--overlay-opacity": overlayOpacity,
-      
+
+      // Outline variables - see setupOutlineControls() in blendModeControls.js
+      // for the reel.playerOutlineEnabled ?? (width > 0) backward-compat fallback
+      "--player-outline-width": `${(reel.playerOutlineEnabled ?? (reel.playerOutlineWidth > 0)) ? (reel.playerOutlineWidth || 0) : 0}px`,
+      "--player-outline-color": reel.playerOutlineColor || REEL_COLOR_DEFAULTS.outlineColor,
+
       // Player height (used for static mode)
       "--player-height": `${reel.playerHeight || 500}px`,
       

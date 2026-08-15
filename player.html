@@ -307,8 +307,12 @@
         ? settings.backgroundImage 
         : null;
       
-      // backgroundColor is ALWAYS the base solid color
-      const backgroundColor = reelData.backgroundColor || settings.backgroundColor || "rgba(255, 255, 255, 1)";
+      // backgroundColor is the base solid color, unless explicitly disabled
+      // (defaults to enabled - matches previewManager.js's generateStyleConfig()).
+      const backgroundColorEnabled = settings.backgroundColorEnabled !== false;
+      const backgroundColor = backgroundColorEnabled
+        ? (reelData.backgroundColor || settings.backgroundColor || "rgba(255, 255, 255, 1)")
+        : "transparent";
       
       // overlayColor is ALWAYS applied to ::before (transparent by default)
       let overlayColor = "rgba(255, 255, 255, 0)";
@@ -372,6 +376,11 @@
       root.style.setProperty('--overlay-color', overlayColor);
       root.style.setProperty('--overlay-base-color', overlayBaseColor);
       root.style.setProperty('--overlay-opacity', overlayOpacity);
+
+      // Outline variables - matches previewManager.js's generateStyleConfig() backward-compat fallback
+      const outlineEnabled = settings.playerOutlineEnabled ?? (settings.playerOutlineWidth > 0);
+      root.style.setProperty('--player-outline-width', `${outlineEnabled ? (settings.playerOutlineWidth || 0) : 0}px`);
+      root.style.setProperty('--player-outline-color', settings.playerOutlineColor || '#ffffff');
 
       // Lottie animation color variables
       root.style.setProperty('--lottie-brightness', colorFilters.brightness);
@@ -528,6 +537,7 @@
           </div>
           <div id="playlist" class="playlist${shouldHideTitle ? ' no-title' : ''}"></div>
           ${mode === 'expandable' ? '<div class="expandable-tap-bar"></div>' : ''}
+          <div class="player-outline-ring"></div>
         </div>
       `;
       

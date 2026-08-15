@@ -16,6 +16,7 @@ export const REEL_COLOR_DEFAULTS = {
   backgroundColor: "rgba(255, 255, 255, 1)",
   overlayColor: "rgba(255, 255, 255, 0.5)",
   playerClosedIdleOverlayColor: "rgba(0, 0, 0, 0.7)",
+  outlineColor: "#ffffff",
 };
 
 /**

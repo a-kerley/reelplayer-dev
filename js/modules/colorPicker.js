@@ -38,6 +38,12 @@ export function createColorPickers(reel, onChange) {
       reelKey: "backgroundColor",
     },
     {
+      id: "pickr-outline-color",
+      var: "--player-outline-color",
+      default: reel.playerOutlineColor || REEL_COLOR_DEFAULTS.outlineColor,
+      reelKey: "playerOutlineColor",
+    },
+    {
       id: "pickr-overlay-color",
       var: "--overlay-color",
       default: reel.overlayColor || REEL_COLOR_DEFAULTS.overlayColor,

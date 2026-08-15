@@ -12,28 +12,32 @@ import { ValidationUtils } from "./validation.js";
 export function setupBackgroundImageControls(reel, onChange) {
   const backgroundImageEnabled = document.getElementById("backgroundImageEnabled");
   const backgroundImageUrl = document.getElementById("backgroundImageUrl");
-  const backgroundImageRow = document.getElementById("backgroundImageRow");
-  
+
   if (!backgroundImageEnabled || !backgroundImageUrl) return;
-  
+
   backgroundImageEnabled.checked = reel.backgroundImageEnabled || false;
-  
+
   const updateBackgroundImageState = () => {
     const isEnabled = backgroundImageEnabled.checked;
     const filePickerBtn = document.getElementById("backgroundImageFilePicker");
     const cropBtn = document.getElementById("backgroundImageCropBtn");
-    
+
+    // Dim the URL input/buttons individually rather than the whole row -
+    // the row now also holds the toggle itself (see js/builder.js), which
+    // must stay at full opacity regardless of its own checked state.
     backgroundImageUrl.disabled = !isEnabled;
-    backgroundImageRow.style.opacity = isEnabled ? "1" : "0.5";
+    backgroundImageUrl.style.opacity = isEnabled ? "1" : "0.5";
 
     if (filePickerBtn) {
       filePickerBtn.disabled = !isEnabled;
+      filePickerBtn.style.opacity = isEnabled ? "1" : "0.5";
     }
 
     if (cropBtn) {
       cropBtn.disabled = !isEnabled;
+      cropBtn.style.opacity = isEnabled ? "1" : "0.5";
     }
-    
+
     reel.backgroundImageEnabled = isEnabled;
   };
   
@@ -126,23 +130,26 @@ export function setupBackgroundImagePreview(reel, onChange) {
 export function setupBackgroundVideoControls(reel, onChange) {
   const backgroundVideoEnabled = document.getElementById("backgroundVideoEnabled");
   const backgroundVideoUrl = document.getElementById("backgroundVideoUrl");
-  const backgroundVideoRow = document.getElementById("backgroundVideoRow");
-  
+
   if (!backgroundVideoEnabled || !backgroundVideoUrl) return;
-  
+
   backgroundVideoEnabled.checked = reel.backgroundVideoEnabled || false;
-  
+
   const updateBackgroundVideoState = () => {
     const isEnabled = backgroundVideoEnabled.checked;
     const videoFilePickerBtn = document.getElementById("backgroundVideoFilePicker");
-    
+
+    // Dim the URL input/button individually rather than the whole row -
+    // the row now also holds the toggle itself (see js/builder.js), which
+    // must stay at full opacity regardless of its own checked state.
     backgroundVideoUrl.disabled = !isEnabled;
-    backgroundVideoRow.style.opacity = isEnabled ? "1" : "0.5";
+    backgroundVideoUrl.style.opacity = isEnabled ? "1" : "0.5";
 
     if (videoFilePickerBtn) {
       videoFilePickerBtn.disabled = !isEnabled;
+      videoFilePickerBtn.style.opacity = isEnabled ? "1" : "0.5";
     }
-    
+
     reel.backgroundVideoEnabled = isEnabled;
   };
   
@@ -218,6 +225,39 @@ export function setupOverlayColorControls(reel, onChange) {
 }
 
 /**
+ * Sets up the static background colour toggle. Unlike overlay colour
+ * (opt-in, defaults off), background colour has always rendered
+ * unconditionally, so this defaults to ON (reel.backgroundColorEnabled
+ * !== false) rather than requiring existing reels to opt back in.
+ * @param {Object} reel - Reel configuration
+ * @param {Function} onChange - Change callback
+ */
+export function setupBackgroundColorControls(reel, onChange) {
+  const backgroundColorEnabled = document.getElementById("backgroundColorEnabled");
+  const backgroundColorButton = document.getElementById("pickr-background-color");
+
+  if (!backgroundColorEnabled) return;
+
+  backgroundColorEnabled.checked = reel.backgroundColorEnabled !== false;
+
+  const updateBackgroundColorState = () => {
+    const isEnabled = backgroundColorEnabled.checked;
+    if (backgroundColorButton) {
+      backgroundColorButton.disabled = !isEnabled;
+      backgroundColorButton.style.opacity = isEnabled ? "1" : "0.5";
+    }
+    reel.backgroundColorEnabled = isEnabled;
+  };
+
+  updateBackgroundColorState();
+
+  backgroundColorEnabled.addEventListener("change", () => {
+    updateBackgroundColorState();
+    onChange();
+  });
+}
+
+/**
  * Sets up opacity and blur value controls
  * @param {Object} reel - Reel configuration
  * @param {Function} onChange - Change callback
@@ -252,6 +292,51 @@ export function setupOpacityAndBlurControls(reel, onChange) {
 
     backgroundBlur.addEventListener("change", onChange);
   }
+}
+
+/**
+ * Sets up the player outline toggle, colour, and width controls
+ * @param {Object} reel - Reel configuration
+ * @param {Function} onChange - Change callback
+ */
+export function setupOutlineControls(reel, onChange) {
+  const outlineEnabled = document.getElementById("playerOutlineEnabled");
+  const outlineColorButton = document.getElementById("pickr-outline-color");
+  const outlineWidth = document.getElementById("playerOutlineWidth");
+  const outlineWidthSlider = document.getElementById("playerOutlineWidthSlider");
+  if (!outlineEnabled || !outlineWidth) return;
+
+  // This toggle didn't exist when playerOutlineWidth was introduced, so an
+  // existing reel with a nonzero width (previously the only way to make an
+  // outline visible) should still show one until the user says otherwise.
+  outlineEnabled.checked = reel.playerOutlineEnabled ?? (reel.playerOutlineWidth > 0);
+
+  outlineWidth.value = reel.playerOutlineWidth || 0;
+  if (outlineWidthSlider) outlineWidthSlider.value = outlineWidth.value;
+
+  const updateOutlineState = () => {
+    const isEnabled = outlineEnabled.checked;
+    if (outlineColorButton) {
+      outlineColorButton.disabled = !isEnabled;
+      outlineColorButton.style.opacity = isEnabled ? "1" : "0.5";
+    }
+    outlineWidth.disabled = !isEnabled;
+    if (outlineWidthSlider) outlineWidthSlider.disabled = !isEnabled;
+    reel.playerOutlineEnabled = isEnabled;
+  };
+
+  updateOutlineState();
+
+  outlineEnabled.addEventListener("change", () => {
+    updateOutlineState();
+    onChange();
+  });
+
+  outlineWidth.addEventListener("input", () => {
+    reel.playerOutlineWidth = parseInt(outlineWidth.value, 10) || 0;
+  });
+
+  outlineWidth.addEventListener("change", onChange);
 }
 
 /**

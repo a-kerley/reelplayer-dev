@@ -517,9 +517,50 @@ button {
 }
 
 /* Exclude background layers and videos from automatic z-index */
-.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay):not(.player-closed-idle-overlay):not(.expandable-tap-bar) {
+.player-wrapper > *:not(.track-background-layer):not(.background-video):not(.project-title-overlay):not(.player-closed-idle-overlay):not(.expandable-tap-bar):not(.player-outline-ring) {
   position: relative;
   z-index: 7;
+}
+
+/* Player outline - a dedicated top layer, not a border/box-shadow directly
+   on .player-wrapper. Two things were tried and rejected first:
+   1. A border/box-shadow ON .player-wrapper itself: a box's own
+      background/border is always painted BEHIND any of its
+      position:relative/absolute descendants (CSS stacking: that's step 1,
+      always under z-index:0+ children) - the background-image layer
+      (.player-wrapper::after) and overlay tint (.player-wrapper::before)
+      are exactly such descendants, so the outline vanished the moment
+      either was active.
+   2. Wrapping .player-wrapper in a new OUTER frame element and putting the
+      shadow there instead: that avoids #1's z-index fight, but a parent's
+      own border/background is ALSO always painted behind its own children
+      regardless of z-index - .player-wrapper (the frame's only child) fills
+      the frame's box edge-to-edge, so it just painted over the frame's
+      shadow instead. Made it worse (invisible in every state, not just
+      when a background was active).
+   This ring is a child INSIDE .player-wrapper instead, given a z-index
+   above everything else here (highest other value in this stylesheet is
+   20) so paint order can never bury it. Mirrored in js/player.js's
+   renderPlayer() and this file's renderPlayerHTML() - see this file's
+   top-of-file duplication warning.
+
+   border-radius: 8px here briefly got dropped entirely - matching
+   .player-wrapper's own overflow:hidden curve exactly still left a hairline
+   gap at the corner, which looked like a stray line tracing the radius.
+   The actual leak was .player-wrapper's own `background-color` (rgba(255,
+   255, 255, 1) by default - see .player-wrapper below) sitting behind
+   *everything*, opaque, with no toggle to turn it off - any sub-pixel gap
+   anywhere always had that solid color to reveal. Now that it's
+   conditionally rendered (js/modules/blendModeControls.js's
+   setupBackgroundColorControls(), defaults on but can be switched off),
+   there's nothing left to bleed through, so the matching radius is back. */
+.player-outline-ring {
+  position: absolute;
+  inset: 0;
+  z-index: 30;
+  pointer-events: none;
+  border-radius: 8px;
+  box-shadow: inset 0 0 0 var(--player-outline-width, 0px) var(--player-outline-color, transparent);
 }
 
 /* Ensure player content sits above overlay effects */

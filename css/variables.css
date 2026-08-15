@@ -13,6 +13,8 @@
   --waveform-unplayed: #929292;                   /* Color of unplayed waveform sections */
   --waveform-hover: rgba(0, 31, 103, 0.126);      /* Hover overlay color on waveform */
   --player-border-color: #ffffff;                 /* Border color for player wrapper */
+  --player-outline-width: 0px;                    /* Player wrapper outline weight (0 = off) */
+  --player-outline-color: #ffffff;                /* Player wrapper outline color */
   
   /* Builder UI Colors (dark theme, matches the Media Library palette) */
   --builder-bg: #2f2f2f;                          /* Background color for builder interface */

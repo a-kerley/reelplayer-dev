@@ -146,12 +146,16 @@ export class EmbedExporter {
 
         // Background settings
         backgroundColor: reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor, // Also in settings for backwards compatibility
+        backgroundColorEnabled: reel.backgroundColorEnabled !== false,
         backgroundImage: reel.backgroundImage,
         backgroundImageEnabled: reel.backgroundImageEnabled,
         backgroundVideo: reel.backgroundVideo,
         backgroundVideoEnabled: reel.backgroundVideoEnabled,
         overlayColor: reel.overlayColor,
         overlayColorEnabled: reel.overlayColorEnabled,
+        playerOutlineEnabled: reel.playerOutlineEnabled ?? (reel.playerOutlineWidth > 0),
+        playerOutlineWidth: reel.playerOutlineWidth || 0,
+        playerOutlineColor: reel.playerOutlineColor || REEL_COLOR_DEFAULTS.outlineColor,
         backgroundOpacity: reel.backgroundOpacity,
         backgroundBlur: reel.backgroundBlur,
         backgroundZoom: reel.backgroundZoom,
