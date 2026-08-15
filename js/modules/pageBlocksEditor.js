@@ -511,6 +511,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     formatButtons.bold.classList.toggle("active", document.queryCommandState("bold"));
     formatButtons.italic.classList.toggle("active", document.queryCommandState("italic"));
     formatButtons.underline.classList.toggle("active", document.queryCommandState("underline"));
+    // queryCommandState("justifyLeft") is true whenever nothing else is set
+    // too (left is every browser's unstyled default), so this always has
+    // exactly one active button, never zero - matches how a real editor's
+    // alignment buttons behave.
+    Object.entries(justifyButtons).forEach(([command, btn]) => {
+      btn.classList.toggle("active", document.queryCommandState(command));
+    });
   }
 
   // Ad hoc font/size/color, applied via a real <span style="..."> (see
@@ -1136,36 +1143,43 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     return null;
   }
 
-  // Icon toggle, matches playerTextStyles.js's Title align control (same
-  // .align-icon class/material-symbols-outlined icon pair),
-  // so alignment reads the same way in both builders. Unrelated to
-  // contenteditable/execCommand - still just block.alignment, applied as
-  // text-align on the block's outer wrapper.
-  const alignGroup = document.createElement("span");
-  alignGroup.className = "icon-toggle-group";
-  const alignIcons = {};
-  [["left", "format_align_left", "Left"], ["center", "format_align_center", "Center"]].forEach(([value, glyph, title]) => {
-    const icon = document.createElement("span");
-    icon.className = "align-icon";
-    icon.title = title;
-    icon.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
-    icon.onclick = () => {
-      block.alignment = value;
-      updateAlignIcons();
-      editable.style.textAlign = value === "center" ? "center" : "left";
-      onChange();
+  // Real per-selection toggles, same document.execCommand()/
+  // queryCommandState() pattern as the B/I/U group above - not
+  // block.alignment (that was a single value for the *whole* block,
+  // applied once to the outer wrapper). justifyLeft/Center/Right/Full
+  // apply to whichever paragraph(s)/heading(s) the current selection spans
+  // (the browser's own native "block-level" targeting - a multi-paragraph
+  // selection re-justifies every paragraph it touches), exactly the
+  // per-line behavior a real editor's alignment buttons have. Still uses
+  // .format-icon (not .align-icon) - visually identical, but marks this
+  // as one of the execCommand-driven toggles, unlike .align-icon's other
+  // consumers (the button block's own alignment, playerTextStyles.js's
+  // Title align), which really are single whole-element settings.
+  const justifyGroup = document.createElement("span");
+  justifyGroup.className = "icon-toggle-group";
+  const justifyButtons = {};
+  [
+    ["justifyLeft", "format_align_left", "Align left"],
+    ["justifyCenter", "format_align_center", "Align center"],
+    ["justifyRight", "format_align_right", "Align right"],
+    ["justifyFull", "format_align_justify", "Justify"],
+  ].forEach(([command, glyph, title]) => {
+    const btn = document.createElement("span");
+    btn.className = "format-icon";
+    btn.title = title;
+    btn.innerHTML = `<span class="material-symbols-outlined">${glyph}</span>`;
+    btn.addEventListener("mousedown", (e) => e.preventDefault());
+    btn.onclick = () => {
+      editable.focus();
+      document.execCommand(command);
+      updateFormatButtonStates();
+      commit();
     };
-    alignIcons[value] = icon;
-    alignGroup.appendChild(icon);
+    justifyButtons[command] = btn;
+    justifyGroup.appendChild(btn);
   });
-  toolbarRow.appendChild(alignGroup);
-
-  function updateAlignIcons() {
-    const align = block.alignment || "left";
-    alignIcons.left.classList.toggle("active", align === "left");
-    alignIcons.center.classList.toggle("active", align === "center");
-  }
-  updateAlignIcons();
+  toolbarRow.appendChild(justifyGroup);
+  toolbarRow.appendChild(createToolbarDivider());
 
   const customizeBtn = document.createElement("button");
   customizeBtn.type = "button";
@@ -1215,6 +1229,19 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     document.execCommand("insertText", false, text);
   });
   editable.addEventListener("blur", commit);
+  // Without this, Chrome's default Enter behavior wraps each new line in a
+  // <div> - not in htmlSanitizer.js's ALLOWED_TAGS, so every line past the
+  // first would get silently unwrapped (text kept, paragraph boundary
+  // lost) the moment this field blurs. <p> is already allowed (it's what
+  // the "Body" style/FORMAT_BLOCK_TAGS above produces) and is also what
+  // the justify buttons below need to exist as *something* alignable -
+  // execCommand("justify*") targets the selection's nearest block-level
+  // ancestor, and a bare text node with no wrapping element has none.
+  // Document-level, not per-element, but harmless to re-set on every
+  // focus - only one contenteditable owns focus at a time.
+  editable.addEventListener("focus", () => {
+    document.execCommand("defaultParagraphSeparator", false, "p");
+  });
   ["keyup", "mouseup", "click"].forEach((evt) => {
     editable.addEventListener(evt, () => {
       updateFormatButtonStates();

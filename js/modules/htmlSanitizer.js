@@ -14,12 +14,16 @@
 
 import { TEXT_FONT_OPTIONS } from "./pageTextStyles.js";
 
-// SPAN is the one allowed tag that carries an attribute besides <A>'s href -
-// js/modules/pageBlocksEditor.js's ad hoc font/size/color toolbar controls
-// wrap a selection in <span style="..."> (never via execCommand, whose
-// output for these is inconsistent across browsers - see that file), so
-// this sanitizer has to actually validate `style`, not just strip it like
-// every other attribute.
+// SPAN and the block tags (P/H1/H2/H3) are the only allowed tags that
+// carry an attribute besides <A>'s href - js/modules/pageBlocksEditor.js's
+// ad hoc font/size/color toolbar controls wrap a selection in
+// <span style="..."> (never via execCommand, whose output for these is
+// inconsistent across browsers - see that file), and its justify toolbar
+// writes style="text-align:..." onto whichever block tag(s) the selection
+// spans (execCommand("justify*") - a real block-level command, so its
+// output is consistent enough to allow directly). Either way this
+// sanitizer has to actually validate `style`, not just strip it like every
+// other attribute - see sanitizeSpanStyle()/sanitizeBlockAlignStyle() below.
 const ALLOWED_TAGS = new Set(["P", "BR", "STRONG", "EM", "U", "H1", "H2", "H3", "A", "SPAN"]);
 
 // execCommand's output tag choice is inconsistent across browsers (some
@@ -47,6 +51,21 @@ const ALLOWED_FONT_FAMILIES = new Set(TEXT_FONT_OPTIONS.map((f) => normalizeFont
 // accepted since either could show up depending on browser.
 const COLOR_RE = /^(#[0-9a-f]{6}|rgb\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}\s*\))$/i;
 const FONT_SIZE_RE = /^(\d{1,3})px$/;
+
+// js/modules/pageBlocksEditor.js's justify toolbar (document.execCommand
+// justifyLeft/Center/Right/Full) writes its result as a plain
+// style="text-align:..." on whichever P/H1/H2/H3 the selection's
+// paragraph(s) are - the block-level equivalent of a SPAN's style above,
+// so it gets the same "rebuild from validated CSSStyleDeclaration
+// properties only" treatment, not a blanket style passthrough.
+const ALIGN_RE = /^(left|center|right|justify)$/;
+const ALIGNABLE_TAGS = new Set(["P", "H1", "H2", "H3"]);
+
+function sanitizeBlockAlignStyle(node) {
+  const { textAlign } = node.style;
+  node.removeAttribute("style");
+  if (textAlign && ALIGN_RE.test(textAlign)) node.style.textAlign = textAlign;
+}
 
 // Rebuilds `<span style="...">` from scratch, keeping only
 // color/font-family/font-size, each independently validated - never trusts
@@ -119,12 +138,14 @@ function sanitizeNode(parent) {
     Array.from(node.attributes).forEach((attr) => {
       if (node.tagName === "A" && attr.name === "href") return;
       if (node.tagName === "SPAN" && attr.name === "style") return;
+      if (ALIGNABLE_TAGS.has(node.tagName) && attr.name === "style") return;
       node.removeAttribute(attr.name);
     });
     if (node.tagName === "A") {
       const href = node.getAttribute("href") || "";
       if (!/^(https?:|mailto:|tel:)/i.test(href)) node.removeAttribute("href");
     }
+    if (ALIGNABLE_TAGS.has(node.tagName)) sanitizeBlockAlignStyle(node);
 
     sanitizeNode(node);
 
@@ -167,7 +188,7 @@ function stripCaretPlaceholders(root) {
   });
 }
 
-/** @param {string} html @returns {string} sanitized HTML, allowlisted to P/BR/STRONG/EM/U/H1-3/A/SPAN[style] */
+/** @param {string} html @returns {string} sanitized HTML, allowlisted to P/BR/STRONG/EM/U/H1-3/A/SPAN[style]/P,H1-3[style=text-align] */
 export function sanitizeHtml(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
