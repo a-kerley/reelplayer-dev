@@ -1542,7 +1542,14 @@ input[type="range"]:focus::-moz-range-thumb {
   margin-bottom: 0.5rem;
 }
 
-.page-block-config .color-row span:first-child {
+/* Direct-child combinator, not a plain descendant one - a bare
+   ".color-row span:first-child" also matches any nested span that happens
+   to be the first child of ITS OWN parent (e.g. the first icon inside an
+   .icon-toggle-group alignment control), not just the row's own label.
+   That silently gave the button block's first alignment icon a bogus
+   88px-wide box (5.5rem, meant only for the "Alignment:" label) while its
+   siblings stayed the correct ~24px square. */
+.page-block-config .color-row > span:first-child {
   min-width: 5.5rem;
 }
 

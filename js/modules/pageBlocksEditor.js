@@ -1835,9 +1835,12 @@ function createButtonConfig(block, onChange, refreshPreview) {
   }, toolbarPickrInstances);
   colorRow.appendChild(bgPickr.btn);
 
+  // No manual margin-left here - .color-row's own flex gap plus the
+  // ".pickr-button:not(:last-child)" spacing rule (both in builder.css)
+  // already separate bgPickr.btn from this label; adding one more on top
+  // just made this one gap wider than every other row's, for no reason.
   const textLabel = document.createElement("span");
   textLabel.textContent = "Text:";
-  textLabel.style.marginLeft = "1rem";
   colorRow.appendChild(textLabel);
   const textPickr = createColorPickrButton(block.textColor || "#ffffff", (hex) => {
     block.textColor = hex;
