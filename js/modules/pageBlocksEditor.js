@@ -1029,6 +1029,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   }
 
   const fontBtn = createDropdownMenuButton("Font...");
+  fontBtn.classList.add("font-picker-btn");
   fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
   fontBtn.onclick = () => {
     saveSelection();
@@ -1559,7 +1560,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
     // renders in its own typeface, not just named, unlike a native
     // <select>'s <option> styling (which this used to rely on instead).
     const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
-    fontBtn.classList.add("customize-styles-font-btn");
+    fontBtn.classList.add("font-picker-btn");
     fontBtn.onclick = () => {
       openContextMenu(fontBtn, fontMenuItems((f) => {
         if (fontsLinked) {

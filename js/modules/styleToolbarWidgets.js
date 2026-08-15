@@ -214,6 +214,7 @@ export function createTextStyleToolbar({
   const customControls = [];
 
   const fontBtn = createDropdownMenuButton(fontLabelFor(getFontFamily()));
+  fontBtn.classList.add("font-picker-btn");
   fontBtn.onclick = () => {
     openContextMenu(fontBtn, fontMenuItems((f) => {
       setFontFamily(f.value === "system" ? undefined : f.value);
