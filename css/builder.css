@@ -1626,6 +1626,21 @@ input[type="range"]:focus::-moz-range-thumb {
   color: #777;
 }
 
+/* openTextStyleDefsDialog()'s Style column (js/modules/
+   styleToolbarWidgets.js) - fixed width, same reasoning as
+   .font-picker-btn/.weight-picker-btn: this cell's own font-size changes
+   with every edit (it previews the role's real resolved size -
+   updateLabelStates()), so without a cap here the column - and the whole
+   table/dialog - would keep growing wider right along with it. Width can
+   still change *tall* (a bigger preview needs a taller row too, and
+   there's no equivalent trick for that - see commitAll()'s own comment
+   on animating that instead of fighting it), just never wide. */
+.text-style-defs-label {
+  width: 220px;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
 /* Shared "Text Style" toolbar (js/modules/styleToolbarWidgets.js's
    createTextStyleToolbar()) - role dropdown + conditional Font/Size/
    Weight/Color, used by both the page button block
@@ -1827,6 +1842,23 @@ input[type="range"]:focus::-moz-range-thumb {
 }
 
 .font-picker-btn .dropdown-menu-btn-label-text {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  min-width: 0;
+}
+
+/* Same fixed-width/ellipsis treatment as .font-picker-btn above, for every
+   Weight dropdown that has one (createWeightControl()'s fixed-list mode,
+   js/modules/styleToolbarWidgets.js - a Google Font with a real static
+   weight list, as opposed to the free-typing spinner system/serif/mono
+   get instead). Narrower than the Font button - weightLabelFor() shows
+   just the OpenType name now ("Bold", not "700 Bold"), and the longest of
+   those ("Extra Light"/"Extra Bold") comfortably fits well under 170px. */
+.weight-picker-btn {
+  width: 110px;
+}
+
+.weight-picker-btn .dropdown-menu-btn-label-text {
   overflow: hidden;
   text-overflow: ellipsis;
   min-width: 0;

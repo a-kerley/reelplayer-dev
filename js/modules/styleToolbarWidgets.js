@@ -135,9 +135,18 @@ function fontLabelFor(value) {
   return (TEXT_FONT_OPTIONS.find((f) => f.value === value) || TEXT_FONT_OPTIONS[0]).label;
 }
 
+// Name only ("Bold"), not "700 Bold" - the number was redundant once every
+// dropdown already shows the weight visually (each menu item previews
+// itself at that actual font-weight), and dropping it shortens every
+// label enough that .weight-picker-btn's fixed width rarely needs to
+// truncate anything. Falls back to the raw number for a stored value with
+// no standard name (WEIGHT_LABELS only covers the 9 round-hundred
+// OpenType classes) - only reachable here for a Google Font weight list
+// that somehow included a non-standard value, since the free-typing
+// spinner (system/serif/mono) never calls this at all.
 function weightLabelFor(weight) {
   const w = weight || "400";
-  return WEIGHT_LABELS[w] ? `${w} ${WEIGHT_LABELS[w]}` : w;
+  return WEIGHT_LABELS[w] || w;
 }
 
 // A Weight control that adapts to whatever font is currently selected -
@@ -181,6 +190,10 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
 
     if (weights) {
       const btn = createDropdownMenuButton(weightLabelFor(current));
+      btn.classList.add("weight-picker-btn");
+      // The numeric value's still one hover away, now that the label
+      // itself only shows the name.
+      btn.title = current;
       btn.onclick = () => {
         openContextMenu(btn, weights.map((w) => ({
           label: weightLabelFor(w),
@@ -188,6 +201,7 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
           onClick: () => {
             setWeight(w);
             setDropdownLabel(btn, weightLabelFor(w));
+            btn.title = w;
             onCommit();
           },
         })));
@@ -416,9 +430,37 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     });
   }
 
+  // A role's Style-column preview renders at its own real font-size (see
+  // updateLabelStates() above), so its row - and with it, the scrollable
+  // table wrapper below - genuinely needs to grow/shrink as that size
+  // changes; there's no way around that without either capping the
+  // preview (losing the actual size comparison it exists to show) or
+  // resizing (breaking the "compact settings table" feel of a dialog).
+  // What IS avoidable is that resize happening as an instant, jarring
+  // snap - so it's animated via the classic FLIP technique: capture the
+  // wrapper's height *before* this edit's DOM changes land, apply them,
+  // then explicitly transition from the old height to the new one rather
+  // than jumping straight to `height:auto` and letting the height change
+  // happen invisibly in a single frame.
+  let heightResetTimer = null;
   function commitAll() {
+    const startHeight = content.getBoundingClientRect().height;
     onCommit();
     updateLabelStates();
+    clearTimeout(heightResetTimer);
+    const endHeight = content.scrollHeight;
+    content.style.height = `${startHeight}px`;
+    content.offsetHeight; // force layout so the browser commits startHeight before animating away from it
+    requestAnimationFrame(() => {
+      content.style.height = `${endHeight}px`;
+    });
+    // Reverts to auto once the transition's done, so a later change in
+    // circumstance this animation doesn't know about (e.g. the window
+    // being resized) doesn't leave the wrapper stuck at a stale pixel
+    // height.
+    heightResetTimer = setTimeout(() => {
+      content.style.height = "auto";
+    }, 260);
   }
 
   // Font linking - session-only (not part of `defs`, so it resets every
@@ -441,7 +483,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
   }
 
   const content = document.createElement("div");
-  content.style.cssText = "max-height:60vh;overflow-y:auto;";
+  content.style.cssText = "max-height:60vh;overflow-y:auto;transition:height 0.25s ease;";
 
   const table = document.createElement("table");
   table.style.cssText = "width:100%;border-collapse:collapse;font-size:var(--builder-text-base);";
@@ -472,6 +514,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     tr.style.borderTop = "1px solid #444";
 
     const labelTd = document.createElement("td");
+    labelTd.className = "text-style-defs-label";
     labelTd.style.cssText = "padding:0.4rem 0.3rem;white-space:nowrap;";
     labelTd.textContent = ROLE_LABELS[role];
     tr.appendChild(labelTd);
@@ -580,9 +623,10 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     message: title,
     content: '<div id="textStyleDefsSlot"></div>',
     buttons: [{ text: "Done", type: "primary", onClick: () => { destroyPickrInstances(); dialog.closeDialog(); } }],
-    // Wide enough for the fixed-width Font column (see .font-picker-btn)
-    // plus Style/Size/Weight/Color/Reset without wrapping.
-    maxWidth: "720px",
+    // Wide enough for the fixed-width Style (.text-style-defs-label) and
+    // Font (.font-picker-btn) columns plus Size/Weight/Color/Reset without
+    // wrapping.
+    maxWidth: "820px",
   });
   // createDialog's `content` option only innerHTML's an HTML string - these
   // rows need real onchange handlers, so an empty placeholder slot is
