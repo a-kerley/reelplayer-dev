@@ -215,7 +215,13 @@
        still only has the old settings.titleAppearance server-side.
        ============================================ */
     function getPlayerTextStyles(settings) {
-      if (settings.playerTextStyles) return settings.playerTextStyles;
+      if (settings.playerTextStyles) {
+        // Back-fill for a reel published under an earlier version of this
+        // feature (before the Playlist row existed) - title/trackName but
+        // no playlist key yet.
+        if (!settings.playerTextStyles.playlist) settings.playerTextStyles.playlist = {};
+        return settings.playerTextStyles;
+      }
 
       const ta = settings.titleAppearance || {};
       const parsePx = (value) => {
@@ -233,6 +239,7 @@
           paddingBottom: parsePx(ta.paddingBottom),
         },
         trackName: {},
+        playlist: {},
       };
     }
 
@@ -343,6 +350,7 @@
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
       applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles));
       applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles));
+      applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles));
 
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');

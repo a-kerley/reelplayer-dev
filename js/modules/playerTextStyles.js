@@ -30,6 +30,7 @@ import { createTextStyleToolbar } from "./styleToolbarWidgets.js";
 // text actually currently looks like, never a blank/generic placeholder.
 const TITLE_DEFAULTS = { fontSize: 21, fontWeight: "700" };
 const TRACK_NAME_DEFAULTS = { fontSize: 14, fontWeight: "600" };
+const PLAYLIST_DEFAULTS = { fontSize: 16, fontWeight: "400" };
 
 let toolbarPickrInstances = [];
 function destroyToolbarPickrInstances() {
@@ -47,7 +48,13 @@ function destroyToolbarPickrInstances() {
 // lazily on first touch" shape as the text block's legacy Markdown-body
 // migration (pageBlockRenderer.js's renderText()).
 function ensurePlayerTextStyles(reel) {
-  if (reel.playerTextStyles) return;
+  if (reel.playerTextStyles) {
+    // A reel migrated under an earlier version of this feature (before
+    // the Playlist row existed) has title/trackName but not playlist yet -
+    // back-fill it rather than re-running the whole migration below.
+    if (!reel.playerTextStyles.playlist) reel.playerTextStyles.playlist = {};
+    return;
+  }
 
   const ta = reel.titleAppearance || {};
   const parsePx = (value) => {
@@ -66,6 +73,7 @@ function ensurePlayerTextStyles(reel) {
       paddingBottom: parsePx(ta.paddingBottom),
     },
     trackName: {},
+    playlist: {},
   };
   delete reel.titleAppearance;
 }
@@ -123,6 +131,9 @@ export function createPlayerTextStylesSection(reel, onChange) {
 
     <div class="builder-section-legend" style="margin-top:1.2rem;">Track Name</div>
     <div id="trackNameStyleToolbarSlot" style="margin-top:0.4rem;"></div>
+
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist (track names &amp; lengths)</div>
+    <div id="playlistStyleToolbarSlot" style="margin-top:0.4rem;"></div>
   `;
 
   const showTitleToggle = createToggleSwitch({ id: "reelShowTitle", checked: !!reel.showTitle });
@@ -174,6 +185,27 @@ export function createPlayerTextStylesSection(reel, onChange) {
     onCommit: onChange,
   });
   section.querySelector("#trackNameStyleToolbarSlot").appendChild(trackNameToolbar);
+
+  // One shared style for both the track name and duration text in every
+  // playlist row (css/playlist.css's .playlist-item/.playlist-duration) -
+  // a single control, not one each, since they're read together as one
+  // row of playlist content rather than two independently-styled pieces.
+  const { toolbar: playlistToolbar } = createTextStyleToolbar({
+    idPrefix: "reelPlaylist",
+    getRole: () => reel.playerTextStyles.playlist.role,
+    setRole: (role) => { reel.playerTextStyles.playlist.role = role; },
+    getFontFamily: () => reel.playerTextStyles.playlist.fontFamily,
+    setFontFamily: (value) => { reel.playerTextStyles.playlist.fontFamily = value; },
+    getFontSize: () => reel.playerTextStyles.playlist.fontSize || PLAYLIST_DEFAULTS.fontSize,
+    setFontSize: (value) => { reel.playerTextStyles.playlist.fontSize = value; },
+    getFontWeight: () => reel.playerTextStyles.playlist.fontWeight || PLAYLIST_DEFAULTS.fontWeight,
+    setFontWeight: (value) => { reel.playerTextStyles.playlist.fontWeight = value; },
+    getColor: () => reel.playerTextStyles.playlist.color || defaultColor(),
+    setColor: (value) => { reel.playerTextStyles.playlist.color = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: onChange,
+  });
+  section.querySelector("#playlistStyleToolbarSlot").appendChild(playlistToolbar);
 
   return section;
 }

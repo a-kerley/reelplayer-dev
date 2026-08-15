@@ -12,6 +12,7 @@ export const playlistScroll = {
       trackEl.dataset.index = index;
 
       const titleEl = document.createElement("span");
+      titleEl.className = "playlist-item-title";
       titleEl.textContent =
         track.title ||
         track.url
@@ -20,7 +21,6 @@ export const playlistScroll = {
           .split("?")[0]
           .replace(/[_-]/g, " ")
           .replace(/\.[^/.]+$/, "");
-      titleEl.style.flex = "1";
 
       const durationEl = document.createElement("span");
       durationEl.className = "playlist-duration";
