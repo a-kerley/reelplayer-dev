@@ -34,6 +34,15 @@
     import { applyPageBackground } from './js/modules/pageBackground.js';
     import { applyTextStyles } from './js/modules/pageTextStyles.js';
 
+    // No-op, exists solely for the side effect of registering a touch
+    // handler on the document: iOS Safari otherwise ignores :active
+    // entirely (a long-standing WebKit quirk - it only evaluates :active
+    // for a tap when it detects a touch listener present somewhere on the
+    // page), which would silently drop the button block's tap feedback
+    // (css/page.css's .page-block-button-link:active) on iOS specifically,
+    // the one platform this was added for.
+    document.addEventListener('touchstart', () => {}, { passive: true });
+
     const root = document.getElementById('pageRoot');
 
     function showStatus(message) {

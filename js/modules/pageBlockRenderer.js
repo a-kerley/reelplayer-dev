@@ -19,6 +19,19 @@ import { ASSIGNABLE_TEXT_ROLES, TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from
 const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
 
+// Banner/image blocks fade in once loaded (css/page.css's .page-image-fade)
+// rather than popping in abruptly. Listeners attached BEFORE `src` is set,
+// not after - setting `src` first risks a cached image finishing loading
+// synchronously before the listener exists, in which case "load" would
+// simply never fire and the image would stay invisible forever. `error`
+// gets the same treatment so a broken image link still reveals itself
+// (as the browser's own broken-image glyph) instead of staying hidden.
+function fadeInOnLoad(img) {
+  img.classList.add("page-image-fade");
+  img.addEventListener("load", () => img.classList.add("is-loaded"), { once: true });
+  img.addEventListener("error", () => img.classList.add("is-loaded"), { once: true });
+}
+
 function renderBannerImage(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-banner";
@@ -33,9 +46,10 @@ function renderBannerImage(block) {
     // crops either dimension; letterboxes (extra space, no fill color)
     // rather than cutting off part of the image.
     const img = document.createElement("img");
-    img.src = block.imageUrl;
     img.alt = block.altText || "";
     img.style.maxHeight = `${block.maxHeight || DEFAULT_BANNER_MAX_HEIGHT}px`;
+    fadeInOnLoad(img);
+    img.src = block.imageUrl;
     el.appendChild(img);
   } else {
     el.textContent = "Banner image not set";
@@ -238,8 +252,9 @@ function renderImage(block) {
   wrapper.style.maxWidth = WIDTH_PRESETS[block.widthPreset] || WIDTH_PRESETS.full;
   if (block.imageUrl) {
     const img = document.createElement("img");
-    img.src = block.imageUrl;
     img.alt = block.altText || "";
+    fadeInOnLoad(img);
+    img.src = block.imageUrl;
     wrapper.appendChild(img);
   } else {
     wrapper.textContent = "Image not set";

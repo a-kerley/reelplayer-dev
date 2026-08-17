@@ -133,6 +133,30 @@ body.page-body {
   margin: 0 auto;
 }
 
+/* Banner/image block fade-in (js/modules/pageBlockRenderer.js's
+   fadeInOnLoad()) - starts hidden, revealed once the image actually has
+   pixels to show instead of popping in the instant the network delivers
+   it. No JS-driven animation loop, no scroll/pointer involvement - just a
+   class toggle on "load"/"error", so it's inherently as cross-browser/
+   touch-safe as a CSS transition gets. prefers-reduced-motion collapses it
+   to an instant reveal (still starts hidden, no animated motion) rather
+   than removing the class entirely, so a broken/slow image can't get
+   stuck invisible under that preference either. */
+.page-image-fade {
+  opacity: 0;
+  transition: opacity 0.4s ease;
+}
+
+.page-image-fade.is-loaded {
+  opacity: 1;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-image-fade {
+    transition: none;
+  }
+}
+
 .page-block-caption {
   color: var(--page-text-muted);
   width: 100%;
@@ -241,11 +265,31 @@ body.page-body {
   border-radius: 6px;
   font-weight: 600;
   text-decoration: none;
-  transition: opacity 0.15s ease;
+  transition: opacity 0.15s ease, transform 0.1s ease;
 }
 
 .page-block-button-link:hover {
   opacity: 0.85;
+}
+
+/* Real tap feedback, not just :hover - :hover is unreliable on touch (it
+   can stick after a tap, or never fire at all), so without this a mobile
+   tap gave no visual response until the navigation itself happened. :active
+   fires consistently for both a mouse press and a touch tap. iOS Safari has
+   a long-standing quirk where :active is ignored entirely unless a touch
+   handler exists somewhere on the page - see page.html's no-op touchstart
+   listener, which exists solely to switch this on. The scale is motion, so
+   it's the one part reduced-motion turns off below; the opacity dip alone
+   still gives a (motionless) pressed cue. */
+.page-block-button-link:active {
+  opacity: 0.7;
+  transform: scale(0.97);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-block-button-link:active {
+    transform: none;
+  }
 }
 
 /* Text Style role assignment (js/modules/pageBlocksEditor.js's
