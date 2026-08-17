@@ -47,7 +47,10 @@ export function applyBlockReveal(scopeEl, scrollSource) {
   // .page-blocks-list > .page-block directly), and this handles both
   // without the caller needing to know which shape it's in.
   const blocks = Array.from(scopeEl.querySelectorAll(".page-blocks-list > .page-block"));
-  if (!blocks.length) return () => {};
+  if (!blocks.length) {
+    console.log("📜 pageBlockReveal: no .page-block elements found under", scopeEl);
+    return () => {};
+  }
 
   // No staged reveal at all under this preference, not just a motion-free
   // version of it - .page-block-reveal-ready (the class that actually
@@ -57,18 +60,24 @@ export function applyBlockReveal(scopeEl, scrollSource) {
   // rare case a block was already mid-reveal when the OS preference
   // changed mid-session.
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
+    console.log("📜 pageBlockReveal: skipped - prefers-reduced-motion is on");
     return () => {};
   }
 
-  blocks.forEach((block, i) => {
+  const delays = blocks.map((block, i) => {
+    const delay = Math.min(i * STAGGER_MS, MAX_DELAY_MS);
     block.classList.add("page-block-reveal-ready");
-    block.style.transitionDelay = `${Math.min(i * STAGGER_MS, MAX_DELAY_MS)}ms`;
+    block.style.transitionDelay = `${delay}ms`;
+    return delay;
   });
+  console.log(`📜 pageBlockReveal: watching ${blocks.length} block(s), delays [${delays.join(", ")}]ms`);
 
   const observer = new IntersectionObserver(
     (entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
+        const i = blocks.indexOf(entry.target);
+        console.log(`📜 pageBlockReveal: block ${i} (${entry.target.className.split(" ")[1] || "?"}) entered viewport - revealing (delay was ${delays[i]}ms)`);
         entry.target.classList.add("is-visible");
         // One-shot reveal, not a repeating scroll animation - once a block
         // has appeared, scrolling it back out and in again shouldn't hide
@@ -84,5 +93,8 @@ export function applyBlockReveal(scopeEl, scrollSource) {
 
   blocks.forEach((block) => observer.observe(block));
 
-  return () => observer.disconnect();
+  return () => {
+    console.log("📜 pageBlockReveal: teardown - observer disconnected");
+    observer.disconnect();
+  };
 }
