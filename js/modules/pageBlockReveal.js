@@ -106,7 +106,30 @@ export function applyBlockReveal(scopeEl, scrollSource) {
           target.removeEventListener("transitionend", onTransitionEnd);
         }
         target.addEventListener("transitionend", onTransitionEnd);
-        target.classList.add("is-visible");
+        // Double rAF, not a direct classList.add() - .page-block-reveal-ready
+        // (opacity:0) was applied earlier in this same function, but style
+        // application alone doesn't guarantee the browser has actually
+        // PAINTED that hidden state yet; paints happen on the rendering
+        // pipeline's own schedule, not synchronously with a style write. On
+        // a busy main thread (this page's two Player iframes + a video
+        // background preload were enough to reproduce it), the first real
+        // paint opportunity can land AFTER is-visible would already have
+        // been added too, so the browser never renders an intermediate
+        // "hidden" frame to transition FROM - it just snaps straight to the
+        // final opacity, no visible fade, even though transitionend still
+        // fires (this is what block 0 finishing in 36ms instead of ~1000ms
+        // during testing turned out to mean). One rAF callback runs before
+        // the NEXT paint - it's still too early, since that same upcoming
+        // paint might be the very first one. A second, nested rAF callback
+        // runs after that paint has already happened, guaranteeing the
+        // hidden state was actually rendered at least once before this flips
+        // it - the standard fix for this class of "transition doesn't
+        // animate" bug.
+        requestAnimationFrame(() => {
+          requestAnimationFrame(() => {
+            target.classList.add("is-visible");
+          });
+        });
         // One-shot reveal, not a repeating scroll animation - once a block
         // has appeared, scrolling it back out and in again shouldn't hide
         // and re-fade it every time.
