@@ -52,7 +52,6 @@ import { colorToRgba } from "./colorUtils.js";
 const FIXED_FACTOR = 1;
 const PARALLAX_FACTOR = 0.4;
 const EDGE_BUFFER = 40; // px - oversize beyond computed height, hides blur's own edge softening
-const SCROLL_MODE_BUFFER = 400; // px - extra drift room needed only in "scroll" mode
 
 function getScrollPos(scrollSource) {
   return scrollSource === window ? window.scrollY : scrollSource.scrollTop;
@@ -236,8 +235,19 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     if (factor >= 1) {
       layer.style.height = `${viewportH + EDGE_BUFFER * 2}px`;
     } else {
+      // translateY(scrollY * factor) makes the layer lag behind the page's
+      // own scroll by (1 - factor) of the true rate (see the "scroll"
+      // parallax comment above), so over the full scrollable range
+      // (maxScroll = contentH - viewportH), the layer's bottom edge falls
+      // behind the viewport's own bottom edge by maxScroll * (1 - factor) -
+      // that's the minimum extra height needed to prevent a gap opening up
+      // by the time scrolling reaches the end. Sizing off the FULL content
+      // height instead (as this used to) demands background-size:cover
+      // scale/crop the image far more than necessary to fill that taller
+      // box, which is what read as an excessively zoomed-in background.
       const contentH = getContentHeight(scopeEl, scrollSource);
-      layer.style.height = `${Math.max(contentH, viewportH) + SCROLL_MODE_BUFFER + EDGE_BUFFER * 2}px`;
+      const maxScroll = Math.max(0, contentH - viewportH);
+      layer.style.height = `${viewportH + maxScroll * (1 - factor) + EDGE_BUFFER * 2}px`;
     }
   }
 
@@ -335,8 +345,9 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // getContentHeight()/scrollHeight - scrollHeight reflects the extent of
     // EVERY descendant, including .page-background-layer's own box, which
     // in "scroll" parallax mode is deliberately oversized past the real
-    // content (SCROLL_MODE_BUFFER). Sizing off scrollHeight fed that
-    // oversize back into this layer's height, which then fed into the next
+    // content (drift room - see sizeLayer()'s own comment for the exact
+    // amount). Sizing off scrollHeight fed that oversize back into this
+    // layer's height, which then fed into the next
     // sizeLayer() computation for .page-background-layer (its own
     // scrollHeight read includes THIS layer's box) - each resize event
     // (fired by mobile browsers as their address bar hides/shows during
