@@ -64,6 +64,16 @@ export function applyBlockReveal(scopeEl, scrollSource) {
     return () => {};
   }
 
+  // t0/elapsed() exist purely to answer "is the delay/duration actually
+  // being honored in real time, or does it just look that way from the
+  // class list" - transition-delay/duration are CSS values, not proof the
+  // browser actually spent that long animating. The "revealing" log fires
+  // when is-visible is added (start of delay countdown); the "finished
+  // fading" log fires on the real transitionend event, so the gap between
+  // them is measured wall-clock time, not a configured value.
+  const t0 = performance.now();
+  const elapsed = () => `${(performance.now() - t0).toFixed(0)}ms`;
+
   const delays = blocks.map((block, i) => {
     const delay = Math.min(i * STAGGER_MS, MAX_DELAY_MS);
     block.classList.add("page-block-reveal-ready");
@@ -76,13 +86,22 @@ export function applyBlockReveal(scopeEl, scrollSource) {
     (entries) => {
       entries.forEach((entry) => {
         if (!entry.isIntersecting) return;
-        const i = blocks.indexOf(entry.target);
-        console.log(`📜 pageBlockReveal: block ${i} (${entry.target.className.split(" ")[1] || "?"}) entered viewport - revealing (delay was ${delays[i]}ms)`);
-        entry.target.classList.add("is-visible");
+        const target = entry.target;
+        const i = blocks.indexOf(target);
+        console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} (${target.className.split(" ")[1] || "?"}) entered viewport - revealing (configured delay ${delays[i]}ms)`);
+        target.addEventListener(
+          "transitionend",
+          (e) => {
+            if (e.propertyName !== "opacity") return;
+            console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} finished fading in`);
+          },
+          { once: true }
+        );
+        target.classList.add("is-visible");
         // One-shot reveal, not a repeating scroll animation - once a block
         // has appeared, scrolling it back out and in again shouldn't hide
         // and re-fade it every time.
-        observer.unobserve(entry.target);
+        observer.unobserve(target);
       });
     },
     {
