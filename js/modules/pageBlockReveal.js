@@ -89,14 +89,23 @@ export function applyBlockReveal(scopeEl, scrollSource) {
         const target = entry.target;
         const i = blocks.indexOf(target);
         console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} (${target.className.split(" ")[1] || "?"}) entered viewport - revealing (configured delay ${delays[i]}ms)`);
-        target.addEventListener(
-          "transitionend",
-          (e) => {
-            if (e.propertyName !== "opacity") return;
-            console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} finished fading in`);
-          },
-          { once: true }
-        );
+        // Not { once: true } - transitionend bubbles, and once:true would
+        // consume the listener on the FIRST transitionend of any kind, which
+        // could be a bubbled one this handler is about to ignore, silently
+        // eating the listener before the real event ever arrives. Removed
+        // manually instead, only once the real match fires.
+        function onTransitionEnd(e) {
+          // A banner/image block's own child <img> has its own separate
+          // opacity transition (css/page.css's .page-image-fade, unrelated
+          // feature) - without the e.target check, that child's transition
+          // finishing bubbles up and gets mistaken for this wrapper's own
+          // reveal transition completing, under-reporting elapsed time by
+          // whatever's left of the child's fade.
+          if (e.target !== target || e.propertyName !== "opacity") return;
+          console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} finished fading in`);
+          target.removeEventListener("transitionend", onTransitionEnd);
+        }
+        target.addEventListener("transitionend", onTransitionEnd);
         target.classList.add("is-visible");
         // One-shot reveal, not a repeating scroll animation - once a block
         // has appeared, scrolling it back out and in again shouldn't hide
