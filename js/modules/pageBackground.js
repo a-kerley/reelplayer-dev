@@ -195,6 +195,30 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
 
   const factor = page.backgroundParallaxMode === "scroll" ? PARALLAX_FACTOR : FIXED_FACTOR;
 
+  // "Fixed" mode's illusion of staying put depends on a JS scroll listener
+  // recalculating a compensating translateY on every frame to exactly
+  // cancel the layer's natural scroll-with-the-page motion - any lag
+  // between the browser's native scroll and that recalculation catching up
+  // (even a single rAF frame) reads as visible jitter, BECAUSE the whole
+  // effect depends on matching scroll position exactly. A "scroll"
+  // (parallax) layer isn't sensitive to the same lag - it's already
+  // supposed to move differently from the page, so a frame of slack is
+  // imperceptible. real position:fixed sidesteps the problem entirely for
+  // the one context where it's actually usable (scrollSource === window,
+  // i.e. the real published page - NOT the builder's own preview pane,
+  // which is its own scrollable element, not the window, and position:fixed
+  // can only ever anchor to the viewport): the browser pins it on the
+  // compositor thread with zero script involved, so there's nothing left
+  // to lag. It also needs no scroll listener at all - a real position:fixed
+  // element is automatically excluded from every ancestor's scrollable
+  // overflow by spec (the exact bug class .page-background-clip's
+  // overflow:hidden exists to prevent for the transform-driven case below),
+  // so it's safe to bypass that wrapper's clipping for this case specifically.
+  const useNativeFixed = factor >= 1 && scrollSource === window;
+  if (useNativeFixed) {
+    layer.style.position = "fixed";
+  }
+
   function sizeClip() {
     clip.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
   }
@@ -236,15 +260,17 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   onMeasureChange.push(sizeClip, sizeLayer);
   sizeClip();
   sizeLayer();
-  updateTransform();
 
-  const scrollTarget = scrollSource === window ? window : scrollSource;
-  scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+  // Native fixed positioning needs none of this - no transform to compute,
+  // no scroll listener to drive it, nothing that could ever lag.
+  if (!useNativeFixed) {
+    updateTransform();
+    const scrollTarget = scrollSource === window ? window : scrollSource;
+    scrollTarget.addEventListener("scroll", onScroll, { passive: true });
+    teardowns.push(() => scrollTarget.removeEventListener("scroll", onScroll));
+  }
 
-  teardowns.push(() => {
-    scrollTarget.removeEventListener("scroll", onScroll);
-    clip.remove();
-  });
+  teardowns.push(() => clip.remove());
 
   return () => teardowns.forEach((fn) => fn());
 }
