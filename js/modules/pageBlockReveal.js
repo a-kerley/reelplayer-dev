@@ -22,8 +22,8 @@
 // block a visitor scrolls all the way down to still reveals close to
 // immediately (the cap keeps a block far down the page from ever waiting
 // on some large, meaningless delay carried over from its raw index).
-const STAGGER_MS = 90;
-const MAX_DELAY_MS = 450;
+const STAGGER_MS = 200;
+const MAX_DELAY_MS = 1000;
 
 /**
  * @param {HTMLElement} scopeEl - document.body for page.html, #pagePreviewPane
