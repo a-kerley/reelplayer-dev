@@ -128,6 +128,27 @@ export function applyBlockReveal(scopeEl, scrollSource) {
         requestAnimationFrame(() => {
           requestAnimationFrame(() => {
             target.classList.add("is-visible");
+            // Block 0 only, temporary - directly samples the actual
+            // rendered opacity value every ~100ms, independent of whether
+            // transitionend fires reliably (it hasn't, consistently, in
+            // real-world testing). This is the ground truth for "is it
+            // really animating or just jumping" - a ramp (0, 0.1, 0.3, 0.6,
+            // 1...) proves a real transition; several 1s in a row from the
+            // very first sample proves it snapped instantly.
+            if (i === 0) {
+              const sampleStart = performance.now();
+              const samples = [];
+              const sampleInterval = setInterval(() => {
+                samples.push({
+                  t: Math.round(performance.now() - sampleStart),
+                  opacity: getComputedStyle(target).opacity,
+                });
+                if (performance.now() - sampleStart > 1500) {
+                  clearInterval(sampleInterval);
+                  console.log("📜 pageBlockReveal: block 0 opacity samples -", samples);
+                }
+              }, 100);
+            }
           });
         });
         // One-shot reveal, not a repeating scroll animation - once a block
