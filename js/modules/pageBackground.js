@@ -219,7 +219,12 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
 
   let ticking = false;
   function updateTransform() {
-    layer.style.transform = `translateY(${getScrollPos(scrollSource) * factor}px)`;
+    // translate3d, not translateY - the 3D form is a much stronger, more
+    // consistent signal to promote the layer onto the GPU compositor than
+    // a plain 2D translateY, on top of the will-change:transform hint in
+    // css/page.css (that hint alone wasn't enough to stop scroll stutter
+    // with a large blurred surface - see that rule's comment).
+    layer.style.transform = `translate3d(0, ${getScrollPos(scrollSource) * factor}px, 0)`;
     ticking = false;
   }
   function onScroll() {
