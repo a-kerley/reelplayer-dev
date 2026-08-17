@@ -53,7 +53,6 @@ const FIXED_FACTOR = 1;
 const PARALLAX_FACTOR = 0.4;
 const EDGE_BUFFER = 40; // px - oversize beyond computed height, hides blur's own edge softening
 const SCROLL_MODE_BUFFER = 400; // px - extra drift room needed only in "scroll" mode
-const OVERSCROLL_SAFETY_BUFFER = 200; // px - see positionContentOverlay()'s fullBleed branch
 
 function getScrollPos(scrollSource) {
   return scrollSource === window ? window.scrollY : scrollSource.scrollTop;
@@ -305,19 +304,27 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // scroll) compounded the two layers' heights off each other with no
     // ceiling. contentEl's own box is unaffected by either layer, so it
     // can't feed a loop.
-    // OVERSCROLL_SAFETY_BUFFER pads the bottom past that computed edge - a
-    // fixed constant, not derived from scrollHeight/anything the overlay
-    // itself affects, so it can't feed the growth loop described above. It
-    // exists so a native rubber-band/elastic overscroll bounce (or any
-    // other momentary over-scroll past the real bottom) still reveals more
-    // of the tint instead of the page's bare background color for that
-    // instant - harmless since it's just a translucent color extending
-    // past content that was never visible without overscrolling anyway.
     overlay.style.top = "0";
     overlay.style.bottom = "";
-    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource)) + OVERSCROLL_SAFETY_BUFFER}px`;
+    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
     overlay.style.borderRadius = "0";
+    // A native rubber-band/elastic overscroll bounce reveals area beyond
+    // scopeEl's own real bottom - the browser paints THAT sliver from
+    // scopeEl's own background-color, not from any element inside it, so
+    // no DOM box can cover it (a first attempt at this padded the overlay's
+    // own height past the real edge instead; that box, being real layout
+    // geometry, made the extra area genuinely scrollable by ordinary
+    // means, not just reachable via bounce - background-color never
+    // affects scrollable overflow, so it's the only way to tint that gap
+    // without reopening that bug). Cleared in the non-fullBleed branch
+    // below so a page that had fullBleed on and then turned it off doesn't
+    // keep a stale tinted background.
+    scopeEl.style.backgroundColor = colorToRgba(
+      page.contentOverlayColor || "#000000",
+      (page.contentOverlayOpacity ?? 0) / 100
+    );
   } else {
+    scopeEl.style.backgroundColor = "";
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
     overlay.style.bottom = "";
     overlay.style.height = `${contentEl.offsetHeight + marginV * 2}px`;
