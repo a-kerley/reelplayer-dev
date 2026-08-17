@@ -163,6 +163,14 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   // anyway.
   const clip = document.createElement("div");
   clip.className = "page-background-clip";
+  // Solid color behind the image layer (painted first, since it's the
+  // clip's own background rather than a sibling/child) - not a translucent
+  // tint stacked on top like .page-content-overlay-layer above. Fills any
+  // transparency in the source image and the blurred layer's own edge
+  // softening with a chosen color instead of scopeEl's plain background.
+  clip.style.backgroundColor = page.backgroundOverlayEnabled
+    ? (page.backgroundOverlayColor || "#000000")
+    : "";
   scopeEl.insertBefore(clip, scopeEl.firstChild);
 
   const layer = document.createElement("div");

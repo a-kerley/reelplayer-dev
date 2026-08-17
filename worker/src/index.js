@@ -22,6 +22,7 @@
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
 //                               analyticsEnabled?, backgroundImageEnabled?, backgroundImage?,
+//                               backgroundOverlayEnabled?, backgroundOverlayColor?,
 //                               backgroundBlur?, backgroundParallaxMode?, contentOverlayColor?,
 //                               contentOverlayOpacity?, contentOverlayFullBleed?,
 //                               contentOverlayMarginVertical?, contentOverlayMarginHorizontal?,
@@ -429,6 +430,8 @@ export default {
           analyticsEnabled: body.analyticsEnabled === true,
           backgroundImageEnabled: body.backgroundImageEnabled === true,
           backgroundImage: typeof body.backgroundImage === "string" ? body.backgroundImage : "",
+          backgroundOverlayEnabled: body.backgroundOverlayEnabled === true,
+          backgroundOverlayColor: typeof body.backgroundOverlayColor === "string" ? body.backgroundOverlayColor : "#000000",
           backgroundBlur: typeof body.backgroundBlur === "number" ? body.backgroundBlur : 12,
           backgroundParallaxMode: body.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
           contentOverlayColor: typeof body.contentOverlayColor === "string" ? body.contentOverlayColor : "#000000",

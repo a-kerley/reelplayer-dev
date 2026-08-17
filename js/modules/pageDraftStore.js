@@ -20,6 +20,8 @@ function normalizePage(page) {
   if (page.analyticsEnabled === undefined) page.analyticsEnabled = false;
   if (page.backgroundImageEnabled === undefined) page.backgroundImageEnabled = false;
   if (page.backgroundImage === undefined) page.backgroundImage = "";
+  if (page.backgroundOverlayEnabled === undefined) page.backgroundOverlayEnabled = false;
+  if (page.backgroundOverlayColor === undefined) page.backgroundOverlayColor = "#000000";
   if (page.backgroundBlur === undefined) page.backgroundBlur = 12;
   if (page.backgroundParallaxMode === undefined) page.backgroundParallaxMode = "fixed";
   if (page.contentOverlayColor === undefined) page.contentOverlayColor = "#000000";

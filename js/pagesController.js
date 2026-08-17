@@ -34,6 +34,8 @@ function createEmptyPage() {
     locked: false,
     backgroundImageEnabled: false,
     backgroundImage: "",
+    backgroundOverlayEnabled: false,
+    backgroundOverlayColor: "#000000",
     backgroundBlur: 12,
     backgroundParallaxMode: "fixed",
     contentOverlayColor: "#000000",
@@ -298,6 +300,38 @@ export function initPagesController() {
         updateCurrentPage();
       });
       urlSlot.appendChild(row);
+    }
+
+    // Solid color rendered behind the image (js/modules/pageBackground.js's
+    // .page-background-clip), not another translucent tint on top of it
+    // like Content Background below - useful for filling a transparent PNG's
+    // gaps or the blurred image's own edge softening with a chosen color
+    // instead of the page's plain background. No opacity slider, unlike
+    // Content Background - <input type="color"> is always opaque, and a
+    // partly-transparent base color behind an opaque cover-sized image
+    // would rarely be visible anyway.
+    const overlayToggleSlot = document.getElementById("pageBackgroundOverlayToggleSlot");
+    if (overlayToggleSlot) {
+      overlayToggleSlot.innerHTML = "";
+      overlayToggleSlot.appendChild(createToggleSwitch({
+        id: "pageBackgroundOverlayEnabled",
+        checked: !!page.backgroundOverlayEnabled,
+        onChange: (e) => {
+          page.backgroundOverlayEnabled = e.target.checked;
+          updateCurrentPage();
+        },
+      }));
+    }
+
+    const overlayBgColorInput = document.getElementById("pageBackgroundOverlayColor");
+    if (overlayBgColorInput) {
+      overlayBgColorInput.value = page.backgroundOverlayColor || "#000000";
+      overlayBgColorInput.addEventListener("input", () => {
+        page.backgroundOverlayColor = overlayBgColorInput.value;
+      });
+      overlayBgColorInput.addEventListener("change", () => {
+        updateCurrentPage();
+      });
     }
 
     const modeSelect = document.getElementById("pageBackgroundParallaxMode");
@@ -615,6 +649,11 @@ export function initPagesController() {
             <span id="pageBackgroundToggleSlot"></span>
           </div>
           <div id="pageBackgroundUrlRowSlot"></div>
+          <div class="color-row" style="margin-top:0.6rem;">
+            <label for="pageBackgroundOverlayEnabled" style="cursor:pointer;">Overlay behind image</label>
+            <span id="pageBackgroundOverlayToggleSlot"></span>
+            <input type="color" id="pageBackgroundOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+          </div>
           <div class="color-row" style="margin-top:0.6rem;">
             <span>Scroll behavior:</span>
             <select id="pageBackgroundParallaxMode" class="builder-select">
