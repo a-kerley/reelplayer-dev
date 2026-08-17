@@ -95,11 +95,11 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   // element itself catches all of those causes uniformly, window resize
   // included (resizing reflows the content, which resizes the observed
   // element), so no separate "resize" listener is needed alongside it.
-  positionContentOverlay(scopeEl, page);
+  positionContentOverlay(scopeEl, page, scrollSource);
   const overlayContentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
   let contentResizeObserver = null;
   if (overlayContentEl) {
-    contentResizeObserver = new ResizeObserver(() => positionContentOverlay(scopeEl, page));
+    contentResizeObserver = new ResizeObserver(() => positionContentOverlay(scopeEl, page, scrollSource));
     contentResizeObserver.observe(overlayContentEl);
   }
   teardowns.push(() => contentResizeObserver?.disconnect());
@@ -107,6 +107,19 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     const existing = scopeEl.querySelector(".page-content-overlay-layer");
     if (existing) existing.remove();
   });
+
+  // Full-bleed mode needs to reach the viewport's bottom even when the
+  // content itself is shorter than the viewport (a short page, or the
+  // builder's preview pane before enough blocks are added) - a pure
+  // viewport-height resize doesn't necessarily change overlayContentEl's
+  // own box, so the ResizeObserver above won't always catch it. See
+  // positionContentOverlay()'s fullBleed branch for why "bottom:0" alone
+  // can't be relied on here.
+  function onViewportResize() {
+    positionContentOverlay(scopeEl, page, scrollSource);
+  }
+  window.addEventListener("resize", onViewportResize);
+  teardowns.push(() => window.removeEventListener("resize", onViewportResize));
 
   if (!page.backgroundImageEnabled || !page.backgroundImage) {
     return () => teardowns.forEach((fn) => fn());
@@ -198,7 +211,7 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
 // elements paint in tree order across the whole subtree, not just among
 // literal siblings, as long as nothing between them establishes its own
 // stacking context - which #pageRoot doesn't.
-function positionContentOverlay(scopeEl, page) {
+function positionContentOverlay(scopeEl, page, scrollSource) {
   const existing = scopeEl.querySelector(".page-content-overlay-layer");
   if (existing) existing.remove();
 
@@ -220,9 +233,20 @@ function positionContentOverlay(scopeEl, page) {
   );
 
   if (fullBleed) {
+    // Not "top:0; bottom:0; height:auto" - scopeEl (body for page.html,
+    // #pagePreviewPane for the builder preview) is only as tall as its own
+    // in-flow content, since absolutely positioned descendants (this layer
+    // included) don't contribute to that auto-height. When the page's
+    // actual content is shorter than the viewport, that leaves scopeEl's
+    // box shorter than the visible page too, so "bottom:0" resolves against
+    // that shorter box and the tint stops short of the real bottom of the
+    // screen - the exact "extends to top but not bottom" symptom. Sizing
+    // explicitly to whichever is taller - content or viewport - covers both:
+    // a long page (content taller than viewport) and a short one (viewport
+    // taller than content).
     overlay.style.top = "0";
-    overlay.style.bottom = "0";
-    overlay.style.height = "";
+    overlay.style.bottom = "";
+    overlay.style.height = `${Math.max(getContentHeight(scopeEl, scrollSource), getViewportHeight(scrollSource))}px`;
     overlay.style.borderRadius = "0";
   } else {
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
