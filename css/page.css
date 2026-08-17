@@ -68,6 +68,12 @@ body.page-body {
   background-size: cover;
   background-position: center;
   background-repeat: no-repeat;
+  /* Promotes this to its own compositor layer - without it, the scroll-
+     driven translateY (js/modules/pageBackground.js's updateTransform())
+     combined with the blur filter set inline per-page can make the browser
+     re-rasterize the blur on every scroll tick instead of just moving an
+     already-blurred bitmap, reading as stutter on scroll. */
+  will-change: transform;
 }
 
 /* Content-column tint - js/modules/pageBackground.js's positionContentOverlay()
