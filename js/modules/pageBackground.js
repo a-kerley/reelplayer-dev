@@ -244,9 +244,23 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // explicitly to whichever is taller - content or viewport - covers both:
     // a long page (content taller than viewport) and a short one (viewport
     // taller than content).
+    //
+    // Measured from contentEl's own box (offsetTop + offsetHeight), NOT
+    // getContentHeight()/scrollHeight - scrollHeight reflects the extent of
+    // EVERY descendant, including .page-background-layer's own box, which
+    // in "scroll" parallax mode is deliberately oversized past the real
+    // content (SCROLL_MODE_BUFFER). Sizing off scrollHeight fed that
+    // oversize back into this layer's height, which then fed into the next
+    // sizeLayer() computation for .page-background-layer (its own
+    // scrollHeight read includes THIS layer's box) - each resize event
+    // (fired by mobile browsers as their address bar hides/shows during
+    // scroll, reproducing as "scrolling near the bottom slowly grows the
+    // page") compounded the two layers' heights off each other with no
+    // ceiling. contentEl's own box is unaffected by either layer, so it
+    // can't feed a loop.
     overlay.style.top = "0";
     overlay.style.bottom = "";
-    overlay.style.height = `${Math.max(getContentHeight(scopeEl, scrollSource), getViewportHeight(scrollSource))}px`;
+    overlay.style.height = `${Math.max(contentEl.offsetTop + contentEl.offsetHeight, getViewportHeight(scrollSource))}px`;
     overlay.style.borderRadius = "0";
   } else {
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
