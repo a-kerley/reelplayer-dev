@@ -145,6 +145,57 @@ column's width from the first row and ignores content afterward — is what
 actually enforces a cap; see `js/modules/styleToolbarWidgets.js`'s
 `openTextStyleDefsDialog()`.
 
+## Gotcha: `js/modules/pageBackground.js` and `document.documentElement.scrollHeight`
+
+Three related, hard-to-spot bugs have come out of this one file, all
+variations on the same trap: **never size or trigger a re-measure off
+`scrollHeight`/`getContentHeight()` in here** - it reflects the extent of
+every descendant, including this module's own absolutely-positioned
+layers, so feeding it back into their own sizing creates a growth loop with
+no ceiling. Always measure the real content element's own box
+(`getContentExtent()` - `contentEl.offsetTop + contentEl.offsetHeight`)
+instead:
+
+- The "Extend to top/bottom of page" content-overlay tint
+  (`contentOverlayFullBleed`) used `top:0; bottom:0; height:auto`, which
+  only stretches to fill the *containing block's own box* - shorter than
+  the viewport whenever the page has little content, so the tint stopped
+  short of the real bottom on short pages.
+- Fixing that by sizing off `scrollHeight` instead created a second bug: in
+  "scroll" parallax mode, `.page-background-layer` is deliberately
+  oversized past real content (`SCROLL_MODE_BUFFER`), and each `resize`
+  event (fired by mobile browsers as their address bar hides/shows during
+  scroll) fed that oversize into the overlay's height, which fed back into
+  the layer's own next size calculation - unbounded growth on every
+  resize, confirmed by hand.
+- Separately, `.page-background-layer`'s scroll-driven
+  `transform: translateY(scrollPos * factor)` has its own version of the
+  same trap: Chrome includes a transformed element's *post-transform* box
+  in its ancestor's scrollable overflow, so translating the layer down as
+  the user scrolls directly grew the page's own `scrollHeight` by the same
+  amount - which grew how far they could scroll, which grew the next
+  translate. This read as "scrolling near the bottom of the page slowly
+  extends it forever" and had nothing to do with resize events at all. The
+  layer is now wrapped in `.page-background-clip` (`overflow:hidden`,
+  height capped via `getContentExtent()`) specifically to absorb this
+  before it reaches the page's own scroll region.
+- A later attempt to pad the full-bleed tint past the real bottom (as a
+  safety margin for native rubber-band/elastic overscroll bounce) hit the
+  same trap from a different angle: any real DOM box tall enough to be
+  visible during a bounce is, by definition, tall enough to be reachable by
+  *ordinary* scrolling too - there's no CSS way to paint below an element's
+  true edge without that space becoming genuinely scrollable. The fix was
+  to set `scopeEl`'s own `background-color` to the tint instead - browsers
+  paint the overscroll-bounce gap from the container's `background-color`,
+  which never affects scrollable layout at all.
+
+If you touch parallax, full-bleed sizing, or anything that reads
+`document.body`/`#pagePreviewPane`'s height in this file, verify by
+scripting repeated `resize` events and a direct `element.style.transform =
+'translateY(2000px)'` probe (not just eyeballing it - the growth is
+gradual and easy to miss in a quick check) and confirming
+`document.documentElement.scrollHeight` doesn't move.
+
 ## Media browsing, text-style toolkit, and Cloudflare backend
 
 See `js/modules/CLAUDE.md` for the shared media-browser component
@@ -166,3 +217,10 @@ No test suite exists. `node --check` (via `node --input-type=module --check
 (`grep -o "{" | wc -l` vs `}`) is a quick CSS sanity check. Beyond that,
 verification means actually loading `index.html`/`player.html` in a browser
 and exercising the feature.
+
+## Git workflow
+
+Commit and push to `main` after making a change, without asking for
+confirmation each time - the user has authorized this standing behavior for
+this repo. (Ordinary git safety rules still apply otherwise: don't force-push,
+don't skip hooks, don't rewrite existing commits.)
