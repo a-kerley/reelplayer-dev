@@ -106,6 +106,35 @@ body.page-body {
   min-height: 2rem;
 }
 
+/* Staged top-to-bottom reveal (js/modules/pageBlockReveal.js's
+   applyBlockReveal()) - .page-block-reveal-ready is only ever added by
+   that JS, so a block stays normally visible if the script hasn't run yet
+   (or never runs, e.g. very old cached page.js) - no flash of hidden
+   content waiting on JS. transition-delay is set inline per-block by that
+   same script (its own stagger math), not here. */
+.page-block-reveal-ready {
+  opacity: 0;
+  transform: translateY(16px);
+  transition: opacity 0.5s ease, transform 0.5s ease;
+}
+
+.page-block-reveal-ready.is-visible {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+/* Belt-and-suspenders alongside applyBlockReveal()'s own reduced-motion
+   check (which skips adding .page-block-reveal-ready at all, the normal
+   case) - covers a block that was already mid-reveal if the OS preference
+   changed mid-session. */
+@media (prefers-reduced-motion: reduce) {
+  .page-block-reveal-ready {
+    opacity: 1;
+    transform: none;
+    transition: none;
+  }
+}
+
 .page-block-empty {
   display: flex;
   align-items: center;

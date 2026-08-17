@@ -23,6 +23,7 @@ import { createToggleSwitch, createUrlInputRow } from "./modules/domUtils.js";
 import { createValueControl } from "./modules/valueControl.js";
 import { applyPageBackground } from "./modules/pageBackground.js";
 import { applyTextStyles } from "./modules/pageTextStyles.js";
+import { applyBlockReveal } from "./modules/pageBlockReveal.js";
 
 function createEmptyPage() {
   return {
@@ -63,6 +64,11 @@ export function initPagesController() {
   // scroll listener wouldn't otherwise be cleaned up just by innerHTML=""
   // wiping its (wiped) children.
   let backgroundCleanup = () => {};
+  // Same reasoning as backgroundCleanup above, for js/modules/
+  // pageBlockReveal.js's IntersectionObserver - it holds references to the
+  // previous render's block elements, which innerHTML="" detaches from the
+  // DOM but doesn't stop the observer from watching.
+  let revealCleanup = () => {};
 
   const loadingOverlay = document.getElementById("builderLoadingOverlay");
   const loadingContent = document.getElementById("builderLoadingContent");
@@ -191,6 +197,7 @@ export function initPagesController() {
   function renderPagePreview(page) {
     if (!pagePreviewPane) return;
     backgroundCleanup();
+    revealCleanup();
 
     const blocks = Array.isArray(page.blocks) ? page.blocks : [];
     if (!blocks.length) {
@@ -207,6 +214,7 @@ export function initPagesController() {
     // js/modules/pageBackground.js's scrollSource param.
     backgroundCleanup = applyPageBackground(pagePreviewPane, page, pagePreviewPane);
     applyTextStyles(pagePreviewPane, page);
+    revealCleanup = applyBlockReveal(pagePreviewPane, pagePreviewPane);
   }
 
   // Mirrors js/main.js's updateReelPublishStatus() - a page has no content-
@@ -736,6 +744,8 @@ export function initPagesController() {
       if (pagePreviewPane) {
         backgroundCleanup();
         backgroundCleanup = () => {};
+        revealCleanup();
+        revealCleanup = () => {};
         pagePreviewPane.innerHTML = "";
       }
       const lockBtn = document.getElementById('pageLockBtn');

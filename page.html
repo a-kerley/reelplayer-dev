@@ -33,6 +33,7 @@
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
     import { applyPageBackground } from './js/modules/pageBackground.js';
     import { applyTextStyles } from './js/modules/pageTextStyles.js';
+    import { applyBlockReveal } from './js/modules/pageBlockReveal.js';
 
     // No-op, exists solely for the side effect of registering a touch
     // handler on the document: iOS Safari otherwise ignores :active
@@ -160,6 +161,7 @@
       // both call the exact same function rather than two implementations.
       applyPageBackground(document.body, pageData, window);
       applyTextStyles(document.body, pageData);
+      applyBlockReveal(document.body, window);
     }
 
     init();
