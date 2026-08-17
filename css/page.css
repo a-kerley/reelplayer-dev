@@ -110,17 +110,16 @@ body.page-body {
    applyBlockReveal()) - .page-block-reveal-ready is only ever added by
    that JS, so a block stays normally visible if the script hasn't run yet
    (or never runs, e.g. very old cached page.js) - no flash of hidden
-   content waiting on JS. transition-delay is set inline per-block by that
-   same script (its own stagger math), not here. */
+   content waiting on JS. Just the static pre-reveal state - the actual
+   fade/rise animation is driven by target.animate() (Web Animations API)
+   in JS, not a CSS transition, so there's no transition-duration/-delay
+   here to keep in sync with that file's own timing constants; its
+   fill:"forwards" animation paints over these values once the reveal
+   fires, permanently, at higher priority than this stylesheet rule (same
+   idea as an inline style). */
 .page-block-reveal-ready {
   opacity: 0;
   transform: translateY(16px);
-  transition: opacity 1s ease, transform 1s ease;
-}
-
-.page-block-reveal-ready.is-visible {
-  opacity: 1;
-  transform: translateY(0);
 }
 
 /* Belt-and-suspenders alongside applyBlockReveal()'s own reduced-motion
@@ -131,7 +130,6 @@ body.page-body {
   .page-block-reveal-ready {
     opacity: 1;
     transform: none;
-    transition: none;
   }
 }
 

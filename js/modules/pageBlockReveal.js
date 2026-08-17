@@ -15,15 +15,32 @@
 // sets anything tied to live scroll position, so it can't reintroduce that
 // bug class.
 //
-// Each block's CSS transition-delay is set from its own position among
-// siblings (0, STAGGER_MS, 2*STAGGER_MS, ...), capped at MAX_DELAY_MS. That
-// staggers whichever blocks are visible together - typically everything
-// above the fold on first load - into a top-to-bottom cascade, while a
-// block a visitor scrolls all the way down to still reveals close to
-// immediately (the cap keeps a block far down the page from ever waiting
-// on some large, meaningless delay carried over from its raw index).
+// Driven by the Web Animations API (target.animate()), NOT a CSS class
+// toggle triggering a declarative transition - that was the original
+// implementation, and real-world testing on a live page repeatedly showed
+// it completing in under 100ms regardless of the declared 1s duration
+// (confirmed by directly sampling computed opacity every 100ms - it read
+// "1" from the very first sample, every time), while an isolated,
+// standalone transition test in the same browser worked correctly. That
+// pattern - a real value change happens, transitionend fires, but the
+// animation itself never visibly runs its declared duration - is the
+// signature of a CSS transition getting cut short by a mid-flight style
+// recalculation (e.g. a web font finishing its swap, or any other layout-
+// triggering change elsewhere on the page landing at the wrong moment).
+// element.animate() keeps its own independent timeline instead of being
+// re-derived from computed style on every recalc, so it isn't vulnerable
+// to that class of interruption.
+//
+// Each block's start delay is set from its own position among siblings (0,
+// STAGGER_MS, 2*STAGGER_MS, ...), capped at MAX_DELAY_MS. That staggers
+// whichever blocks are visible together - typically everything above the
+// fold on first load - into a top-to-bottom cascade, while a block a
+// visitor scrolls all the way down to still reveals close to immediately
+// (the cap keeps a block far down the page from ever waiting on some large,
+// meaningless delay carried over from its raw index).
 const STAGGER_MS = 400;
 const MAX_DELAY_MS = 2000;
+const FADE_DURATION_MS = 1000;
 
 /**
  * @param {HTMLElement} scopeEl - document.body for page.html, #pagePreviewPane
@@ -47,40 +64,20 @@ export function applyBlockReveal(scopeEl, scrollSource) {
   // .page-blocks-list > .page-block directly), and this handles both
   // without the caller needing to know which shape it's in.
   const blocks = Array.from(scopeEl.querySelectorAll(".page-blocks-list > .page-block"));
-  if (!blocks.length) {
-    console.log("📜 pageBlockReveal: no .page-block elements found under", scopeEl);
-    return () => {};
-  }
+  if (!blocks.length) return () => {};
 
   // No staged reveal at all under this preference, not just a motion-free
   // version of it - .page-block-reveal-ready (the class that actually
   // hides a block pre-reveal) is never added, so blocks simply render
-  // normally visible, like before this feature existed. css/page.css
-  // carries a matching (belt-and-suspenders) reduced-motion rule for the
-  // rare case a block was already mid-reveal when the OS preference
-  // changed mid-session.
+  // normally visible, like before this feature existed.
   if (window.matchMedia("(prefers-reduced-motion: reduce)").matches) {
-    console.log("📜 pageBlockReveal: skipped - prefers-reduced-motion is on");
     return () => {};
   }
 
-  // t0/elapsed() exist purely to answer "is the delay/duration actually
-  // being honored in real time, or does it just look that way from the
-  // class list" - transition-delay/duration are CSS values, not proof the
-  // browser actually spent that long animating. The "revealing" log fires
-  // when is-visible is added (start of delay countdown); the "finished
-  // fading" log fires on the real transitionend event, so the gap between
-  // them is measured wall-clock time, not a configured value.
-  const t0 = performance.now();
-  const elapsed = () => `${(performance.now() - t0).toFixed(0)}ms`;
-
   const delays = blocks.map((block, i) => {
-    const delay = Math.min(i * STAGGER_MS, MAX_DELAY_MS);
     block.classList.add("page-block-reveal-ready");
-    block.style.transitionDelay = `${delay}ms`;
-    return delay;
+    return Math.min(i * STAGGER_MS, MAX_DELAY_MS);
   });
-  console.log(`📜 pageBlockReveal: watching ${blocks.length} block(s), delays [${delays.join(", ")}]ms`);
 
   const observer = new IntersectionObserver(
     (entries) => {
@@ -88,69 +85,23 @@ export function applyBlockReveal(scopeEl, scrollSource) {
         if (!entry.isIntersecting) return;
         const target = entry.target;
         const i = blocks.indexOf(target);
-        console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} (${target.className.split(" ")[1] || "?"}) entered viewport - revealing (configured delay ${delays[i]}ms)`);
-        // Not { once: true } - transitionend bubbles, and once:true would
-        // consume the listener on the FIRST transitionend of any kind, which
-        // could be a bubbled one this handler is about to ignore, silently
-        // eating the listener before the real event ever arrives. Removed
-        // manually instead, only once the real match fires.
-        function onTransitionEnd(e) {
-          // A banner/image block's own child <img> has its own separate
-          // opacity transition (css/page.css's .page-image-fade, unrelated
-          // feature) - without the e.target check, that child's transition
-          // finishing bubbles up and gets mistaken for this wrapper's own
-          // reveal transition completing, under-reporting elapsed time by
-          // whatever's left of the child's fade.
-          if (e.target !== target || e.propertyName !== "opacity") return;
-          console.log(`📜 pageBlockReveal: [${elapsed()}] block ${i} finished fading in`);
-          target.removeEventListener("transitionend", onTransitionEnd);
-        }
-        target.addEventListener("transitionend", onTransitionEnd);
-        // Double rAF, not a direct classList.add() - .page-block-reveal-ready
-        // (opacity:0) was applied earlier in this same function, but style
-        // application alone doesn't guarantee the browser has actually
-        // PAINTED that hidden state yet; paints happen on the rendering
-        // pipeline's own schedule, not synchronously with a style write. On
-        // a busy main thread (this page's two Player iframes + a video
-        // background preload were enough to reproduce it), the first real
-        // paint opportunity can land AFTER is-visible would already have
-        // been added too, so the browser never renders an intermediate
-        // "hidden" frame to transition FROM - it just snaps straight to the
-        // final opacity, no visible fade, even though transitionend still
-        // fires (this is what block 0 finishing in 36ms instead of ~1000ms
-        // during testing turned out to mean). One rAF callback runs before
-        // the NEXT paint - it's still too early, since that same upcoming
-        // paint might be the very first one. A second, nested rAF callback
-        // runs after that paint has already happened, guaranteeing the
-        // hidden state was actually rendered at least once before this flips
-        // it - the standard fix for this class of "transition doesn't
-        // animate" bug.
-        requestAnimationFrame(() => {
-          requestAnimationFrame(() => {
-            target.classList.add("is-visible");
-            // Block 0 only, temporary - directly samples the actual
-            // rendered opacity value every ~100ms, independent of whether
-            // transitionend fires reliably (it hasn't, consistently, in
-            // real-world testing). This is the ground truth for "is it
-            // really animating or just jumping" - a ramp (0, 0.1, 0.3, 0.6,
-            // 1...) proves a real transition; several 1s in a row from the
-            // very first sample proves it snapped instantly.
-            if (i === 0) {
-              const sampleStart = performance.now();
-              const samples = [];
-              const sampleInterval = setInterval(() => {
-                samples.push({
-                  t: Math.round(performance.now() - sampleStart),
-                  opacity: getComputedStyle(target).opacity,
-                });
-                if (performance.now() - sampleStart > 1500) {
-                  clearInterval(sampleInterval);
-                  console.log("📜 pageBlockReveal: block 0 opacity samples -", samples);
-                }
-              }, 100);
-            }
-          });
-        });
+        // fill: "forwards" holds the end state after the animation
+        // completes, at higher priority than the underlying CSS (same
+        // idea as an inline style) - .page-block-reveal-ready's opacity:0/
+        // translateY(16px) stays in the stylesheet as the pre-reveal state,
+        // this just paints over it once, permanently, per element.
+        target.animate(
+          [
+            { opacity: 0, transform: "translateY(16px)" },
+            { opacity: 1, transform: "translateY(0)" },
+          ],
+          {
+            duration: FADE_DURATION_MS,
+            delay: delays[i],
+            easing: "ease",
+            fill: "forwards",
+          }
+        );
         // One-shot reveal, not a repeating scroll animation - once a block
         // has appeared, scrolling it back out and in again shouldn't hide
         // and re-fade it every time.
@@ -165,24 +116,5 @@ export function applyBlockReveal(scopeEl, scrollSource) {
 
   blocks.forEach((block) => observer.observe(block));
 
-  // Fires once, at a fixed point safely past every possible delay+duration
-  // (MAX_DELAY_MS + a 1s fade + 1s slack), and reports each block's actual
-  // ground-truth state - not reliant on a person timing when they check the
-  // console themselves, or on transitionend having fired at all (a heavily
-  // loaded main thread, e.g. from a browser extension's own content script,
-  // can starve/coalesce a transition without ever firing that event).
-  setTimeout(() => {
-    const report = blocks.map((block, i) => ({
-      i,
-      type: block.className.split(" ")[1] || "?",
-      opacity: getComputedStyle(block).opacity,
-      isVisibleClass: block.classList.contains("is-visible"),
-    }));
-    console.log(`📜 pageBlockReveal: [${elapsed()}] final status check -`, report);
-  }, MAX_DELAY_MS + 2000);
-
-  return () => {
-    console.log("📜 pageBlockReveal: teardown - observer disconnected");
-    observer.disconnect();
-  };
+  return () => observer.disconnect();
 }
