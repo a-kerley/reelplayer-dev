@@ -121,6 +121,22 @@ export function applyBlockReveal(scopeEl, scrollSource) {
 
   blocks.forEach((block) => observer.observe(block));
 
+  // Fires once, at a fixed point safely past every possible delay+duration
+  // (MAX_DELAY_MS + a 1s fade + 1s slack), and reports each block's actual
+  // ground-truth state - not reliant on a person timing when they check the
+  // console themselves, or on transitionend having fired at all (a heavily
+  // loaded main thread, e.g. from a browser extension's own content script,
+  // can starve/coalesce a transition without ever firing that event).
+  setTimeout(() => {
+    const report = blocks.map((block, i) => ({
+      i,
+      type: block.className.split(" ")[1] || "?",
+      opacity: getComputedStyle(block).opacity,
+      isVisibleClass: block.classList.contains("is-visible"),
+    }));
+    console.log(`📜 pageBlockReveal: [${elapsed()}] final status check -`, report);
+  }, MAX_DELAY_MS + 2000);
+
   return () => {
     console.log("📜 pageBlockReveal: teardown - observer disconnected");
     observer.disconnect();
