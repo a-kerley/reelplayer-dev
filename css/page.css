@@ -29,16 +29,28 @@ body.page-body {
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
 }
 
-/* Page-level background image (js/modules/pageBackground.js). Inserted as
-   the FIRST child of its positioning container (document.body for
-   page.html, #pagePreviewPane for the builder's own live preview) and left
-   at the default z-index:auto - painting order among same-stacking-level
+/* Page-level background image (js/modules/pageBackground.js). .page-background-clip
+   is inserted as the FIRST child of its positioning container (document.body
+   for page.html, #pagePreviewPane for the builder's own live preview) and
+   left at the default z-index:auto - painting order among same-stacking-level
    elements follows DOM order, so being first is what keeps this behind the
    actual content, no z-index trickery (and the stacking-context edge cases
-   that come with it) needed. position/top/left/right/height/transform are
-   all set inline by pageBackground.js (height and the scroll-driven
-   transform are computed, not static); this class only carries what's
-   static across every page. */
+   that come with it) needed. overflow:hidden on the clip wrapper is load-
+   bearing, not decorative - see pageBackground.js's header comment: without
+   it, the (scroll-transformed) .page-background-layer inside inflates the
+   positioning container's own scrollable overflow, letting the page scroll
+   further every time it's scrolled. height on the clip and top/left/right/
+   height/transform on the layer are all set inline by pageBackground.js
+   (computed, not static); these classes only carry what's static across
+   every page. */
+.page-background-clip {
+  position: absolute;
+  left: 0;
+  right: 0;
+  overflow: hidden;
+  pointer-events: none;
+}
+
 .page-background-layer {
   position: absolute;
   pointer-events: none;

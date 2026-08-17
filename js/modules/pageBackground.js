@@ -32,6 +32,21 @@
 //     the-page motion, so it reads as pinned regardless of scroll depth.
 //   - factor <1 ("scroll") lets it still move, just slower than the
 //     foreground, producing drift.
+//
+// The layer is wrapped in .page-background-clip (overflow:hidden, height
+// capped to the real content/viewport extent - see getContentExtent()
+// below) rather than inserted into scopeEl directly. Chrome includes a
+// transformed descendant's POST-transform box in its ancestor's scrollable
+// overflow, so translateY(scrollPos * factor) on the bare layer grows
+// scopeEl's own scrollHeight by that same translateY amount as the user
+// scrolls - which grows how far they CAN scroll, which grows the next
+// translateY, with no ceiling (confirmed by hand: setting a bare layer's
+// transform to translateY(2000px) alone moved document.documentElement.
+// scrollHeight by exactly 2000px). That's the mechanism behind "scrolling
+// near the bottom of the page slowly extends it forever" - the clip
+// wrapper absorbs the transformed box's overflow before it ever reaches
+// scopeEl, confirmed by hand to hold scrollHeight flat across repeated
+// scrolls even with the layer transformed far past its wrapper.
 import { colorToRgba } from "./colorUtils.js";
 
 const FIXED_FACTOR = 1;
@@ -45,6 +60,18 @@ function getScrollPos(scrollSource) {
 
 function getViewportHeight(scrollSource) {
   return scrollSource === window ? window.innerHeight : scrollSource.clientHeight;
+}
+
+// The real, un-inflated extent of the page's own content - contentEl's own
+// box, NOT scopeEl.scrollHeight/documentElement.scrollHeight (both of which
+// include every descendant's rendered extent, transformed layers included -
+// exactly the measurement this module must avoid feeding on, see the
+// header comment). Shared by positionContentOverlay()'s fullBleed sizing
+// and the background clip wrapper's sizing below, so both are pinned to
+// the same safe, non-circular number.
+function getContentExtent(scopeEl) {
+  const contentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
+  return contentEl ? contentEl.offsetTop + contentEl.offsetHeight : 0;
 }
 
 function getContentHeight(scopeEl, scrollSource) {
@@ -87,19 +114,27 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     scopeEl.style.position = "relative";
   }
 
-  // Positioned by measuring the content element (see positionContentOverlay
-  // below), so it needs to re-run any time that element's own size
-  // changes - not just on window resize, but also e.g. an image inside a
-  // block finishing its async load and growing the content taller after
-  // the initial measurement already ran. A ResizeObserver on the content
-  // element itself catches all of those causes uniformly, window resize
-  // included (resizing reflows the content, which resizes the observed
-  // element), so no separate "resize" listener is needed alongside it.
-  positionContentOverlay(scopeEl, page, scrollSource);
+  // Both the content-overlay tint and the background clip wrapper (below)
+  // need to re-measure whenever the real content's size changes - not just
+  // on window resize, but also e.g. an image inside a block finishing its
+  // async load and growing the content taller after the initial
+  // measurement already ran - or the viewport itself resizes. Collected in
+  // one list so a single ResizeObserver + a single "resize" listener drive
+  // both, instead of each maintaining its own (see positionContentOverlay's
+  // fullBleed branch and the header comment for why neither can safely
+  // measure off scrollHeight to react to this itself).
+  const onMeasureChange = [];
+
+  function refreshOverlay() {
+    positionContentOverlay(scopeEl, page, scrollSource);
+  }
+  onMeasureChange.push(refreshOverlay);
+  refreshOverlay();
+
   const overlayContentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
   let contentResizeObserver = null;
   if (overlayContentEl) {
-    contentResizeObserver = new ResizeObserver(() => positionContentOverlay(scopeEl, page, scrollSource));
+    contentResizeObserver = new ResizeObserver(() => onMeasureChange.forEach((fn) => fn()));
     contentResizeObserver.observe(overlayContentEl);
   }
   teardowns.push(() => contentResizeObserver?.disconnect());
@@ -108,15 +143,8 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     if (existing) existing.remove();
   });
 
-  // Full-bleed mode needs to reach the viewport's bottom even when the
-  // content itself is shorter than the viewport (a short page, or the
-  // builder's preview pane before enough blocks are added) - a pure
-  // viewport-height resize doesn't necessarily change overlayContentEl's
-  // own box, so the ResizeObserver above won't always catch it. See
-  // positionContentOverlay()'s fullBleed branch for why "bottom:0" alone
-  // can't be relied on here.
   function onViewportResize() {
-    positionContentOverlay(scopeEl, page, scrollSource);
+    onMeasureChange.forEach((fn) => fn());
   }
   window.addEventListener("resize", onViewportResize);
   teardowns.push(() => window.removeEventListener("resize", onViewportResize));
@@ -124,6 +152,18 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   if (!page.backgroundImageEnabled || !page.backgroundImage) {
     return () => teardowns.forEach((fn) => fn());
   }
+
+  // .page-background-layer is wrapped in this overflow:hidden container,
+  // capped to getContentExtent()/viewport height rather than left to size
+  // itself off the layer - see the header comment for why: the layer's own
+  // transform would otherwise inflate scopeEl's scrollable overflow
+  // directly. Anything the (intentionally oversized, for blur-edge and
+  // drift buffer) layer transforms past this boundary is simply clipped,
+  // which is correct - nothing should render below the real page bottom
+  // anyway.
+  const clip = document.createElement("div");
+  clip.className = "page-background-clip";
+  scopeEl.insertBefore(clip, scopeEl.firstChild);
 
   const layer = document.createElement("div");
   layer.className = "page-background-layer";
@@ -143,15 +183,22 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   layer.style.left = "0";
   layer.style.right = "0";
 
-  scopeEl.insertBefore(layer, scopeEl.firstChild);
+  clip.appendChild(layer);
 
   const factor = page.backgroundParallaxMode === "scroll" ? PARALLAX_FACTOR : FIXED_FACTOR;
+
+  function sizeClip() {
+    clip.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
+  }
 
   function sizeLayer() {
     // Zero first so this element's own (previous) height can't inflate the
     // scrollHeight/documentHeight read just below - a real feedback loop
     // otherwise, since the layer is itself part of what contributes to that
-    // measurement.
+    // measurement. (The clip wrapper above stops the layer's TRANSFORM from
+    // reaching scopeEl's scrollHeight, but its plain, un-transformed height
+    // still does, same as any other in-flow measurement - this guard is
+    // still needed.)
     layer.style.height = "0px";
     const viewportH = getViewportHeight(scrollSource);
     if (factor >= 1) {
@@ -173,17 +220,17 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     requestAnimationFrame(updateTransform);
   }
 
+  onMeasureChange.push(sizeClip, sizeLayer);
+  sizeClip();
   sizeLayer();
   updateTransform();
 
   const scrollTarget = scrollSource === window ? window : scrollSource;
   scrollTarget.addEventListener("scroll", onScroll, { passive: true });
-  window.addEventListener("resize", sizeLayer);
 
   teardowns.push(() => {
     scrollTarget.removeEventListener("scroll", onScroll);
-    window.removeEventListener("resize", sizeLayer);
-    layer.remove();
+    clip.remove();
   });
 
   return () => teardowns.forEach((fn) => fn());
@@ -245,7 +292,7 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // a long page (content taller than viewport) and a short one (viewport
     // taller than content).
     //
-    // Measured from contentEl's own box (offsetTop + offsetHeight), NOT
+    // Measured via getContentExtent() (contentEl's own box), NOT
     // getContentHeight()/scrollHeight - scrollHeight reflects the extent of
     // EVERY descendant, including .page-background-layer's own box, which
     // in "scroll" parallax mode is deliberately oversized past the real
@@ -254,13 +301,12 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // sizeLayer() computation for .page-background-layer (its own
     // scrollHeight read includes THIS layer's box) - each resize event
     // (fired by mobile browsers as their address bar hides/shows during
-    // scroll, reproducing as "scrolling near the bottom slowly grows the
-    // page") compounded the two layers' heights off each other with no
+    // scroll) compounded the two layers' heights off each other with no
     // ceiling. contentEl's own box is unaffected by either layer, so it
     // can't feed a loop.
     overlay.style.top = "0";
     overlay.style.bottom = "";
-    overlay.style.height = `${Math.max(contentEl.offsetTop + contentEl.offsetHeight, getViewportHeight(scrollSource))}px`;
+    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
     overlay.style.borderRadius = "0";
   } else {
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
