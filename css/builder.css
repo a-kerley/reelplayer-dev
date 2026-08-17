@@ -463,6 +463,10 @@ body {
   box-sizing: border-box;
   background: var(--page-bg);
   color: var(--page-text);
+  /* Matches page.html's own html.page-html (css/page.css) - smooths a
+     same-page anchor jump inside the preview pane too, without touching
+     ordinary wheel/touch scrolling. */
+  scroll-behavior: smooth;
 }
 
 /* .page-blocks-list/.page-status-message deliberately carry NO padding

@@ -22,6 +22,17 @@
   --page-accent: #5b8def;
 }
 
+/* Scoped to the `.page-html` class on page.html's own <html> tag, not a
+   bare `html` selector - this file is also loaded directly by index.html
+   (the builder), and a bare selector would silently apply to the builder's
+   own window scrolling too. Only affects scrolling driven by a same-page
+   anchor (`href="#id"`, `scrollIntoView()`) - ordinary wheel/touch/trackpad
+   scrolling is untouched, so this can't reintroduce any of the scroll-
+   driven bugs documented in js/modules/pageBackground.js's header comment. */
+html.page-html {
+  scroll-behavior: smooth;
+}
+
 body.page-body {
   margin: 0;
   background: var(--page-bg);
