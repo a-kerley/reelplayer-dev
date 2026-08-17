@@ -53,6 +53,7 @@ const FIXED_FACTOR = 1;
 const PARALLAX_FACTOR = 0.4;
 const EDGE_BUFFER = 40; // px - oversize beyond computed height, hides blur's own edge softening
 const SCROLL_MODE_BUFFER = 400; // px - extra drift room needed only in "scroll" mode
+const OVERSCROLL_SAFETY_BUFFER = 200; // px - see positionContentOverlay()'s fullBleed branch
 
 function getScrollPos(scrollSource) {
   return scrollSource === window ? window.scrollY : scrollSource.scrollTop;
@@ -304,9 +305,17 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // scroll) compounded the two layers' heights off each other with no
     // ceiling. contentEl's own box is unaffected by either layer, so it
     // can't feed a loop.
+    // OVERSCROLL_SAFETY_BUFFER pads the bottom past that computed edge - a
+    // fixed constant, not derived from scrollHeight/anything the overlay
+    // itself affects, so it can't feed the growth loop described above. It
+    // exists so a native rubber-band/elastic overscroll bounce (or any
+    // other momentary over-scroll past the real bottom) still reveals more
+    // of the tint instead of the page's bare background color for that
+    // instant - harmless since it's just a translucent color extending
+    // past content that was never visible without overscrolling anyway.
     overlay.style.top = "0";
     overlay.style.bottom = "";
-    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
+    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource)) + OVERSCROLL_SAFETY_BUFFER}px`;
     overlay.style.borderRadius = "0";
   } else {
     overlay.style.top = `${contentEl.offsetTop - marginV}px`;
