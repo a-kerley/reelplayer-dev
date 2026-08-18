@@ -456,7 +456,11 @@ body {
   height: var(--page-preview-height, 320px);
   min-height: 120px;
   max-height: 900px;
-  overflow-y: auto;
+  /* scroll, not auto - matches page.html's own html.page-html (css/page.css)
+     for the same reason: an always-reserved scrollbar gutter, so its width
+     doesn't change (and re-crop .page-background-layer's background-size:
+     cover) the moment this pane's content crosses its height. */
+  overflow-y: scroll;
   overflow-x: hidden;
   margin: 0 -2.5rem 0 -3.5rem; /* see .page-preview-resize-handle above for why left/right differ */
   padding: 1rem 2.5rem;

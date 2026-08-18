@@ -29,8 +29,22 @@
    anchor (`href="#id"`, `scrollIntoView()`) - ordinary wheel/touch/trackpad
    scrolling is untouched, so this can't reintroduce any of the scroll-
    driven bugs documented in js/modules/pageBackground.js's header comment. */
+/* overflow-y:scroll (not the default auto) keeps the vertical scrollbar's
+   gutter reserved at all times, instead of it toggling in/out exactly when
+   content crosses the viewport height (e.g. once an image inside a block
+   finishes loading and the page becomes taller than the viewport - or vice
+   versa, as `.page-blocks-list` starts out tall then shrinks once web fonts
+   swap in). Without this, that toggle changes documentElement's width by
+   the scrollbar's own width (confirmed by hand: ~15px in Chrome), which
+   .page-background-layer's background-size:cover (css/page.css below)
+   immediately re-crops against, reading as a visible "scale jump" in the
+   background image right after load. `scrollbar-gutter: stable` is the
+   spec-intended fix for exactly this but, confirmed by hand, has no effect
+   on the root/viewport scrollbar in Chrome - only this classic always-on
+   scrollbar approach actually holds the width constant here. */
 html.page-html {
   scroll-behavior: smooth;
+  overflow-y: scroll;
 }
 
 body.page-body {
