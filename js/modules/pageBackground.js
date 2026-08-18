@@ -152,25 +152,69 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     return () => teardowns.forEach((fn) => fn());
   }
 
-  // .page-background-layer is wrapped in this overflow:hidden container,
-  // capped to getContentExtent()/viewport height rather than left to size
-  // itself off the layer - see the header comment for why: the layer's own
-  // transform would otherwise inflate scopeEl's scrollable overflow
-  // directly. Anything the (intentionally oversized, for blur-edge and
-  // drift buffer) layer transforms past this boundary is simply clipped,
-  // which is correct - nothing should render below the real page bottom
-  // anyway.
-  const clip = document.createElement("div");
-  clip.className = "page-background-clip";
-  // Solid color behind the image layer (painted first, since it's the
-  // clip's own background rather than a sibling/child) - not a translucent
-  // tint stacked on top like .page-content-overlay-layer above. Fills any
-  // transparency in the source image and the blurred layer's own edge
-  // softening with a chosen color instead of scopeEl's plain background.
-  clip.style.backgroundColor = page.backgroundOverlayEnabled
-    ? (page.backgroundOverlayColor || "#000000")
-    : "";
-  scopeEl.insertBefore(clip, scopeEl.firstChild);
+  const factor = page.backgroundParallaxMode === "scroll" ? PARALLAX_FACTOR : FIXED_FACTOR;
+
+  // "Fixed" mode's illusion of staying put depends, in the general case, on
+  // a JS scroll listener recalculating a compensating translateY on every
+  // frame to exactly cancel the layer's natural scroll-with-the-page
+  // motion - any lag between the browser's native scroll and that
+  // recalculation catching up (even a single rAF frame) reads as visible
+  // jitter, BECAUSE the whole effect depends on matching scroll position
+  // exactly. A "scroll" (parallax) layer isn't sensitive to the same lag -
+  // it's already supposed to move differently from the page, so a frame of
+  // slack is imperceptible. Two real, no-JS alternatives sidestep the
+  // problem entirely, each usable in exactly one of the two contexts this
+  // function serves:
+  //   - scrollSource === window (the real published page): real CSS
+  //     position:fixed. The browser pins it on the compositor thread with
+  //     zero script involved, so there's nothing left to lag.
+  //   - scrollSource !== window (the builder's own preview pane):
+  //     position:fixed can only ever anchor to the true browser viewport,
+  //     not an arbitrary scrollable element, so it's unusable here -
+  //     position:sticky is the equivalent tool for sticking to a specific
+  //     scroll container instead. It requires the sticky element to NOT
+  //     be nested inside an overflow:hidden ancestor (confirmed by hand -
+  //     sticky silently stops sticking and just scrolls normally the
+  //     moment one intervenes, since the browser resolves it against the
+  //     wrong "nearest scroll container"), so it can't use
+  //     .page-background-clip; instead .page-background-sticky-anchor
+  //     (height:0, so it reserves no layout space of its own - confirmed
+  //     by hand its own tall absolutely-positioned child doesn't inflate
+  //     the pane's scrollHeight either) sits as a plain sibling, with the
+  //     layer positioned absolutely inside it exactly as it would be
+  //     inside .page-background-clip.
+  const useNativeFixed = factor >= 1 && scrollSource === window;
+  const usePaneSticky = factor >= 1 && scrollSource !== window;
+
+  // Solid color behind the image layer - not a translucent tint stacked on
+  // top like .page-content-overlay-layer above. Fills any transparency in
+  // the source image and the blurred layer's own edge softening with a
+  // chosen color instead of scopeEl's plain background.
+  const overlayColor = page.backgroundOverlayEnabled ? (page.backgroundOverlayColor || "#000000") : "";
+
+  let clip = null;
+  let anchor = null;
+  if (usePaneSticky) {
+    anchor = document.createElement("div");
+    anchor.className = "page-background-sticky-anchor";
+    scopeEl.insertBefore(anchor, scopeEl.firstChild);
+  } else {
+    // .page-background-layer is wrapped in this overflow:hidden container,
+    // capped to getContentExtent()/viewport height rather than left to size
+    // itself off the layer - see the header comment for why: the layer's
+    // own transform would otherwise inflate scopeEl's scrollable overflow
+    // directly. Anything the (intentionally oversized, for blur-edge and
+    // drift buffer) layer transforms past this boundary is simply clipped,
+    // which is correct - nothing should render below the real page bottom
+    // anyway. (useNativeFixed has no transform to worry about, but reuses
+    // this same wrapper for simplicity - it's an inert ancestor for that
+    // case, since a real position:fixed descendant is excluded from its
+    // scrollable overflow regardless.)
+    clip = document.createElement("div");
+    clip.className = "page-background-clip";
+    clip.style.backgroundColor = overlayColor;
+    scopeEl.insertBefore(clip, scopeEl.firstChild);
+  }
 
   const layer = document.createElement("div");
   layer.className = "page-background-layer";
@@ -190,35 +234,27 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   layer.style.left = "0";
   layer.style.right = "0";
 
-  clip.appendChild(layer);
-
-  const factor = page.backgroundParallaxMode === "scroll" ? PARALLAX_FACTOR : FIXED_FACTOR;
-
-  // "Fixed" mode's illusion of staying put depends on a JS scroll listener
-  // recalculating a compensating translateY on every frame to exactly
-  // cancel the layer's natural scroll-with-the-page motion - any lag
-  // between the browser's native scroll and that recalculation catching up
-  // (even a single rAF frame) reads as visible jitter, BECAUSE the whole
-  // effect depends on matching scroll position exactly. A "scroll"
-  // (parallax) layer isn't sensitive to the same lag - it's already
-  // supposed to move differently from the page, so a frame of slack is
-  // imperceptible. real position:fixed sidesteps the problem entirely for
-  // the one context where it's actually usable (scrollSource === window,
-  // i.e. the real published page - NOT the builder's own preview pane,
-  // which is its own scrollable element, not the window, and position:fixed
-  // can only ever anchor to the viewport): the browser pins it on the
-  // compositor thread with zero script involved, so there's nothing left
-  // to lag. It also needs no scroll listener at all - a real position:fixed
-  // element is automatically excluded from every ancestor's scrollable
-  // overflow by spec (the exact bug class .page-background-clip's
-  // overflow:hidden exists to prevent for the transform-driven case below),
-  // so it's safe to bypass that wrapper's clipping for this case specifically.
-  const useNativeFixed = factor >= 1 && scrollSource === window;
-  if (useNativeFixed) {
-    layer.style.position = "fixed";
+  if (usePaneSticky) {
+    // No separate wrapper carrying the color here (the sticky anchor is
+    // height:0, so a background-color on it would never have any visible
+    // area to paint into) - set directly on the layer instead. Ends up
+    // identical in practice: background-image paints over background-color
+    // on the same element by default, same layering .page-background-clip
+    // gave the transform-driven case.
+    layer.style.backgroundColor = overlayColor;
+    anchor.style.position = "sticky";
+    anchor.style.top = "0";
+    anchor.style.height = "0";
+    anchor.appendChild(layer);
+  } else {
+    if (useNativeFixed) {
+      layer.style.position = "fixed";
+    }
+    clip.appendChild(layer);
   }
 
   function sizeClip() {
+    if (!clip) return;
     clip.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
   }
 
@@ -271,16 +307,16 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   sizeClip();
   sizeLayer();
 
-  // Native fixed positioning needs none of this - no transform to compute,
-  // no scroll listener to drive it, nothing that could ever lag.
-  if (!useNativeFixed) {
+  // Native fixed/sticky positioning needs none of this - no transform to
+  // compute, no scroll listener to drive it, nothing that could ever lag.
+  if (!useNativeFixed && !usePaneSticky) {
     updateTransform();
     const scrollTarget = scrollSource === window ? window : scrollSource;
     scrollTarget.addEventListener("scroll", onScroll, { passive: true });
     teardowns.push(() => scrollTarget.removeEventListener("scroll", onScroll));
   }
 
-  teardowns.push(() => clip.remove());
+  teardowns.push(() => (clip ?? anchor).remove());
 
   return () => teardowns.forEach((fn) => fn());
 }

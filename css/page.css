@@ -62,6 +62,24 @@ body.page-body {
   pointer-events: none;
 }
 
+/* "Fixed" mode's alternative to .page-background-clip when scopeEl is the
+   builder's own preview pane, not the real page's window - see
+   pageBackground.js's own comment on useNativeFixed/usePaneSticky for why
+   these two contexts each need a different no-JS mechanism. A plain block
+   element already spans the full available width on its own, so no left/
+   right here - position/top/height are set inline (there so they're set
+   once, right alongside the rest of the layer's own inline styles, not
+   because they vary per-page) - height:0 is load-bearing, not decorative:
+   it's what
+   stops the visually-tall absolutely-positioned .page-background-layer
+   inside from inflating the pane's own scrollable height, confirmed by
+   hand). Deliberately NOT overflow:hidden like .page-background-clip -
+   position:sticky silently stops sticking entirely if nested inside one,
+   also confirmed by hand. */
+.page-background-sticky-anchor {
+  pointer-events: none;
+}
+
 .page-background-layer {
   position: absolute;
   pointer-events: none;
