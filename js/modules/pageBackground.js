@@ -51,7 +51,24 @@ import { colorToRgba } from "./colorUtils.js";
 
 const FIXED_FACTOR = 1;
 const PARALLAX_FACTOR = 0.4;
-const EDGE_BUFFER = 40; // px - oversize beyond computed height, hides blur's own edge softening
+// px - floor for the vertical oversize that hides blur's own edge softening
+// (see getEdgeBuffer() below) - the minimum even at backgroundBlur:0, so
+// there's still a small margin for subpixel/rounding slack at the seam.
+const MIN_EDGE_BUFFER = 40;
+
+// CSS blur(Npx) maps to a Gaussian stdDeviation of N/2 (the CSS Filter
+// Effects spec defines it that way), and a Gaussian's visible extent
+// (where it's faded to imperceptible, conventionally ~3 standard
+// deviations) reaches roughly 1.5x its stated radius - EDGE_BUFFER was a
+// flat 40px regardless of the actual configured blur, so a high blur
+// radius (this feature supports up to 60px) could exceed it and reveal a
+// visible seam/see-through edge instead of a fully soft fade. Scaling with
+// the real radius (2x, a bit more generous than the theoretical 1.5x, as
+// cheap insurance) keeps the edge fully hidden regardless of how high the
+// blur is set.
+function getEdgeBuffer(blurPx) {
+  return Math.max(MIN_EDGE_BUFFER, (blurPx ?? 0) * 2);
+}
 
 function getScrollPos(scrollSource) {
   return scrollSource === window ? window.scrollY : scrollSource.scrollTop;
@@ -216,6 +233,8 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     scopeEl.insertBefore(clip, scopeEl.firstChild);
   }
 
+  const edgeBuffer = getEdgeBuffer(page.backgroundBlur);
+
   const layer = document.createElement("div");
   layer.className = "page-background-layer";
   layer.style.backgroundImage = `url("${page.backgroundImage}")`;
@@ -230,7 +249,7 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   // free of anything that could affect the builder chrome that also loads
   // it (see that file's own header comment), for an edge effect nobody
   // will be scrolling sideways to see anyway.
-  layer.style.top = `-${EDGE_BUFFER}px`;
+  layer.style.top = `-${edgeBuffer}px`;
   layer.style.left = "0";
   layer.style.right = "0";
 
@@ -269,7 +288,7 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     layer.style.height = "0px";
     const viewportH = getViewportHeight(scrollSource);
     if (factor >= 1) {
-      layer.style.height = `${viewportH + EDGE_BUFFER * 2}px`;
+      layer.style.height = `${viewportH + edgeBuffer * 2}px`;
     } else {
       // translateY(scrollY * factor) makes the layer lag behind the page's
       // own scroll by (1 - factor) of the true rate (see the "scroll"
@@ -283,7 +302,7 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
       // box, which is what read as an excessively zoomed-in background.
       const contentH = getContentHeight(scopeEl, scrollSource);
       const maxScroll = Math.max(0, contentH - viewportH);
-      layer.style.height = `${viewportH + maxScroll * (1 - factor) + EDGE_BUFFER * 2}px`;
+      layer.style.height = `${viewportH + maxScroll * (1 - factor) + edgeBuffer * 2}px`;
     }
   }
 
