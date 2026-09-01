@@ -697,7 +697,10 @@
         if (!isTyping && (e.code === "Space" || e.key === " ")) {
           e.preventDefault();
           if (playerApp.wavesurfer && playerApp.isWaveformReady) {
-            playerApp.wavesurfer.playPause();
+            // Same fade-aware toggle the play/pause button uses - NOT a raw
+            // wavesurfer.playPause(), which skips the audio/video fades (see
+            // playerApp.togglePlayback() in js/player.js).
+            playerApp.togglePlayback();
           }
         }
       });

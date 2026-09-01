@@ -41,8 +41,8 @@ own `renderPlayer()` for a real embed - it has its own hand-written
 equivalent to what `renderPlayer()` does for the builder's live preview, but
 are a **separate, manually-kept-in-sync copy**, not the same code path.
 
-This has already caused two real, hard-to-spot bugs (both worked perfectly
-in the builder preview, both silently broken only in a real embed):
+This has already caused three real, hard-to-spot bugs (all worked in the
+builder preview, all silently wrong only in a real embed):
 
 - `initializeEmbedPlayer()` never created `playerApp.closedIdleManager` -
   every `closedIdleManager?.*` call elsewhere in `player.js` silently
@@ -56,13 +56,26 @@ in the builder preview, both silently broken only in a real embed):
   which compared against the wrong layer pointer and left
   `videoState.trackVideoPlaying` stuck `true` forever after the first exit,
   permanently blocking `checkConditions()` from ever re-entering idle.
+- `player.html`'s inline `setupKeyboardControls()` (spacebar play/pause)
+  called `wavesurfer.playPause()` directly - a hard toggle that skips the
+  audio + video fades. The fade-aware logic lived only inside
+  `setupPlayPauseUI()`'s `playPauseBtn.onclick` closure, so spacebar on a
+  real page bypassed the fades while the button kept them (the builder
+  preview has no spacebar handler at all, so its spacebar only worked via
+  native activation of the focused button → the faded onclick, hiding the
+  divergence). Fixed by extracting the one fade-aware toggle to
+  `playerApp.togglePlayback()`; every "toggle playback" entry point
+  (`onclick`, spacebar, and any future one) MUST call that, never a raw
+  `wavesurfer.playPause()/play()/pause()`.
 
-Neither failure threw an error or logged a warning - both were just quiet
-no-ops. When adding or changing anything in `renderPlayer()` (player.js) -
-new DOM structure, new classes, new setup calls, new state resets - check
-whether `player.html`'s `renderPlayerHTML()`/`initializeEmbedPlayer()` needs
-the equivalent change, and verify by testing an actual embed (see "Test
-Embed" button in the export dialog), not just the builder preview.
+None of these threw an error or logged a warning - all were just quiet
+no-ops / silent divergences. When adding or changing anything in
+`renderPlayer()` (player.js) - new DOM structure, new classes, new setup
+calls, new state resets, or a new "toggle playback"/keyboard path - check
+whether `player.html`'s `renderPlayerHTML()`/`initializeEmbedPlayer()`/inline
+`<script>` needs the equivalent change, and verify by testing an actual
+embed (see "Test Embed" button in the export dialog), not just the builder
+preview.
 
 **`css/layout.css` is loaded by both.** Anything in it must keep working with
 a reel's own per-reel light/dark appearance — never add builder-chrome-only

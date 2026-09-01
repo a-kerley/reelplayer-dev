@@ -243,6 +243,43 @@ const playerAppCore = {
     }
   },
 
+  // Cross-media coordination with the containing ReelPlayer *page* (not a
+  // third-party host). The page-level coordinator
+  // (js/modules/pageMediaCoordinator.js) can't read this same-origin embed's
+  // internals reliably across renders, so we hand it explicit
+  // playing/paused signals and accept an explicit pause command back. On a
+  // raw third-party embed there's simply no coordinator listening and the
+  // command never arrives - harmless.
+  emitCoordinationState(playing) {
+    // The wavesurfer play/pause handlers can fire more than once for one
+    // real transition (and pause -> stopVideo etc. can re-enter); only tell
+    // the page when the state actually flips, so the coordinator never sees
+    // a spurious "playing" it would treat as a fresh start.
+    if (this._lastEmittedCoordState === playing) return;
+    this._lastEmittedCoordState = playing;
+    try {
+      window.parent.postMessage(
+        { type: playing ? "reelplayer:playing" : "reelplayer:paused" },
+        "*"
+      );
+    } catch (e) {
+      // window.parent unreachable (unusual sandboxing) - nothing to do.
+    }
+  },
+
+  // Idempotent: setupWaveformEvents() runs on every render, this must not
+  // stack listeners. Mirrors the reelplayer:resize handshake's message
+  // shape.
+  setupMediaCoordination() {
+    if (this._mediaCoordinationBound) return;
+    this._mediaCoordinationBound = true;
+    window.addEventListener("message", (event) => {
+      const data = event.data;
+      if (!data || data.type !== "reelplayer:command") return;
+      if (data.command === "pause") this.pauseForOtherPlayer();
+    });
+  },
+
   cacheElements() {
     this.elements.waveform = document.getElementById("waveform");
     this.elements.playPauseBtn = document.getElementById("playPause");
@@ -807,6 +844,15 @@ const playerAppCore = {
     const volumeControl = this.elements.volumeControl;
     const playheadTime = this.elements.playheadTime;
 
+    // Cross-media coordination on a ReelPlayer *page*: the page-level
+    // coordinator (js/modules/pageMediaCoordinator.js) tells this embed to
+    // pause when a video block (or another reel) starts. Called from here
+    // so both the builder preview (renderPlayer()) and the real embed
+    // (player.html's initializeEmbedPlayer()) get it - both funnel through
+    // this one method. reel<->reel is still handled directly by
+    // pauseOtherPlayers()/pauseForOtherPlayer().
+    this.setupMediaCoordination();
+
     // Attached once here, NOT inside the "ready" handler below: "ready" fires on
     // every wavesurfer.load() call, i.e. every track switch (track switching
     // reuses this same persistent instance/DOM node, it doesn't destroy and
@@ -992,6 +1038,9 @@ const playerAppCore = {
       // Stop any other reelplayer embed already playing elsewhere on the
       // same host page - see pauseOtherPlayers()'s own comment for how.
       this.pauseOtherPlayers();
+      // And tell the page-level coordinator (if we're inside a ReelPlayer
+      // page) so it can pause any playing video blocks.
+      this.emitCoordinationState(true);
 
       // Start video playback
       // Note: playVideo() has built-in interruption handling via activeFades Map
@@ -1019,15 +1068,16 @@ const playerAppCore = {
         document.dispatchEvent(new CustomEvent("playback:pause"));
         return;
       }
-      
+
       this.updatePlayingState(false);
-      
+
       // Stop video playback with fade-out
       // Note: stopVideo() has built-in interruption handling via activeFades Map
       // Audio has already faded out by this point (sequenced in button handler)
       this.stopVideo();
-      
+
       document.dispatchEvent(new CustomEvent("playback:pause"));
+      this.emitCoordinationState(false);
     });
     this.wavesurfer.on("finish", () => {
       // Check if we should auto-play next track BEFORE updating state
@@ -1040,11 +1090,12 @@ const playerAppCore = {
       // Only update playing state to false if NOT auto-playing next track
       if (!shouldAutoPlay) {
         this.updatePlayingState(false);
+        this.emitCoordinationState(false);
       }
-      
+
       // Stop video playback
       this.stopVideo();
-      
+
       document.dispatchEvent(new CustomEvent("playback:finish"));
       
       // Auto-play next track if available
@@ -1108,44 +1159,51 @@ const playerAppCore = {
     return `${min}:${sec}`;
   },
 
+  // The single fade-aware play/pause toggle. EVERY "toggle playback" entry
+  // point must call this - the play/pause button (setupPlayPauseUI below)
+  // and player.html's spacebar handler both do. Do NOT call
+  // wavesurfer.playPause()/play()/pause() directly for a user toggle: that
+  // skips the audio (and, via the 'pause' event, video) fades and the
+  // GainNode-bug workaround below, which is exactly the drift that let
+  // spacebar-on-a-page bypass the fades while the button kept them.
+  togglePlayback() {
+    if (this.wavesurfer.isPlaying()) {
+      // pauseAfterFade: true so the actual pause() (and the 'pause' event
+      // that triggers video fade-out) happens *inside* the fade-out, right
+      // after gain reaches silence - not in a separate .then() here, which
+      // left a window where gain got restored to full volume while audio
+      // was still actually playing, audible as a pop right before pausing.
+      this.applyAudioFadeOut(true);
+      return;
+    }
+    // Check if resuming from pause (not at start)
+    const currentTime = this.wavesurfer.getCurrentTime();
+    const isResuming = currentTime > 0;
+
+    if (isResuming) {
+      // Resuming from pause: fade in both audio and video. Read the
+      // nominal volume, not wavesurfer.getVolume() - see the lastKnownVolume
+      // comment in playerAppCore for why (interrupted-fade edge case).
+      const targetVolume = this.lastKnownVolume;
+      // Cancel any still-active fade automation first - see comment on
+      // the equivalent call above (wasPlayingBeforeTrackSwitch branch).
+      this.cancelActiveFades();
+      this.wavesurfer.setVolume(0);
+      this.wavesurfer.play(); // Triggers 'play' event which starts video
+      // See the equivalent comment above (wasPlayingBeforeTrackSwitch
+      // branch) - a plain delay here, not rAF, avoids a real Chromium
+      // GainNode automation bug.
+      setTimeout(() => {
+        this.applyAudioFadeInFromZero(targetVolume);
+      }, 20);
+    } else {
+      // Starting from beginning: no fade
+      this.wavesurfer.play(); // Triggers 'play' event which starts video
+    }
+  },
+
   setupPlayPauseUI() {
-    const playPauseBtn = this.elements.playPauseBtn;
-    playPauseBtn.onclick = () => {
-      if (this.wavesurfer.isPlaying()) {
-        // pauseAfterFade: true so the actual pause() (and the 'pause' event
-        // that triggers video fade-out) happens *inside* the fade-out, right
-        // after gain reaches silence - not in a separate .then() here, which
-        // left a window where gain got restored to full volume while audio
-        // was still actually playing, audible as a pop right before pausing.
-        this.applyAudioFadeOut(true);
-      } else {
-        // Check if resuming from pause (not at start)
-        const currentTime = this.wavesurfer.getCurrentTime();
-        const isResuming = currentTime > 0;
-        
-        
-        if (isResuming) {
-          // Resuming from pause: fade in both audio and video. Read the
-          // nominal volume, not wavesurfer.getVolume() - see the lastKnownVolume
-          // comment in playerAppCore for why (interrupted-fade edge case).
-          const targetVolume = this.lastKnownVolume;
-          // Cancel any still-active fade automation first - see comment on
-          // the equivalent call above (wasPlayingBeforeTrackSwitch branch).
-          this.cancelActiveFades();
-          this.wavesurfer.setVolume(0);
-          this.wavesurfer.play(); // Triggers 'play' event which starts video
-          // See the equivalent comment above (wasPlayingBeforeTrackSwitch
-          // branch) - a plain delay here, not rAF, avoids a real Chromium
-          // GainNode automation bug.
-          setTimeout(() => {
-            this.applyAudioFadeInFromZero(targetVolume);
-          }, 20);
-        } else {
-          // Starting from beginning: no fade
-          this.wavesurfer.play(); // Triggers 'play' event which starts video
-        }
-      }
-    };
+    this.elements.playPauseBtn.onclick = () => this.togglePlayback();
   },
 
   setupWaveSurfer() {

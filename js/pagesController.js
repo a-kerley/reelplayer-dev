@@ -24,6 +24,7 @@ import { createValueControl } from "./modules/valueControl.js";
 import { applyPageBackground } from "./modules/pageBackground.js";
 import { applyTextStyles } from "./modules/pageTextStyles.js";
 import { applyBlockReveal } from "./modules/pageBlockReveal.js";
+import { attachMediaCoordinator } from "./modules/pageMediaCoordinator.js";
 
 function createEmptyPage() {
   return {
@@ -69,6 +70,10 @@ export function initPagesController() {
   // previous render's block elements, which innerHTML="" detaches from the
   // DOM but doesn't stop the observer from watching.
   let revealCleanup = () => {};
+  // js/modules/pageMediaCoordinator.js - a window "message" listener plus a
+  // delegated one on the previous render's block list; same detach-doesn't-
+  // unbind reasoning as the two above.
+  let mediaCoordinatorCleanup = () => {};
 
   const loadingOverlay = document.getElementById("builderLoadingOverlay");
   const loadingContent = document.getElementById("builderLoadingContent");
@@ -198,6 +203,8 @@ export function initPagesController() {
     if (!pagePreviewPane) return;
     backgroundCleanup();
     revealCleanup();
+    mediaCoordinatorCleanup();
+    mediaCoordinatorCleanup = () => {};
 
     const blocks = Array.isArray(page.blocks) ? page.blocks : [];
     if (!blocks.length) {
@@ -208,6 +215,7 @@ export function initPagesController() {
       blocks.forEach((block) => list.appendChild(renderBlock(block, page)));
       pagePreviewPane.innerHTML = "";
       pagePreviewPane.appendChild(list);
+      mediaCoordinatorCleanup = attachMediaCoordinator(list);
     }
 
     // #pagePreviewPane is its own scroll container (not the window) - see
@@ -746,6 +754,8 @@ export function initPagesController() {
         backgroundCleanup = () => {};
         revealCleanup();
         revealCleanup = () => {};
+        mediaCoordinatorCleanup();
+        mediaCoordinatorCleanup = () => {};
         pagePreviewPane.innerHTML = "";
       }
       const lockBtn = document.getElementById('pageLockBtn');

@@ -430,6 +430,167 @@ body.page-body {
   border-radius: 8px;
 }
 
+/* ---- Expandable video block (js/modules/pageBlockRenderer.js's
+   decorateExpandableVideo()). Only ever applies when the block opts in
+   (data-expandable); a plain embedded-video block is untouched by all of
+   this. See docs/VIDEO_BLOCK_COLLAPSIBLE_SPEC.md. ---- */
+.page-block-embedded-video[data-expandable] {
+  --ev-transition: 0.35s;
+  position: relative;
+  overflow: hidden;
+  border-radius: 8px;
+  /* No vertical padding here (unlike the base rule) - the renderer drives
+     an explicit pixel height (clientWidth x aspect-ratio) and vertical
+     padding would offset the box from that computed value. Keep the visual
+     spacing as margin. */
+  padding: 0;
+  margin: 0.5rem 0;
+  box-sizing: border-box;
+  transition: height var(--ev-transition) ease;
+}
+
+/* Collapsed rest state. Expanded height is set inline in pixels by the
+   renderer (decorateExpandableVideo clears the base inline aspect-ratio) -
+   there is deliberately no expanded-state height rule here. */
+.page-block-embedded-video[data-expandable]:not(.ev-expanded) {
+  height: var(--ev-collapsed-height, 120px);
+  cursor: pointer;
+}
+
+.page-block-embedded-video[data-expandable] .ev-closed-bg {
+  position: absolute;
+  /* Oversize the image by ~2x the blur radius on every side so its own
+     blur-softened edges fall outside the wrapper's overflow:hidden clip -
+     otherwise the feathered edge sits inside the box and the iframe shows
+     through around the border (most visible once the embed has loaded). */
+  top: calc(-2 * var(--ev-blur, 8px));
+  left: calc(-2 * var(--ev-blur, 8px));
+  width: calc(100% + 4 * var(--ev-blur, 8px));
+  height: calc(100% + 4 * var(--ev-blur, 8px));
+  object-fit: cover;
+  filter: blur(var(--ev-blur, 8px));
+  transition: opacity var(--ev-transition) ease, filter var(--ev-transition) ease;
+  pointer-events: none;
+}
+
+.page-block-embedded-video[data-expandable] .ev-overlay-tint {
+  position: absolute;
+  inset: 0;
+  pointer-events: none;
+  transition: opacity var(--ev-transition) ease;
+}
+
+.page-block-embedded-video[data-expandable] .ev-overlay {
+  position: absolute;
+  inset: 0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 1rem;
+  box-sizing: border-box;
+  pointer-events: none;
+  transition: opacity var(--ev-transition) ease;
+}
+
+.page-block-embedded-video[data-expandable] .ev-overlay-image {
+  background-position: center;
+  background-repeat: no-repeat;
+  background-size: contain;
+}
+
+.page-block-embedded-video[data-expandable] .ev-overlay-text {
+  text-align: center;
+}
+
+/* Fallback styling only - a [data-text-role] on the span pulls the page's
+   own --page-text-* custom properties (same as .page-block-text / the
+   button block), and "Custom" mode sets font/size/weight/color inline. */
+.page-block-embedded-video[data-expandable] .ev-overlay-text span {
+  color: #fff;
+  font-size: clamp(1.1rem, 3vw, 1.75rem);
+  font-weight: 600;
+  line-height: 1.25;
+  text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
+}
+
+/* De-blur + fade the collapsed layers out as the block expands. */
+.page-block-embedded-video[data-expandable].ev-expanded .ev-closed-bg,
+.page-block-embedded-video[data-expandable].ev-expanded .ev-overlay-tint,
+.page-block-embedded-video[data-expandable].ev-expanded .ev-overlay {
+  opacity: 0;
+}
+
+.page-block-embedded-video[data-expandable].ev-expanded .ev-closed-bg {
+  filter: blur(0);
+}
+
+/* Overlay-image intro scale-in, ported from the reel player's
+   .project-title-overlay (css/expandable.css). Plays once, on first load. */
+.page-block-embedded-video[data-expandable] .ev-overlay-image.needs-intro {
+  opacity: 0;
+}
+
+@keyframes evOverlayIntro {
+  0% {
+    opacity: 0;
+    transform: scale(0.95) translateY(10px);
+  }
+  100% {
+    opacity: 1;
+    transform: scale(1) translateY(0);
+  }
+}
+
+.page-block-embedded-video[data-expandable] .ev-overlay-image.intro-animation {
+  animation: evOverlayIntro 0.8s ease-out forwards;
+}
+
+/* Mobile-only tap affordance (js/modules/pageBlockRenderer.js's
+   wireExpandableVideoTouch()). Hidden on hover-capable devices and once the
+   block is expanded - it's purely an "expand" target; scrolling the block
+   out of the viewport's middle third is what collapses it. Full-cover so
+   the whole collapsed box is tappable, with a small grabber pill at the
+   bottom as the visible hint. Sits above the pointer-events:none layers. */
+.page-block-embedded-video[data-expandable] .ev-tap-bar {
+  display: none;
+}
+
+@media (hover: none) and (pointer: coarse) {
+  .page-block-embedded-video[data-expandable]:not(.ev-expanded) .ev-tap-bar {
+    display: flex;
+    position: absolute;
+    inset: 0;
+    align-items: flex-end;
+    justify-content: center;
+    padding-bottom: 8px;
+    pointer-events: auto;
+    cursor: pointer;
+  }
+
+  .page-block-embedded-video[data-expandable]:not(.ev-expanded) .ev-tap-bar::after {
+    content: "";
+    width: 36px;
+    height: 4px;
+    border-radius: 2px;
+    background: rgba(255, 255, 255, 0.85);
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.55);
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-block-embedded-video[data-expandable],
+  .page-block-embedded-video[data-expandable] .ev-closed-bg,
+  .page-block-embedded-video[data-expandable] .ev-overlay {
+    transition: none;
+  }
+  .page-block-embedded-video[data-expandable] .ev-overlay-image.intro-animation {
+    animation: none;
+  }
+  .page-block-embedded-video[data-expandable] .ev-overlay-image.needs-intro {
+    opacity: 1;
+  }
+}
+
 /* page.html-only, preview-mode ("Preview Page" in the builder): a fixed
    banner making it unmistakable this is draft content, not the live page -
    never rendered by the builder's own preview pane, which has its own

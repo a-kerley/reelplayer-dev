@@ -339,15 +339,33 @@ function renderPlayer(block, page) {
 // Shared by both the renderer here and the block editor's own URL-field
 // validation (js/modules/pageBlocksEditor.js) - a pasted watch/share URL is
 // parsed into an embeddable iframe src exactly once, so the two never drift
-// on which URL shapes are recognized.
+// on which URL shapes are recognized. Every accessor below (embed src,
+// provider name, thumbnail) routes through matchVideoUrl() so that single
+// list stays the only place URL shapes are recognized.
+// enablejsapi=1 (+ origin) turns on YouTube's postMessage player API, which
+// the expandable video block uses to know whether the embed is playing (so
+// it won't contract mid-playback). Harmless on a plain non-expandable embed
+// - it changes nothing visible - so it's added unconditionally rather than
+// threaded through as a flag. Vimeo's postMessage API needs no URL opt-in.
+function youtubeEmbedUrl(id) {
+  let url = `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1`;
+  const origin = typeof window !== "undefined" && /^https?:/.test(window.location.origin) ? window.location.origin : "";
+  if (origin) url += `&origin=${encodeURIComponent(origin)}`;
+  return url;
+}
+const youtubeThumb = (id) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
+
 const VIDEO_URL_PATTERNS = [
-  { host: /(^|\.)youtube\.com$/, extract: (u) => u.searchParams.get("v"), embed: (id) => `https://www.youtube-nocookie.com/embed/${id}` },
-  { host: /(^|\.)youtu\.be$/, extract: (u) => u.pathname.slice(1), embed: (id) => `https://www.youtube-nocookie.com/embed/${id}` },
-  { host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: (id) => `https://player.vimeo.com/video/${id}` },
+  { provider: "youtube", host: /(^|\.)youtube\.com$/, extract: (u) => u.searchParams.get("v"), embed: youtubeEmbedUrl, thumb: youtubeThumb },
+  { provider: "youtube", host: /(^|\.)youtu\.be$/, extract: (u) => u.pathname.slice(1), embed: youtubeEmbedUrl, thumb: youtubeThumb },
+  // Vimeo has no static thumbnail URL (it needs an oEmbed API call), so
+  // thumb() returns null - the editor only offers "use video thumbnail" for
+  // YouTube and forces a custom image for Vimeo.
+  { provider: "vimeo", host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: (id) => `https://player.vimeo.com/video/${id}`, thumb: () => null },
 ];
 
-/** @param {string} videoUrl @returns {string|null} an embeddable iframe src, or null if unrecognized */
-export function parseVideoEmbedUrl(videoUrl) {
+/** @param {string} videoUrl @returns {{pattern: object, id: string}|null} */
+function matchVideoUrl(videoUrl) {
   if (!videoUrl) return null;
   let parsed;
   try {
@@ -355,13 +373,31 @@ export function parseVideoEmbedUrl(videoUrl) {
   } catch {
     return null;
   }
-  for (const { host, extract, embed } of VIDEO_URL_PATTERNS) {
-    if (host.test(parsed.hostname)) {
-      const id = extract(parsed);
-      return id ? embed(id) : null;
+  for (const pattern of VIDEO_URL_PATTERNS) {
+    if (pattern.host.test(parsed.hostname)) {
+      const id = pattern.extract(parsed);
+      return id ? { pattern, id } : null;
     }
   }
   return null;
+}
+
+/** @param {string} videoUrl @returns {string|null} an embeddable iframe src, or null if unrecognized */
+export function parseVideoEmbedUrl(videoUrl) {
+  const match = matchVideoUrl(videoUrl);
+  return match ? match.pattern.embed(match.id) : null;
+}
+
+/** @param {string} videoUrl @returns {"youtube"|"vimeo"|null} */
+export function parseVideoProvider(videoUrl) {
+  const match = matchVideoUrl(videoUrl);
+  return match ? match.pattern.provider : null;
+}
+
+/** @param {string} videoUrl @returns {string|null} a static thumbnail image URL (YouTube only) */
+export function parseVideoThumbnailUrl(videoUrl) {
+  const match = matchVideoUrl(videoUrl);
+  return match ? match.pattern.thumb(match.id) : null;
 }
 
 const ASPECT_RATIOS = { "16:9": "16 / 9", "4:3": "4 / 3", "1:1": "1 / 1", "9:16": "9 / 16" };
@@ -386,7 +422,478 @@ function renderEmbeddedVideo(block) {
   iframe.setAttribute("allowfullscreen", "");
   wrapper.appendChild(iframe);
 
+  // Play-state detection runs for every video block (not just expandable
+  // ones): it feeds both the expandable collapse-lock AND the page-level
+  // cross-media coordinator (js/modules/pageMediaCoordinator.js), which
+  // needs to know a plain embedded video started so it can pause the reel
+  // players.
+  wireVideoPlaybackDetection(wrapper, iframe, block);
+
+  // Everything above is the original non-expandable rendering plus the
+  // (invisible) play-state wiring. Expandable mode only ever *adds* layers
+  // and behaviour on top of it.
+  if (block.expandable) {
+    decorateExpandableVideo(wrapper, iframe, block);
+  }
+
   return wrapper;
+}
+
+const EXPANDABLE_VIDEO_DEFAULTS = { collapsedHeight: 120, closedBgBlur: 8 };
+// Matches the reel player's .project-title-overlay intro (see
+// validateProjectTitleImage() in js/player.js) - keep in sync with the
+// keyframe/animation duration in css/page.css.
+const EXPANDABLE_OVERLAY_INTRO_MS = 800;
+// Desktop-only: an incidental mouseleave (cursor clipping the block edge
+// while scrolling past) shouldn't collapse instantly - same reasoning as
+// the reel player's pre-collapsing dead-time.
+const EXPANDABLE_COLLAPSE_DELAY_MS = 1200;
+
+/**
+ * Adds the collapsed-state layers (blurred background fill + optional
+ * contained overlay) and the desktop hover expand/collapse state machine to
+ * an already-built .page-block-embedded-video wrapper. Mobile (touch) is
+ * wired separately - see VIDEO_BLOCK_COLLAPSIBLE_SPEC.md section 5.
+ */
+function decorateExpandableVideo(wrapper, iframe, block) {
+  wrapper.dataset.expandable = "";
+  // Expandable mode drives height in explicit pixels (collapsed <-> a
+  // width x aspect-ratio target), the same way the reel player's expandable
+  // mode does - transitioning `height` while `aspect-ratio` is also set is
+  // janky (the browser recomputes the ratio mid-transition). The base
+  // renderer set an inline aspect-ratio; clear it so only pixel heights are
+  // ever in play here.
+  wrapper.style.aspectRatio = "";
+  const collapsedHeight = Number(block.collapsedHeight) || EXPANDABLE_VIDEO_DEFAULTS.collapsedHeight;
+  const blur = Number(block.closedBgBlur ?? EXPANDABLE_VIDEO_DEFAULTS.closedBgBlur);
+  wrapper.style.setProperty("--ev-collapsed-height", `${collapsedHeight}px`);
+  wrapper.style.setProperty("--ev-blur", `${blur}px`);
+
+  // Layer 2: blurred background fill (cover). YouTube thumbnail, a
+  // media-library image, or nothing ("none" - the collapsed box just shows
+  // the top slice of the video's own poster). onerror drops the layer,
+  // mirroring the reel player's own project-title-image validation.
+  let bgSrc = "";
+  if (block.closedBgMode === "custom") {
+    bgSrc = block.closedBgImage || "";
+  } else if (block.closedBgMode !== "none") {
+    bgSrc = parseVideoThumbnailUrl(block.videoUrl) || "";
+  }
+  if (bgSrc) {
+    const bg = document.createElement("img");
+    bg.className = "ev-closed-bg";
+    bg.src = bgSrc;
+    bg.alt = "";
+    bg.setAttribute("aria-hidden", "true");
+    bg.addEventListener("error", () => bg.remove());
+    wrapper.appendChild(bg);
+  }
+
+  // Layer 2b: flat colour tint over the background fill (colour + alpha),
+  // gated by its own enable toggle.
+  if (block.closedOverlayColorEnabled && block.closedOverlayColor) {
+    const tint = document.createElement("div");
+    tint.className = "ev-overlay-tint";
+    tint.style.background = block.closedOverlayColor;
+    wrapper.appendChild(tint);
+  }
+
+  // Layer 3: contained foreground overlay - image OR text, mutually
+  // exclusive.
+  if (block.overlayMode === "image" && block.overlayImage) {
+    const overlay = document.createElement("div");
+    overlay.className = "ev-overlay ev-overlay-image needs-intro";
+    overlay.style.backgroundImage = `url('${block.overlayImage}')`;
+    wrapper.appendChild(overlay);
+    // Trigger the intro scale-in only once the image actually loads (same
+    // pattern as validateProjectTitleImage()); drop the layer if it 404s.
+    const probe = new Image();
+    probe.onload = () => {
+      overlay.classList.add("intro-animation");
+      setTimeout(() => overlay.classList.remove("intro-animation", "needs-intro"), EXPANDABLE_OVERLAY_INTRO_MS);
+    };
+    probe.onerror = () => overlay.remove();
+    probe.src = block.overlayImage;
+  } else if (block.overlayMode === "text" && block.overlayText) {
+    const overlay = document.createElement("div");
+    overlay.className = "ev-overlay ev-overlay-text";
+    const span = document.createElement("span");
+    span.textContent = block.overlayText;
+    applyExpandableOverlayTextStyle(span, block);
+    overlay.appendChild(span);
+    wrapper.appendChild(overlay);
+  }
+
+  // Mobile-only tap target (CSS hides it on hover devices and while
+  // expanded). Appended last so it sits above every other layer and the
+  // iframe - pointer-events:auto on it, none on the layers below.
+  const tapBar = document.createElement("div");
+  tapBar.className = "ev-tap-bar";
+  tapBar.setAttribute("role", "button");
+  tapBar.setAttribute("aria-label", "Expand video");
+  wrapper.appendChild(tapBar);
+
+  const ec = createEvExpandCollapse(wrapper, iframe, block);
+  if (isTouchExpandableDevice()) {
+    wireExpandableVideoTouch(wrapper, block, ec);
+  } else {
+    wireExpandableVideoDesktop(wrapper, block, ec);
+  }
+}
+
+// Wires YouTube/Vimeo play-state detection for one embedded-video block.
+// Reflects it on `wrapper.dataset.evPlaying` ("true" / absent) and fires
+// bubbling `ev:play` / `ev:pause` CustomEvents, consumed by:
+//   - the expandable collapse-lock (decorateExpandableVideo's wirings), and
+//   - the page-level cross-media coordinator (js/modules/
+//     pageMediaCoordinator.js), which listens on an ancestor.
+// Also accepts an `ev:command:pause` CustomEvent back on the wrapper (the
+// coordinator's "stop, something else started" signal) and forwards it to
+// the embed as a real pause command. Runs for EVERY video block, expandable
+// or not. YouTube needs enablejsapi=1 on the src (see youtubeEmbedUrl);
+// Vimeo's postMessage API is always on.
+function wireVideoPlaybackDetection(wrapper, iframe, block) {
+  const provider = parseVideoProvider(block.videoUrl);
+  if (!provider) return;
+
+  function setPlaying(on) {
+    const was = wrapper.dataset.evPlaying === "true";
+    if (on) wrapper.dataset.evPlaying = "true";
+    else delete wrapper.dataset.evPlaying;
+    if (on !== was) {
+      wrapper.dispatchEvent(new CustomEvent(on ? "ev:play" : "ev:pause", { bubbles: true }));
+    }
+  }
+
+  function onMessage(e) {
+    // Self-remove once this iframe is gone (builder re-render deletes the
+    // old row) - matches renderPlayer()'s own message-listener guard.
+    if (!iframe.isConnected) {
+      window.removeEventListener("message", onMessage);
+      return;
+    }
+    if (!iframe.contentWindow || e.source !== iframe.contentWindow) return;
+    let data = e.data;
+    if (typeof data === "string") {
+      try { data = JSON.parse(data); } catch { return; }
+    }
+    if (!data || typeof data !== "object") return;
+
+    if (provider === "youtube") {
+      // -1 unstarted, 0 ended, 1 playing, 2 paused, 3 buffering, 5 cued
+      let state;
+      if (data.event === "onStateChange") state = data.info;
+      else if (data.event === "infoDelivery" && data.info && typeof data.info.playerState === "number") state = data.info.playerState;
+      if (state === undefined) return;
+      setPlaying(state === 1);
+    } else if (provider === "vimeo") {
+      if (data.event === "play") setPlaying(true);
+      else if (data.event === "pause" || data.event === "ended") setPlaying(false);
+    }
+  }
+  window.addEventListener("message", onMessage);
+
+  function subscribe() {
+    const w = iframe.contentWindow;
+    if (!w) return;
+    if (provider === "youtube") {
+      w.postMessage(JSON.stringify({ event: "listening", id: block.blockId, channel: "widget" }), "*");
+      w.postMessage(JSON.stringify({ event: "command", func: "addEventListener", args: ["onStateChange"], id: block.blockId, channel: "widget" }), "*");
+    } else {
+      ["play", "pause", "ended"].forEach((ev) => {
+        w.postMessage(JSON.stringify({ method: "addEventListener", value: ev }), "*");
+      });
+    }
+  }
+  // YouTube in particular sometimes needs the handshake repeated until its
+  // player script is ready to answer; a couple of cheap retries covers it.
+  iframe.addEventListener("load", () => {
+    subscribe();
+    setTimeout(subscribe, 300);
+    setTimeout(subscribe, 900);
+  });
+
+  // The coordinator's "pause yourself" signal -> a real embed pause command.
+  wrapper.addEventListener("ev:command:pause", () => {
+    const w = iframe.contentWindow;
+    if (!w) return;
+    if (provider === "youtube") {
+      w.postMessage(JSON.stringify({ event: "command", func: "pauseVideo", id: block.blockId, channel: "widget" }), "*");
+    } else {
+      w.postMessage(JSON.stringify({ method: "pause" }), "*");
+    }
+  });
+}
+
+// Same role-or-custom resolution as renderButtonBlock() above: an assigned
+// text role drives font/size/weight/colour together via page.css's
+// [data-text-role] rules; "Custom" (no role) sets each field inline.
+function applyExpandableOverlayTextStyle(el, block) {
+  if (block.overlayTextStyleRole && ASSIGNABLE_TEXT_ROLES.includes(block.overlayTextStyleRole)) {
+    el.dataset.textRole = block.overlayTextStyleRole;
+    return;
+  }
+  if (block.overlayTextColor) el.style.color = block.overlayTextColor;
+  const font = TEXT_FONT_OPTIONS.find((f) => f.value === block.overlayFontFamily);
+  if (font) {
+    el.style.fontFamily = font.stack;
+    ensureInlineGoogleFont(font.value);
+  }
+  if (block.overlayFontSize) el.style.fontSize = `${block.overlayFontSize}px`;
+  if (block.overlayFontWeight) el.style.fontWeight = block.overlayFontWeight;
+}
+
+function expandableVideoExpandedHeight(wrapper, block) {
+  const ratio = ASPECT_RATIOS[block.aspectRatio] || ASPECT_RATIOS["16:9"];
+  const [w, h] = ratio.split("/").map((n) => parseFloat(n));
+  return wrapper.clientWidth * (h / w);
+}
+
+function isTouchExpandableDevice() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
+/**
+ * The shared expand/collapse *mechanics* - class toggle, the FLIP pixel
+ * height animation, resize-tracking of the expanded height, and the
+ * never-collapse-mid-playback guard. Both the desktop (hover) and touch
+ * (scroll/tap) wirings drive this same object so the animation can't drift
+ * between them; each adds only its own triggers.
+ */
+function createEvExpandCollapse(wrapper, iframe, block) {
+  const reduceMotion = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
+  let expanded = false;
+  let endHandler = null;
+
+  const collapsedPx = () => Number(block.collapsedHeight) || EXPANDABLE_VIDEO_DEFAULTS.collapsedHeight;
+
+  // While collapsed the embed sits full-size behind the cover layers (which
+  // are pointer-events:none), so without this a click or Tab lands straight
+  // on the iframe - it takes focus and hijacks the spacebar, and can even
+  // start playback under the cover. `inert` pulls it out of the tab order
+  // and blocks pointer/keyboard entirely until the block expands.
+  function setInert(on) {
+    if (on) iframe.setAttribute("inert", "");
+    else iframe.removeAttribute("inert");
+  }
+  setInert(true);
+
+  function clearEndHandler() {
+    if (endHandler) {
+      wrapper.removeEventListener("transitionend", endHandler);
+      endHandler = null;
+    }
+  }
+
+  // The expanded box is an explicit pixel height (width x aspect-ratio) -
+  // no aspect-ratio fallback keeps it right as the viewport width changes,
+  // so re-derive it on resize while expanded.
+  function onResize() {
+    if (expanded && !reduceMotion) {
+      wrapper.style.height = `${expandableVideoExpandedHeight(wrapper, block)}px`;
+    }
+  }
+
+  function expand() {
+    if (expanded) return;
+    expanded = true;
+    setInert(false);
+    clearEndHandler();
+    window.addEventListener("resize", onResize, { passive: true });
+
+    // .ev-expanded first (drives the overlay/blur fade); it removes the CSS
+    // collapsed-height rule, so we must immediately re-assert an explicit
+    // start height and flush *before* setting the target - otherwise the
+    // wrapper resolves to `auto` (~0, the iframe's collapsed content height)
+    // for a frame and the growth animates from nothing.
+    wrapper.classList.add("ev-expanded");
+    const target = expandableVideoExpandedHeight(wrapper, block);
+    if (reduceMotion) {
+      wrapper.style.height = `${target}px`;
+      return;
+    }
+    wrapper.style.height = `${collapsedPx()}px`;
+    void wrapper.offsetHeight;
+    wrapper.style.height = `${target}px`;
+  }
+
+  function collapse({ animate = true } = {}) {
+    if (!expanded) return false;
+    if (wrapper.dataset.evPlaying === "true") return false;
+    expanded = false;
+    setInert(true);
+    window.removeEventListener("resize", onResize);
+    clearEndHandler();
+    if (reduceMotion || !animate) {
+      wrapper.classList.remove("ev-expanded");
+      wrapper.style.height = "";
+      return true;
+    }
+    // Pin the current expanded height as an explicit start, flush, then drop
+    // to the collapsed height. Hand back to the CSS rule once it settles.
+    wrapper.style.height = `${wrapper.getBoundingClientRect().height}px`;
+    void wrapper.offsetHeight;
+    wrapper.classList.remove("ev-expanded");
+    wrapper.style.height = `${collapsedPx()}px`;
+    endHandler = (e) => {
+      if (e.target !== wrapper || e.propertyName !== "height") return;
+      clearEndHandler();
+      if (!expanded) wrapper.style.height = "";
+    };
+    wrapper.addEventListener("transitionend", endHandler);
+    return true;
+  }
+
+  return {
+    expand,
+    collapse,
+    reduceMotion,
+    get expanded() { return expanded; },
+  };
+}
+
+function wireExpandableVideoDesktop(wrapper, block, ec) {
+  let collapseTimer = null;
+  // Default true: expansion happens on hover, so the pointer starts over the
+  // block. Only a real outside pointermove flips it false. Consulted when
+  // playback stops to decide whether to honour a deferred collapse.
+  let pointerInside = true;
+
+  function cancelCollapse() {
+    clearTimeout(collapseTimer);
+    collapseTimer = null;
+  }
+
+  function scheduleCollapse() {
+    if (!collapseTimer) {
+      collapseTimer = setTimeout(() => {
+        collapseTimer = null;
+        if (!ec.collapse()) return; // bailed (playing) - a later ev:pause retries
+        unbindTracking();
+      }, EXPANDABLE_COLLAPSE_DELAY_MS);
+    }
+  }
+
+  // Collapse can't be driven off the wrapper's own pointerleave: the embed
+  // is a cross-origin iframe, so as soon as the cursor crosses onto the
+  // video the parent frame stops getting pointer events (and fires a
+  // spurious pointerleave on the wrapper). Instead, track the pointer at the
+  // window level and collapse only when it's genuinely outside the wrapper's
+  // box. While the cursor sits over the iframe we get no events at all -
+  // which is the behaviour we want: it stays expanded.
+  function onWindowPointerMove(e) {
+    if (!ec.expanded) return;
+    const r = wrapper.getBoundingClientRect();
+    pointerInside = e.clientX >= r.left && e.clientX <= r.right && e.clientY >= r.top && e.clientY <= r.bottom;
+    if (pointerInside) cancelCollapse();
+    else scheduleCollapse();
+  }
+
+  function onDocumentPointerLeave() {
+    if (ec.expanded) scheduleCollapse();
+  }
+
+  function bindTracking() {
+    window.addEventListener("pointermove", onWindowPointerMove, { passive: true });
+    document.addEventListener("pointerleave", onDocumentPointerLeave);
+  }
+
+  function unbindTracking() {
+    window.removeEventListener("pointermove", onWindowPointerMove);
+    document.removeEventListener("pointerleave", onDocumentPointerLeave);
+  }
+
+  wrapper.addEventListener("pointerenter", (e) => {
+    if (e.pointerType === "touch") return;
+    pointerInside = true;
+    cancelCollapse();
+    if (!ec.expanded) {
+      ec.expand();
+      bindTracking();
+    }
+  });
+
+  // ec.collapse() bails while dataset.evPlaying is "true". When playback
+  // stops, honour a collapse the pointer has already earned by moving away;
+  // if it starts playing, drop any pending collapse outright.
+  wrapper.addEventListener("ev:play", cancelCollapse);
+  wrapper.addEventListener("ev:pause", () => {
+    if (ec.expanded && !pointerInside) scheduleCollapse();
+  });
+}
+
+// Mobile (no hover): expansion follows scroll position - the block expands
+// while it overlaps the viewport's middle third and collapses once it has
+// fully left that band - plus a dedicated tap bar (mobile-only, collapsed
+// state only) as an explicit expand tap. Mirrors
+// setupExpandableModeTouchInteractions() in js/player.js.
+function wireExpandableVideoTouch(wrapper, block, ec) {
+  // Flat time cooldown after a manual tap: the IntersectionObservers also
+  // fire *during* the expand/collapse animation as the box geometry
+  // changes, and a tap could hit a transient frame that re-triggers the
+  // opposite action. Every observer firing within this window is ignored.
+  const evTransitionMs = (parseFloat(getComputedStyle(wrapper).getPropertyValue("--ev-transition")) || 0.35) * 1000;
+  const TAP_COOLDOWN_MS = evTransitionMs + 150;
+  let overrideUntil = 0;
+  let inBand = false;
+  let inTopHalf = true;
+
+  // Second observer, read only as a boolean (its rect numbers are unsafe
+  // cross-frame, per js/player.js) - did the block exit off the TOP? Only
+  // then is there visible space below worth anchoring during the shrink.
+  const topHalfObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) inTopHalf = entry.isIntersecting;
+  }, { threshold: 0, rootMargin: "0px 0px -50% 0px" });
+  topHalfObserver.observe(wrapper);
+
+  function collapseFromScroll() {
+    if (wrapper.dataset.evPlaying === "true") return; // §5.6 playback lock
+    if (!ec.expanded) return;
+    if (!inTopHalf || ec.reduceMotion) {
+      ec.collapse();
+      return;
+    }
+    // Exited off the top: keep the content below visually anchored by
+    // scrolling up in step with the actual rendered shrink (ResizeObserver,
+    // not an assumed easing curve - same reasoning as js/player.js's
+    // compensateScrollDuringCollapse()).
+    let last = wrapper.getBoundingClientRect().height;
+    const ro = new ResizeObserver(() => {
+      const h = wrapper.getBoundingClientRect().height;
+      const delta = h - last;
+      if (delta < 0) window.scrollBy(0, delta);
+      last = h;
+    });
+    ro.observe(wrapper);
+    ec.collapse();
+    setTimeout(() => ro.disconnect(), evTransitionMs + 250);
+  }
+
+  const bandObserver = new IntersectionObserver((entries) => {
+    for (const entry of entries) {
+      inBand = entry.isIntersecting;
+      if (performance.now() < overrideUntil) continue;
+      if (inBand) ec.expand();
+      else collapseFromScroll();
+    }
+  }, { threshold: 0, rootMargin: "-33% 0px -33% 0px" });
+  bandObserver.observe(wrapper);
+
+  // Tap bar - only present/visible while collapsed (CSS), so it's purely an
+  // "expand" affordance; scrolling it out of the band is what collapses it.
+  const tapBar = wrapper.querySelector(".ev-tap-bar");
+  if (tapBar) {
+    tapBar.addEventListener("click", () => {
+      overrideUntil = performance.now() + TAP_COOLDOWN_MS;
+      ec.expand();
+    });
+  }
+
+  // If playback stops after the block has already scrolled out of the band,
+  // the collapse that was suppressed can now happen.
+  wrapper.addEventListener("ev:pause", () => {
+    if (ec.expanded && !inBand && performance.now() >= overrideUntil) collapseFromScroll();
+  });
 }
 
 // A styled <a>, not a <button> - it's always a navigation to block.url, and

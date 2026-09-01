@@ -5,9 +5,9 @@
 // generic shared abstraction - the two lists differ enough per-row (type-
 // specific config forms here vs. fixed title/url fields there) that forcing
 // a shared component would add more indirection than it'd save.
-import { createUrlInputRow } from "./domUtils.js";
+import { createUrlInputRow, createToggleSwitch } from "./domUtils.js";
 import { createValueControl, buildValueControl } from "./valueControl.js";
-import { renderBlock, parseVideoEmbedUrl } from "./pageBlockRenderer.js";
+import { renderBlock, parseVideoEmbedUrl, parseVideoProvider } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
@@ -76,6 +76,11 @@ function createEmptyBlock(type) {
     case "player":
       return { blockId, type, reelId: "", reelTitle: "", height: 500 };
     case "embedded-video":
+      // Expandable-mode fields are intentionally absent here - a block
+      // without them renders exactly as it always has (see
+      // renderEmbeddedVideo()'s `if (block.expandable)` guard). They're
+      // added lazily by createEmbeddedVideoConfig() when the toggle is
+      // first switched on.
       return { blockId, type, videoUrl: "", aspectRatio: "16:9" };
     case "button":
       return { blockId, type, label: "Click Here", url: "", alignment: "center", backgroundColor: "#4a90e2", textColor: "#ffffff" };
@@ -350,7 +355,7 @@ function createConfigForm(block, page, onChange, refreshPreview) {
       form.appendChild(createPlayerConfig(block, onChange, refreshPreview));
       break;
     case "embedded-video":
-      form.appendChild(createEmbeddedVideoConfig(block, onChange, refreshPreview));
+      form.appendChild(createEmbeddedVideoConfig(block, page, onChange, refreshPreview));
       break;
     case "button":
       form.appendChild(createButtonConfig(block, page, onChange, refreshPreview));
@@ -1569,7 +1574,34 @@ function createPlayerConfig(block, onChange, refreshPreview) {
   return wrap;
 }
 
-function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
+// Fields only meaningful once "Expandable" is switched on. Added lazily
+// (rather than in createEmptyBlock()) so a block that never opts in stays
+// byte-for-byte identical to a pre-feature one - see renderEmbeddedVideo().
+const EXPANDABLE_VIDEO_FIELD_DEFAULTS = {
+  collapsedHeight: 120,
+  closedBgImage: "",
+  closedBgBlur: 8,
+  closedOverlayColor: "rgba(0, 0, 0, 0.35)",
+  closedOverlayColorEnabled: false,
+  overlayMode: "none",
+  overlayImage: "",
+  overlayText: "",
+};
+
+function ensureExpandableVideoDefaults(block) {
+  for (const [key, value] of Object.entries(EXPANDABLE_VIDEO_FIELD_DEFAULTS)) {
+    if (block[key] == null) block[key] = value;
+  }
+  if (block.closedBgMode == null) {
+    // Default to the free static thumbnail when we can get one, otherwise a
+    // custom image is the only option (Vimeo has no static thumbnail URL).
+    block.closedBgMode = parseVideoProvider(block.videoUrl) === "youtube" ? "thumbnail" : "custom";
+  }
+}
+
+const IMAGE_PICKER_EXTENSIONS = [".jpg", ".jpeg", ".png", ".webp", ".gif"];
+
+function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
   const urlRow = document.createElement("div");
@@ -1593,6 +1625,7 @@ function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
   function commit() {
     block.videoUrl = urlInput.value.trim();
     errorMsg.style.display = block.videoUrl && !parseVideoEmbedUrl(block.videoUrl) ? "block" : "none";
+    syncClosedBgModeOptions();
     refreshPreview();
     onChange();
   }
@@ -1620,6 +1653,253 @@ function createEmbeddedVideoConfig(block, onChange, refreshPreview) {
   };
   aspectRow.append(aspectLabel, aspectSelect);
   wrap.appendChild(aspectRow);
+
+  // ---- Expandable mode ----------------------------------------------------
+  const expToggleRow = document.createElement("div");
+  expToggleRow.className = "color-row";
+  expToggleRow.style.marginTop = "0.75rem";
+  const expToggleLabel = document.createElement("label");
+  expToggleLabel.textContent = "Expandable";
+  expToggleLabel.htmlFor = `${block.blockId}-ev-expandable`;
+  expToggleLabel.style.cursor = "pointer";
+  expToggleLabel.style.color = "var(--builder-accent)";
+  expToggleLabel.style.fontWeight = "var(--builder-weight-bold)";
+  const expToggle = createToggleSwitch({
+    id: `${block.blockId}-ev-expandable`,
+    checked: block.expandable === true,
+    onChange: () => {
+      block.expandable = expToggle.querySelector("input").checked;
+      if (block.expandable) ensureExpandableVideoDefaults(block);
+      syncExpandableVisibility();
+      refreshPreview();
+      onChange();
+    },
+  });
+  expToggleRow.append(expToggleLabel, expToggle);
+  wrap.appendChild(expToggleRow);
+
+  const expFields = document.createElement("div");
+  expFields.style.flexDirection = "column";
+  expFields.style.gap = "0.6rem";
+  expFields.style.marginTop = "0.6rem";
+  wrap.appendChild(expFields);
+
+  // Collapsed height
+  const { row: collapsedHeightRow, input: collapsedHeightInput } = createValueControl({
+    id: `${block.blockId}-ev-collapsedHeight`,
+    label: "Collapsed Height (px):",
+    value: block.collapsedHeight ?? EXPANDABLE_VIDEO_FIELD_DEFAULTS.collapsedHeight,
+    min: 60,
+    max: 400,
+    step: 5,
+    unit: "px",
+    tooltip: "Height of the block before it expands on hover",
+  });
+  collapsedHeightInput.addEventListener("input", () => {
+    const val = parseInt(collapsedHeightInput.value, 10);
+    if (!isNaN(val)) block.collapsedHeight = val;
+  });
+  collapsedHeightInput.addEventListener("change", () => { refreshPreview(); onChange(); });
+  expFields.appendChild(collapsedHeightRow);
+
+  // Closed background source
+  const closedBgModeRow = document.createElement("div");
+  closedBgModeRow.className = "color-row";
+  const closedBgModeLabel = document.createElement("span");
+  closedBgModeLabel.textContent = "Collapsed background:";
+  const closedBgModeSelect = document.createElement("select");
+  closedBgModeSelect.className = "builder-select";
+  closedBgModeSelect.onchange = () => {
+    block.closedBgMode = closedBgModeSelect.value;
+    syncExpandableVisibility();
+    refreshPreview();
+    onChange();
+  };
+  closedBgModeRow.append(closedBgModeLabel, closedBgModeSelect);
+  expFields.appendChild(closedBgModeRow);
+
+  function syncClosedBgModeOptions() {
+    const youtube = parseVideoProvider(block.videoUrl) === "youtube";
+    const current = block.closedBgMode || (youtube ? "thumbnail" : "custom");
+    closedBgModeSelect.innerHTML = "";
+    const options = youtube
+      ? [["thumbnail", "YouTube thumbnail"], ["custom", "Custom image"], ["none", "None"]]
+      : [["custom", "Custom image"], ["none", "None"]];
+    for (const [value, text] of options) {
+      const opt = document.createElement("option");
+      opt.value = value;
+      opt.textContent = text;
+      closedBgModeSelect.appendChild(opt);
+    }
+    // A block set to "thumbnail" whose URL is no longer YouTube can't show
+    // one - fall back to custom so the control never lies about what renders.
+    const resolved = !youtube && current === "thumbnail" ? "custom" : current;
+    closedBgModeSelect.value = resolved;
+    if (block.expandable) block.closedBgMode = resolved;
+  }
+
+  // Custom collapsed image
+  const { row: closedImageRow, input: closedImageInput } = createUrlInputRow({
+    id: `${block.blockId}-ev-closedBgImage`,
+    label: "Collapsed Image:",
+    value: block.closedBgImage || "",
+    placeholder: "Paste an image URL or select from Media Library",
+    pickerOptions: {
+      directory: "assets/images/page-blocks",
+      extensions: IMAGE_PICKER_EXTENSIONS,
+      title: "Select Collapsed Image",
+    },
+  });
+  closedImageInput.addEventListener("input", () => { block.closedBgImage = closedImageInput.value; });
+  closedImageInput.addEventListener("blur", () => { refreshPreview(); onChange(); });
+  expFields.appendChild(closedImageRow);
+
+  // Colour tint over the collapsed background (colour + alpha), gated by its
+  // own enable toggle - same row shape as the reel builder's "Idle Overlay
+  // Colour" (js/modules/expandableMode.js's createColorPickerRow()): label
+  // becomes a <label for> the toggle, toggle sits between it and the swatch,
+  // swatch dims + disables when off. Fades away as the block expands.
+  const overlayTintRow = document.createElement("div");
+  overlayTintRow.className = "color-row";
+  const overlayTintLabel = document.createElement("label");
+  overlayTintLabel.textContent = "Overlay Colour:";
+  overlayTintLabel.htmlFor = `${block.blockId}-ev-overlayTintEnabled`;
+  overlayTintLabel.style.cursor = "pointer";
+  overlayTintRow.appendChild(overlayTintLabel);
+
+  const overlayTintPickr = createColorPickrButton(
+    block.closedOverlayColor || "rgba(0, 0, 0, 0.35)",
+    (value) => { block.closedOverlayColor = value; refreshPreview(); onChange(); },
+    toolbarPickrInstances,
+    { opacity: true },
+  );
+
+  function applyOverlayTintEnabled() {
+    const on = block.closedOverlayColorEnabled === true;
+    overlayTintPickr.btn.disabled = !on;
+    overlayTintPickr.btn.style.opacity = on ? "1" : "0.5";
+  }
+
+  const overlayTintToggle = createToggleSwitch({
+    id: `${block.blockId}-ev-overlayTintEnabled`,
+    checked: block.closedOverlayColorEnabled === true,
+    onChange: () => {
+      block.closedOverlayColorEnabled = overlayTintToggle.querySelector("input").checked;
+      applyOverlayTintEnabled();
+      refreshPreview();
+      onChange();
+    },
+  });
+  overlayTintRow.appendChild(overlayTintToggle);
+  overlayTintRow.appendChild(overlayTintPickr.btn);
+  applyOverlayTintEnabled();
+  expFields.appendChild(overlayTintRow);
+
+  // Background blur
+  const { row: closedBlurRow, input: closedBlurInput } = createValueControl({
+    id: `${block.blockId}-ev-closedBgBlur`,
+    label: "Background Blur (px):",
+    value: block.closedBgBlur ?? EXPANDABLE_VIDEO_FIELD_DEFAULTS.closedBgBlur,
+    min: 0,
+    max: 50,
+    step: 1,
+    unit: "px",
+    tooltip: "Blur applied to the collapsed background image; animates away on expand",
+  });
+  closedBlurInput.addEventListener("input", () => {
+    const val = parseInt(closedBlurInput.value, 10);
+    if (!isNaN(val)) block.closedBgBlur = val;
+  });
+  closedBlurInput.addEventListener("change", () => { refreshPreview(); onChange(); });
+  expFields.appendChild(closedBlurRow);
+
+  // Overlay mode
+  const overlayModeRow = document.createElement("div");
+  overlayModeRow.className = "color-row";
+  const overlayModeLabel = document.createElement("span");
+  overlayModeLabel.textContent = "Overlay:";
+  const overlayModeSelect = document.createElement("select");
+  overlayModeSelect.className = "builder-select";
+  [["none", "None"], ["image", "Image"], ["text", "Text"]].forEach(([v, text]) => {
+    const opt = document.createElement("option");
+    opt.value = v;
+    opt.textContent = text;
+    overlayModeSelect.appendChild(opt);
+  });
+  overlayModeSelect.onchange = () => {
+    block.overlayMode = overlayModeSelect.value;
+    syncExpandableVisibility();
+    refreshPreview();
+    onChange();
+  };
+  overlayModeRow.append(overlayModeLabel, overlayModeSelect);
+  expFields.appendChild(overlayModeRow);
+
+  // Overlay image
+  const { row: overlayImageRow, input: overlayImageInput } = createUrlInputRow({
+    id: `${block.blockId}-ev-overlayImage`,
+    label: "Overlay Image:",
+    value: block.overlayImage || "",
+    placeholder: "Paste an image URL or select from Media Library",
+    pickerOptions: {
+      directory: "assets/images/page-blocks",
+      extensions: IMAGE_PICKER_EXTENSIONS,
+      title: "Select Overlay Image",
+    },
+  });
+  overlayImageInput.addEventListener("input", () => { block.overlayImage = overlayImageInput.value; });
+  overlayImageInput.addEventListener("blur", () => { refreshPreview(); onChange(); });
+  expFields.appendChild(overlayImageRow);
+
+  // Overlay text + shared text-style toolbar (same pattern as the button block)
+  const overlayTextRow = document.createElement("div");
+  overlayTextRow.className = "color-row";
+  const overlayTextLabel = document.createElement("span");
+  overlayTextLabel.textContent = "Overlay Text:";
+  const overlayTextInput = document.createElement("input");
+  overlayTextInput.type = "text";
+  overlayTextInput.value = block.overlayText || "";
+  overlayTextInput.placeholder = "Text shown over the collapsed video";
+  overlayTextInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
+  overlayTextInput.oninput = () => { block.overlayText = overlayTextInput.value; };
+  overlayTextInput.onblur = () => { refreshPreview(); onChange(); };
+  overlayTextRow.append(overlayTextLabel, overlayTextInput);
+
+  const { toolbar: overlayStyleToolbar } = createTextStyleToolbar({
+    idPrefix: `${block.blockId}-ev-overlay`,
+    roleDefs: page?.textStyleDefs,
+    getRole: () => block.overlayTextStyleRole,
+    setRole: (role) => { block.overlayTextStyleRole = role; },
+    getFontFamily: () => block.overlayFontFamily,
+    setFontFamily: (value) => { block.overlayFontFamily = value; },
+    getFontSize: () => block.overlayFontSize,
+    setFontSize: (value) => { block.overlayFontSize = value; },
+    getFontWeight: () => block.overlayFontWeight,
+    setFontWeight: (value) => { block.overlayFontWeight = value; },
+    getColor: () => block.overlayTextColor,
+    setColor: (value) => { block.overlayTextColor = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: () => { refreshPreview(); onChange(); },
+  });
+  expFields.appendChild(overlayStyleToolbar);
+  expFields.appendChild(overlayTextRow);
+
+  function syncExpandableVisibility() {
+    const on = block.expandable === true;
+    expFields.style.display = on ? "flex" : "none";
+    if (!on) return;
+    syncClosedBgModeOptions();
+    const mode = block.closedBgMode || "thumbnail";
+    closedImageRow.style.display = mode === "custom" ? "" : "none";
+    const overlay = block.overlayMode || "none";
+    overlayImageRow.style.display = overlay === "image" ? "" : "none";
+    overlayTextRow.style.display = overlay === "text" ? "" : "none";
+    overlayStyleToolbar.style.display = overlay === "text" ? "" : "none";
+  }
+
+  // Seed the overlay-mode select from saved state, then apply visibility.
+  overlayModeSelect.value = block.overlayMode || "none";
+  syncExpandableVisibility();
 
   return wrap;
 }

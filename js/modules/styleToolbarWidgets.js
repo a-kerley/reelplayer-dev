@@ -21,7 +21,13 @@ const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e3
 // is deferred a tick (same setTimeout(...,0) "DOM readiness" pattern
 // colorPicker.js uses), after the caller has synchronously appended the
 // returned .btn to the document.
-export function createColorPickrButton(initialColor, onApply, instanceList) {
+// opts.opacity: when true, the picker gains an alpha slider and hands
+// onApply an "rgba(r, g, b, a)" string instead of a 6-digit hex. Only safe
+// for callers that write the value somewhere the HTML sanitizer never sees
+// (e.g. an inline style on an element the code itself builds) - the default
+// (false) keeps the sanitizer-safe #rrggbb behaviour every other caller
+// relies on.
+export function createColorPickrButton(initialColor, onApply, instanceList, { opacity = false } = {}) {
   const btn = document.createElement("button");
   btn.type = "button";
   btn.className = "pickr-button";
@@ -32,16 +38,11 @@ export function createColorPickrButton(initialColor, onApply, instanceList) {
       theme: "nano",
       default: initialColor || "#ffffff",
       swatches: TEXT_COLOR_SWATCHES,
-      // No opacity component - text color has no use for alpha here, and
-      // htmlSanitizer.js's COLOR_RE only accepts a plain 6-digit #rrggbb/
-      // rgb(), not an alpha channel, so keeping this off means the value
-      // this button ever hands to onApply is always something the
-      // sanitizer will actually keep.
       components: {
         preview: true,
-        opacity: false,
+        opacity,
         hue: true,
-        interaction: { hex: true, input: true, save: true },
+        interaction: { hex: true, rgba: opacity, input: true, save: true },
       },
     });
     pickrRef = pickr;
@@ -51,20 +52,21 @@ export function createColorPickrButton(initialColor, onApply, instanceList) {
     // "#dc3545ff") that htmlSanitizer.js's 6-digit COLOR_RE rejects
     // outright, which silently dropped every applied color until this was
     // switched to always emit exactly #rrggbb.
-    const toSanitizableHex = (color) => {
+    const toValue = (color) => {
+      if (opacity) return color.toRGBA().toString();
       const [r, g, b] = color.toRGBA();
       return "#" + [r, g, b].map((v) => Math.round(v).toString(16).padStart(2, "0")).join("");
     };
     pickr.on("init", () => {
-      btn.style.background = toSanitizableHex(pickr.getColor());
+      btn.style.background = toValue(pickr.getColor());
     });
     pickr.on("change", (color) => {
-      btn.style.background = toSanitizableHex(color);
+      btn.style.background = toValue(color);
     });
     pickr.on("save", (color) => {
-      const hex = toSanitizableHex(color);
-      btn.style.background = hex;
-      onApply(hex);
+      const value = toValue(color);
+      btn.style.background = value;
+      onApply(value);
       pickr.hide();
     });
   }, 0);

@@ -34,6 +34,7 @@
     import { applyPageBackground } from './js/modules/pageBackground.js';
     import { applyTextStyles } from './js/modules/pageTextStyles.js';
     import { applyBlockReveal } from './js/modules/pageBlockReveal.js';
+    import { attachMediaCoordinator } from './js/modules/pageMediaCoordinator.js';
 
     // No-op, exists solely for the side effect of registering a touch
     // handler on the document: iOS Safari otherwise ignores :active
@@ -89,6 +90,8 @@
       document.body.classList.add('page-preview-mode');
     }
 
+    let mediaCoordinatorCleanup = null;
+
     function renderPage(pageData) {
       document.title = pageData.title || 'Page';
 
@@ -107,6 +110,9 @@
 
       root.innerHTML = '';
       root.appendChild(list);
+
+      mediaCoordinatorCleanup?.();
+      mediaCoordinatorCleanup = attachMediaCoordinator(list);
     }
 
     async function init() {
