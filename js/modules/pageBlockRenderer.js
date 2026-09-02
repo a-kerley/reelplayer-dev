@@ -403,6 +403,41 @@ function vimeoEmbedUrl(id, o) {
 
 const youtubeThumb = (id) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
 
+// Cloudflare Stream: a share/embed/watch URL from the dashboard carries the
+// account's own `customer-<code>.cloudflarestream.com` host plus a 32-hex
+// video UID somewhere in the path (…/<uid>, …/<uid>/iframe, …/<uid>/watch) or
+// as ?video=<uid>. The account host is kept and reused for the iframe + the
+// (genuinely static) thumbnail; if a host-less legacy URL was pasted we fall
+// back to Cloudflare's customer-code-free `videodelivery.net`.
+const STREAM_UID_RE = /^[0-9a-f]{32}$/i;
+function streamHostFor(parsedUrl) {
+  const h = parsedUrl && parsedUrl.hostname;
+  return h && /^customer-[a-z0-9]+\.cloudflarestream\.com$/i.test(h) ? h : "videodelivery.net";
+}
+function extractStreamUid(u) {
+  const seg = u.pathname.split("/").find((s) => STREAM_UID_RE.test(s));
+  if (seg) return seg;
+  const q = u.searchParams.get("video");
+  return q && STREAM_UID_RE.test(q) ? q : null;
+}
+function streamEmbedUrl(uid, o, parsedUrl) {
+  const params = new URLSearchParams();
+  if (o) {
+    if (o.controls === false) params.set("controls", "false");
+    if (o.loop) params.set("loop", "true");
+    // Browsers only autoplay muted; Stream is the same, so autoplay implies muted.
+    if (o.autoplay) { params.set("autoplay", "true"); params.set("muted", "true"); }
+    else if (o.muted) params.set("muted", "true");
+    if (o.accentColor) params.set("primaryColor", String(o.accentColor).replace(/^#/, ""));
+    const start = embedTimeSeconds(o.startTime);
+    if (start != null) params.set("startTime", `${start}s`);
+  }
+  const qs = params.toString();
+  return `https://${streamHostFor(parsedUrl)}/${uid}/iframe${qs ? `?${qs}` : ""}`;
+}
+const streamThumb = (uid, parsedUrl) =>
+  `https://${streamHostFor(parsedUrl)}/${uid}/thumbnails/thumbnail.jpg?time=1s&height=720`;
+
 const VIDEO_URL_PATTERNS = [
   { provider: "youtube", host: /(^|\.)youtube\.com$/, extract: (u) => u.searchParams.get("v"), embed: youtubeEmbedUrl, thumb: youtubeThumb },
   { provider: "youtube", host: /(^|\.)youtu\.be$/, extract: (u) => u.pathname.slice(1), embed: youtubeEmbedUrl, thumb: youtubeThumb },
@@ -410,9 +445,10 @@ const VIDEO_URL_PATTERNS = [
   // thumb() returns null - the editor only offers "use video thumbnail" for
   // YouTube and forces a custom image for Vimeo.
   { provider: "vimeo", host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: vimeoEmbedUrl, thumb: () => null },
+  { provider: "stream", host: /(^|\.)cloudflarestream\.com$|(^|\.)videodelivery\.net$/, extract: extractStreamUid, embed: streamEmbedUrl, thumb: streamThumb },
 ];
 
-/** @param {string} videoUrl @returns {{pattern: object, id: string}|null} */
+/** @param {string} videoUrl @returns {{pattern: object, id: string, url: URL}|null} */
 function matchVideoUrl(videoUrl) {
   if (!videoUrl) return null;
   let parsed;
@@ -424,7 +460,7 @@ function matchVideoUrl(videoUrl) {
   for (const pattern of VIDEO_URL_PATTERNS) {
     if (pattern.host.test(parsed.hostname)) {
       const id = pattern.extract(parsed);
-      return id ? { pattern, id } : null;
+      return id ? { pattern, id, url: parsed } : null;
     }
   }
   return null;
@@ -433,19 +469,19 @@ function matchVideoUrl(videoUrl) {
 /** @param {string} videoUrl @param {Object} [options] block.embedOptions @returns {string|null} an embeddable iframe src, or null if unrecognized */
 export function parseVideoEmbedUrl(videoUrl, options) {
   const match = matchVideoUrl(videoUrl);
-  return match ? match.pattern.embed(match.id, options) : null;
+  return match ? match.pattern.embed(match.id, options, match.url) : null;
 }
 
-/** @param {string} videoUrl @returns {"youtube"|"vimeo"|null} */
+/** @param {string} videoUrl @returns {"youtube"|"vimeo"|"stream"|null} */
 export function parseVideoProvider(videoUrl) {
   const match = matchVideoUrl(videoUrl);
   return match ? match.pattern.provider : null;
 }
 
-/** @param {string} videoUrl @returns {string|null} a static thumbnail image URL (YouTube only) */
+/** @param {string} videoUrl @returns {string|null} a static thumbnail image URL (YouTube and Stream only) */
 export function parseVideoThumbnailUrl(videoUrl) {
   const match = matchVideoUrl(videoUrl);
-  return match ? match.pattern.thumb(match.id) : null;
+  return match ? match.pattern.thumb(match.id, match.url) : null;
 }
 
 const ASPECT_RATIOS = { "16:9": "16 / 9", "4:3": "4 / 3", "1:1": "1 / 1", "9:16": "9 / 16" };
@@ -645,6 +681,12 @@ function decorateExpandableVideo(wrapper, iframe, block, page) {
 function wireVideoPlaybackDetection(wrapper, iframe, block) {
   const provider = parseVideoProvider(block.videoUrl);
   if (!provider) return;
+  // Cloudflare Stream's raw iframe has no documented postMessage play/pause
+  // protocol (it needs their player SDK), so a Stream video can't drive the
+  // cross-media pause coordinator or the "don't collapse mid-playback" guard.
+  // It still embeds and plays fine - this is a known gap, tracked for when the
+  // Stream media-browser work lands.
+  if (provider === "stream") return;
 
   // Scrubbing (the progress bar, arrow-key seek, chapter skip) makes the
   // embed report a brief not-playing blip - buffering, sometimes a flash of

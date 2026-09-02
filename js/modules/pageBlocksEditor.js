@@ -1908,7 +1908,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   const urlInput = document.createElement("input");
   urlInput.type = "url";
   urlInput.value = block.videoUrl || "";
-  urlInput.placeholder = "Paste a YouTube or Vimeo link";
+  urlInput.placeholder = "Paste a YouTube, Vimeo, or Cloudflare Stream link";
   urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
 
   // Cog: per-provider "Advanced Embed Settings" (controls, related videos,
@@ -1928,7 +1928,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   const errorMsg = document.createElement("p");
   errorMsg.className = "builder-empty-state";
   errorMsg.style.cssText = "text-align:left;padding:0.2rem 0 0;display:none;color:#dc3545;";
-  errorMsg.textContent = "Couldn't recognize that as a YouTube or Vimeo link.";
+  errorMsg.textContent = "Couldn't recognize that as a YouTube, Vimeo, or Cloudflare Stream link.";
   wrap.appendChild(errorMsg);
 
   let lastProvider = parseVideoProvider(block.videoUrl);
@@ -2057,11 +2057,13 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   expFields.appendChild(closedBgModeRow);
 
   function syncClosedBgModeOptions() {
-    const youtube = parseVideoProvider(block.videoUrl) === "youtube";
-    const current = block.closedBgMode || (youtube ? "thumbnail" : "custom");
+    // YouTube and Cloudflare Stream both expose a static thumbnail URL
+    // (parseVideoThumbnailUrl); Vimeo doesn't, so it's custom-image only.
+    const hasThumb = ["youtube", "stream"].includes(parseVideoProvider(block.videoUrl));
+    const current = block.closedBgMode || (hasThumb ? "thumbnail" : "custom");
     closedBgModeSelect.innerHTML = "";
-    const options = youtube
-      ? [["thumbnail", "YouTube thumbnail"], ["custom", "Custom image"], ["none", "None"]]
+    const options = hasThumb
+      ? [["thumbnail", "Video thumbnail"], ["custom", "Custom image"], ["none", "None"]]
       : [["custom", "Custom image"], ["none", "None"]];
     for (const [value, text] of options) {
       const opt = document.createElement("option");
@@ -2069,9 +2071,9 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
       opt.textContent = text;
       closedBgModeSelect.appendChild(opt);
     }
-    // A block set to "thumbnail" whose URL is no longer YouTube can't show
-    // one - fall back to custom so the control never lies about what renders.
-    const resolved = !youtube && current === "thumbnail" ? "custom" : current;
+    // A block set to "thumbnail" whose URL no longer has one - fall back to
+    // custom so the control never lies about what renders.
+    const resolved = !hasThumb && current === "thumbnail" ? "custom" : current;
     closedBgModeSelect.value = resolved;
     if (block.expandable) block.closedBgMode = resolved;
   }

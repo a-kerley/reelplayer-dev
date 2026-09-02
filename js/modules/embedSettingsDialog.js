@@ -40,6 +40,17 @@ const OPTION_SPECS = {
     { kind: "color", key: "accentColor", label: "Accent colour" },
     { kind: "number", key: "startTime", label: "Start at (sec)", min: 0, max: 86400 },
   ],
+  // Cloudflare Stream iframe params (streamEmbedUrl in pageBlockRenderer.js).
+  // Autoplay is muted-only by browser policy, so its label says so; there's
+  // no end-time param on the Stream iframe.
+  stream: [
+    { kind: "toggle", key: "controls", label: "Player controls", defaultOn: true },
+    { kind: "toggle", key: "autoplay", label: "Autoplay (muted)", defaultOn: false },
+    { kind: "toggle", key: "loop", label: "Loop", defaultOn: false },
+    { kind: "toggle", key: "muted", label: "Start muted", defaultOn: false },
+    { kind: "color", key: "accentColor", label: "Player colour" },
+    { kind: "number", key: "startTime", label: "Start at (sec)", min: 0, max: 86400 },
+  ],
 };
 
 const SLOT_ID = "embedSettingsSlot";
