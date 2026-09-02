@@ -1613,16 +1613,45 @@ input[type="range"]:focus::-moz-range-thumb {
   display: flex;
   align-items: center;
   flex-wrap: wrap;
-  gap: 0.5rem;
-  margin-bottom: 0.5rem;
+  gap: 0.35rem 0.45rem;
+  margin-bottom: 0.65rem;
 }
 
-/* "Apply style..."/"Font..." - wide enough that the button doesn't visibly
-   resize every time its label changes to reflect the current selection
-   (updateInlineControlDisplays()), from a short default like "Font..." up
-   to a longer picked value like "Merriweather". */
+/* One shared control height so every item - dropdowns, icon groups, the
+   segmented number fields, the colour swatch, the Customize button - lands
+   on the same centerline instead of each sitting a pixel or two off. */
+.page-block-text-toolbar > .dropdown-menu-btn,
+.page-block-text-toolbar > .weight-control-wrap,
+.page-block-text-toolbar > .icon-toggle-group,
+.page-block-text-toolbar > .value-control,
+.page-block-text-toolbar > .format-icon,
+.page-block-text-toolbar > .page-block-add-btn {
+  height: 28px;
+}
+
+/* Style menu ("Body"/"Heading 2"/"Apply style...") - wide enough not to
+   resize between those labels, but the old 9rem was generous. */
 .page-block-text-toolbar .dropdown-menu-btn {
-  min-width: 9rem;
+  min-width: 6.5rem;
+}
+
+/* Font name is the widest label here - a touch narrower than the 170px
+   base; the longest names ellipsize (.font-picker-btn rule). */
+.page-block-text-toolbar .font-picker-btn {
+  width: 150px;
+}
+
+/* Weight labels ("Regular"/"SemiBold"/"Extra Bold") - fixed, and just wide
+   enough that the common one-word ones don't truncate. */
+.page-block-text-toolbar .weight-control-wrap,
+.page-block-text-toolbar .weight-picker-btn {
+  min-width: 0;
+  width: 7rem;
+}
+
+/* Trim the caret segment - 1.6rem read chunky against the 28px controls. */
+.page-block-text-toolbar .dropdown-menu-btn-arrow {
+  width: 1.35rem;
 }
 
 /* Same segmented number+spin look as every other value control
@@ -1634,13 +1663,25 @@ input[type="range"]:focus::-moz-range-thumb {
    slider-sharing defaults (flex:1;min-width:0, meant to share a row with
    that slider) to flex:0 0 auto so this sits at its own content width
    among the toolbar's other items instead of stretching to fill it. */
-.page-block-text-toolbar-size {
+.page-block-text-toolbar-size,
+.page-block-text-toolbar-lineheight {
   flex: 0 0 auto;
   min-width: 0;
 }
 
-.page-block-text-toolbar-size .value-control-slider-wrap {
+.page-block-text-toolbar-size .value-control-slider-wrap,
+.page-block-text-toolbar-lineheight .value-control-slider-wrap {
   display: none;
+}
+
+/* Leading glyph on the two compact numeric fields (Size, Line spacing) in
+   place of a text label - keeps them narrow and reads as one icon vocabulary
+   with the B/I/U and align buttons. */
+.page-block-text-toolbar-num-icon {
+  font-size: 17px;
+  color: #8a8a8a;
+  margin-right: 0.2rem;
+  flex-shrink: 0;
 }
 
 /* Customize Text Styles dialog's per-role Size field (js/modules/
@@ -1748,19 +1789,39 @@ input[type="range"]:focus::-moz-range-thumb {
   margin-top: -1px;
 }
 
-/* Pickr's own .pickr wrapper carries a bit of built-in vertical padding
-   the other toolbar items don't have, which sits the 20px swatch a touch
-   below their shared center line despite .page-block-text-toolbar's own
-   align-items:center - nudged up to actually land on it. */
+/* Sit Pickr's swatch on the shared centerline. It carries a little built-in
+   vertical padding the other items don't, so centre it in a 28px box of its
+   own rather than nudging with a negative margin. */
 .page-block-text-toolbar .pickr {
-  margin-top: -1px;
+  display: inline-flex;
+  align-items: center;
+  height: 28px;
+}
+
+/* A slightly larger, rounded swatch so the colour control doesn't read as a
+   stray chip between the taller dropdowns either side of it. */
+.page-block-text-toolbar .pcr-button {
+  width: 22px !important;
+  height: 22px !important;
+  min-width: 22px !important;
+  min-height: 22px !important;
+  max-width: 22px !important;
+  max-height: 22px !important;
+  border-radius: 4px;
+  border-color: #555;
 }
 
 .page-block-toolbar-divider {
   align-self: stretch;
   width: 1px;
-  margin: 0.2rem 0;
-  background: #444;
+  margin: 3px 0;
+  background: #3a3a3a;
+}
+
+/* A touch more legible at rest than the shared 0.5 - this toolbar packs a
+   lot of glyphs and 0.5 read faint against the dark field. */
+.page-block-text-toolbar .format-icon {
+  opacity: 0.6;
 }
 
 /* Builder-chrome-only additions on top of .page-block-text (css/page.css,
@@ -1786,6 +1847,21 @@ input[type="range"]:focus::-moz-range-thumb {
 .page-block-text-editable:empty::before {
   content: attr(data-placeholder);
   color: #888;
+}
+
+/* The video block's overlay-text editor (createEmbeddedVideoConfig() ->
+   createTextConfig({ editableClass: "ev-overlay-text-editable" })) - real
+   WYSIWYG for it means matching css/page.css's .ev-overlay-text-body
+   exactly: no per-paragraph/-heading margin, line-height inherited from
+   the field's one value, so Line Spacing visibly does the same thing here
+   as it does in the collapsed preview instead of being masked by the real
+   text block's fixed paragraph margin. */
+.page-block-text-editable.ev-overlay-text-editable p,
+.page-block-text-editable.ev-overlay-text-editable h1,
+.page-block-text-editable.ev-overlay-text-editable h2,
+.page-block-text-editable.ev-overlay-text-editable h3 {
+  margin: 0;
+  line-height: inherit;
 }
 
 .page-block-row-preview {
@@ -1866,6 +1942,14 @@ input[type="range"]:focus::-moz-range-thumb {
      doesn't reach the button's right edge, leaving it floating with a gap
      after it instead of glued to the right as it should be. */
   flex: 1;
+  /* ...but also let it *shrink* past its text's intrinsic width (flex children
+     default to min-width:auto) - without this a long picked value like
+     "SemiBold" in the fixed-width Weight picker won't ellipsize, it just
+     shoves the fixed-width arrow segment past the button's overflow:hidden
+     right edge and clips it. .dropdown-menu-btn-label-text does the actual
+     ellipsis (font-picker-btn / weight-picker-btn rules below). */
+  min-width: 0;
+  overflow: hidden;
   gap: 0.4rem;
   padding: 0.35rem 0.6rem;
   color: #fff;

@@ -196,6 +196,10 @@ function renderText(block) {
   const el = document.createElement("div");
   el.className = "page-block page-block-text";
   el.style.textAlign = block.alignment === "center" ? "center" : "left";
+  // Per-field line spacing (createTextConfig's line-height control) - css/
+  // page.css's .page-block-text rules read this with a 1.6 fallback, so an
+  // unset value renders exactly as before.
+  if (block.lineHeight != null) el.style.setProperty("--page-text-block-line-height", String(block.lineHeight));
 
   // bodyHtml (contenteditable WYSIWYG editor, js/modules/pageBlocksEditor.js)
   // takes priority over the legacy Markdown body below - a block only ever
@@ -342,17 +346,61 @@ function renderPlayer(block, page) {
 // on which URL shapes are recognized. Every accessor below (embed src,
 // provider name, thumbnail) routes through matchVideoUrl() so that single
 // list stays the only place URL shapes are recognized.
-// enablejsapi=1 (+ origin) turns on YouTube's postMessage player API, which
-// the expandable video block uses to know whether the embed is playing (so
-// it won't contract mid-playback). Harmless on a plain non-expandable embed
-// - it changes nothing visible - so it's added unconditionally rather than
-// threaded through as a flag. Vimeo's postMessage API needs no URL opt-in.
-function youtubeEmbedUrl(id) {
-  let url = `https://www.youtube-nocookie.com/embed/${id}?enablejsapi=1`;
+// A non-negative integer from an "advanced embed settings" number field, or
+// null for blank/invalid (YouTube/Vimeo silently ignore bad start/end).
+function embedTimeSeconds(v) {
+  if (v === "" || v == null) return null;
+  const n = Math.floor(Number(v));
+  return Number.isFinite(n) && n >= 0 ? n : null;
+}
+
+// Applies the block's `embedOptions` (edited via the cog dialog -
+// js/modules/embedSettingsDialog.js) to a YouTube embed URL's params. Only
+// keys that differ from YouTube's own default do anything; an absent option
+// = default. enablejsapi=1 (+ origin) is NOT one of these - it's mandatory
+// (the play-state detection and page-level media coordinator both depend on
+// it), set unconditionally after this so a stray option can't clobber it.
+function applyYouTubeEmbedOptions(params, o) {
+  if (!o) return;
+  if (o.controls === false) params.set("controls", "0");
+  if (o.relChannelOnly) params.set("rel", "0");
+  if (o.fullscreenButton === false) params.set("fs", "0");
+  if (o.keyboardControls === false) params.set("disablekb", "1");
+  if (o.captionsDefault) params.set("cc_load_policy", "1");
+  if (o.playsInline) params.set("playsinline", "1");
+  const start = embedTimeSeconds(o.startTime);
+  const end = embedTimeSeconds(o.endTime);
+  if (start != null) params.set("start", String(start));
+  if (end != null && (start == null || end > start)) params.set("end", String(end));
+}
+
+function youtubeEmbedUrl(id, options) {
+  const params = new URLSearchParams();
+  applyYouTubeEmbedOptions(params, options);
+  params.set("enablejsapi", "1");
   const origin = typeof window !== "undefined" && /^https?:/.test(window.location.origin) ? window.location.origin : "";
-  if (origin) url += `&origin=${encodeURIComponent(origin)}`;
+  if (origin) params.set("origin", origin);
+  return `https://www.youtube-nocookie.com/embed/${id}?${params}`;
+}
+
+function vimeoEmbedUrl(id, o) {
+  const params = new URLSearchParams();
+  if (o) {
+    if (o.controls === false) params.set("controls", "0");
+    if (o.title === false) params.set("title", "0");
+    if (o.byline === false) params.set("byline", "0");
+    if (o.portrait === false) params.set("portrait", "0");
+    if (o.doNotTrack) params.set("dnt", "1");
+    if (o.accentColor) params.set("color", String(o.accentColor).replace(/^#/, ""));
+  }
+  const qs = params.toString();
+  let url = `https://player.vimeo.com/video/${id}${qs ? `?${qs}` : ""}`;
+  // Vimeo takes a start time as a #t= hash, not a query param.
+  const start = o && embedTimeSeconds(o.startTime);
+  if (start != null) url += `#t=${start}s`;
   return url;
 }
+
 const youtubeThumb = (id) => `https://img.youtube.com/vi/${id}/hqdefault.jpg`;
 
 const VIDEO_URL_PATTERNS = [
@@ -361,7 +409,7 @@ const VIDEO_URL_PATTERNS = [
   // Vimeo has no static thumbnail URL (it needs an oEmbed API call), so
   // thumb() returns null - the editor only offers "use video thumbnail" for
   // YouTube and forces a custom image for Vimeo.
-  { provider: "vimeo", host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: (id) => `https://player.vimeo.com/video/${id}`, thumb: () => null },
+  { provider: "vimeo", host: /(^|\.)vimeo\.com$/, extract: (u) => u.pathname.split("/").filter(Boolean).pop(), embed: vimeoEmbedUrl, thumb: () => null },
 ];
 
 /** @param {string} videoUrl @returns {{pattern: object, id: string}|null} */
@@ -382,10 +430,10 @@ function matchVideoUrl(videoUrl) {
   return null;
 }
 
-/** @param {string} videoUrl @returns {string|null} an embeddable iframe src, or null if unrecognized */
-export function parseVideoEmbedUrl(videoUrl) {
+/** @param {string} videoUrl @param {Object} [options] block.embedOptions @returns {string|null} an embeddable iframe src, or null if unrecognized */
+export function parseVideoEmbedUrl(videoUrl, options) {
   const match = matchVideoUrl(videoUrl);
-  return match ? match.pattern.embed(match.id) : null;
+  return match ? match.pattern.embed(match.id, options) : null;
 }
 
 /** @param {string} videoUrl @returns {"youtube"|"vimeo"|null} */
@@ -402,11 +450,11 @@ export function parseVideoThumbnailUrl(videoUrl) {
 
 const ASPECT_RATIOS = { "16:9": "16 / 9", "4:3": "4 / 3", "1:1": "1 / 1", "9:16": "9 / 16" };
 
-function renderEmbeddedVideo(block) {
+function renderEmbeddedVideo(block, page) {
   const wrapper = document.createElement("div");
   wrapper.className = "page-block page-block-embedded-video";
 
-  const embedSrc = parseVideoEmbedUrl(block.videoUrl);
+  const embedSrc = parseVideoEmbedUrl(block.videoUrl, block.embedOptions);
   if (!embedSrc) {
     wrapper.textContent = "No video URL set";
     wrapper.classList.add("page-block-empty");
@@ -433,7 +481,7 @@ function renderEmbeddedVideo(block) {
   // (invisible) play-state wiring. Expandable mode only ever *adds* layers
   // and behaviour on top of it.
   if (block.expandable) {
-    decorateExpandableVideo(wrapper, iframe, block);
+    decorateExpandableVideo(wrapper, iframe, block, page);
   }
 
   return wrapper;
@@ -455,7 +503,7 @@ const EXPANDABLE_COLLAPSE_DELAY_MS = 1200;
  * an already-built .page-block-embedded-video wrapper. Mobile (touch) is
  * wired separately - see VIDEO_BLOCK_COLLAPSIBLE_SPEC.md section 5.
  */
-function decorateExpandableVideo(wrapper, iframe, block) {
+function decorateExpandableVideo(wrapper, iframe, block, page) {
   wrapper.dataset.expandable = "";
   // Expandable mode drives height in explicit pixels (collapsed <-> a
   // width x aspect-ratio target), the same way the reel player's expandable
@@ -514,13 +562,55 @@ function decorateExpandableVideo(wrapper, iframe, block) {
     };
     probe.onerror = () => overlay.remove();
     probe.src = block.overlayImage;
-  } else if (block.overlayMode === "text" && block.overlayText) {
+  } else if (block.overlayMode === "text" && (block.overlayTextBlock?.bodyHtml || block.overlayText)) {
     const overlay = document.createElement("div");
     overlay.className = "ev-overlay ev-overlay-text";
-    const span = document.createElement("span");
-    span.textContent = block.overlayText;
-    applyExpandableOverlayTextStyle(span, block);
-    overlay.appendChild(span);
+    if (block.overlayTextBlock?.bodyHtml) {
+      // Rich WYSIWYG content, authored via the shared text-block editor.
+      // sanitizeHtml() is the real security boundary (same as renderText()).
+      // Carries the real .page-block-text class so it uses the EXACT same
+      // p/h1/h2/h3/strong/em/u typography rules - and the same inherited
+      // --page-text-{role}-* custom properties (set page-wide on an ancestor
+      // by applyTextStyles) - as the editor and normal text blocks. css/
+      // page.css then overrides only what the overlay needs different
+      // (white+shadow, no padding, field-driven line spacing). Anything less
+      // than a shared rule set drifts the moment more than one font/size/
+      // weight is in play.
+      const body = document.createElement("div");
+      body.className = "ev-overlay-text-body page-block-text";
+      const align = block.overlayTextBlock.alignment;
+      body.style.textAlign = align === "center" ? "center" : align === "right" ? "right" : "left";
+      if (block.overlayTextBlock.lineHeight != null) body.style.lineHeight = String(block.overlayTextBlock.lineHeight);
+      body.innerHTML = sanitizeHtml(block.overlayTextBlock.bodyHtml);
+      // Load any Google Font picked per-run via the toolbar Font dropdown
+      // (an inline <span style="font-family:...">, not a page role) - the
+      // page-wide applyTextStyles only fetches role fonts.
+      body.querySelectorAll("span[style*='font-family']").forEach((s) => {
+        const ff = (s.style.fontFamily || "").replace(/['"]/g, "").trim();
+        const match = TEXT_FONT_OPTIONS.find((f) => f.stack.replace(/['"]/g, "").trim() === ff);
+        if (match) ensureInlineGoogleFont(match.value);
+      });
+      overlay.appendChild(body);
+      // [overlay-debug] - keep until the overlay text is confirmed correct.
+      // Deferred so `body` is attached (caller appends the wrapper into the
+      // row preview / page synchronously right after this returns).
+      setTimeout(() => {
+        if (!body.isConnected) { console.log("[overlay-debug] RENDERED overlay - body never attached"); return; }
+        const dbgP = body.querySelector("p, h1, h2, h3") || body;
+        const csBody = getComputedStyle(body);
+        const csP = getComputedStyle(dbgP);
+        console.log(`[overlay-debug] RENDERED overlay lhField=${block.overlayTextBlock.lineHeight}
+  container: lh=${csBody.lineHeight} size=${csBody.fontSize} weight=${csBody.fontWeight} family=${csBody.fontFamily}
+  ${dbgP.tagName}:   lh=${csP.lineHeight} size=${csP.fontSize} weight=${csP.fontWeight} family=${csP.fontFamily}
+  html: ${body.innerHTML}`);
+      }, 0);
+    } else {
+      // Legacy single styled line (block.overlayText + overlay* style fields).
+      const span = document.createElement("span");
+      span.textContent = block.overlayText;
+      applyExpandableOverlayTextStyle(span, block);
+      overlay.appendChild(span);
+    }
     wrapper.appendChild(overlay);
   }
 
@@ -556,13 +646,33 @@ function wireVideoPlaybackDetection(wrapper, iframe, block) {
   const provider = parseVideoProvider(block.videoUrl);
   if (!provider) return;
 
+  // Scrubbing (the progress bar, arrow-key seek, chapter skip) makes the
+  // embed report a brief not-playing blip - buffering, sometimes a flash of
+  // "paused" - before it resumes. Clearing evPlaying on that would unlock
+  // the collapse guard mid-navigation. So the *rising* edge is immediate,
+  // but the *falling* edge waits out a short grace: a real pause still
+  // lands (~half a second later - imperceptible, and collapse has its own
+  // 1.2s delay after that), while a seek's blip is cancelled by the
+  // playing state coming straight back.
+  const PAUSE_GRACE_MS = 600;
+  let pausePending = null;
+
   function setPlaying(on) {
-    const was = wrapper.dataset.evPlaying === "true";
-    if (on) wrapper.dataset.evPlaying = "true";
-    else delete wrapper.dataset.evPlaying;
-    if (on !== was) {
-      wrapper.dispatchEvent(new CustomEvent(on ? "ev:play" : "ev:pause", { bubbles: true }));
+    if (on) {
+      clearTimeout(pausePending);
+      pausePending = null;
+      if (wrapper.dataset.evPlaying !== "true") {
+        wrapper.dataset.evPlaying = "true";
+        wrapper.dispatchEvent(new CustomEvent("ev:play", { bubbles: true }));
+      }
+      return;
     }
+    if (wrapper.dataset.evPlaying !== "true" || pausePending) return;
+    pausePending = setTimeout(() => {
+      pausePending = null;
+      delete wrapper.dataset.evPlaying;
+      wrapper.dispatchEvent(new CustomEvent("ev:pause", { bubbles: true }));
+    }, PAUSE_GRACE_MS);
   }
 
   function onMessage(e) {
@@ -585,6 +695,9 @@ function wireVideoPlaybackDetection(wrapper, iframe, block) {
       if (data.event === "onStateChange") state = data.info;
       else if (data.event === "infoDelivery" && data.info && typeof data.info.playerState === "number") state = data.info.playerState;
       if (state === undefined) return;
+      // Buffering is "trying to play" - never treat it as a stop (the grace
+      // timer below would catch it anyway, but this avoids even starting it).
+      if (state === 3) return;
       setPlaying(state === 1);
     } else if (provider === "vimeo") {
       if (data.event === "play") setPlaying(true);

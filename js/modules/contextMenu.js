@@ -6,11 +6,13 @@
 // same positioning/outside-click/Escape/scroll-dismiss behavior rather than
 // a second hand-copy of it.
 let openMenuCleanup = null;
+let openMenuAnchor = null;
 
 export function closeContextMenu() {
   if (openMenuCleanup) {
     openMenuCleanup();
     openMenuCleanup = null;
+    openMenuAnchor = null;
   }
 }
 
@@ -33,7 +35,19 @@ export function closeContextMenu() {
  *   function creates, not the trigger that opened it).
  */
 export function openContextMenu(anchorEl, items, opts = {}) {
+  // Clicking the same trigger again closes the menu instead of flickering it
+  // shut and straight back open - a normal dropdown toggle.
+  const reopeningSameAnchor = openMenuAnchor === anchorEl;
   closeContextMenu();
+  if (reopeningSameAnchor) return;
+
+  // For a value-reflecting dropdown (Font / Weight / Style menus, all built on
+  // createDropdownMenuButton), highlight the item matching the trigger's
+  // current label. The trailing " •" override marker on the style button isn't
+  // part of any item label, so strip it before comparing.
+  const currentLabel = anchorEl
+    .querySelector?.(".dropdown-menu-btn-label-text")
+    ?.textContent.replace(/\s*•\s*$/, "").trim();
 
   const menu = document.createElement("div");
   menu.className = "app-context-menu";
@@ -41,6 +55,10 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = item.danger ? "danger" : "";
+    if (currentLabel && typeof item.label === "string" && item.label.trim() === currentLabel) {
+      btn.classList.add("selected");
+      btn.setAttribute("aria-current", "true");
+    }
     if (item.style) btn.style.cssText = item.style;
     btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
     if (opts.preventFocusSteal) {
@@ -66,7 +84,10 @@ export function openContextMenu(anchorEl, items, opts = {}) {
   menu.style.top = `${top}px`;
 
   const onOutsideClick = (e) => {
-    if (!menu.contains(e.target) && e.target !== anchorEl) closeContextMenu();
+    // A click on the anchor (or anything inside it, e.g. the label span / caret
+    // svg) is left for the anchor's own handler to toggle - closing here first
+    // would make that handler always see "not open" and reopen instead.
+    if (!menu.contains(e.target) && !anchorEl.contains(e.target)) closeContextMenu();
   };
   const onKeydown = (e) => { if (e.key === "Escape") closeContextMenu(); };
   const onScroll = () => closeContextMenu();
@@ -79,6 +100,7 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     window.addEventListener("scroll", onScroll, true);
   }, 0);
 
+  openMenuAnchor = anchorEl;
   openMenuCleanup = () => {
     menu.remove();
     document.removeEventListener("mousedown", onOutsideClick);

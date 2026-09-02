@@ -10,7 +10,7 @@
 import { createValueControl } from "./valueControl.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
-import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ROLE_DEFAULT_LINE_HEIGHT, ensureInlineGoogleFont } from "./pageTextStyles.js";
 
 const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
 
@@ -433,6 +433,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
       labelTd.style.fontSize = `${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`;
       labelTd.style.fontWeight = def.fontWeight || ROLE_DEFAULT_WEIGHT[role];
+      labelTd.style.lineHeight = String(def.lineHeight != null ? def.lineHeight : ROLE_DEFAULT_LINE_HEIGHT[role]);
       labelTd.style.color = def.color || ROLE_DEFAULT_COLOR[role];
       labelTd.style.fontFamily = font ? font.stack : "";
     });
@@ -484,6 +485,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       <th style="width:170px;text-align:center;padding:0.3rem;"><span style="display:inline-flex;align-items:center;justify-content:center;gap:0.3rem;">Font<span id="fontLinkToggleSlot"></span></span></th>
       <th style="width:90px;text-align:center;padding:0.3rem;">Size</th>
       <th style="width:110px;text-align:center;padding:0.3rem;">Weight</th>
+      <th style="width:90px;text-align:center;padding:0.3rem;">Line ht.</th>
       <th style="width:60px;text-align:center;padding:0.3rem;">Color</th>
       <th style="width:80px;padding:0.3rem;"></th>
     </tr>
@@ -539,7 +541,9 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       min: 8,
       max: 96,
       step: 1,
-      unit: "px",
+      // No "px" unit here - the column is only 90px wide and the suffix
+      // overflowed the cell into the Weight dropdown next to it. The "Size"
+      // header already says what the number is.
     });
     sizeControl.control.classList.add("customize-styles-size-control");
     sizeControl.input.addEventListener("input", () => {
@@ -562,6 +566,25 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     weightTd.appendChild(weightControl.control);
     tr.appendChild(weightTd);
     fontRows.push({ def, fontBtn, weightControl });
+
+    const lineTd = document.createElement("td");
+    lineTd.style.cssText = cellStyle;
+    const lineControl = createValueControl({
+      id: `${role}-textStyleDefsLineHeight`,
+      label: "",
+      value: def.lineHeight != null ? def.lineHeight : ROLE_DEFAULT_LINE_HEIGHT[role],
+      min: 0,
+      max: 3,
+      step: 0.1,
+    });
+    lineControl.control.classList.add("customize-styles-size-control");
+    lineControl.input.addEventListener("input", () => {
+      const val = parseFloat(lineControl.input.value);
+      def.lineHeight = !isNaN(val) ? Math.round(val * 10) / 10 : undefined;
+      commitAll();
+    });
+    lineTd.appendChild(lineControl.control);
+    tr.appendChild(lineTd);
 
     const colorTd = document.createElement("td");
     colorTd.style.cssText = cellStyle;
@@ -619,7 +642,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     // the table's real rendered width (each column's padding adds to its
     // th's declared width, so the table always ends up a bit wider than
     // the raw column-width sum).
-    maxWidth: "860px",
+    maxWidth: "960px",
   });
   // createDialog's `content` option only innerHTML's an HTML string - these
   // rows need real onchange handlers, so an empty placeholder slot is

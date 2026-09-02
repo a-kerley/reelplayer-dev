@@ -513,6 +513,17 @@
   color: #fff;
 }
 
+/* The item matching the trigger's current value (Font / Weight / Style menus). */
+.app-context-menu button.selected {
+  background: rgba(74, 144, 226, 0.14);
+  color: #fff;
+  box-shadow: inset 2px 0 0 var(--builder-accent);
+}
+
+.app-context-menu button.selected:hover {
+  background: rgba(74, 144, 226, 0.22);
+}
+
 .app-context-menu button.danger {
   color: #f27686;
 }

@@ -52,6 +52,10 @@ export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", 
 // hue.
 export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playlistItem: 16 };
 export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
+// Unitless line-height. Matches the fallbacks baked into css/page.css's
+// .page-block-text {h1,h2,h3,p} rules, so an uncustomized role renders
+// exactly as before.
+export const ROLE_DEFAULT_LINE_HEIGHT = { h1: 1.2, h2: 1.25, h3: 1.3, body: 1.6, link: 1.6, playlistItem: 1.6 };
 export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#ffffff", link: "#ffffff", playlistItem: "#ffffff" };
 
 // A curated pick, not an open text field - three system/web-safe stacks
@@ -194,6 +198,12 @@ export function applyTextStyles(scopeEl, page) {
       scopeEl.style.setProperty(`--page-text-${role}-color`, def.color);
     } else {
       scopeEl.style.removeProperty(`--page-text-${role}-color`);
+    }
+
+    if (def.lineHeight != null) {
+      scopeEl.style.setProperty(`--page-text-${role}-line-height`, String(def.lineHeight));
+    } else {
+      scopeEl.style.removeProperty(`--page-text-${role}-line-height`);
     }
   });
 

@@ -51,6 +51,11 @@ const ALLOWED_FONT_FAMILIES = new Set(TEXT_FONT_OPTIONS.map((f) => normalizeFont
 // accepted since either could show up depending on browser.
 const COLOR_RE = /^(#[0-9a-f]{6}|rgb\(\s*\d{1,3},\s*\d{1,3},\s*\d{1,3}\s*\))$/i;
 const FONT_SIZE_RE = /^(\d{1,3})px$/;
+// The Weight control (js/modules/styleToolbarWidgets.js's
+// createWeightControl()) emits a keyword, a round-hundred from a Google
+// Font's static weight list, or - for the system/serif/mono spinner - any
+// integer the user types. CSS font-weight's valid range is 1-1000.
+const FONT_WEIGHT_RE = /^(normal|bold|1000|[1-9][0-9]{0,2})$/;
 
 // js/modules/pageBlocksEditor.js's justify toolbar (document.execCommand
 // justifyLeft/Center/Right/Full) writes its result as a plain
@@ -68,12 +73,12 @@ function sanitizeBlockAlignStyle(node) {
 }
 
 // Rebuilds `<span style="...">` from scratch, keeping only
-// color/font-family/font-size, each independently validated - never trusts
-// the CSS text itself, only specific properties read via the already-
-// browser-parsed CSSStyleDeclaration (node.style), each checked against a
-// strict allowlist/pattern before being written back.
+// color/font-family/font-size/font-weight, each independently validated -
+// never trusts the CSS text itself, only specific properties read via the
+// already-browser-parsed CSSStyleDeclaration (node.style), each checked
+// against a strict allowlist/pattern before being written back.
 function sanitizeSpanStyle(node) {
-  const { color, fontFamily, fontSize } = node.style;
+  const { color, fontFamily, fontSize, fontWeight } = node.style;
   node.removeAttribute("style");
   if (color && COLOR_RE.test(color)) node.style.color = color;
   if (fontFamily && ALLOWED_FONT_FAMILIES.has(normalizeFontFamily(fontFamily))) node.style.fontFamily = fontFamily;
@@ -81,6 +86,7 @@ function sanitizeSpanStyle(node) {
     const px = parseInt(fontSize, 10);
     if (px >= 8 && px <= 96) node.style.fontSize = fontSize;
   }
+  if (fontWeight && FONT_WEIGHT_RE.test(fontWeight)) node.style.fontWeight = fontWeight;
   return node.style.length > 0;
 }
 
@@ -188,11 +194,44 @@ function stripCaretPlaceholders(root) {
   });
 }
 
+const BLOCK_TAGS = new Set(["P", "H1", "H2", "H3"]);
+
+// Guarantees block-wrapped output: any run of bare inline/text nodes sitting
+// directly at the root (P/BR/STRONG/EM/U/A/SPAN or text) gets wrapped in a
+// <p>. contenteditable routinely leaves the first typed line unwrapped, and
+// once inline styles/execCommand touch bare root content the structure
+// degrades (stray </p>, deep nesting) - a state the .page-block-text /
+// .ev-overlay-text-body CSS (which targets real p/h1/h2/h3 elements) can't
+// style. Running on every sanitizeHtml() call heals it in both the editor's
+// commit and the renderer's re-sanitize.
+function wrapBareInlineRuns(root) {
+  let node = root.firstChild;
+  let currentP = null;
+  while (node) {
+    const next = node.nextSibling;
+    const isBlock = node.nodeType === Node.ELEMENT_NODE && BLOCK_TAGS.has(node.tagName);
+    if (isBlock) {
+      currentP = null;
+    } else if (node.nodeType === Node.TEXT_NODE && !node.textContent.trim() && !currentP) {
+      root.removeChild(node); // inter-block whitespace-only text
+    } else {
+      if (!currentP) {
+        currentP = root.ownerDocument.createElement("p");
+        root.insertBefore(currentP, node);
+      }
+      currentP.appendChild(node);
+    }
+    node = next;
+  }
+  root.querySelectorAll("p").forEach((p) => { if (!p.hasChildNodes()) p.remove(); });
+}
+
 /** @param {string} html @returns {string} sanitized HTML, allowlisted to P/BR/STRONG/EM/U/H1-3/A/SPAN[style]/P,H1-3[style=text-align] */
 export function sanitizeHtml(html) {
   const template = document.createElement("template");
   template.innerHTML = html;
   sanitizeNode(template.content);
   stripCaretPlaceholders(template.content);
+  wrapBareInlineRuns(template.content);
   return template.innerHTML;
 }

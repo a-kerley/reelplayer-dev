@@ -14,7 +14,7 @@ import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
 import { ROLE_LABELS, TEXT_FONT_OPTIONS, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
-import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
+import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, createWeightControl, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 
 const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
@@ -440,7 +440,7 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
 // is rendered once via the existing renderBlock() to seed this field's
 // initial content, then converts to bodyHtml the first time it's actually
 // edited - no forced bulk migration.
-function createTextConfig(block, page, onChange, refreshPreview) {
+function createTextConfig(block, page, onChange, refreshPreview, { editableClass } = {}) {
   const wrap = document.createElement("div");
 
   // Single consolidated toolbar above the field (style menu, B/I/U, align
@@ -498,9 +498,33 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     btn.addEventListener("mousedown", (e) => e.preventDefault());
     btn.onclick = () => {
       editable.focus();
+      // Canonicalize first so execCommand toggles against a clean single span
+      // layer rather than last session's nested/styleless-span cruft - without
+      // this, un-bolding a <strong> already wrapped in a size span silently
+      // no-ops and Bold gets stuck "on".
+      reserializeEditable();
+      // Bold and the Weight dropdown are two entry points to font-weight -
+      // Bold stays a real toggle across both. If the selection is heavy
+      // only because of a Weight-dropdown span (not execCommand's own
+      // <strong>), pressing Bold just clears that span (-> regular) rather
+      // than layering a <strong> on top. Otherwise it's the normal toggle,
+      // after first dropping any weight span so <strong> isn't immediately
+      // overridden. The reverse (a weight unwrapping <strong>) is in
+      // applyInlineStyle().
+      if (command === "bold") {
+        const heavyViaSpanOnly = selectionIsHeavy() && !document.queryCommandState("bold");
+        clearWeightSpansInSelection();
+        if (heavyViaSpanOnly) {
+          commit();
+          updateFormatButtonStates();
+          return;
+        }
+      }
       document.execCommand(command);
-      updateFormatButtonStates();
+      // commit() re-canonicalizes the editable (reserializeEditable) and can
+      // move the selection, so read the button state back *after* it, not before.
       commit();
+      updateFormatButtonStates();
     };
     formatButtons[command] = btn;
     formatGroup.appendChild(btn);
@@ -509,7 +533,11 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   toolbarRow.appendChild(createToolbarDivider());
 
   function updateFormatButtonStates() {
-    formatButtons.bold.classList.toggle("active", document.queryCommandState("bold"));
+    // Also lit when the selection is heavy via an explicit Weight-dropdown
+    // value (>= 600), not just execCommand's own <strong>, so Bold's state
+    // matches what's actually on screen. Pressing it then clears that weight
+    // (clearWeightSpansInSelection) and toggles from there.
+    formatButtons.bold.classList.toggle("active", document.queryCommandState("bold") || selectionIsHeavy());
     formatButtons.italic.classList.toggle("active", document.queryCommandState("italic"));
     formatButtons.underline.classList.toggle("active", document.queryCommandState("underline"));
     // queryCommandState("justifyLeft") is true whenever nothing else is set
@@ -562,6 +590,89 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     });
   }
 
+  // execCommand("bold") plus the Bold/Weight-dropdown reconciliation
+  // (clearWeightSpansInSelection etc.) leave the *editable* with nested and
+  // styleless spans - e.g. <span style="font-size:31px"><span><strong>...  -
+  // that were only ever cleaned out of the saved bodyHtml copy, never here.
+  // They compound over a session, and once a <strong> ends up wrapped in a
+  // size span execCommand can no longer toggle it off: Bold sticks "on" and
+  // repeated presses are silent no-ops. Folding the editable back through the
+  // sanitizer after a format action restores a canonical DOM (one span layer,
+  // no bare wrappers) - the structure execCommand actually needs.
+  //
+  // Only runs for a real range selection: a collapsed caret may be sitting in
+  // a just-inserted CARET_PLACEHOLDER span (applyInlineStyle's "style the next
+  // character I type" gesture), which sanitize strips - folding that back now
+  // would delete the span the caret lives in. innerHTML replacement detaches
+  // every node savedRange holds, so the caret is saved/restored as a plain-
+  // text character offset (sanitize only ever rewrites tags/attributes, never
+  // the text itself, so offsets round-trip).
+  function reserializeEditable() {
+    const sel = window.getSelection();
+    if (sel.isCollapsed || !sel.rangeCount || !editable.contains(sel.anchorNode)) return;
+    const r = sel.getRangeAt(0);
+    // applyInlineStyle()/applyFontSizeStep() reselect the span they just made
+    // with element-level boundaries (setStartBefore/setEndAfter), specifically
+    // so selectionRunValue()'s range.intersectsNode() walk includes only that
+    // span's own text and not the neighbouring runs. Re-deriving the selection
+    // from plain text offsets here collapses those onto adjacent text nodes,
+    // whose boundary-touch then counts as an intersection - so the toolbar
+    // reads two fonts and shows "Mixed" right after a successful single change.
+    // Those paths build clean single spans anyway (no execCommand nesting to
+    // fold), so skip them; the B/I/U path still gets canonicalised.
+    if (r.startContainer.nodeType === Node.ELEMENT_NODE || r.endContainer.nodeType === Node.ELEMENT_NODE) return;
+    const clean = sanitizeHtml(editable.innerHTML);
+    if (clean === editable.innerHTML) return;
+    const start = caretCharOffset(r.startContainer, r.startOffset);
+    const end = caretCharOffset(r.endContainer, r.endOffset);
+    editable.innerHTML = clean;
+    block.bodyHtml = clean;
+    const restored = rangeFromCharOffsets(start, end);
+    sel.removeAllRanges();
+    sel.addRange(restored);
+    savedRange = restored.cloneRange();
+  }
+
+  // Character offset from the editable's start to (container, offset), counting
+  // only rendered text - the unit reserializeEditable() saves the caret in.
+  function caretCharOffset(container, offset) {
+    const pre = document.createRange();
+    pre.selectNodeContents(editable);
+    pre.setEnd(container, offset);
+    return pre.toString().length;
+  }
+
+  // Inverse of caretCharOffset(): a Range spanning the same two text offsets
+  // in the freshly-rebuilt DOM.
+  function rangeFromCharOffsets(start, end) {
+    const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT);
+    let count = 0;
+    let node;
+    let sNode = null;
+    let sOff = 0;
+    let eNode = null;
+    let eOff = 0;
+    while ((node = walker.nextNode())) {
+      const len = node.textContent.length;
+      if (sNode === null && count + len >= start) {
+        sNode = node;
+        sOff = start - count;
+      }
+      if (count + len >= end) {
+        eNode = node;
+        eOff = end - count;
+        break;
+      }
+      count += len;
+    }
+    const r = document.createRange();
+    if (sNode) r.setStart(sNode, sOff);
+    else { r.selectNodeContents(editable); r.collapse(false); }
+    if (eNode) r.setEnd(eNode, eOff);
+    else r.collapse(sNode ? true : false);
+    return r;
+  }
+
   // The nearest SPAN ancestor of `range` (walking up from its
   // commonAncestorContainer - the one node guaranteed to contain the whole
   // range, not just one end of it) that already carries an explicit value
@@ -596,7 +707,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   function selectionHasOverride(range) {
     if (!range) return false;
     if (range.collapsed) {
-      return !!(findWrappingSpan(range, "fontFamily") || findWrappingSpan(range, "fontSize") || findWrappingSpan(range, "color"));
+      return !!(findWrappingSpan(range, "fontFamily") || findWrappingSpan(range, "fontSize") || findWrappingSpan(range, "color") || findWrappingSpan(range, "fontWeight"));
     }
     const walker = document.createTreeWalker(editable, NodeFilter.SHOW_TEXT, {
       acceptNode: (node) => (range.intersectsNode(node) ? NodeFilter.FILTER_ACCEPT : NodeFilter.FILTER_SKIP),
@@ -606,7 +717,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       if (!node.textContent) continue;
       let el = node.parentElement;
       while (el && el !== editable) {
-        if (el.tagName === "SPAN" && (el.style.fontFamily || el.style.fontSize || el.style.color)) return true;
+        if (el.tagName === "SPAN" && (el.style.fontFamily || el.style.fontSize || el.style.color || el.style.fontWeight)) return true;
         el = el.parentElement;
       }
     }
@@ -675,12 +786,48 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       const fragment = range.extractContents();
       fragment.querySelectorAll("span").forEach((el) => {
         if (el.style[prop]) el.style[prop] = "";
+        // A span left with no inline style at all (its only property was the
+        // one just cleared) is pure wrapper debris - unwrap it now rather than
+        // sealing it permanently inside the new span. Without this, re-styling
+        // text that already had a span for `prop`, or a selection crossing
+        // span boundaries, accumulates nested/styleless <span><span> shells.
+        if (el.style.length === 0) {
+          while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+          el.remove();
+        }
       });
+      // Bold and the Weight dropdown both target font-weight; keep them
+      // coherent by making the last action win rather than silently stack.
+      // Setting a weight unwraps any <strong>/<b> in the range (execCommand
+      // bold's output) so the new weight span isn't shadowing a dead
+      // <strong> underneath. The reverse - Bold clearing weight spans -
+      // is handled in the B button's own onclick.
+      if (prop === "fontWeight") {
+        fragment.querySelectorAll("b, strong").forEach((el) => {
+          while (el.firstChild) el.parentNode.insertBefore(el.firstChild, el);
+          el.remove();
+        });
+      }
       const span = document.createElement("span");
       span.style[prop] = value;
       span.appendChild(fragment);
       range.insertNode(span);
       removeEmptySpans();
+      // The new span can land inside an ancestor span that also sets `prop`
+      // (re-styling text already wrapped for it) - that ancestor's value is
+      // now shadowed dead weight, so clear it, and drop the ancestor whole if
+      // that was all it carried.
+      for (let anc = span.parentNode; anc && anc !== editable && anc.tagName === "SPAN"; ) {
+        const next = anc.parentNode;
+        if (anc.style[prop]) {
+          anc.style[prop] = "";
+          if (anc.style.length === 0) {
+            while (anc.firstChild) next.insertBefore(anc.firstChild, anc);
+            anc.remove();
+          }
+        }
+        anc = next;
+      }
       // Reselects the new span itself (start-before/end-after it), not
       // selectNodeContents(span) (just its children) - the latter looks
       // equivalent (same highlighted text) but means any later
@@ -870,11 +1017,36 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // selectionHasOverride()/the styleBtn "•" marker exists to flag).
   function stripOverrideSpans(root) {
     root.querySelectorAll("span").forEach((span) => {
-      if (span.style.fontFamily || span.style.fontSize || span.style.color) {
+      if (span.style.fontFamily || span.style.fontSize || span.style.color || span.style.fontWeight) {
         while (span.firstChild) span.parentNode.insertBefore(span.firstChild, span);
         span.remove();
       }
     });
+  }
+
+  // Clears the font-weight off any span touching the current selection -
+  // called just before execCommand("bold") so Bold's <strong> starts from a
+  // clean slate instead of being visually overridden by a leftover numeric
+  // weight the Weight dropdown set. Only nulls the property (no unwrap) so
+  // the live selection survives for the execCommand that follows;
+  // now-styleless spans are dropped by sanitizeHtml() at commit().
+  function clearWeightSpansInSelection() {
+    const sel = window.getSelection();
+    if (!sel.rangeCount || !editable.contains(sel.anchorNode)) return;
+    const range = sel.getRangeAt(0);
+    editable.querySelectorAll("span").forEach((span) => {
+      if (span.style.fontWeight && range.intersectsNode(span)) span.style.fontWeight = "";
+    });
+  }
+
+  // Effective font-weight at the caret is >= 600 - covers a <strong>, a
+  // Weight-dropdown span, and a heavy per-role default alike.
+  function selectionIsHeavy() {
+    const sel = window.getSelection();
+    const node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : null;
+    const el = node ? (node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement) : null;
+    if (!el) return false;
+    return (parseInt(getComputedStyle(el).fontWeight, 10) || 400) >= 600;
   }
 
   // The size to show/step from when nothing at the selection has an
@@ -1006,6 +1178,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
       const role = currentBlockRole();
       setStyleBtnLabel(role, selectionHasOverride(range));
     }
+    // Re-derive the weight dropdown for the selection's current font and
+    // reflect its current weight. null until the deferred init below builds
+    // it (createWeightControl's synchronous render() needs `editable`).
+    weightControl?.refresh();
   }
 
   // Shared by both updateInlineControlDisplays() branches above - appends
@@ -1153,10 +1329,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     min: SIZE_MIN,
     max: SIZE_MAX,
     step: SIZE_STEP,
-    unit: "px",
   });
   sizeControl.control.classList.add("page-block-text-toolbar-size");
-  sizeControl.input.title = "Font size (px) for the selected text";
+  sizeControl.control.title = "Font size (px) for the selected text";
+  const sizeIcon = document.createElement("span");
+  sizeIcon.className = "material-symbols-outlined page-block-text-toolbar-num-icon";
+  sizeIcon.textContent = "format_size";
+  sizeControl.control.prepend(sizeIcon);
   const sizeInput = sizeControl.input;
 
   const spinUp = sizeControl.control.querySelector(".value-control-spin-up");
@@ -1202,7 +1381,70 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   }, toolbarPickrInstances);
   colorPickr.btn.title = "Text color for the selected text";
   toolbarRow.appendChild(colorPickr.btn);
+
+  // Weight: the same font-aware control the Customize Text Styles dialog
+  // uses (dropdown of the current font's real static weights, or a spinner
+  // for system/serif/mono). Applied per-selection via a <span
+  // style="font-weight:...">, which htmlSanitizer.js now keeps.
+  //
+  // createWeightControl() runs its render() synchronously, and render()
+  // calls the getters below - which read `editable` - so unlike every
+  // other toolbar closure here it CANNOT be built inline (editable isn't
+  // declared yet). Built into this placeholder from the same deferred init
+  // as updateInlineControlDisplays() at the end of this function.
+  function currentSelectionRange() {
+    const sel = window.getSelection();
+    if (savedRange) return savedRange;
+    return sel.rangeCount && editable.contains(sel.anchorNode) ? sel.getRangeAt(0) : null;
+  }
+  function currentFontValue() {
+    const range = currentSelectionRange();
+    const fontSpan = range && findWrappingSpan(range, "fontFamily");
+    const family = fontSpan ? normalizeFontFamily(fontSpan.style.fontFamily) : effectiveFontFamily();
+    const opt = TEXT_FONT_OPTIONS.find((f) => normalizeFontFamily(f.stack) === family);
+    return opt ? opt.value : "system";
+  }
+  let weightControl = null;
+  const weightSlot = document.createElement("span");
+  weightSlot.className = "weight-control-wrap";
+  weightSlot.title = "Font weight for the selected text";
+  toolbarRow.appendChild(weightSlot);
+
+  // Line spacing lives in the toolbar (after Weight), not its own row below the
+  // field. Placeholder here; the real control needs `editable`/`commit`, built
+  // in the deferred init lower down and swapped into this slot.
+  const lineHeightSlot = document.createElement("span");
+  toolbarRow.appendChild(lineHeightSlot);
+
   toolbarRow.appendChild(createToolbarDivider());
+  function buildWeightControl() {
+    if (weightControl) return;
+    weightControl = createWeightControl({
+      idPrefix: `${block.blockId}-toolbar`,
+      getFontFamily: currentFontValue,
+      getWeight: () => {
+        const range = currentSelectionRange();
+        const wSpan = range && findWrappingSpan(range, "fontWeight");
+        if (wSpan) return wSpan.style.fontWeight;
+        const sel = window.getSelection();
+        const node = sel.rangeCount && editable.contains(sel.anchorNode) ? sel.anchorNode : editable;
+        const el = node.nodeType === Node.ELEMENT_NODE ? node : node.parentElement;
+        return String(Math.round(parseFloat(getComputedStyle(el || editable).fontWeight)) || 400);
+      },
+      setWeight: (value) => {
+        if (value == null) return;
+        applyInlineStyle("fontWeight", String(value));
+        // NOT updateInlineControlDisplays() here - createWeightControl's own
+        // onClick has already set the button label, and refreshing now
+        // rebuilds it from getWeight(), which can't see the span we just
+        // wrapped (the selection is start-before/end-after it, so
+        // findWrappingSpan walks past it) and so snaps the label back to
+        // "Regular". The next real selection change re-syncs it.
+      },
+      onCommit: commit,
+    });
+    weightSlot.replaceWith(weightControl.control);
+  }
 
   // Link/unlink toggle - unlike the styling controls above, this doesn't
   // need savedRange for the "already a link" case, but does for creating
@@ -1271,20 +1513,24 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     btn.onclick = () => {
       editable.focus();
       document.execCommand(command);
-      updateFormatButtonStates();
       commit();
+      updateFormatButtonStates();
     };
     justifyButtons[command] = btn;
     justifyGroup.appendChild(btn);
   });
   toolbarRow.appendChild(justifyGroup);
-  toolbarRow.appendChild(createToolbarDivider());
 
   const customizeBtn = document.createElement("button");
   customizeBtn.type = "button";
   customizeBtn.className = "page-block-add-btn";
   customizeBtn.textContent = "Customize Styles...";
-  customizeBtn.style.marginLeft = "auto";
+  // No margin-left:auto and no leading divider - in a flex-wrap toolbar that
+  // auto margin snapped the button between the align-icons row and a right-
+  // aligned row of its own (resizing the gap before it) every time the panel
+  // width crossed a wrap point, and the 1px divider would wrap onto a line by
+  // itself. Its accent-bordered style already reads as separate; it now just
+  // flows inline and wraps predictably like any other item.
   customizeBtn.onclick = () => openCustomizeStylesDialog(page, onChange, refreshPreview);
   toolbarRow.appendChild(customizeBtn);
 
@@ -1297,7 +1543,7 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // the final styling, not generic browser bold/italic - .page-block-
   // text-editable layers the builder-chrome-only editing-field look
   // (border/background/focus ring) on top, in css/builder.css.
-  editable.className = "page-block-text page-block-text-editable";
+  editable.className = "page-block-text page-block-text-editable" + (editableClass ? ` ${editableClass}` : "");
   editable.setAttribute("data-placeholder", "Type your text here...");
   editable.style.textAlign = block.alignment === "center" ? "center" : "left";
   editable.innerHTML = initialEditableHtml(block);
@@ -1305,6 +1551,37 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // customization live inside the editor itself, not just in the preview
   // panes - genuine WYSIWYG rather than generic browser bold/italic.
   applyTextStyles(editable, page);
+  // Per-field line spacing - one value for the whole block (paragraphs),
+  // set as a CSS custom property that css/page.css's .page-block-text rule
+  // reads (with a 1.6 fallback). Mirrored on the rendered block by
+  // renderText().
+  if (block.lineHeight != null) editable.style.setProperty("--page-text-block-line-height", String(block.lineHeight));
+
+  const { control: lineHeightControl, input: lineHeightInput } = createValueControl({
+    id: `${block.blockId}-lineHeight`,
+    label: "",
+    value: block.lineHeight ?? 1.6,
+    min: 0,
+    max: 3,
+    step: 0.1,
+  });
+  // Compact toolbar form: hide the hover-reveal slider (CSS), sit at content
+  // width, and use a leading icon instead of a "Line spacing:" text label.
+  lineHeightControl.classList.add("page-block-text-toolbar-lineheight");
+  lineHeightControl.title = "Line spacing - line-height for this block's paragraphs";
+  const lhIcon = document.createElement("span");
+  lhIcon.className = "material-symbols-outlined page-block-text-toolbar-num-icon";
+  lhIcon.textContent = "format_line_spacing";
+  lineHeightControl.prepend(lhIcon);
+  const applyLineHeight = () => {
+    const val = parseFloat(lineHeightInput.value);
+    if (isNaN(val)) return;
+    block.lineHeight = Math.round(val * 10) / 10;
+    editable.style.setProperty("--page-text-block-line-height", String(block.lineHeight));
+    commit();
+  };
+  lineHeightInput.addEventListener("change", applyLineHeight);
+  lineHeightSlot.replaceWith(lineHeightControl);
 
   // Deliberately does NOT call refreshPreview() - harmless either way now
   // (it's a no-op for text blocks, which have no separate
@@ -1316,6 +1593,17 @@ function createTextConfig(block, page, onChange, refreshPreview) {
     block.bodyHtml = sanitizeHtml(editable.innerHTML);
     delete block.body;
     delete block.heading;
+    // Fold that sanitized HTML back into the live editable so nesting /
+    // styleless-span cruft can't accumulate across a session (see its comment).
+    reserializeEditable();
+    // [overlay-debug] - keep until the overlay text is confirmed correct
+    const dbgP = editable.querySelector("p, h1, h2, h3") || editable;
+    const csEd = getComputedStyle(editable);
+    const csP = getComputedStyle(dbgP);
+    console.log(`[overlay-debug] EDITOR commit lhField=${block.lineHeight}
+  container: lh=${csEd.lineHeight} size=${csEd.fontSize} weight=${csEd.fontWeight} family=${csEd.fontFamily}
+  ${dbgP.tagName}:   lh=${csP.lineHeight} size=${csP.fontSize} weight=${csP.fontWeight} family=${csP.fontFamily}
+  html: ${block.bodyHtml}`);
     onChange();
   }
 
@@ -1359,7 +1647,10 @@ function createTextConfig(block, page, onChange, refreshPreview) {
   // actually interacted with, correctly showed a real font. By the time
   // this fires, the synchronous appendChild() that follows createTextConfig()
   // has already run.
-  setTimeout(updateInlineControlDisplays, 0);
+  setTimeout(() => {
+    buildWeightControl();
+    updateInlineControlDisplays();
+  }, 0);
 
   const hint = document.createElement("p");
   hint.className = "builder-empty-state";
@@ -1372,7 +1663,13 @@ function createTextConfig(block, page, onChange, refreshPreview) {
 
 function initialEditableHtml(block) {
   if (block.bodyHtml) return sanitizeHtml(block.bodyHtml);
-  if (!block.heading && !block.body) return "";
+  // A block container from the start - typing into a truly empty
+  // contenteditable leaves the first line unwrapped at the root, and every
+  // execCommand/style applied to bare root-level content then compounds
+  // structural damage (stray </p>, runaway nesting, <font> tags). The
+  // sanitizer now also heals this on commit (wrapBareInlineRuns), but
+  // starting clean avoids the flicker.
+  if (!block.heading && !block.body) return "<p><br></p>";
   // One-time seed from the legacy heading/Markdown-body fields -
   // renderBlock() builds this via safe DOM construction
   // (createElement/createTextNode, see pageBlockRenderer.js), so reading
@@ -1613,7 +1910,19 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   urlInput.value = block.videoUrl || "";
   urlInput.placeholder = "Paste a YouTube or Vimeo link";
   urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
-  urlRow.append(urlLabel, urlInput);
+
+  // Cog: per-provider "Advanced Embed Settings" (controls, related videos,
+  // start/end, Vimeo chrome, etc.). Hidden until the URL is a recognized
+  // provider; opens a dialog that edits block.embedOptions live.
+  const advBtn = document.createElement("button");
+  advBtn.type = "button";
+  advBtn.className = "file-picker-btn";
+  advBtn.setAttribute("aria-label", "Advanced embed settings");
+  advBtn.dataset.tooltip = "Advanced embed settings";
+  advBtn.style.cssText = "background:transparent;border:none;color:#ccc;border-radius:4px;padding:0.35em 0.5em;cursor:pointer;display:none;align-items:center;justify-content:center;";
+  advBtn.innerHTML = `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;"><path stroke-linecap="round" stroke-linejoin="round" d="M9.594 3.94c.09-.542.56-.94 1.11-.94h2.593c.55 0 1.02.398 1.11.94l.213 1.281c.063.374.313.686.645.87.074.04.147.083.22.127.324.196.72.257 1.075.124l1.217-.456a1.125 1.125 0 0 1 1.37.49l1.296 2.247a1.125 1.125 0 0 1-.26 1.431l-1.003.827c-.293.241-.438.613-.43.992a7.723 7.723 0 0 1 0 .255c-.008.378.137.75.43.991l1.004.827c.424.35.534.955.26 1.43l-1.298 2.247a1.125 1.125 0 0 1-1.369.491l-1.217-.456c-.355-.133-.75-.072-1.076.124a6.47 6.47 0 0 1-.22.128c-.331.183-.581.495-.644.869l-.213 1.281c-.09.543-.56.94-1.11.94h-2.594c-.55 0-1.019-.398-1.11-.94l-.213-1.281c-.062-.374-.312-.686-.644-.87a6.52 6.52 0 0 1-.22-.127c-.325-.196-.72-.257-1.076-.124l-1.217.456a1.125 1.125 0 0 1-1.369-.49l-1.297-2.247a1.125 1.125 0 0 1 .26-1.431l1.004-.827c.292-.24.437-.613.43-.991a6.932 6.932 0 0 1 0-.255c.007-.38-.138-.751-.43-.992l-1.004-.827a1.125 1.125 0 0 1-.26-1.43l1.297-2.247a1.125 1.125 0 0 1 1.37-.491l1.216.456c.356.133.751.072 1.076-.124.072-.044.146-.086.22-.128.332-.183.582-.495.644-.869l.214-1.28Z" /><path stroke-linecap="round" stroke-linejoin="round" d="M15 12a3 3 0 1 1-6 0 3 3 0 0 1 6 0Z" /></svg>`;
+
+  urlRow.append(urlLabel, urlInput, advBtn);
   wrap.appendChild(urlRow);
 
   const errorMsg = document.createElement("p");
@@ -1622,15 +1931,44 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   errorMsg.textContent = "Couldn't recognize that as a YouTube or Vimeo link.";
   wrap.appendChild(errorMsg);
 
+  let lastProvider = parseVideoProvider(block.videoUrl);
+
+  function syncAdvBtn() {
+    const provider = parseVideoProvider(block.videoUrl);
+    advBtn.disabled = !provider;
+    advBtn.style.display = provider ? "flex" : "none";
+  }
+  advBtn.onclick = async () => {
+    const provider = parseVideoProvider(block.videoUrl);
+    if (!provider) return;
+    if (!block.embedOptions) block.embedOptions = {};
+    const { openEmbedSettingsDialog } = await import("./embedSettingsDialog.js");
+    openEmbedSettingsDialog({
+      provider,
+      options: block.embedOptions,
+      onChange: () => { refreshPreview(); onChange(); },
+    });
+  };
+
   function commit() {
     block.videoUrl = urlInput.value.trim();
     errorMsg.style.display = block.videoUrl && !parseVideoEmbedUrl(block.videoUrl) ? "block" : "none";
+    // A changed provider makes the old provider's embedOptions meaningless -
+    // clear them so a leftover YouTube `rel=0` doesn't ride along on a Vimeo
+    // URL (harmless at render time, but confusing in the saved data).
+    const provider = parseVideoProvider(block.videoUrl);
+    if (provider !== lastProvider) {
+      block.embedOptions = {};
+      lastProvider = provider;
+    }
+    syncAdvBtn();
     syncClosedBgModeOptions();
     refreshPreview();
     onChange();
   }
   urlInput.addEventListener("input", () => { block.videoUrl = urlInput.value.trim(); });
   urlInput.addEventListener("blur", commit);
+  syncAdvBtn();
 
   const aspectRow = document.createElement("div");
   aspectRow.className = "color-row";
@@ -1851,38 +2189,43 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   overlayImageInput.addEventListener("blur", () => { refreshPreview(); onChange(); });
   expFields.appendChild(overlayImageRow);
 
-  // Overlay text + shared text-style toolbar (same pattern as the button block)
-  const overlayTextRow = document.createElement("div");
-  overlayTextRow.className = "color-row";
-  const overlayTextLabel = document.createElement("span");
-  overlayTextLabel.textContent = "Overlay Text:";
-  const overlayTextInput = document.createElement("input");
-  overlayTextInput.type = "text";
-  overlayTextInput.value = block.overlayText || "";
-  overlayTextInput.placeholder = "Text shown over the collapsed video";
-  overlayTextInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
-  overlayTextInput.oninput = () => { block.overlayText = overlayTextInput.value; };
-  overlayTextInput.onblur = () => { refreshPreview(); onChange(); };
-  overlayTextRow.append(overlayTextLabel, overlayTextInput);
-
-  const { toolbar: overlayStyleToolbar } = createTextStyleToolbar({
-    idPrefix: `${block.blockId}-ev-overlay`,
-    roleDefs: page?.textStyleDefs,
-    getRole: () => block.overlayTextStyleRole,
-    setRole: (role) => { block.overlayTextStyleRole = role; },
-    getFontFamily: () => block.overlayFontFamily,
-    setFontFamily: (value) => { block.overlayFontFamily = value; },
-    getFontSize: () => block.overlayFontSize,
-    setFontSize: (value) => { block.overlayFontSize = value; },
-    getFontWeight: () => block.overlayFontWeight,
-    setFontWeight: (value) => { block.overlayFontWeight = value; },
-    getColor: () => block.overlayTextColor,
-    setColor: (value) => { block.overlayTextColor = value; },
-    pickrInstances: toolbarPickrInstances,
-    onCommit: () => { refreshPreview(); onChange(); },
-  });
-  expFields.appendChild(overlayStyleToolbar);
-  expFields.appendChild(overlayTextRow);
+  // Overlay text: the full text-block WYSIWYG editor (multi-line, headings,
+  // B/I/U, alignment, inline font/size/colour), bound to a nested sub-block
+  // so createTextConfig() needs no changes - it only ever touches
+  // bodyHtml / alignment / blockId on whatever object it's handed. Built
+  // lazily the first time Overlay = Text is selected. The old single-line
+  // block.overlayText (+ overlay* style fields) is still rendered as a
+  // fallback for blocks saved before this - see decorateExpandableVideo().
+  const overlayTextSlot = document.createElement("div");
+  expFields.appendChild(overlayTextSlot);
+  let overlayTextBuilt = false;
+  function ensureOverlayTextEditor() {
+    if (overlayTextBuilt) return;
+    overlayTextBuilt = true;
+    if (!block.overlayTextBlock) {
+      // One-time migration, same idea as initialEditableHtml()'s legacy-
+      // field seed for the real text block: a block saved with the old
+      // single-line overlayText (pre-rich-editor) gets that text carried
+      // into bodyHtml, rather than opening this editor blank. This matters
+      // beyond cosmetics - decorateExpandableVideo() only takes the rich
+      // render path (with line-height/weight/etc. support) when bodyHtml is
+      // non-empty; leaving it blank here meant every edit made in this
+      // editor (Line spacing included) was silently applied to a field the
+      // renderer never looked at, because it was still rendering the old
+      // overlayText through the legacy <span> path (fixed line-height,
+      // no per-role sizing) underneath.
+      let bodyHtml = "";
+      if (block.overlayText) {
+        const p = document.createElement("p");
+        p.textContent = block.overlayText;
+        bodyHtml = p.outerHTML;
+      }
+      block.overlayTextBlock = { blockId: `${block.blockId}-ovl`, bodyHtml, alignment: "center" };
+    }
+    overlayTextSlot.appendChild(
+      createTextConfig(block.overlayTextBlock, page, () => { refreshPreview(); onChange(); }, refreshPreview, { editableClass: "ev-overlay-text-editable" })
+    );
+  }
 
   function syncExpandableVisibility() {
     const on = block.expandable === true;
@@ -1893,8 +2236,8 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     closedImageRow.style.display = mode === "custom" ? "" : "none";
     const overlay = block.overlayMode || "none";
     overlayImageRow.style.display = overlay === "image" ? "" : "none";
-    overlayTextRow.style.display = overlay === "text" ? "" : "none";
-    overlayStyleToolbar.style.display = overlay === "text" ? "" : "none";
+    if (overlay === "text") ensureOverlayTextEditor();
+    overlayTextSlot.style.display = overlay === "text" ? "" : "none";
   }
 
   // Seed the overlay-mode select from saved state, then apply visibility.
