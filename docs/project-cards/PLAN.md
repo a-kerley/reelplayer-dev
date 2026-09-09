@@ -16,19 +16,30 @@ Status: not started. Source snapshot from boxed-ape-site is in
 
 Do **not** build a new player or a second render path. A project card =
 
-- a real **reelplayer reel** (expandable mode: collapsed video/logo banner ⇄
-  expanded player) — authored 100% in the existing Reel builder, untouched,
-  and referenced by id. The card does **not** copy the reel's config.
+- a real **reelplayer reel** — authored 100% in the existing Reel builder,
+  untouched, referenced by id. The card does **not** copy the reel's config.
 - **+ an "Info" tab** next to the reel's "Listen" tab: description, stats,
-  links, partner logos. This markup is ported from
-  `boxed-ape-source/project-card.js` — the chrome only, not its interaction
-  logic (see §5).
+  links, partner logos. Markup ported from
+  `boxed-ape-source/project-card.js` — chrome only, not its interaction logic
+  (see §5).
+
+**The card owns the collapse.** The banner ⇄ tabs expand/collapse is *card*
+chrome (the boxed-ape mechanic). The reel inside renders in **static
+presentation, always** — just the player, no reel-level banner, no nested
+expand. `mode` and every expandable / player-closed-idle field on the reel is
+ignored in a card. Any reel is pickable; how it was authored for its own
+standalone embed doesn't matter.
 
 **Reference model, not copy.** A `card_<id>` blob holds only card-only fields
-+ a `reelId`. The Worker inlines the referenced reel into the `/cards/:id`
-response, and the player draws that reel **inline** (one iframe, one document,
-one resize handshake — not an iframe nested inside the card iframe). Editing
-the reel in the Reel builder updates every card that points at it.
++ `reelId` + a `cardOverrides` block. The Worker inlines the referenced reel
+into the `/cards/:id` response; the player draws it **inline** (one iframe,
+one document, one resize handshake — not an iframe nested in the card
+iframe). Editing the reel updates every card that points at it.
+
+Precedent: `js/modules/pageBlockRenderer.js`'s `renderPlayer()` +
+`js/modules/reelPicker.js` already do exactly this for Page *player blocks* —
+reference a reel by id, pass page-level overrides into the player. Cards are
+the same shape; reuse `reelPicker.js` for the card form's picker.
 
 New content type key: **`card`**, beside `reel` and `page`.
 KV prefixes: `card_<id>` (published), `draft_card_<id>` (in progress) —
@@ -63,9 +74,9 @@ New from-scratch work is small: the **Card Info form** (§3), the
 
 ### Schema
 
-Because the reel is referenced, a card blob is *just* the card-only fields —
-none of the colour / background / expandable / playlist / text-style fields
-(those live on the reel):
+Because the reel is referenced, a card blob is *just* the card-only fields
+plus an override block — none of the colour / background / expandable /
+playlist / text-style fields (those live on the reel):
 
 ```
 reelId          string   (which published reel plays in this card;
@@ -78,17 +89,54 @@ description     [string]  (paragraphs, Info tab)
 stats          [{ label?, value }]   (label omitted = badge style)
 links          [{ url, icon, alt }]  (icon = filename in assets/card-icons/)
 analyticsEnabled boolean  (default false; see §4)
-order           number   (default sort in the sidebar list; NOT layout —
-                          layout is per-page on the boxed-ape side)
+order           number   (default sort in the sidebar list; NOT layout)
+cardOverrides   object   (see "Data boundary" below — visual props that win
+                          over the reel's own, for page-wide consistency)
 ```
 
 `enableListenTab` from the snapshot is gone — it's just `!reelId`.
+
+### Data boundary: reel vs card
+
+What `renderPlayer()` gets is the inlined reel with `cardOverrides` merged on
+top and `mode` forced to static. Reel schema is `embedExporter.js`
+`storeReelData()` / `builder.js` `createEmptyReel()`.
+
+**Pass through unchanged (the actual player):**
+`playlist[]` (url, title, per-track `backgroundImage`/`backgroundVideo`/
+`backgroundZoom`).
+
+**Pass through, but `cardOverrides` wins when set:**
+`varUiAccent`, `varWaveformUnplayed`, `varWaveformHover`, `playerTextStyles`
+(track-name / playlist text), `hoverDarken*`, `idleUnblur*`,
+`playerOutline*`, wrapper `backgroundColor` / `overlayColor` /
+`backgroundOpacity` / `backgroundBlur`.
+
+**Ignored in a card (card chrome supersedes):**
+`mode`, `expandableCollapsedHeight`, `expandableExpandedHeight`,
+`projectTitleImage`, `showWaveformOnCollapse`, all `playerClosedIdle*`
+(no collapsed reel state), `playerHeight` (player fills the Listen-tab box,
+playlist scrolls via `playlistScroll.js`), `showTitle`/`title` as a player
+overlay (card has its own `<h3>` + banner logo — override back on with
+`cardOverrides.showReelTitle`).
+
+**Banner visual:** defaults to the reel's `backgroundVideo` →
+`backgroundImage` → `playlist[0].backgroundImage`; `cardOverrides.bannerImage`
+/ `bannerVideo` override.
+
+**`cardOverrides` whitelist:** `accent`, `waveformUnplayed`, `waveformHover`,
+`playerBackground`, `textStyles`, `bannerImage`, `bannerVideo`,
+`showReelTitle`, `outlineWidth`/`outlineColor`, plus card-chrome vars
+(`--card-gradient-top`/`-bottom`, `--card-tab-toggle-bg`, `--card-tab-active-bg`,
+`--card-text-primary`/`-secondary`, `--card-icon-filter` — from the snapshot's
+`themeColors`).
 
 ### Form
 
 A single small panel — no reel-config fields:
 
-- **reel picker** — dropdown of published reels (+ "none / Info-only")
+- **reel picker** — `reelPicker.js` (already built for Page player blocks) +
+  a "none / Info-only" option
 - description — textarea, blank-line separated → `description[]`
 - stats — repeater of `{ label, value }` rows
 - links — repeater of `{ url, icon (select from `assets/card-icons/`), alt }`
@@ -96,6 +144,10 @@ A single small panel — no reel-config fields:
 - logo + logoAlt — media picker + text
 - composers — text
 - analyticsEnabled — checkbox
+- **Card style overrides** `<details>` — the `cardOverrides` whitelist:
+  colour pickers (reuse `colorPicker.js`) for accent / waveform / player
+  background / card-chrome vars, banner media pickers, `showReelTitle`
+  toggle. All optional; empty = use the reel's own value.
 
 **v1 shortcut:** ship the form as the reel picker + one raw-JSON textarea for
 the rest. Prove the spine end to end (§7) before building the repeater UI.
@@ -139,19 +191,37 @@ player would be a fourth.
 
 Bootstrap flow for `player?id=<cardId>`:
 
-1. Fetch `/cards/<cardId>` → `{ ...cardFields, reel }`.
-2. Render the **card chrome** from `cardFields`: the outer frame, the
-   Info/Listen `.tab-toggle`, and the Info panel (`renderExtraContent()`,
-   `renderStats()`, `renderLinks()`, `renderPartnerLogos()` ported from
-   `boxed-ape-source/project-card.js` — **markup only**).
-3. For the collapsed banner + Listen tab, call the **same `renderPlayer()`**
-   the builder preview uses, passing `reel` as its config. Identical code
-   path, no copy.
-4. No `reel` → Info-only: skip step 3 entirely (no player instantiated).
-5. Port `boxed-ape-source/project-card.css` → new **`css/card.css`**, loaded
-   by `player.html`. Keys off `--card-*` vars set from the reel's own
-   theme/appearance (reuse the reel's colour resolution — the card does not
-   carry its own `themeColors`).
+1. Fetch `/cards/<cardId>` → `{ ...cardFields, cardOverrides, reel }`.
+2. Render the **card chrome** from `cardFields`: outer frame, Info/Listen
+   `.tab-toggle`, Info panel (`renderExtraContent()`, `renderStats()`,
+   `renderLinks()`, `renderPartnerLogos()` ported from
+   `boxed-ape-source/project-card.js` — **markup only**). The collapsed
+   **banner** is card chrome too (background media + overlay `logo` +
+   `partnerLogos` on hover), not the reel's collapsed state.
+3. Build the player config: `{ ...reel, ...merge(cardOverrides), mode:
+   "static" }` (see §3 "Data boundary" for the merge rules), then call the
+   **same `renderPlayer()`** the builder preview uses. Identical code path,
+   no copy. Pass `showTitle: cardOverrides.showReelTitle ?? false`.
+4. No `reel` → Info-only: skip step 3 (no player instantiated).
+5. **Sizing:** the player fills the Listen-tab box; `playlistScroll.js`
+   scrolls the playlist within it (the snapshot's `switchTab()` already
+   matches both tabs to the Info tab's height — keep that). The card
+   bootstrap owns the single `reelplayer:resize` post to the host —
+   `max(bannerHeight, activeTabHeight)`; the inline player posts nothing
+   cross-frame (same document).
+6. Port `boxed-ape-source/project-card.css` → new **`css/card.css`**, loaded
+   by `player.html`. Card-chrome `--card-*` vars come from
+   `cardOverrides` (falling back to the reel's own colours); the player
+   region's own vars resolve as they already do.
+
+### Text-style resolver — the CLAUDE.md duplication pair
+
+`cardOverrides.textStyles` must slot in as a **new top tier** above
+`reel.playerTextStyles`, mirroring how `page.textStyleDefs` already does for
+Pages. That resolution lives in `previewManager.js`'s
+`resolveTextUnit()`/`textUnitStyleVars()` **and** a hand-copy inside
+`player.html`'s inline `<script>` — the identical edit goes in both, verified
+against a real embed (this is the second drift pair CLAUDE.md warns about).
 
 ### Do NOT port the snapshot's interaction logic
 
@@ -230,11 +300,21 @@ match any card iframe by id prefix.
 Settled 2026-09-09.
 
 - **Card ↔ reel: reference model.** A `card_<id>` blob = card-only fields +
-  `reelId`. The Worker inlines the reel on GET; the player draws it inline
-  (one iframe). Editing the reel updates every card. The card form loses all
-  reel-config fields — just the Info panel + a reel picker. Cost: the
+  `reelId` + `cardOverrides`. The Worker inlines the reel on GET; the player
+  draws it inline (one iframe). Editing the reel updates every card. The card
+  form loses all reel-config fields — Info panel + reel picker
+  (`reelPicker.js`, already built) + an optional override block. Cost: the
   reference can dangle (handled — GET returns `reel: null` → Info-only, plus
   a builder warn on reel delete).
+
+- **Reel renders static inside a card; `cardOverrides` is the consistency
+  layer.** The card owns collapse/expand, so the reel's `mode` +
+  expandable/closed-idle fields are ignored (§3 "Data boundary" has the full
+  pass-through / ignored / overridable split). The player config is
+  `{ ...reel, ...cardOverrides, mode:"static" }` merged at one point in the
+  `mode:"card"` bootstrap. Any reel is pickable regardless of how it was
+  authored. `cardOverrides.textStyles` needs a new top tier in the
+  `previewManager.js` + `player.html` text-style resolver pair (§5).
 
 - **Embed shape: one iframe per card, drawn inline.** Cards go into
   hand-authored boxed-ape marketing pages among non-reelplayer content, so a
