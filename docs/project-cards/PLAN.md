@@ -1,28 +1,38 @@
 # Project Cards — build plan
 
 Add a **Project Cards** builder tab to reelplayer. Cards are authored here,
-published to Cloudflare KV like reels, and embedded on any boxed-ape-site page
-as **one `<iframe>` per card** (maximally modular — each card is independent,
-lazy-loads, and can be placed anywhere).
+published to Cloudflare KV like reels, and embedded on any hand-built
+boxed-ape marketing page as **one `<iframe>` per card** — cards get sprinkled
+in among non-reelplayer content, so each card must be fully self-contained,
+lazy-loadable, and placeable anywhere. (A reelplayer *Page* is not an option
+here: the host pages are hand-authored, not reelplayer-rendered.)
 
 Status: not started. Source snapshot from boxed-ape-site is in
 `boxed-ape-source/` (see its README for provenance + a per-file guide).
 
 ---
 
-## 1. Guiding decision: a card is a reel + an Info panel
+## 1. Guiding decision: a card is a *referenced* reel + an Info panel
 
 Do **not** build a new player or a second render path. A project card =
 
-- reelplayer **expandable-mode reel** (collapsed video/logo banner ⇄ expanded
-  player) — this mechanic already exists, untouched
-- **+ an "Info" tab** next to the existing "Listen" tab: description, stats,
-  links, partner logos. This markup already exists in
-  `boxed-ape-source/project-card.js` — it gets ported, not reinvented.
+- a real **reelplayer reel** (expandable mode: collapsed video/logo banner ⇄
+  expanded player) — authored 100% in the existing Reel builder, untouched,
+  and referenced by id. The card does **not** copy the reel's config.
+- **+ an "Info" tab** next to the reel's "Listen" tab: description, stats,
+  links, partner logos. This markup is ported from
+  `boxed-ape-source/project-card.js` — the chrome only, not its interaction
+  logic (see §5).
 
-New content type key: **`card`**, sitting beside `reel` and `page`.
+**Reference model, not copy.** A `card_<id>` blob holds only card-only fields
++ a `reelId`. The Worker inlines the referenced reel into the `/cards/:id`
+response, and the player draws that reel **inline** (one iframe, one document,
+one resize handshake — not an iframe nested inside the card iframe). Editing
+the reel in the Reel builder updates every card that points at it.
+
+New content type key: **`card`**, beside `reel` and `page`.
 KV prefixes: `card_<id>` (published), `draft_card_<id>` (in progress) —
-mirrors the reel/page prefix convention in `worker/CLAUDE.md`.
+mirrors the reel/page convention in `worker/CLAUDE.md`.
 
 ---
 
@@ -30,192 +40,254 @@ mirrors the reel/page prefix convention in `worker/CLAUDE.md`.
 
 | Piece | File | How |
 |---|---|---|
+| Reel authoring | Reels tab (whole flow) | **unchanged** — the reel half of a card is just a normal published reel |
 | Sidebar tab switch | `js/modules/tabController.js` | add one `createTabController` entry |
 | Draft persistence | `js/modules/draftStoreFactory.js` | `createDraftStore({ prefix: "/drafts/cards", normalize })` — new instance, zero new persistence logic |
 | Sidebar list / rename / delete | `js/modules/sidebarList.js` | reuse as Reels/Pages do |
 | Auth + password gating | `js/modules/builderAuth.js` | unchanged |
 | Content-hash IDs | `js/modules/contentHash.js` | `generateCardId(card)` like `embedExporter.generateReelId` |
-| Media pick (image/video/audio) | Media Library tab + `media.boxedape.com` R2 | cards pick from the same library |
-| Colour pickers, text-style toolkit | `js/modules/colorPicker.js`, `styleToolbarWidgets.js` | reuse in the card form |
-| Player runtime | `player.html` / `js/player.js` | **`mode:"card"` render branch only** — see §5 |
+| Reel picker | reel list route + `sidebarList` data | the card form's "which reel plays here" dropdown |
+| Media pick (logo, partner logos) | Media Library tab + `media.boxedape.com` R2 | cards pick from the same library |
+| Player runtime | `player.html` / `js/player.js` | `mode:"card"` branch calls the **same `renderPlayer()`** the builder preview uses, on the inlined reel data — see §5 |
 | Iframe embed markup + auto-height | `js/modules/embedExporter.js` | its `<iframe>` + `reelplayer:resize` / `reelplayer:scrollCompensate` postMessage handshake already does everything the card grid needs |
-| Cloudflare Worker + KV + R2 | `worker/src/index.js` | **+2 route blocks**, copied from `/reels/:id` and `/drafts/:id` (see §4) |
-| Cards inside a reelplayer Page (optional, later) | `js/modules/pageBlockRenderer.js` | one new `card` block type = copy of the `player` block, pointed at `/cards/` |
+| Opt-in analytics | `worker/src/index.js` `/stats/*`, builder View Stats modal | add `card` as a third stat type — see §4 |
+| Cloudflare Worker + KV + R2 | `worker/src/index.js` | route blocks copied from `/reels/:id` + `/drafts/pages/:id` (see §4) |
 
-New, genuinely-from-scratch work is small: the **Card Info form section**
-(§3), the **`mode:"card"` render branch** (§5), **2 worker routes** (§4), and
-the **boxed-ape iframe injector** (§6).
+New from-scratch work is small: the **Card Info form** (§3), the
+**`mode:"card"` render branch** (§5), the **worker routes + reel inlining**
+(§4), and the **boxed-ape iframe injector** (§6).
 
 ---
 
 ## 3. Card schema + builder form
 
-### Schema (from `boxed-ape-source/projects-data.js`)
+### Schema
 
-Everything a reel already has (`playlist`→ maps to `audioTracks`, all the
-colour/background/expandable/text-style fields) **plus** card-only fields:
+Because the reel is referenced, a card blob is *just* the card-only fields —
+none of the colour / background / expandable / playlist / text-style fields
+(those live on the reel):
 
 ```
+reelId          string   (which published reel plays in this card;
+                          absent = Info-only card, no player)
 logo            string   (overlay logo on the banner)
 logoAlt         string
 partnerLogos    [{ src, alt }]
 composers       string   ("Music by …" hover text)
 description     [string]  (paragraphs, Info tab)
 stats          [{ label?, value }]   (label omitted = badge style)
-links          [{ url, icon, alt }]  (icon = filename in the shared icon set)
-enableListenTab boolean  (false = Info-only card, no player)
+links          [{ url, icon, alt }]  (icon = filename in assets/card-icons/)
+analyticsEnabled boolean  (default false; see §4)
 order           number   (default sort in the sidebar list; NOT layout —
-                          layout is decided per-page on the boxed-ape side)
+                          layout is per-page on the boxed-ape side)
 ```
+
+`enableListenTab` from the snapshot is gone — it's just `!reelId`.
 
 ### Form
 
-Reuse the Reels editor form (colours, background, expandable settings, player
-text styles) and add one **"Card Info"** `<details>` section:
+A single small panel — no reel-config fields:
 
+- **reel picker** — dropdown of published reels (+ "none / Info-only")
 - description — textarea, blank-line separated → `description[]`
 - stats — repeater of `{ label, value }` rows
-- links — repeater of `{ url, icon (select from shared set), alt }` rows
+- links — repeater of `{ url, icon (select from `assets/card-icons/`), alt }`
 - partner logos — repeater using the existing media/file picker
 - logo + logoAlt — media picker + text
 - composers — text
-- enableListenTab — checkbox
+- analyticsEnabled — checkbox
 
-**v1 shortcut:** ship the form as the reel form + a single raw-JSON textarea
-for the card-only fields. Prove the spine end to end (§7) before building the
-repeater UI.
+**v1 shortcut:** ship the form as the reel picker + one raw-JSON textarea for
+the rest. Prove the spine end to end (§7) before building the repeater UI.
 
 ---
 
 ## 4. Worker changes (`worker/src/index.js`)
 
-Copy two existing blocks, s/reel/card/, s/`reel_`/`card_`/,
-s/`draft_`/`draft_card_`/:
-
-1. **`/drafts/cards/:id`** — GET/POST/DELETE, all password-gated. Byte-for-byte
+1. **`/drafts/cards/:id`** — GET/POST/DELETE, password-gated. Byte-for-byte
    the `/drafts/pages/:id` block with the key prefix changed.
-2. **`/cards/:id`** — public GET (the `player.html` fetch target for a card),
-   password-gated POST (publish) and DELETE. Model on `/reels/:id`. No
-   slug/rename machinery — a card id is a content hash like a reel's, not a
-   stable slug like a page's.
+2. **`/cards/:id`** — public GET, password-gated POST (publish) and DELETE.
+   Model on `/reels/:id` (content-hash id, no slug/rename machinery). **GET
+   inlines the referenced reel:** read `card_<id>`, then if it has a `reelId`
+   also read `reel_<reelId>` and return `{ ...card, reel: <reelData|null> }`.
+   `reel: null` when the reel is missing/unpublished → card renders Info-only
+   (dangling-reference rule, below).
 3. `/drafts/cards` and `/cards` **list** routes — copy the reel list routes
-   (`listEntries(env, "card_", …)`), for the sidebar.
-4. Stats (optional, later): widen the `/stats/(reel|page)/…` regex to
-   `(reel|page|card)` and add the `card_` key branch.
+   (`listEntries(env, "card_", …)`), for the sidebar + the reel picker's
+   inverse ("which cards use this reel").
+4. **Analytics.** Widen the `/stats/(reel|page)/…` regex to
+   `(reel|page|card)`, add a `card_<id>` existence + `analyticsEnabled`
+   branch (public POST, re-checked per beacon, exactly as reel/page). Events
+   store as `stat_card_<id>_<ts>_<rand>` in the same `REELS` namespace. See
+   §8 "Analytics" for where a card's *play* events land.
 
-No KV namespace change — cards live in the same `REELS` namespace under the
-new prefix, exactly as pages do.
+**Dangling reference.** When a reel is deleted in the builder, scan `card_*`
+for `reelId === <that id>` and warn ("used by N cards") before allowing it.
+Runtime is already safe (GET returns `reel: null` → Info-only), so the warn
+is a courtesy, not a guard.
+
+No KV namespace change — cards live in `REELS` under the new prefix.
 
 ---
 
 ## 5. `mode:"card"` render branch
 
-**Route it through `renderPlayer()` in `js/player.js` — never a second
-hand-written copy.** This repo's `CLAUDE.md` documents three real bugs from
-`player.html`'s bootstrap drifting from `player.js`; a card branch that
-hand-copies markup would be a fourth. `player.html`'s inline bootstrap should
-call the same `playerApp` render entry point the builder preview uses.
+**Route the player half through `renderPlayer()` in `js/player.js` — never a
+second hand-written copy.** This repo's `CLAUDE.md` documents three real bugs
+from `player.html`'s bootstrap drifting from `player.js`; a hand-copied card
+player would be a fourth.
 
-Branch behaviour when the fetched object has `mode === "card"`:
+Bootstrap flow for `player?id=<cardId>`:
 
-1. Render the expandable-reel player as normal (collapsed banner ⇄ player).
-2. Wrap it in the card chrome ported from `boxed-ape-source/project-card.js`:
-   `template()`, `renderExtraContent()`, `renderStats()`, `renderLinks()`,
-   `renderPartnerLogos()`, plus the Info/Listen `.tab-toggle`.
-3. Port `boxed-ape-source/project-card.css` → new **`css/card.css`**, loaded
-   by `player.html`. It keys off `--card-*` CSS vars — set them from the
-   card's `themeColors` (port `applyThemeColors()`).
-4. `enableListenTab: false` → Info-only, no player instantiated (the boxed-ape
-   code already has this path).
-5. Expand/collapse still posts `reelplayer:resize` — the card grid depends on
-   it (§6). Confirm the Info tab's height is reported too, not just the
-   player's.
+1. Fetch `/cards/<cardId>` → `{ ...cardFields, reel }`.
+2. Render the **card chrome** from `cardFields`: the outer frame, the
+   Info/Listen `.tab-toggle`, and the Info panel (`renderExtraContent()`,
+   `renderStats()`, `renderLinks()`, `renderPartnerLogos()` ported from
+   `boxed-ape-source/project-card.js` — **markup only**).
+3. For the collapsed banner + Listen tab, call the **same `renderPlayer()`**
+   the builder preview uses, passing `reel` as its config. Identical code
+   path, no copy.
+4. No `reel` → Info-only: skip step 3 entirely (no player instantiated).
+5. Port `boxed-ape-source/project-card.css` → new **`css/card.css`**, loaded
+   by `player.html`. Keys off `--card-*` vars set from the reel's own
+   theme/appearance (reuse the reel's colour resolution — the card does not
+   carry its own `themeColors`).
+
+### Do NOT port the snapshot's interaction logic
+
+`project-card.js`'s `handleMouseEnter/Leave`, `expand()`, `collapse()`,
+`MOUSE_LEAVE_DELAY` auto-collapse are **desktop-hover-only** and break on
+touch (no `mouseleave` on a phone → card stuck open). The reel's existing
+**expandable-mode** expand/collapse + touch handling already solves this for
+every third-party embed. The card wrapper adds only the Info/Listen tab
+toggle on top of that — it does not re-implement expand/collapse or
+hover-to-play.
+
+### Mobile parity (must match the existing player)
+
+- The reel player already works on mobile (it's a third-party embed). The
+  **new** surface is the card chrome — hold it to the same bar.
+- `reelplayer:resize` must re-fire on viewport resize, orientation change,
+  and mobile address-bar show/hide, and must report the height of whichever
+  of {collapsed banner, Info tab, Listen tab} is currently visible — not just
+  the player (the snapshot's `switchTab()` already measures the Info tab;
+  keep that, wire it to the resize post).
+- Info/Listen tab buttons ≥44px touch targets.
+- Banner `<video>`: `muted loop playsinline preload="metadata"` (snapshot has
+  `preload="auto"` — N cards would pull N full videos on load).
+- Verify on real device emulation, matching how the player is already tested
+  — not just a narrow desktop window.
 
 `css/layout.css` is shared with the builder — keep card styling in
-`css/card.css`, not there (same rule as `css/player.css`).
+`css/card.css` (same rule as `css/player.css`).
 
 ---
 
 ## 6. boxed-ape-site side
 
-Strip the projects system down to a placement layer:
+Strip the projects system to a placement layer:
 
 - **Delete:** `projects-data.js`, `project-card.js`, `AudioPlayer.js`,
   `audio-player.css`, `project-card.css` (moves here as `css/card.css`).
-- **Keep:** `masonry-layout.js` — but repoint its reflow trigger from card
-  DOM class changes to `window` `message` events
-  (`event.data.type === "reelplayer:resize"` for any card iframe).
-- **New (~30 lines):** an injector that takes an ordered list of
-  `{ cardId }` (inline in the page, or a tiny `cards.js`), and for each
-  appends
-  `<iframe src="https://<player-origin>/player?id=<cardId>" loading="lazy"
-   style="width:100%;border:none">` into `.project-cards-container`, then
-  hands the wrappers to `MasonryLayout`.
-- Per-page arrangement = just the order of that list on each page. Any
-  boxed-ape page can include the injector with its own list.
+- **Keep:** `masonry-layout.js` — repoint its reflow trigger from card DOM
+  class changes to `window` `message` events
+  (`event.data.type === "reelplayer:resize"` for any card iframe). One column
+  on mobile, reflow on every resize message.
+- **New (~30 lines):** an injector taking an ordered `[{ cardId }]` list
+  (inline in the page, or a tiny `cards.js`), appending
+  `<iframe src="https://player.boxedape.com/player?id=<cardId>"
+   loading="lazy" style="width:100%;border:none">` into
+  `.project-cards-container`, then handing the wrappers to `MasonryLayout`.
+- Per-page arrangement = the order of that list on each page. Any hand-built
+  boxed-ape page includes the injector with its own list.
 
-Host-height handshake: copy the `message` listener from
-`embedExporter.js`'s `resizeScript` (it already handles both `resize` and
-`scrollCompensate`), generalised to match any card iframe by id prefix.
+Host-height handshake: copy the `message` listener from `embedExporter.js`'s
+`resizeScript` (handles both `resize` and `scrollCompensate`), generalised to
+match any card iframe by id prefix.
 
 ---
 
 ## 7. First slice (spine, then flesh)
 
-1. Worker: add `/drafts/cards/:id`, `/cards/:id`, list routes.
+1. Worker: `/drafts/cards/:id`, `/cards/:id` (with reel inlining), list routes.
 2. `createDraftStore` card instance + `createTabController` entry + a stub
-   "Project Cards" panel reusing the reel form + one raw-JSON textarea.
-3. `generateCardId` + a `publishCard()` (copy of `embedExporter.storeReelData`
+   "Project Cards" panel: reel picker + one raw-JSON textarea.
+3. `generateCardId` + `publishCard()` (copy of `embedExporter.storeReelData`
    → `POST /cards/:id`).
-4. `mode:"card"` branch in the player render path: banner + Info/Listen tabs,
-   minimal CSS.
-5. Publish one test card. In a throwaway boxed-ape page, embed its iframe,
-   confirm `reelplayer:resize` drives height and masonry reflows.
-6. Only then: build the real Card Info form (repeaters), port full
-   `card.css`, migrate assets, do the boxed-ape cleanup.
+4. `mode:"card"` branch: fetch card, render chrome + Info/Listen tabs, call
+   `renderPlayer()` on the inlined `reel`. Minimal CSS.
+5. Publish one test card pointing at an existing reel. In a throwaway
+   boxed-ape page, embed its iframe; confirm `reelplayer:resize` drives
+   height (banner *and* Info tab), masonry reflows, and it works on a phone
+   viewport.
+6. Only then: real Card Info form (repeaters), full `card.css`, asset
+   migration, analytics wiring, boxed-ape cleanup.
 
 ---
 
-## 8. Resolved decisions (was: open questions)
+## 8. Resolved decisions
 
-Settled 2026-09-09. Kept here so the rationale isn't lost.
+Settled 2026-09-09.
 
-- **SEO — iframe only, no static text.** Projects pages don't need to rank.
-  The injector appends iframes from a bare `[{ cardId }]` list; no host-DOM
-  text mirror. `projects-data.js` can be deleted outright in the boxed-ape
-  cleanup (§6) — no slim manifest needed.
+- **Card ↔ reel: reference model.** A `card_<id>` blob = card-only fields +
+  `reelId`. The Worker inlines the reel on GET; the player draws it inline
+  (one iframe). Editing the reel updates every card. The card form loses all
+  reel-config fields — just the Info panel + a reel picker. Cost: the
+  reference can dangle (handled — GET returns `reel: null` → Info-only, plus
+  a builder warn on reel delete).
+
+- **Embed shape: one iframe per card, drawn inline.** Cards go into
+  hand-authored boxed-ape marketing pages among non-reelplayer content, so a
+  reelplayer Page renderer isn't applicable and modularity is the point. The
+  reel player renders inline inside the single card iframe — no iframe nested
+  in an iframe, no resize-handshake chaining.
+
+- **Mobile: parity with the existing player.** Reuse the reel's
+  expandable-mode expand/collapse + touch handling; port only the Info-panel
+  markup and tab toggle from the snapshot, not its hover/auto-collapse logic.
+  Resize handshake re-fires on orientation/address-bar changes and reports
+  the visible tab's height. Verify on device emulation. (§5.)
+
+- **Analytics: card-level, opt-in.** Add `card` as a third stat type
+  (`stat_card_<id>_*`, `card.analyticsEnabled` default false, same public
+  POST + per-beacon opt-in check as reel/page). **Play events from the inline
+  player must target `/stats/card/<cardId>`, not the reel** — the card is the
+  marketing unit on the page, so `renderPlayer()` / the bootstrap needs a
+  stats-target override (`{ statsType:'card', statsId: cardId }`) when
+  rendering inside a card. The referenced reel's own standalone embeds keep
+  logging to `reel_<id>` unaffected. Event vocab: reuse existing `view`
+  (card iframe rendered) + `play` (track played); skip a separate `expand`
+  event for v1. Builder View Stats modal: add the `card` type to its
+  client-side aggregation.
+
+- **SEO — none needed.** Host pages are marketing pages, not indexed project
+  listings. Injector appends iframes from a bare `[{ cardId }]` list, no
+  host-DOM text mirror. `projects-data.js` deleted outright.
 
 - **Asset migration — ship the SVGs in this repo, no R2.** Move
   `boxed-ape-source/assets/icons/*` + `assets/link_icons/*` (~13 files) into
-  `assets/card-icons/` here. They're served by the existing `reelplayer-app`
-  static worker (every path but `/` and `/index.html` is already public).
-  Reference them by **absolute URL on the player origin** so they resolve
-  regardless of embed context. R2 is for user-uploaded media; these are
-  code-coupled UI chrome that should version with the templates naming them
-  (`renderLinks()`, the `.tab-btn` icons).
+  `assets/card-icons/`, served by the existing `reelplayer-app` static worker
+  (all paths but `/` and `/index.html` are public). Reference them
+  **root-relative** (`/assets/card-icons/…`) — the card renders on the player
+  origin, so no domain constant is needed and the snapshot's broken relative
+  paths are fixed. R2 is for user media; these are code-coupled chrome.
+  *Optional:* inline the ~13 SVGs into the template/CSS as the snapshot
+  already does for the play/pause/volume icons — kills 13 requests per card,
+  nothing to migrate.
 
-- **Player origin — custom domain.** Register a `player.boxedape.com` /
-  `cards.boxedape.com` custom domain for the `reelplayer-app` static worker
-  before boxed-ape goes live, so the public embed URL is brand-owned and
-  stable. `embedExporter.js` builds embed URLs from
-  `window.location.origin + pathname`, so pointing the builder at the custom
-  domain makes both reel and card embeds emit it automatically. **Not a
-  blocker for the internal spine (§7)** — that can run against the current
-  `*.workers.dev` URL; the domain must exist before any boxed-ape page bakes
-  in an iframe `src`.
+- **Player origin — custom domain.** Register `player.boxedape.com` for the
+  `reelplayer-app` static worker (serves reels *and* cards — one domain, not
+  a separate `cards.` host). `embedExporter.js` derives embed URLs from
+  `window.location.origin`, so pointing the builder there fixes reel and card
+  embeds together. Not a blocker for the internal spine (§7); must exist
+  before any boxed-ape page bakes in an iframe `src`. *Same pass:* give the
+  API worker a real host too (`api.boxedape.com`) — `js/config.js` currently
+  hardcodes a bare `*.workers.dev` subdomain that every published card/reel
+  fetches at runtime and that some networks block.
 
-- **Per-card iframe cost — accept for v1, one tweak.** The boxed-ape card
-  code already defers `initAudioPlayer()` (wavesurfer) to the first
-  **Listen**-tab click, so the real per-card cost is N× `player.js`/CSS parse
-  + the collapsed banner `<video>`, not N× wavesurfer. Keep `loading="lazy"`
-  for below-the-fold. **Change the banner video to `preload="metadata"`** —
-  the snapshot uses `preload="auto"`, which would pull N full videos on load.
-  Revisit only if a page has **>12 cards above the fold** or shows a measured
-  LCP regression.
-
-- **Card ↔ reel overlap — self-contained.** A card owns its full config
-  (playlist, colours, expandable/text-style fields, card-only fields) in its
-  own `card_<id>` blob. No `reelId` reference, no second fetch, no
-  cross-content-type dependency in the worker/player. Known downside: a
-  project with both a published reel and a card can drift between them —
-  acceptable, since cards are authored separately anyway.
+- **Per-card cost — accept for v1.** `loading="lazy"` + browser cache dedupes
+  shared assets across iframes, so past the first card it's N× parse, not N×
+  download. Wavesurfer init is already deferred to the first Listen-tab
+  click; **also confirm `player.js` doesn't *statically* import wavesurfer**
+  — if it does, make it a dynamic `import()` so collapsed cards never fetch
+  it. Revisit at >12 above-the-fold cards or a measured LCP regression.
