@@ -176,24 +176,46 @@ Host-height handshake: copy the `message` listener from
 
 ---
 
-## 8. Open questions
+## 8. Resolved decisions (was: open questions)
 
-- **SEO** — not yet addressed. Card text inside a cross-origin iframe is
-  invisible to the host page for search. If any projects page needs to rank,
-  the injector should also emit each card's `description`/`title` as static
-  text in the host DOM (visually hidden or as a `<noscript>`-style fallback).
-  Decide before the boxed-ape cleanup deletes `projects-data.js`.
-- **Asset migration** — `assets/icons/*` (tab icons) and `assets/link_icons/*`
-  (Spotify/Apple/Tidal/PlayStation/Safari) are referenced by the card
-  templates. Move into reelplayer and serve from the player origin, or upload
-  to R2 and reference via `R2_PUBLIC_URL`. Snapshot in
-  `boxed-ape-source/assets/`.
-- **Player origin** — boxed-ape iframes will point at the `reelplayer-app`
-  Workers domain. Confirm that's the intended public origin, or set up a
-  `cards.boxedape.com` / `player.boxedape.com` custom domain.
-- **Per-card iframe cost** — N cards on a page = N loads of `player.js` +
-  wavesurfer. `loading="lazy"` covers below-the-fold; revisit if a page has
-  many above-the-fold cards.
-- **Card ↔ reel overlap** — if a project already has a published reel, is the
-  card a wrapper around that same reel id, or a self-contained copy? Leaning
-  self-contained (simpler; a card owns its own `card_<id>` blob).
+Settled 2026-09-09. Kept here so the rationale isn't lost.
+
+- **SEO — iframe only, no static text.** Projects pages don't need to rank.
+  The injector appends iframes from a bare `[{ cardId }]` list; no host-DOM
+  text mirror. `projects-data.js` can be deleted outright in the boxed-ape
+  cleanup (§6) — no slim manifest needed.
+
+- **Asset migration — ship the SVGs in this repo, no R2.** Move
+  `boxed-ape-source/assets/icons/*` + `assets/link_icons/*` (~13 files) into
+  `assets/card-icons/` here. They're served by the existing `reelplayer-app`
+  static worker (every path but `/` and `/index.html` is already public).
+  Reference them by **absolute URL on the player origin** so they resolve
+  regardless of embed context. R2 is for user-uploaded media; these are
+  code-coupled UI chrome that should version with the templates naming them
+  (`renderLinks()`, the `.tab-btn` icons).
+
+- **Player origin — custom domain.** Register a `player.boxedape.com` /
+  `cards.boxedape.com` custom domain for the `reelplayer-app` static worker
+  before boxed-ape goes live, so the public embed URL is brand-owned and
+  stable. `embedExporter.js` builds embed URLs from
+  `window.location.origin + pathname`, so pointing the builder at the custom
+  domain makes both reel and card embeds emit it automatically. **Not a
+  blocker for the internal spine (§7)** — that can run against the current
+  `*.workers.dev` URL; the domain must exist before any boxed-ape page bakes
+  in an iframe `src`.
+
+- **Per-card iframe cost — accept for v1, one tweak.** The boxed-ape card
+  code already defers `initAudioPlayer()` (wavesurfer) to the first
+  **Listen**-tab click, so the real per-card cost is N× `player.js`/CSS parse
+  + the collapsed banner `<video>`, not N× wavesurfer. Keep `loading="lazy"`
+  for below-the-fold. **Change the banner video to `preload="metadata"`** —
+  the snapshot uses `preload="auto"`, which would pull N full videos on load.
+  Revisit only if a page has **>12 cards above the fold** or shows a measured
+  LCP regression.
+
+- **Card ↔ reel overlap — self-contained.** A card owns its full config
+  (playlist, colours, expandable/text-style fields, card-only fields) in its
+  own `card_<id>` blob. No `reelId` reference, no second fetch, no
+  cross-content-type dependency in the worker/player. Known downside: a
+  project with both a published reel and a card can drift between them —
+  acceptable, since cards are authored separately anyway.
