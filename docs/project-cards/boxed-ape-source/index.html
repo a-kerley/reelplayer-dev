@@ -1,0 +1,88 @@
+<!DOCTYPE html>
+<html lang="en">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
+    <title>Boxed Ape | Homepage</title>
+  <link rel="stylesheet" href="style.css" />
+  <link rel="stylesheet" href="project-card.css" />
+  <link rel="stylesheet" href="audio-player.css" />
+    <link
+      rel="stylesheet"
+      href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined"
+    />
+    <!-- WaveSurfer.js -->
+    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+  </head>
+  <body>
+    <div class="header-title-nav-wrapper">
+      <nav class="nav-container">
+        <ul class="header-nav-list">
+          <li class="header-nav-item--active"><a href="#">Home</a></li>
+          <li><a href="#">About</a></li>
+          <li><a href="#">Listen</a></li>
+          <li><a href="#">Projects</a></li>
+          <li><a href="#">Contact</a></li>
+        </ul>
+      </nav>
+    </div>
+    <div id="scrollbar-content">
+      <section class="hero">
+        <div class="hero-logo-wrapper">
+          <img
+            src="assets/landingpage/BA_HERO_LOGO.webp"
+            alt="Boxed Ape | Games Composers"
+            class="hero-logo"
+          />
+        </div>
+        <div class="hero-overlay"></div>
+      </section>
+
+      <section class="awards-block">
+        <div class="awards-block-crop">
+          <section class="awards-block-image">
+            <div class="awards-block-image-overlay"></div>
+            <div class="awards-block-content">
+              <h2 class="awards-block-title">music for games.</h2>
+              <img
+                src="assets/landingpage/TheIvors_Nominee2025_lockup_white.webp"
+                alt="The Ivors Nominee 2025"
+                class="ivor-novello-nominee-logo"
+              />
+            </div>
+          </section>
+        </div>
+      </section>
+
+      <section class="project-cards-block">
+        <div class="project-cards-container">
+          <!-- Card wrappers are generated dynamically from projects-data.js -->
+        </div>
+      </section>
+
+      <section class="dummy-scroll-test">
+        <div class="dummy-content">
+          <h2>Scroll Test Section</h2>
+          <p>
+            This block is here to test scrolling and fixed nav behavior. Add
+            more content here as needed to fill the page.
+          </p>
+        </div>
+      </section>
+
+      <footer>
+        <p>&copy; 2025 Boxed Ape Ltd</p>
+      </footer>
+    </div>
+
+    <label id="smooth-scroll-toggle" class="switch">
+      <input type="checkbox" id="smooth-scroll-checkbox" />
+      <span class="slider"></span>
+    </label>
+
+    <script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.39/dist/lenis.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/smooth-scrollbar@8.8.4/dist/smooth-scrollbar.js"></script>
+  <script type="module" src="script.js"></script>
+  </body>
+</html>
