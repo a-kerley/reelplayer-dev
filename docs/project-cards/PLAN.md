@@ -15,23 +15,31 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   for tab-row space). v1 stub form: reel picker + one raw-JSON textarea for
   everything else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
   `js/modules/cardPublish.js`).
-- §7.4 (first slice only) `player.html?id=<cardId>&type=card` fetches the
-  card, forces the inlined reel's `mode` to `"static"`, and calls
-  `playerApp.renderPlayer()` (generalized to accept a `containerId` instead
-  of hardcoding the builder's own preview pane) into `#embedPlayer`. No card
-  chrome yet - no banner, no Info/Listen tabs, no `cardOverrides` merge, no
-  resize handshake, no analytics wiring. Verified against a real local
-  card: waveform loads, play/pause + finish all work.
+- §7.4 `player.html?id=<cardId>&type=card` fetches the card and renders
+  its chrome via `js/modules/cardChrome.js`: banner (image only - no video
+  crossfade yet) with logo/partner-logos-on-hover/composers, Info/Listen
+  tab toggle, Info tab (title/description/stats/links, icons served from
+  `assets/card-icons/`), and a Listen tab that lazily mounts the inlined
+  reel (forced `mode:"static"`) via `playerApp.renderPlayer()` the first
+  time it's opened - never a second render copy. Desktop-hover expand/
+  collapse only (new code modeled on, not reusing, the reel's own
+  expandable-mode UX - see §5's updated note) with a working
+  `reelplayer:resize` handshake verified through a real iframe.
+  `applyReelStyles()` was split into `applyReelStyleVars()` (CSS vars only,
+  used by a card's mounted reel) vs. the container-background half (plain
+  reel embeds only) so a card's own banner background doesn't get
+  clobbered by its reel's.
+  Not yet done: mobile scroll-band expand, `cardOverrides` merge, banner
+  video, and analytics.
 - Also: `js/config.js` now points `WORKER_BASE_URL` at `localhost:8787`
   automatically when served from `localhost`, so local dev never touches
   production KV - run `npx wrangler dev` (from `worker/`, or pass
   `--config wrangler.toml` explicitly - see worker/README.md for why) +
   `python3 dev-server.py` together for a fully local loop.
 
-Not started: the rest of §7.4/§7.5 (card chrome ported from
-`boxed-ape-source/project-card.js`/`.css` - banner, Info/Listen tabs,
-`cardOverrides`, resize handshake, mobile parity, analytics), §7.6 (real
-repeater form), and all of §6 (boxed-ape-site injector).
+Not started: mobile scroll-band expand/collapse, `cardOverrides` merge,
+banner video crossfade, the text-style-resolver new tier, analytics
+wiring, §7.6 (real repeater form), and all of §6 (boxed-ape-site injector).
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).

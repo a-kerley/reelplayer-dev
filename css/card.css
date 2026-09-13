@@ -1,0 +1,269 @@
+/* card.css - Project Cards chrome (banner + Info/Listen tabs), loaded only
+   by player.html for a card embed (player?id=<cardId>&type=card).
+   Deliberately NOT a byte-for-byte port of docs/project-cards/
+   boxed-ape-source/project-card.css - that file hand-tunes absolute-pixel
+   positioning for one fixed card size in a masonry grid; this uses flexbox
+   so the card sizes itself from its own content instead, matching how the
+   rest of this codebase avoids magic-number positioning where layout can
+   do the job. Visual intent (banner + gradient + centered logo + hover
+   partner logos + Info/Listen tabs) is the same; exact pixel values differ.
+   See docs/project-cards/PLAN.md §5 for what's deferred (banner video
+   crossfade, mobile scroll-band expand, full theme parity).
+
+   Card-chrome colors are the cardOverrides whitelist from PLAN.md §3 -
+   --card-gradient-top/-bottom, --card-tab-toggle-bg, --card-tab-active-bg,
+   --card-text-primary/-secondary, --card-icon-filter - each with a sane
+   dark-UI default so an override-free card still looks intentional. */
+
+.project-card {
+  position: relative;
+  width: 100%;
+  border-radius: 10px;
+  overflow: hidden;
+  background: #1a1a1a;
+  box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
+  color: var(--card-text-primary, #fff);
+}
+
+.project-card-banner {
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 200px;
+  padding: 1.5rem 1rem 1rem;
+  cursor: pointer;
+  background: #111 center / cover no-repeat;
+}
+
+.project-card-banner-img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+}
+
+.project-card-banner::after {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--card-gradient-bottom, linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0.05) 100%));
+}
+
+.project-card-logo {
+  position: relative;
+  z-index: 2;
+  max-width: 60%;
+  max-height: 80px;
+  margin-bottom: 0.75rem;
+  filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.8));
+  pointer-events: none;
+}
+
+.project-card-hover-text {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.4rem;
+  opacity: 0;
+  transform: translateY(6px);
+  transition: opacity 0.25s ease, transform 0.25s ease;
+  margin-bottom: 0.75rem;
+  pointer-events: none;
+}
+
+.project-card:hover .project-card-hover-text {
+  opacity: 1;
+  transform: translateY(0);
+}
+
+.project-card-hover-text .hover-logos {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+}
+
+.project-card-hover-text .hover-logos img {
+  height: 20px;
+  width: auto;
+  filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.8));
+}
+
+.project-card-composers {
+  font-size: 0.75rem;
+  color: var(--card-text-secondary, #ccc);
+  text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
+}
+
+.project-card-banner-buttons {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  gap: 0.5rem;
+}
+
+.card-banner-btn {
+  min-height: 44px;
+  min-width: 44px;
+  padding: 0.5rem 1rem;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 255, 255, 0.3);
+  border-radius: 20px;
+  color: #fff;
+  font-size: 0.85rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.card-banner-btn:hover {
+  background: rgba(255, 255, 255, 0.2);
+}
+
+/* Expanded content - hidden until .project-card.expanded */
+.project-card-extra {
+  display: none;
+  padding: 1.25rem;
+}
+
+.project-card.expanded .project-card-extra {
+  display: block;
+  animation: card-fade-in 0.3s ease-out;
+}
+
+@keyframes card-fade-in {
+  from { opacity: 0; transform: translateY(6px); }
+  to { opacity: 1; transform: translateY(0); }
+}
+
+.project-card-extra h3 {
+  margin: 0 0 0.75rem;
+  font-size: 1.1rem;
+  font-weight: 700;
+}
+
+.project-card-extra p {
+  margin: 0 0 0.75rem;
+  font-size: 0.9rem;
+  line-height: 1.5;
+  color: var(--card-text-secondary, #ccc);
+}
+
+.tab-toggle {
+  display: flex;
+  justify-content: center;
+  gap: 4px;
+  margin-bottom: 1rem;
+  padding: 4px;
+  background: var(--card-tab-toggle-bg, rgba(0, 0, 0, 0.3));
+  border-radius: 8px;
+  width: fit-content;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+.tab-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 40px;
+  height: 40px;
+  padding: 6px;
+  background: transparent;
+  border: none;
+  border-radius: 6px;
+  cursor: pointer;
+  transition: background 0.2s ease;
+}
+
+.tab-btn img {
+  width: 100%;
+  height: 100%;
+}
+
+.tab-btn .tab-icon-filled {
+  display: none;
+}
+
+.tab-btn.active {
+  background: var(--card-tab-active-bg, rgba(255, 255, 255, 0.15));
+}
+
+.tab-btn.active .tab-icon-outline {
+  display: none;
+}
+
+.tab-btn.active .tab-icon-filled {
+  display: block;
+  filter: var(--card-icon-filter, brightness(0) invert(1));
+}
+
+.tab-content {
+  display: none;
+}
+
+.tab-content.active {
+  display: block;
+}
+
+.extra-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  margin-bottom: 1rem;
+}
+
+.extra-stats > div {
+  padding: 0.3rem 0.7rem;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 20px;
+  font-size: 0.8rem;
+  color: var(--card-text-secondary, #ccc);
+}
+
+.extra-stats strong {
+  color: var(--card-text-primary, #fff);
+  margin-right: 0.3rem;
+}
+
+.extra-links {
+  display: flex;
+  gap: 0.75rem;
+}
+
+.extra-link {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: rgba(255, 255, 255, 0.08);
+  transition: background 0.2s ease;
+}
+
+.extra-link:hover {
+  background: rgba(255, 255, 255, 0.18);
+}
+
+.link-icon-svg {
+  width: 18px;
+  height: 18px;
+  filter: var(--card-icon-filter, brightness(0) invert(1));
+}
+
+/* The reel player mounts here (Listen tab) via playerApp.renderPlayer() -
+   deliberately no card.css rules target .player-wrapper/#waveform/etc,
+   those come entirely from css/player.css + css/playlist.css, unmodified -
+   same "never a second copy" reasoning as the JS render path itself. */
+.card-listen-player {
+  min-height: 200px;
+}

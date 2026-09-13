@@ -20,7 +20,8 @@
   <link rel="stylesheet" href="css/player.css">
   <link rel="stylesheet" href="css/playlist.css">
   <link rel="stylesheet" href="css/expandable.css">
-  
+  <link rel="stylesheet" href="css/card.css">
+
   <style>
     /* ============================================
        IFRAME-SPECIFIC STYLES
@@ -85,6 +86,7 @@
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
     import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './js/modules/pageTextStyles.js';
+    import { renderCardChrome } from './js/modules/cardChrome.js';
 
     // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
     // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
@@ -204,13 +206,13 @@
 
     /* ============================================
        CARD LOADING (docs/project-cards/PLAN.md §5)
-       First slice: fetch the card, reuse playerApp.renderPlayer() (the
-       same method the builder's own Reels-tab live preview uses) on its
-       inlined reel - into #embedPlayer instead of the builder's
-       #reelPlayerPreview (see js/player.js's renderPlayer() containerId
-       param). No card chrome yet (banner, Info/Listen tabs, cardOverrides
-       merge, resize handshake, analytics) - that's a separate follow-up
-       slice once this proves the fetch + render plumbing end to end.
+       Fetches the card, renders its chrome (banner + Info/Listen tabs -
+       js/modules/cardChrome.js), and lazily mounts the inlined reel into
+       the Listen tab via the same playerApp.renderPlayer() the builder's
+       own live preview uses (never a second hand-written copy) the first
+       time a visitor actually opens that tab - see cardChrome.js's own
+       header comment for what's still deferred (cardOverrides merge,
+       mobile scroll-band expand, analytics).
        ============================================ */
     async function loadAndRenderCard(cardId) {
       try {
@@ -220,53 +222,38 @@
           return;
         }
         const cardData = await response.json();
+        const container = document.getElementById('embedPlayer');
 
-        // No reelId, or the referenced reel is missing/unpublished - render
-        // Info-only per PLAN.md's dangling-reference rule. This slice has
-        // no Info panel yet, so just say so rather than showing an error
-        // (a card with no reel isn't actually broken).
-        if (!cardData.reel) {
-          document.getElementById('embedPlayer').innerHTML =
-            '<div class="loading-message">This card has no player.</div>';
-          return;
-        }
+        const { listenContainerId } = renderCardChrome(container, cardData, {
+          onActivateListen: () => {
+            // A card's reel always renders static (the card owns collapse,
+            // not the reel) - see PLAN.md §3's "Data boundary".
+            const reel = { ...cardData.reel, mode: 'static' };
 
-        // A card's reel always renders static (the card owns collapse, not
-        // the reel) - see PLAN.md §3's "Data boundary". cardOverrides
-        // merging isn't implemented yet in this first slice.
-        const reel = { ...cardData.reel, mode: 'static' };
+            // Only the CSS vars a mounted reel reads (accent, waveform
+            // colors, text styles, ...) - NOT applyReelStyles()'s
+            // background/min-height, which would apply the reel's own
+            // background to the *card's* #embedPlayer container instead of
+            // the card's own banner/chrome background.
+            applyReelStyleVars(reel);
 
-        if (!reel.playlist || reel.playlist.length === 0) {
-          document.getElementById('embedPlayer').innerHTML =
-            '<div class="loading-message">This card\'s reel has no tracks.</div>';
-          return;
-        }
+            const flatReel = { ...reel, ...(reel.settings || {}) };
+            playerApp.renderPlayer({
+              showTitle: flatReel.showTitle,
+              title: flatReel.title,
+              playlist: reel.playlist,
+              reel: flatReel,
+              containerId: listenContainerId,
+            });
 
-        // applyReelStyles() already reads the nested reel.settings shape
-        // unchanged - a card's inlined reel is exactly a GET /reels/:id
-        // response, same as loadReelData() above returns.
-        applyReelStyles(reel);
-
-        // renderPlayer() (js/player.js) expects the *flat* shape the
-        // builder's live-edit reel object has (reel.mode,
-        // reel.hoverDarkenEnabled, etc. at the top level) - same flattening
-        // initializeEmbedPlayer() below already does for the plain-reel
-        // embed path.
-        const flatReel = { ...reel, ...(reel.settings || {}) };
-
-        playerApp.renderPlayer({
-          showTitle: flatReel.showTitle,
-          title: flatReel.title,
-          playlist: reel.playlist,
-          reel: flatReel,
-          containerId: 'embedPlayer',
+            // Both generic (icon swap + spacebar toggle), no analytics
+            // wiring yet for cards - analyticsEnabled stays false at
+            // module scope, so setupPlaybackEventListeners()'s segment
+            // tracking is a no-op.
+            setupKeyboardControls();
+            setupPlaybackEventListeners();
+          },
         });
-
-        // Both generic (icon swap + spacebar toggle), no analytics wiring
-        // yet for cards - analyticsEnabled stays false at module scope, so
-        // setupPlaybackEventListeners()'s segment tracking is a no-op.
-        setupKeyboardControls();
-        setupPlaybackEventListeners();
       } catch (error) {
         console.error('Failed to load card:', error);
         showError('Failed to load card');
@@ -364,11 +351,18 @@
     }
 
     /* ============================================
-       APPLY REEL STYLES
-       Sets CSS variables and container styles
-       Matches PreviewManager behavior exactly
+       APPLY REEL STYLE VARS
+       Sets only the CSS custom properties every reel-derived render reads
+       (css/player.css etc.) - split out of applyReelStyles() below so a
+       card embed (js/modules/cardChrome.js) can theme its mounted reel
+       without also forcing that reel's own background/min-height onto
+       #embedPlayer, which is the *card's* container, not the reel's -
+       see applyReelStyles()'s own comment for the plain-reel-embed half
+       this used to do unconditionally.
+       Matches PreviewManager behavior exactly.
+       Returns the values applyReelStyles() still needs for the container.
        ============================================ */
-    function applyReelStyles(reelData) {
+    function applyReelStyleVars(reelData) {
       const settings = reelData.settings || {};
       const pts = getPlayerTextStyles(settings);
 
@@ -489,16 +483,31 @@
       root.style.setProperty('--hover-darken-target-brightness', 1 - (settings.hoverDarkenAmount ?? 15) / 100);
       root.style.setProperty('--idle-unblur-target-reduction', (settings.idleUnblurAmount ?? 50) / 100);
 
-      // ============================================
-      // Apply container styles
-      // ============================================
+      return {
+        mode: reelData.mode || 'static',
+        playerHeight,
+        backgroundColor,
+        backgroundImage,
+        expandableCollapsedHeight: settings.expandableCollapsedHeight || 120,
+      };
+    }
+
+    /* ============================================
+       APPLY REEL STYLES (plain reel embed only)
+       CSS vars (applyReelStyleVars() above) plus this reel's own
+       background/min-height applied directly to #embedPlayer - correct
+       only when the reel IS the whole embed. A card embed's #embedPlayer
+       is the *card's* container instead (js/modules/cardChrome.js owns
+       its background/sizing), so js/modules/cardChrome.js's mounted reel
+       calls applyReelStyleVars() directly and skips this half.
+       ============================================ */
+    function applyReelStyles(reelData) {
+      const { mode, playerHeight, backgroundColor, backgroundImage, expandableCollapsedHeight } = applyReelStyleVars(reelData);
+
       const container = document.getElementById('embedPlayer');
-      const mode = reelData.mode || 'static';
-      
+
       // Set minimum height based on mode
-      const initialHeight = mode === 'expandable'
-        ? (settings.expandableCollapsedHeight || 120)
-        : playerHeight;
+      const initialHeight = mode === 'expandable' ? expandableCollapsedHeight : playerHeight;
       container.style.minHeight = `${initialHeight}px`;
 
       // Notify parent window if in iframe (for iframe height adjustment).
@@ -518,7 +527,7 @@
 
       // Apply base background color (always applied)
       container.style.backgroundColor = backgroundColor;
-      
+
       // Apply background image if present
       if (backgroundImage) {
         container.style.backgroundImage = `url("${backgroundImage}")`;
@@ -534,7 +543,7 @@
       // This ensures consistent behavior with the preview
       // No need to create a separate overlay div
     }
-    
+
     /* ============================================
        RENDER PLAYER HTML
        Builds complete player structure
