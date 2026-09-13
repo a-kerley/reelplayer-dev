@@ -179,6 +179,11 @@ document.addEventListener("DOMContentLoaded", async () => {
         activeClass: "media-library-active",
         onActivate: () => renderMediaLibraryTab(),
       },
+      {
+        btn: document.getElementById("tabCardsBtn"),
+        panel: document.getElementById("cardsPanel"),
+        mainView: document.getElementById("cardBuilderView"),
+      },
     ]);
 
     initSidebarResize();

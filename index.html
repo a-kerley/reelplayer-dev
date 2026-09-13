@@ -23,23 +23,33 @@
     <!-- === Builder UI (start) === -->
     <div class="builder-app">
       <aside class="builder-sidebar">
-        <div class="sidebar-tabs">
-          <button type="button" id="tabReelsBtn" class="sidebar-tab active">Reels</button>
-          <button type="button" id="tabPagesBtn" class="sidebar-tab">Pages</button>
-          <button type="button" id="tabMediaBtn" class="sidebar-tab">Media Library</button>
+        <div class="sidebar-builder-section">
+          <div class="sidebar-tabs">
+            <button type="button" id="tabReelsBtn" class="sidebar-tab active">Reels</button>
+            <button type="button" id="tabPagesBtn" class="sidebar-tab">Pages</button>
+            <button type="button" id="tabCardsBtn" class="sidebar-tab">Project Cards</button>
+          </div>
+          <div id="reelsPanel">
+            <button id="newReelBtn">+ New Reel</button>
+            <span id="draftSaveStatus" class="draft-save-status"></span>
+            <ul id="reelList"></ul>
+          </div>
+          <div id="pagesPanel" style="display: none;">
+            <button id="newPageBtn">+ New Page</button>
+            <span id="pageDraftSaveStatus" class="draft-save-status"></span>
+            <ul id="pageList"></ul>
+          </div>
+          <div id="cardsPanel" style="display: none;">
+            <p class="builder-empty-state">Project Cards — coming soon.</p>
+          </div>
         </div>
-        <div id="reelsPanel">
-          <button id="newReelBtn">+ New Reel</button>
-          <span id="draftSaveStatus" class="draft-save-status"></span>
-          <ul id="reelList"></ul>
-        </div>
-        <div id="pagesPanel" style="display: none;">
-          <button id="newPageBtn">+ New Page</button>
-          <span id="pageDraftSaveStatus" class="draft-save-status"></span>
-          <ul id="pageList"></ul>
-        </div>
-        <div id="mediaPanel" style="display: none;">
-          <p class="builder-empty-state">Browse and manage all uploaded media.</p>
+        <!-- Media Library isn't a builder like Reels/Pages/Cards - it's a
+             shared resource all three draw from - so it's pinned at the
+             bottom of the sidebar rather than grouped into the same tab
+             row (see .sidebar-media-section in css/builder.css). -->
+        <div class="sidebar-media-section">
+          <button type="button" id="tabMediaBtn" class="sidebar-media-btn" title="Browse and manage all uploaded media.">Media Library</button>
+          <div id="mediaPanel" style="display: none;"></div>
         </div>
         <div id="sidebarResizeHandle" class="sidebar-resize-handle"></div>
       </aside>
@@ -83,6 +93,9 @@
           <div id="pagePreviewPane" class="page-preview-pane"></div>
         </div>
         <div id="mediaLibraryView" style="display: none;"></div>
+        <div id="cardBuilderView" style="display: none;">
+          <p class="builder-empty-state">Project Cards builder — coming soon.</p>
+        </div>
       </main>
     </div>
     <!-- === Builder UI (end) === -->

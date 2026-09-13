@@ -133,8 +133,22 @@ body {
 }
 
 /* ==============================================
-   SIDEBAR TABS (Reels / Pages / Media Library)
+   SIDEBAR BUILDER TABS (Reels / Pages / Project Cards)
+   Media Library isn't one of these - it's a shared resource, not a
+   content type you author - so it lives in its own pinned section below
+   (.sidebar-media-section), not in this row. That also keeps this row at
+   3 flex:1 tabs, which fits the sidebar's 200px min-width; a 4th tab here
+   didn't (see git history - "Media Library"/"Project Cards" wrapped/
+   overflowed at min-width when this row briefly held all four).
    ============================================== */
+.sidebar-builder-section {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+}
+
 .sidebar-tabs {
   display: flex;
   gap: 0.4rem;
@@ -154,6 +168,35 @@ body {
 }
 
 .sidebar-tab.active {
+  background: var(--builder-accent);
+  color: white;
+  border-color: var(--builder-accent);
+}
+
+/* ==============================================
+   SIDEBAR MEDIA LIBRARY SECTION (pinned to sidebar bottom)
+   ============================================== */
+.sidebar-media-section {
+  flex-shrink: 0;
+  margin-top: 0.75rem;
+  padding-top: 0.75rem;
+  border-top: 1px solid var(--builder-border);
+}
+
+.sidebar-media-btn {
+  width: 100%;
+  box-sizing: border-box;
+  background: none;
+  border: 1px solid var(--builder-border);
+  border-radius: 5px;
+  padding: 0.4rem 0.3rem;
+  font-size: var(--builder-text-base);
+  font-weight: var(--builder-weight-semibold);
+  cursor: pointer;
+  color: var(--builder-accent);
+}
+
+.sidebar-media-btn.active {
   background: var(--builder-accent);
   color: white;
   border-color: var(--builder-accent);
