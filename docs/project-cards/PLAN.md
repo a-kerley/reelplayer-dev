@@ -253,11 +253,24 @@ against a real embed (this is the second drift pair CLAUDE.md warns about).
 
 `project-card.js`'s `handleMouseEnter/Leave`, `expand()`, `collapse()`,
 `MOUSE_LEAVE_DELAY` auto-collapse are **desktop-hover-only** and break on
-touch (no `mouseleave` on a phone → card stuck open). The reel's existing
-**expandable-mode** expand/collapse + touch handling already solves this for
-every third-party embed. The card wrapper adds only the Info/Listen tab
-toggle on top of that — it does not re-implement expand/collapse or
-hover-to-play.
+touch (no `mouseleave` on a phone → card stuck open).
+
+**Modeled on, not literally reusing, the reel's expandable-mode.** The card
+should *feel* identical to a reel expanding — hover-to-expand on desktop,
+the same scroll-band `IntersectionObserver` approach on mobile
+(`setupExpandableModeTouchInteractions()` in `js/player.js`) rather than
+boxed-ape's fragile hover-timeout, so it never gets stuck open on touch.
+But `player.js`'s actual `expandPlayer()`/`collapsePlayer()` aren't callable
+for this: they're wired directly into that one reel's own wavesurfer/video-
+crossfade/idle-manager state and a resize height keyed to the *reel's own*
+`--expandable-expanded-height` — none of which exists (or should exist,
+since the reel inside always renders `mode:"static"`) for the card wrapper.
+The card needs its **own small, new expand/collapse controller** — same
+desktop-hover / mobile-scroll-band interaction pattern, new code, targeting
+the card wrapper's own banner⇄Info/Listen-tabs state and its own resize
+height (whichever of {banner, Info tab, Listen tab} is visible) instead of
+the reel's. The card wrapper adds only the Info/Listen tab toggle on top of
+that — it does not re-implement hover-to-play.
 
 ### Mobile parity (must match the existing player)
 
