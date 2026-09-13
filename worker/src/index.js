@@ -37,6 +37,22 @@
 //   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt,
 //                               publishedSlug, locked}
 //   DELETE /drafts/pages/:id  - password-gated, removes the entry
+//   GET    /cards/:id         - public, returns the stored card JSON with its referenced reel
+//                               inlined - {...card, reel: <reelData|null>} ("reel" is null when
+//                               the card has no reelId, or its reel is missing/unpublished - the
+//                               card renders Info-only, see docs/project-cards/PLAN.md)
+//   POST   /cards/:id         - password-gated, stores the JSON body. Modeled on /reels/:id
+//                               (content-hash id, no slug/rename machinery), not /pages/:slug.
+//   GET    /cards             - password-gated, lists {id, title, reelId, created,
+//                               analyticsEnabled} for every stored card
+//   DELETE /cards/:id         - password-gated, removes the entry
+//   GET    /drafts/cards/:id  - password-gated, same visibility rules as /drafts/:id
+//   POST   /drafts/cards/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
+//   GET    /drafts/cards      - password-gated, lists {id, title, createdAt, updatedAt,
+//                               publishedEmbedId, publishedAt, locked} - same shape as GET
+//                               /drafts (reel drafts), since cards are id-based like reels, not
+//                               slug-based like pages
+//   DELETE /drafts/cards/:id  - password-gated, removes the entry
 //   POST   /media/upload      - password-gated, ?key=<key>, body = raw file bytes
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
 //   POST   /media/rename      - password-gated, body {from, to}. Also scans every reel/page
@@ -47,25 +63,27 @@
 //                               that rewrite above would touch - {matches: [{key, type, title}]}
 //   DELETE /media/delete      - password-gated, ?key=<key>
 //   POST   /stats/:type/:id   - public, body {event, sessionId, trackIndex?, trackTitle?,
-//                               listenSeconds?}; :type is "reel" or "page". No-ops (200, no
-//                               write) unless the target exists and has analyticsEnabled=true.
+//                               listenSeconds?}; :type is "reel", "page", or "card". No-ops (200,
+//                               no write) unless the target exists and has analyticsEnabled=true.
 //   GET    /stats/:type/:id   - password-gated, lists every raw stat event for that target,
 //                               newest first - the builder aggregates client-side.
 //
-// Drafts (in-progress builder reels/pages, auto-saved as the user edits) use
-// a separate `draft_<id>` / `draft_page_<id>` key prefix in the same REELS
-// namespace as published reels/pages (`reel_<id>` / `page_<slug>`) - same
-// store, disjoint keys, different JSON shape (the raw flat builder object,
-// not the nested settings:{}/blocks:[] export shape) and different
-// visibility (drafts are never public, since only the password-gated
-// builder itself ever needs to read them - unlike a published reel or page,
-// which anonymous visitors' browsers must be able to fetch anywhere it's
-// embedded/shared).
+// Drafts (in-progress builder reels/pages/cards, auto-saved as the user
+// edits) use a separate `draft_<id>` / `draft_page_<id>` / `draft_card_<id>`
+// key prefix in the same REELS namespace as published reels/pages/cards
+// (`reel_<id>` / `page_<slug>` / `card_<id>`) - same store, disjoint keys,
+// different JSON shape (the raw flat builder object, not the nested
+// settings:{}/blocks:[] export shape) and different visibility (drafts are
+// never public, since only the password-gated builder itself ever needs to
+// read them - unlike a published reel/page/card, which anonymous visitors'
+// browsers must be able to fetch anywhere it's embedded/shared).
 //
 // Pages are keyed by `slug` (a user-editable, renameable public identifier)
 // rather than a stable id, unlike reels which are keyed by their immutable
 // embed id - see the POST /pages/:slug handler for the rename/collision
-// mechanics this requires that reels don't need.
+// mechanics this requires that reels don't need. Cards follow the reel
+// convention (content-hash id, no slug) - see docs/project-cards/PLAN.md
+// §1/§4 for why a card is a reference to a reel rather than a copy of one.
 
 // Keep in sync with js/config.js's R2_PUBLIC_URL - reels/pages store a
 // file's full public URL (this + "/" + its R2 key), not the bare key, so
@@ -119,16 +137,20 @@ async function parseJsonBody(request) {
 // a prefix, fetch + parse each one, and pluck out just the summary fields
 // each listing view needs.
 //
-// excludePrefix exists because "draft_" and "draft_page_" aren't disjoint -
-// every draft_page_<id> key also starts with "draft_", so KV's plain
-// prefix match alone would have GET /drafts (reel drafts) silently
-// returning page drafts too. GET /drafts/pages doesn't need this itself:
-// "draft_page_" has no shorter prefix elsewhere in this namespace that
-// would similarly swallow it.
-async function listEntries(env, prefix, pickFields, excludePrefix) {
+// excludePrefixes exists because "draft_" isn't disjoint from "draft_page_"
+// or "draft_card_" - every draft_page_<id>/draft_card_<id> key also starts
+// with "draft_", so KV's plain prefix match alone would have GET /drafts
+// (reel drafts) silently returning page/card drafts too. GET /drafts/pages
+// and GET /drafts/cards don't need this themselves: "draft_page_"/
+// "draft_card_" have no shorter prefix elsewhere in this namespace that
+// would similarly swallow them. Accepts a single string or an array.
+async function listEntries(env, prefix, pickFields, excludePrefixes) {
   const list = await env.REELS.list({ prefix });
-  const keys = excludePrefix
-    ? list.keys.filter((key) => !key.name.startsWith(excludePrefix))
+  const excludes = excludePrefixes
+    ? [].concat(excludePrefixes)
+    : [];
+  const keys = excludes.length
+    ? list.keys.filter((key) => !excludes.some((ex) => key.name.startsWith(ex)))
     : list.keys;
   const entries = await Promise.all(
     keys.map(async (key) => {
@@ -268,8 +290,9 @@ export default {
     }
 
     // GET /drafts - list all drafts (builder sidebar), password-gated.
-    // Excludes draft_page_* keys - see listEntries()'s own comment for why
-    // that's not automatic just from the "draft_" prefix alone.
+    // Excludes draft_page_*/draft_card_* keys - see listEntries()'s own
+    // comment for why that's not automatic just from the "draft_" prefix
+    // alone.
     if (pathname === "/drafts" && request.method === "GET") {
       const authError = requireAuth(request, env);
       if (authError) return authError;
@@ -277,7 +300,7 @@ export default {
       const entries = await listEntries(env, "draft_", (r) => ({
         id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
         publishedEmbedId: r.publishedEmbedId, publishedAt: r.publishedAt, locked: r.locked,
-      }), "draft_page_");
+      }), ["draft_page_", "draft_card_"]);
       return jsonResponse(entries);
     }
 
@@ -292,6 +315,20 @@ export default {
       const entries = await listEntries(env, "draft_page_", (p) => ({
         id: p.id, title: p.title, slug: p.slug, createdAt: p.createdAt, updatedAt: p.updatedAt,
         publishedSlug: p.publishedSlug, locked: p.locked,
+      }));
+      return jsonResponse(entries);
+    }
+
+    // GET /drafts/cards - list all card drafts (Project Cards sidebar),
+    // password-gated. Must be checked before the generic /drafts/:id block
+    // below, same reasoning as /drafts/pages above.
+    if (pathname === "/drafts/cards" && request.method === "GET") {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+
+      const entries = await listEntries(env, "draft_card_", (c) => ({
+        id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
+        publishedEmbedId: c.publishedEmbedId, publishedAt: c.publishedAt, locked: c.locked,
       }));
       return jsonResponse(entries);
     }
@@ -337,6 +374,38 @@ export default {
     const pageDraftMatch = pathname.match(/^\/drafts\/pages\/([a-zA-Z0-9_-]+)$/);
     if (pageDraftMatch) {
       const key = `draft_page_${pageDraftMatch[1]}`;
+
+      if (request.method === "GET") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const value = await env.REELS.get(key);
+        if (!value) return jsonResponse({ error: "Not found" }, 404);
+        return rawJsonResponse(value);
+      }
+
+      if (request.method === "POST") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
+        body.updatedAt = Date.now();
+        await env.REELS.put(key, JSON.stringify(body));
+        return jsonResponse({ ok: true, updatedAt: body.updatedAt });
+      }
+
+      if (request.method === "DELETE") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        await env.REELS.delete(key);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    // /drafts/cards/:id - card drafts, same visibility rules as /drafts/:id
+    // (password-gated on every method, no legitimate anonymous consumer).
+    const cardDraftMatch = pathname.match(/^\/drafts\/cards\/([a-zA-Z0-9_-]+)$/);
+    if (cardDraftMatch) {
+      const key = `draft_card_${cardDraftMatch[1]}`;
 
       if (request.method === "GET") {
         const authError = requireAuth(request, env);
@@ -457,13 +526,82 @@ export default {
       }
     }
 
-    // /stats/:type/:id - :type constrained to "reel"/"page" directly in the
+    // GET /cards - list all published cards (Project Cards sidebar /
+    // management view). Explicit "card_" prefix so this never picks up
+    // draft_card_ keys sharing the same REELS namespace.
+    if (pathname === "/cards" && request.method === "GET") {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+
+      const entries = await listEntries(env, "card_", (c) => ({
+        id: c.id, title: c.title, reelId: c.reelId, created: c.created,
+        analyticsEnabled: c.analyticsEnabled === true,
+      }));
+      return jsonResponse(entries);
+    }
+
+    // /cards/:id - modeled on /reels/:id (content-hash id, no slug/rename
+    // machinery), not /pages/:slug - see docs/project-cards/PLAN.md §1/§4.
+    // GET is public (player.html's fetch target for a card embed) and
+    // inlines the referenced reel: {...card, reel: <reelData|null>}. "reel"
+    // is null when the card has no reelId, or the referenced reel is
+    // missing/unpublished - the card renders Info-only rather than 404ing,
+    // since a card's own content is still valid without its reel.
+    const cardMatch = pathname.match(/^\/cards\/([a-zA-Z0-9_-]+)$/);
+    if (cardMatch) {
+      const key = `card_${cardMatch[1]}`;
+
+      if (request.method === "GET") {
+        const value = await env.REELS.get(key);
+        if (!value) return jsonResponse({ error: "Not found" }, 404);
+        let card;
+        try {
+          card = JSON.parse(value);
+        } catch {
+          return jsonResponse({ error: "Not found" }, 404);
+        }
+        let reel = null;
+        if (card.reelId) {
+          const reelValue = await env.REELS.get(`reel_${card.reelId}`);
+          if (reelValue) {
+            try {
+              reel = JSON.parse(reelValue);
+            } catch {
+              reel = null;
+            }
+          }
+        }
+        return jsonResponse({ ...card, reel });
+      }
+
+      if (request.method === "POST") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        const body = await request.text();
+        try {
+          JSON.parse(body);
+        } catch {
+          return jsonResponse({ error: "Invalid JSON body" }, 400);
+        }
+        await env.REELS.put(key, body);
+        return jsonResponse({ ok: true });
+      }
+
+      if (request.method === "DELETE") {
+        const authError = requireAuth(request, env);
+        if (authError) return authError;
+        await env.REELS.delete(key);
+        return jsonResponse({ ok: true });
+      }
+    }
+
+    // /stats/:type/:id - :type constrained to "reel"/"page"/"card" directly in the
     // regex. POST is public (called from player.html/page.html for any
     // visitor), GET is password-gated (the builder's "View Stats" modal).
-    const statsMatch = pathname.match(/^\/stats\/(reel|page)\/([a-zA-Z0-9_-]+)$/);
+    const statsMatch = pathname.match(/^\/stats\/(reel|page|card)\/([a-zA-Z0-9_-]+)$/);
     if (statsMatch) {
       const [, targetType, targetId] = statsMatch;
-      const targetKey = targetType === "reel" ? `reel_${targetId}` : `page_${targetId}`;
+      const targetKey = `${targetType}_${targetId}`;
 
       if (request.method === "POST") {
         const { body, error } = await parseJsonBody(request);
@@ -522,12 +660,14 @@ export default {
 
     // Type label for a REELS-namespace key, for display in the /media/usages
 // preview and nowhere else - matches worker/CLAUDE.md's key-prefix scheme.
-// Order matters: "draft_page_" must be checked before "draft_", since every
-// draft_page_<id> key also starts with "draft_" (see listEntries()'s own
-// comment on the same ambiguity).
+// Order matters: "draft_page_"/"draft_card_" must be checked before
+// "draft_", since every draft_page_<id>/draft_card_<id> key also starts
+// with "draft_" (see listEntries()'s own comment on the same ambiguity).
 function keyEntryType(keyName) {
   if (keyName.startsWith("draft_page_")) return "page draft";
+  if (keyName.startsWith("draft_card_")) return "card draft";
   if (keyName.startsWith("page_")) return "page";
+  if (keyName.startsWith("card_")) return "card";
   if (keyName.startsWith("draft_")) return "reel draft";
   if (keyName.startsWith("reel_")) return "reel";
   return "other";
