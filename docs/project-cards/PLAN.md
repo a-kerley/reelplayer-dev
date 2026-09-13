@@ -7,8 +7,34 @@ in among non-reelplayer content, so each card must be fully self-contained,
 lazy-loadable, and placeable anywhere. (A reelplayer *Page* is not an option
 here: the host pages are hand-authored, not reelplayer-rendered.)
 
-Status: not started. Source snapshot from boxed-ape-site is in
-`boxed-ape-source/` (see its README for provenance + a per-file guide).
+Status: spine in progress (§7). Done so far, 2026-09-13:
+- §7.1 Worker routes: `/cards/:id` (with reel inlining + dangling-reference
+  →Info-only fallback), `/drafts/cards/:id`, both list routes, `/stats/card/:id`.
+- §7.2 (partial) Builder: Project Cards tab exists (grouped with Reels/Pages;
+  Media Library moved to its own pinned sidebar section, no longer competing
+  for tab-row space). v1 stub form: reel picker + one raw-JSON textarea for
+  everything else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
+  `js/modules/cardPublish.js`).
+- §7.4 (first slice only) `player.html?id=<cardId>&type=card` fetches the
+  card, forces the inlined reel's `mode` to `"static"`, and calls
+  `playerApp.renderPlayer()` (generalized to accept a `containerId` instead
+  of hardcoding the builder's own preview pane) into `#embedPlayer`. No card
+  chrome yet - no banner, no Info/Listen tabs, no `cardOverrides` merge, no
+  resize handshake, no analytics wiring. Verified against a real local
+  card: waveform loads, play/pause + finish all work.
+- Also: `js/config.js` now points `WORKER_BASE_URL` at `localhost:8787`
+  automatically when served from `localhost`, so local dev never touches
+  production KV - run `npx wrangler dev` (from `worker/`, or pass
+  `--config wrangler.toml` explicitly - see worker/README.md for why) +
+  `python3 dev-server.py` together for a fully local loop.
+
+Not started: the rest of §7.4/§7.5 (card chrome ported from
+`boxed-ape-source/project-card.js`/`.css` - banner, Info/Listen tabs,
+`cardOverrides`, resize handshake, mobile parity, analytics), §7.6 (real
+repeater form), and all of §6 (boxed-ape-site injector).
+
+Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
+README for provenance + a per-file guide).
 
 ---
 
