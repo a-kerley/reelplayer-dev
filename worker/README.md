@@ -50,6 +50,21 @@ To run the Worker locally before deploying (useful for testing):
 npx wrangler dev
 ```
 
+Run it from *this* `worker/` directory - `npx wrangler dev`/`deploy` reads
+whatever `wrangler.toml`/`wrangler.jsonc` is in the current directory, and
+the repo root has its own (`wrangler.jsonc`, the separate static-assets
+`reelplayer-app` project) - running either command from the wrong directory
+silently targets/deploys that one instead. If unsure, pass
+`--config wrangler.toml` explicitly.
+
+Local KV/R2 state persists under `worker/.wrangler` (gitignored) and starts
+empty - a fresh `wrangler dev` has no reels/pages/cards until you publish
+something to it. `js/config.js`'s `WORKER_BASE_URL` automatically points the
+builder at `http://localhost:8787` when it's served from `localhost` (e.g.
+via `python3 dev-server.py`), so running both together - `wrangler dev`
+here and `dev-server.py` at the repo root - gives a fully local loop with no
+reads/writes against production data.
+
 Then from another terminal:
 
 ```bash
