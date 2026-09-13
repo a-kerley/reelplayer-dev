@@ -2006,7 +2006,11 @@ const playerAppCore = {
    * Assumes volume is already set to 0 before calling
    * @param {number} targetVolume - The target volume to fade to
    */
-  renderPlayer({ showTitle, title, playlist, reel }) {
+  // containerId defaults to "reelPlayerPreview" - the builder's own Reels
+  // tab live-preview pane, this method's original and still only caller
+  // before player.html's card branch (see docs/project-cards/PLAN.md §5)
+  // became a second one needing a different mount point ("embedPlayer").
+  renderPlayer({ showTitle, title, playlist, reel, containerId = "reelPlayerPreview" }) {
     // Clean up old event listeners before re-rendering
     this.cleanupExpandableModeListeners();
     this.cleanupStaticModeListeners();
@@ -2020,8 +2024,8 @@ const playerAppCore = {
     this.expandable.isPlaying = false;
     this.expandable.settings = reel;
     this.expandable.showWaveformOnCollapse = reel?.showWaveformOnCollapse !== false;
-    
-    const container = document.getElementById("reelPlayerPreview");
+
+    const container = document.getElementById(containerId);
     if (!container) return;
     
     const shouldHideTitle = !(showTitle && title && title.trim());

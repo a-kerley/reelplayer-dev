@@ -109,9 +109,14 @@
     // INITIALIZATION
     // ============================================
     
-    // Get reel ID from URL parameter
+    // Get reel/card ID from URL parameter. A card embed is
+    // player?id=<cardId>&type=card - explicit, rather than probing /cards/
+    // then /reels/ (or vice versa) with whatever bare id shows up, since
+    // both are independent content-hash id spaces with no guaranteed
+    // disambiguation between them.
     const urlParams = new URLSearchParams(window.location.search);
     const reelId = urlParams.get('id');
+    const embedType = urlParams.get('type'); // 'card', or absent for a reel
 
     // Only present when this embed came from a page's Player block whose
     // page had at least one text-style role customized
@@ -130,6 +135,8 @@
 
     if (!reelId) {
       showError('No reel ID provided');
+    } else if (embedType === 'card') {
+      loadAndRenderCard(reelId);
     } else {
       loadAndRenderReel(reelId);
     }
@@ -194,7 +201,78 @@
         return null;
       }
     }
-    
+
+    /* ============================================
+       CARD LOADING (docs/project-cards/PLAN.md §5)
+       First slice: fetch the card, reuse playerApp.renderPlayer() (the
+       same method the builder's own Reels-tab live preview uses) on its
+       inlined reel - into #embedPlayer instead of the builder's
+       #reelPlayerPreview (see js/player.js's renderPlayer() containerId
+       param). No card chrome yet (banner, Info/Listen tabs, cardOverrides
+       merge, resize handshake, analytics) - that's a separate follow-up
+       slice once this proves the fetch + render plumbing end to end.
+       ============================================ */
+    async function loadAndRenderCard(cardId) {
+      try {
+        const response = await fetch(`${WORKER_BASE_URL}/cards/${cardId}`);
+        if (!response.ok) {
+          showError('Card not found');
+          return;
+        }
+        const cardData = await response.json();
+
+        // No reelId, or the referenced reel is missing/unpublished - render
+        // Info-only per PLAN.md's dangling-reference rule. This slice has
+        // no Info panel yet, so just say so rather than showing an error
+        // (a card with no reel isn't actually broken).
+        if (!cardData.reel) {
+          document.getElementById('embedPlayer').innerHTML =
+            '<div class="loading-message">This card has no player.</div>';
+          return;
+        }
+
+        // A card's reel always renders static (the card owns collapse, not
+        // the reel) - see PLAN.md §3's "Data boundary". cardOverrides
+        // merging isn't implemented yet in this first slice.
+        const reel = { ...cardData.reel, mode: 'static' };
+
+        if (!reel.playlist || reel.playlist.length === 0) {
+          document.getElementById('embedPlayer').innerHTML =
+            '<div class="loading-message">This card\'s reel has no tracks.</div>';
+          return;
+        }
+
+        // applyReelStyles() already reads the nested reel.settings shape
+        // unchanged - a card's inlined reel is exactly a GET /reels/:id
+        // response, same as loadReelData() above returns.
+        applyReelStyles(reel);
+
+        // renderPlayer() (js/player.js) expects the *flat* shape the
+        // builder's live-edit reel object has (reel.mode,
+        // reel.hoverDarkenEnabled, etc. at the top level) - same flattening
+        // initializeEmbedPlayer() below already does for the plain-reel
+        // embed path.
+        const flatReel = { ...reel, ...(reel.settings || {}) };
+
+        playerApp.renderPlayer({
+          showTitle: flatReel.showTitle,
+          title: flatReel.title,
+          playlist: reel.playlist,
+          reel: flatReel,
+          containerId: 'embedPlayer',
+        });
+
+        // Both generic (icon swap + spacebar toggle), no analytics wiring
+        // yet for cards - analyticsEnabled stays false at module scope, so
+        // setupPlaybackEventListeners()'s segment tracking is a no-op.
+        setupKeyboardControls();
+        setupPlaybackEventListeners();
+      } catch (error) {
+        console.error('Failed to load card:', error);
+        showError('Failed to load card');
+      }
+    }
+
     /* ============================================
        ERROR DISPLAY
        ============================================ */
