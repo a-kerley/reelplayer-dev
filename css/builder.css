@@ -98,7 +98,8 @@ body {
 }
 
 #reelsPanel > #newReelBtn,
-#pagesPanel > #newPageBtn {
+#pagesPanel > #newPageBtn,
+#cardsPanel > #newCardBtn {
   width: 100%;
   margin-bottom: 1.2rem;
   background: var(--builder-accent);
@@ -203,12 +204,13 @@ body {
 }
 
 /* ==============================================
-   REEL / PAGE LIST SIDEBAR SECTIONS
-   Both lists share the exact same generic renderer
+   REEL / PAGE / CARD LIST SIDEBAR SECTIONS
+   All three lists share the exact same generic renderer
    (js/modules/sidebarList.js) and so share this styling too -
-   #reelList and #pageList are just its two mount points.
+   #reelList, #pageList and #cardList are just its three mount points.
    ============================================== */
 #reelList,
+#cardList,
 #pageList {
   list-style: none;
   margin: 0;
@@ -218,18 +220,21 @@ body {
 }
 
 #reelList li.active,
+#cardList li.active,
 #pageList li.active {
   background: var(--builder-accent);
   color: white;
 }
 
 #reelList li:hover,
+#cardList li:hover,
 #pageList li:hover {
   background: var(--builder-hover);
   color: white;
 }
 
 #reelList li,
+#cardList li,
 #pageList li {
   width: 100%;
   box-sizing: border-box;
@@ -249,6 +254,7 @@ body {
 }
 
 #reelList li span,
+#cardList li span,
 #pageList li span {
   flex: 1 1 auto;
   min-width: 0;
@@ -265,11 +271,13 @@ body {
    (js/pagesSidebar.js and js/sidebar.js's respective renderSubtitle
    callbacks, both rendered by the shared js/modules/sidebarList.js). */
 #reelList li,
+#cardList li,
 #pageList li {
   flex-wrap: wrap;
 }
 
 #reelList li .sidebar-item-subtitle,
+#cardList li .sidebar-item-subtitle,
 #pageList li .sidebar-item-subtitle {
   flex-basis: 100%;
   min-width: 0;
@@ -284,6 +292,7 @@ body {
 }
 
 #reelList li .lock-reel-btn,
+#cardList li .lock-reel-btn,
 #pageList li .lock-reel-btn {
   background: none;
   border: none;
@@ -303,18 +312,21 @@ body {
 }
 
 #reelList li .lock-reel-btn.locked,
+#cardList li .lock-reel-btn.locked,
 #pageList li .lock-reel-btn.locked {
   opacity: 1;
   color: #e2a03f;
 }
 
 #reelList li .lock-reel-btn:hover,
+#cardList li .lock-reel-btn:hover,
 #pageList li .lock-reel-btn:hover {
   opacity: 1;
   transform: scale(1.15);
 }
 
 #reelList li .delete-reel-btn,
+#cardList li .delete-reel-btn,
 #pageList li .delete-reel-btn {
   background: none;
   border: none;
@@ -333,17 +345,20 @@ body {
    both to the right edge as a pair - a second auto margin here would split
    the free space between them instead, pushing them apart. */
 #reelList li .lock-reel-btn + .delete-reel-btn,
+#cardList li .lock-reel-btn + .delete-reel-btn,
 #pageList li .lock-reel-btn + .delete-reel-btn {
   margin-left: 0;
 }
 
 #reelList li .delete-reel-btn svg,
+#cardList li .delete-reel-btn svg,
 #pageList li .delete-reel-btn svg {
   color: inherit;
   transition: color 0.15s, transform 0.15s;
 }
 
 #reelList li .delete-reel-btn:hover svg,
+#cardList li .delete-reel-btn:hover svg,
 #pageList li .delete-reel-btn:hover svg {
   color: var(--builder-delete-hover);
   transform: scale(1.23);
@@ -669,7 +684,8 @@ body {
 #managePagesBtn,
 #previewPageBtn,
 #customizeTextStylesBtn,
-#refreshPreviewBtn {
+#refreshPreviewBtn,
+#cardPublishBtn {
   background: var(--builder-accent);
   color: white;
   border: none;
@@ -686,7 +702,8 @@ body {
 #manageEmbedsBtn,
 #managePagesBtn,
 #previewPageBtn,
-#customizeTextStylesBtn {
+#customizeTextStylesBtn,
+#cardPublishBtn {
   font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
   margin-top: 1rem;
@@ -698,7 +715,8 @@ body {
 #managePagesBtn:hover,
 #previewPageBtn:hover,
 #customizeTextStylesBtn:hover,
-#refreshPreviewBtn:hover {
+#refreshPreviewBtn:hover,
+#cardPublishBtn:hover {
   background: var(--builder-hover);
 }
 

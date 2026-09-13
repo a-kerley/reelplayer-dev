@@ -19,6 +19,7 @@ import { createTabController } from "./modules/tabController.js";
 import { initSidebarResize } from "./modules/sidebarResize.js";
 import { initPagePreviewResize } from "./modules/pagePreviewResize.js";
 import { initPagesController } from "./pagesController.js";
+import { initCardsController } from "./cardsController.js";
 import {
   listDrafts,
   loadDraft,
@@ -159,6 +160,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // an unhide. Pages/Media Library render on demand, the first time each
     // tab is actually opened.
     const pagesController = initPagesController();
+    const cardsController = initCardsController();
     createTabController([
       {
         btn: document.getElementById("tabReelsBtn"),
@@ -183,6 +185,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         btn: document.getElementById("tabCardsBtn"),
         panel: document.getElementById("cardsPanel"),
         mainView: document.getElementById("cardBuilderView"),
+        onActivate: () => cardsController.activate(),
       },
     ]);
 

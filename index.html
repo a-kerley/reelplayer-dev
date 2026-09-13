@@ -40,7 +40,9 @@
             <ul id="pageList"></ul>
           </div>
           <div id="cardsPanel" style="display: none;">
-            <p class="builder-empty-state">Project Cards — coming soon.</p>
+            <button id="newCardBtn">+ New Card</button>
+            <span id="cardDraftSaveStatus" class="draft-save-status"></span>
+            <ul id="cardList"></ul>
           </div>
         </div>
         <!-- Media Library isn't a builder like Reels/Pages/Cards - it's a
@@ -94,7 +96,7 @@
         </div>
         <div id="mediaLibraryView" style="display: none;"></div>
         <div id="cardBuilderView" style="display: none;">
-          <p class="builder-empty-state">Project Cards builder — coming soon.</p>
+          <div id="cardEditorPane"></div>
         </div>
       </main>
     </div>
