@@ -88,13 +88,19 @@
     import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './js/modules/pageTextStyles.js';
     import { renderCardChrome, mergeCardOverrides } from './js/modules/cardChrome.js';
 
-    // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
-    // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
-    // reelData.analyticsEnabled, read by setupPlaybackEventListeners()'s
+    // Opt-in analytics (see js/modules/statsBeacon.js / worker/CLAUDE.md) -
+    // set once loadAndRenderReel()/loadAndRenderCard() confirms the
+    // target's own analyticsEnabled, read by setupPlaybackEventListeners()'s
     // listen-segment tracking below. sessionId ties every "play" beacon
-    // from this page load back to its one "view" beacon.
+    // from this page load back to its one "view" beacon. analyticsStatsType
+    // is "reel" for a plain reel embed, "card" for a card embed - PLAN.md
+    // §8: a card's play events target /stats/card/<cardId>, never the
+    // reel's own stats, since the card is the marketing unit on the host
+    // page. analyticsStatsId is that target's own id (reelId or cardId,
+    // never the card's *referenced* reelId even when statsType is "card").
     let analyticsEnabled = false;
-    let analyticsReelId = null;
+    let analyticsStatsType = 'reel';
+    let analyticsStatsId = null;
     let analyticsPlaylist = [];
     const sessionId = createSessionId();
     let segmentTrackIndex = null;
@@ -167,10 +173,11 @@
         // (setupPlaybackEventListeners below) reads these same module-level
         // vars, so this must run before playback can start.
         analyticsEnabled = reelData.analyticsEnabled === true;
-        analyticsReelId = reelId;
+        analyticsStatsType = 'reel';
+        analyticsStatsId = reelId;
         analyticsPlaylist = reelData.playlist || [];
         if (analyticsEnabled) {
-          sendStatBeacon('reel', analyticsReelId, { event: 'view', sessionId });
+          sendStatBeacon(analyticsStatsType, analyticsStatsId, { event: 'view', sessionId });
         }
 
         // Apply custom CSS variables from reel settings
@@ -224,6 +231,23 @@
         const cardData = await response.json();
         const container = document.getElementById('embedPlayer');
 
+        // Opt-in analytics (PLAN.md §8) - "view" fires once, immediately,
+        // for the card iframe itself rendering, independent of whether the
+        // Listen tab ever gets opened. Targets /stats/card/<cardId>, never
+        // the referenced reel's own stats - the card is the marketing unit
+        // on the host page. analyticsPlaylist/analyticsStatsType/Id are set
+        // here (not inside onActivateListen) so they're already correct by
+        // the time setupPlaybackEventListeners() (wired inside
+        // onActivateListen, once the reel actually mounts) reads them for
+        // "play" segment tracking.
+        analyticsEnabled = cardData.analyticsEnabled === true;
+        analyticsStatsType = 'card';
+        analyticsStatsId = cardId;
+        analyticsPlaylist = cardData.reel?.playlist || [];
+        if (analyticsEnabled) {
+          sendStatBeacon(analyticsStatsType, analyticsStatsId, { event: 'view', sessionId });
+        }
+
         const { listenContainerId } = renderCardChrome(container, cardData, {
           onActivateListen: () => {
             // A card's reel always renders static (the card owns collapse,
@@ -263,10 +287,11 @@
               containerId: listenContainerId,
             });
 
-            // Both generic (icon swap + spacebar toggle), no analytics
-            // wiring yet for cards - analyticsEnabled stays false at
-            // module scope, so setupPlaybackEventListeners()'s segment
-            // tracking is a no-op.
+            // Both generic (icon swap + spacebar toggle) - "play" segment
+            // tracking inside setupPlaybackEventListeners() reads the
+            // analyticsStatsType/Id already set above, near the "view"
+            // beacon, so it correctly targets stats/card/<cardId> once a
+            // track actually plays.
             setupKeyboardControls();
             setupPlaybackEventListeners();
           },
@@ -876,7 +901,7 @@
       if (listenSeconds < 1) return; // ignore accidental/instant clicks
 
       const trackTitle = (trackIndex !== null && analyticsPlaylist[trackIndex]?.title) || "";
-      sendStatBeacon('reel', analyticsReelId, {
+      sendStatBeacon(analyticsStatsType, analyticsStatsId, {
         event: 'play', sessionId, trackIndex, trackTitle, listenSeconds,
       });
     }

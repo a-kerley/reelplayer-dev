@@ -41,8 +41,9 @@ export function createSessionId() {
   return Date.now().toString(36) + Math.random().toString(36).slice(2);
 }
 
-/** @param {'reel'|'page'} targetType
- *  @param {string} targetId - reel's publishedEmbedId, or page's publishedSlug
+/** @param {'reel'|'page'|'card'} targetType
+ *  @param {string} targetId - reel's publishedEmbedId, page's publishedSlug,
+ *    or card's own published id
  *  @param {Object} payload - {event: 'view'|'play', sessionId, trackIndex?, trackTitle?, listenSeconds?} */
 export function sendStatBeacon(targetType, targetId, payload) {
   if (isOperatorBrowser()) return;

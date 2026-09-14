@@ -109,6 +109,27 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   while `scrollY` tracked it in lockstep frame by frame. No console
   errors; Listen tab + lazy reel mount re-verified working with the new
   markup structure.
+- Analytics wiring (2026-09-14): `player.html`'s module-level
+  `analyticsReelId` generalized to `analyticsStatsType`/`analyticsStatsId`,
+  set by `loadAndRenderCard()` to `'card'`/`cardId` (never the card's
+  *referenced* reelId) right after fetching the card, so both the
+  immediate "view" beacon and the later "play" segment tracking inside
+  `onActivateListen` (which reads the same module-level vars) correctly
+  target `/stats/card/<cardId>` - PLAN.md §8: a card's plays are the
+  marketing unit's own stats, not the underlying reel's. `endListenSegment()`
+  now sends through these generic vars instead of a hardcoded `'reel'`.
+  `js/modules/statsViewer.js`'s `openStatsModal()`/`fetchStats()` needed
+  zero code changes - already fully generic on `targetType`, just a stale
+  JSDoc (`'reel'|'page'`, now includes `'card'`) - no "Manage Published
+  Cards" modal exists yet to wire a Stats button into, that's part of the
+  real form/management UI (§7.6), not this slice. Verified against the
+  Worker's stored stat events directly: `view` fires on card load,
+  `play` fires with correct track index/title/duration after a full
+  play-through, targeted at `stat_card_<id>_*` - and confirmed the
+  referenced reel's own `stat_reel_*` stayed empty (correctly isolated).
+  Also had to clear this browser's `reelplayer_operator` localStorage
+  self-exclusion flag (set by every builder page load) to get a beacon to
+  fire in testing at all - restored after.
 - `textStyles` resolver tier (2026-09-14): turned out much smaller than
   expected - `previewManager.js`'s `resolveTextUnit()` already takes a
   generic "highest-precedence role style source" parameter
@@ -173,9 +194,13 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   the v1 stub form) hasn't been published yet - see chat history for the
   full JSON blob, not saved to a repo file.
 
-Not started: analytics wiring, §7.6 (real repeater form), and all of §6
-(boxed-ape-site injector). §7a (not scheduled) notes a possible future
-contextual-hint UX for reel fields a card ignores.
+Not started: §7.6 (real repeater form, including a "Manage Published
+Cards" modal with its own Stats button), and all of §6 (boxed-ape-site
+injector). §7a (not scheduled) notes a possible future contextual-hint UX
+for reel fields a card ignores.
+
+**Everything in §5 (the render slice) is now done.** What's left is
+entirely builder-side UI (§7.6) and the boxed-ape-site injector (§6).
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).

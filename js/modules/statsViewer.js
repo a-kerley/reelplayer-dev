@@ -129,8 +129,9 @@ function renderStatsHTML(summary) {
   return summaryLine + perTrackTable + sessionsTable;
 }
 
-/** @param {'reel'|'page'} targetType
- *  @param {string} targetId - reel's publishedEmbedId, or page's publishedSlug
+/** @param {'reel'|'page'|'card'} targetType
+ *  @param {string} targetId - reel's publishedEmbedId, page's publishedSlug,
+ *    or card's own published id (not its referenced reelId)
  *  @param {string} label - display name shown in the modal title */
 export async function openStatsModal(targetType, targetId, label) {
   const password = await getBuilderPassword();
