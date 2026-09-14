@@ -229,10 +229,23 @@
             // A card's reel always renders static (the card owns collapse,
             // not the reel) - see PLAN.md §3's "Data boundary". Card
             // overrides (accent/waveform/outline/background/title - the
-            // textStyles/banner-media parts of the whitelist are handled
-            // elsewhere, see mergeCardOverrides()'s own comment) win over
-            // whatever the reel itself has set.
+            // banner-media part of the whitelist is handled elsewhere, see
+            // mergeCardOverrides()'s own comment) win over whatever the
+            // reel itself has set.
             const reel = mergeCardOverrides({ ...cardData.reel, mode: 'static' }, cardData.cardOverrides);
+
+            // cardOverrides.textStyles slots into the exact same top-precedence
+            // tier pageRoleStyles already occupies for a reel embedded in a
+            // reelplayer Page's player block (resolveTextUnit() above just
+            // reads pageRoleStyles?.[role] generically - it doesn't care
+            // whether the source is a page or a card, both are "this
+            // embedding instance's own role override", the same tier PLAN.md
+            // §5 calls for). Safe to reuse rather than needing a fourth
+            // resolution tier: a card is never also a reelplayer Page player
+            // block (PLAN.md §1 - pages aren't an option for cards at all), so
+            // this and the pageTextStyles URL param can never both apply to
+            // the same render.
+            pageRoleStyles = cardData.cardOverrides?.textStyles || null;
 
             // Only the CSS vars a mounted reel reads (accent, waveform
             // colors, text styles, ...) - NOT applyReelStyles()'s

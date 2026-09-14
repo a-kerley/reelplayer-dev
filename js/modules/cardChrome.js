@@ -21,10 +21,10 @@
 // the whitelist's other keys are handled elsewhere, not here:
 // - bannerImage/bannerVideo: banner-only, resolveBannerImage()/
 //   resolveBannerVideo() below
-// - textStyles: NOT handled by this function - needs a new top tier in
-//   the previewManager.js/player.html text-style resolver pair (its own
-//   separate slice, PLAN.md §5's "second drift pair" note), not a plain
-//   settings-field override like the rest of this whitelist.
+// - textStyles: not a plain settings-field override like the rest of this
+//   whitelist - player.html wires it directly into the existing
+//   pageRoleStyles slot in its resolveTextUnit()/applyReelStyleVars()
+//   pair (PLAN.md §5's "second drift pair"), not through this function.
 const OVERRIDE_SETTINGS_FIELD = {
   accent: "varUiAccent",
   waveformUnplayed: "varWaveformUnplayed",

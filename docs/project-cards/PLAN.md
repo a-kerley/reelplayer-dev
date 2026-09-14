@@ -109,6 +109,23 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   while `scrollY` tracked it in lockstep frame by frame. No console
   errors; Listen tab + lazy reel mount re-verified working with the new
   markup structure.
+- `textStyles` resolver tier (2026-09-14): turned out much smaller than
+  expected - `previewManager.js`'s `resolveTextUnit()` already takes a
+  generic "highest-precedence role style source" parameter
+  (`pageRoleStyles`), and doesn't care whether that source is a page or a
+  card; a card is never also inside a reelplayer Page player block (§1 -
+  pages aren't an option for cards), so `pageTextStylesParam` and a card's
+  `cardOverrides.textStyles` can never both apply to the same
+  `player.html` render. So no changes were needed to either file's
+  `resolveTextUnit()`/`textUnitStyleVars()` at all - `player.html`'s card
+  path just sets the same module-level `pageRoleStyles` variable to
+  `cardData.cardOverrides?.textStyles` right before calling
+  `applyReelStyleVars()`, reusing the exact tier PLAN.md called for
+  instead of needing a fourth one. `previewManager.js` needed zero
+  changes (the Reels-tab builder preview never has card context).
+  Verified with deliberately conflicting values (reel fallback: blue
+  30px; card override: orange 40px/900 weight) - card override rendered
+  correctly, no console errors.
 - Banner video crossfade (2026-09-14): `resolveBannerVideo()` mirrors
   `resolveBannerImage()`'s fallback chain (`cardOverrides.bannerVideo` →
   the reel's own `backgroundVideo`/`backgroundVideoEnabled`). Desktop-hover
@@ -156,10 +173,9 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   the v1 stub form) hasn't been published yet - see chat history for the
   full JSON blob, not saved to a repo file.
 
-Not started: the text-style-resolver new tier, analytics wiring, §7.6
-(real repeater form), and all of §6 (boxed-ape-site injector). §7a (not
-scheduled) notes a possible future contextual-hint UX
-for reel fields a card ignores.
+Not started: analytics wiring, §7.6 (real repeater form), and all of §6
+(boxed-ape-site injector). §7a (not scheduled) notes a possible future
+contextual-hint UX for reel fields a card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).
