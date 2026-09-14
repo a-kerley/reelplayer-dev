@@ -215,10 +215,14 @@ export function createClearButton({ onClick }) {
  * @param {string} options.placeholder - Input placeholder
  * @param {string} options.tooltip - Optional title attribute for the label
  * @param {Object} options.pickerOptions - openFilePicker options; omit to skip the browse button
+ * @param {Function} options.onPickerClick - use instead of pickerOptions when the browse
+ *   button should open something other than the media openFilePicker() (e.g.
+ *   cardsController.js's reel field opening openReelPicker() instead) - still
+ *   renders the identical row/button, just wires the click differently.
  * @param {Function} options.onInput - Input event handler
  * @returns {{row: HTMLDivElement, input: HTMLInputElement}}
  */
-export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onInput = null, toggle = null }) {
+export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onPickerClick = null, onInput = null, toggle = null }) {
   const row = document.createElement("div");
   row.className = "color-row";
 
@@ -263,23 +267,27 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   }
 
   let pickerBtn = null;
-  if (pickerOptions) {
+  if (pickerOptions || onPickerClick) {
     pickerBtn = createFilePickerButton({
       id: `${id}FilePicker`,
-      ariaLabel: pickerOptions.ariaLabel || `Browse ${label}`,
-      title: pickerOptions.title || `Browse ${label}`
+      ariaLabel: pickerOptions?.ariaLabel || `Browse ${label}`,
+      title: pickerOptions?.title || `Browse ${label}`
     });
-    pickerBtn.addEventListener("click", async () => {
-      const { openFilePicker } = await import("./filePicker.js");
-      openFilePicker({
-        ...pickerOptions,
-        onSelect: (filePath) => {
-          input.value = filePath;
-          input.dispatchEvent(new Event("input", { bubbles: true }));
-          input.dispatchEvent(new Event("blur", { bubbles: true }));
-        }
+    if (onPickerClick) {
+      pickerBtn.addEventListener("click", onPickerClick);
+    } else {
+      pickerBtn.addEventListener("click", async () => {
+        const { openFilePicker } = await import("./filePicker.js");
+        openFilePicker({
+          ...pickerOptions,
+          onSelect: (filePath) => {
+            input.value = filePath;
+            input.dispatchEvent(new Event("input", { bubbles: true }));
+            input.dispatchEvent(new Event("blur", { bubbles: true }));
+          }
+        });
       });
-    });
+    }
     row.appendChild(pickerBtn);
   }
 

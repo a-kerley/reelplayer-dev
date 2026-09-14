@@ -9,11 +9,12 @@ here: the host pages are hand-authored, not reelplayer-rendered.)
 
 ## Status (as of 2026-09-14)
 
-**§7.1-§7.4 (the whole spine + render slice) are done.** What's left is
-entirely builder-side UI (§7.6) and the boxed-ape-site embedding side
-(§6). Detailed implementation notes below; git history
-(`git log --oneline -- docs/project-cards js/modules/cardChrome.js
-css/card.css`) has the turn-by-turn story if needed.
+**§7.1-§7.4 and §7.6 (the spine + render slice + real builder form) are
+done.** What's left is the "Manage Published Cards" modal (needed before a
+Stats button can be wired up) and the boxed-ape-site embedding side (§6).
+Detailed implementation notes below; git history (`git log --oneline --
+docs/project-cards js/modules/cardChrome.js css/card.css
+js/cardsController.js`) has the turn-by-turn story if needed.
 
 ### Worker (§7.1)
 `/cards/:id` (public GET inlines the referenced reel, `reel: null` on a
@@ -21,15 +22,29 @@ missing/unpublished reference rather than 404ing - Info-only fallback),
 `/drafts/cards/:id`, both list routes, `/stats/card/:id`. Mirrors
 `/reels/:id` (content-hash id, no slug), not `/pages/:slug`.
 
-### Builder (§7.2, v1 stub only)
+### Builder (§7.2/§7.6 - real form, done)
 Project Cards tab exists, grouped with Reels/Pages (Media Library moved
 to its own pinned sidebar section - see §7's original notes below for
-why). Form is a stub: reel picker + one raw-JSON textarea for everything
-else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
-`js/modules/cardPublish.js`). **Not yet built**: the real repeater form
-(§7.6) and a "Manage Published Cards" modal (needed before a Stats button
-can be wired up - `statsViewer.js` itself is already fully generic on
-`targetType`, no code changes needed there).
+why). The form is the real repeater UI, not the original v1 raw-JSON-
+textarea stub (retired - see git history for it):
+`js/cardsController.js`, `js/modules/cardDraftStore.js`,
+`js/modules/cardPublish.js`. Covers every schema field in §3 below except
+`cardOverrides.textStyles` (still deferred, see §5) - reel picker, logo +
+alt, listen-tab banner image, composers, description, Stats/Links/Partner
+Logos repeaters (modeled on `tracksEditor.js`'s add/remove-row pattern, no
+drag-reorder), analytics toggle, `order`, and a "Card Style Overrides"
+fieldset with real Pickr color swatches (`js/modules/colorPicker.js`'s
+Pickr setup was generalized into `createGenericColorPickers()` for this,
+zero behavior change to the reel builder's own colors) for both the
+reel-facing overrides (accent/waveform/player-background/outline) and the
+card-chrome CSS vars (text/tab-toggle/tab-active colors, icon filter).
+Also has its own live preview pane (`#cardPreviewPane`, mirrors the Reels
+tab's debounced-refresh-plus-manual-button pattern) that calls the exact
+same `renderCardChrome()`/`mergeCardOverrides()`/`playerApp.renderPlayer()`
+a real embed uses - never a second render copy for the builder's own
+preview either. **Not yet built**: a "Manage Published Cards" modal
+(needed before a Stats button can be wired up - `statsViewer.js` itself is
+already fully generic on `targetType`, no code changes needed there).
 
 ### `player.html?id=<cardId>&type=card` render (§7.4/§5 - done)
 `js/modules/cardChrome.js` + `css/card.css` render the full card chrome:
@@ -39,7 +54,11 @@ can be wired up - `statsViewer.js` itself is already fully generic on
   (`resolveBannerVideo()`, same fallback shape) - `preload="metadata"`,
   revealed only once `readyState >= HAVE_ENOUGH_DATA`/`canplaythrough`
   fires (never fades in a still-buffering video), never triggered on
-  touch (no hover).
+  touch (no hover). A second image layer (`card.listenImage`, ported from
+  the boxed-ape-source snapshot's own info/listen image swap) crossfades
+  in when the Listen tab is switched to - only rendered at all when
+  `listenImage` is actually set, so the common single-image card has just
+  one permanently-active layer and nothing to crossfade.
 - **Info/Listen tabs**: Info shows title/description/stats/links (icons
   from `assets/card-icons/`); Listen lazily mounts the referenced reel
   (forced `mode:"static"`) via the same `playerApp.renderPlayer()` the
@@ -193,6 +212,10 @@ reelId          string   (which published reel plays in this card;
                           absent = Info-only card, no player)
 logo            string   (overlay logo on the banner)
 logoAlt         string
+listenImage     string   (optional - crossfades in when the Listen tab opens,
+                          ported from the boxed-ape-source snapshot's
+                          `listenImage`; falls back to the collapsed banner
+                          image when unset, i.e. no crossfade at all)
 partnerLogos    [{ src, alt }]
 composers       string   ("Music by …" hover text)
 description     [string]  (paragraphs, Info tab)
@@ -239,7 +262,12 @@ overlay (card has its own `<h3>` + banner logo — override back on with
 `showReelTitle`, `outlineWidth`/`outlineColor`, plus card-chrome vars
 (`--card-gradient-top`/`-bottom`, `--card-tab-toggle-bg`, `--card-tab-active-bg`,
 `--card-text-primary`/`-secondary`, `--card-icon-filter` — from the snapshot's
-`themeColors`).
+`themeColors`). The builder form (§7.6) has controls for all of these except
+`textStyles` (still deferred - see §5's text-style-resolver note). Both
+gradient vars now crossfade in `css/card.css` (the banner's collapsed
+`--card-gradient-top` <-> expanded `--card-gradient-bottom`, ported from
+the original's `.project-card-main::before`/`::after` pair - `--card-
+gradient-top` used to be dead code here until this pass).
 
 ### Form
 
@@ -333,17 +361,33 @@ Pages. That resolution lives in `previewManager.js`'s
 `player.html`'s inline `<script>` — the identical edit goes in both, verified
 against a real embed (this is the second drift pair CLAUDE.md warns about).
 
-### Do NOT port the snapshot's interaction logic
+### Interaction model — now ported from the snapshot (revised 2026-09-14)
 
-`project-card.js`'s `handleMouseEnter/Leave`, `expand()`, `collapse()`,
-`MOUSE_LEAVE_DELAY` auto-collapse are **desktop-hover-only** and break on
-touch (no `mouseleave` on a phone → card stuck open).
+Earlier revisions of this doc rejected porting `project-card.js`'s
+`handleMouseEnter/Leave`/`expand()`/`collapse()`/`MOUSE_LEAVE_DELAY` outright,
+reasoning they were desktop-hover-only and would break on touch (no
+`mouseleave` on a phone → card stuck open). That conflated two different
+things: the *mechanism* (a `mouseleave`-driven timer) is genuinely
+touch-incompatible, but touch never reaches that code path at all - it has
+its own entirely separate `IntersectionObserver` branch (unchanged, see
+below). So the original's real two-stage desktop model - hover alone only
+*peeks* (video preview + logo/partner-logos/composers reveal via CSS
+`:hover`; the panel stays collapsed), an explicit click is what actually
+expands it, and a short mouseleave grace-period delay is what collapses it
+again - is now ported for desktop (`cardChrome.js`'s desktop branch), not
+worked around. `card.css`'s image/video/gradient layers were also moved
+from `.project-card-banner`-scoped to full-`.project-card`-scoped to match
+the original's `.project-card-main` - the same backdrop now spans the
+whole card, collapsed or expanded, stretching to reveal more of itself as
+the card grows, rather than a fixed banner strip above a separate flat
+panel.
 
-**Modeled on, not literally reusing, the reel's expandable-mode.** The card
-should *feel* identical to a reel expanding — hover-to-expand on desktop,
-the same scroll-band `IntersectionObserver` approach on mobile
-(`setupExpandableModeTouchInteractions()` in `js/player.js`) rather than
-boxed-ape's fragile hover-timeout, so it never gets stuck open on touch.
+**Still modeled on, not literally reusing, the reel's expandable-mode** for
+touch. The scroll-band `IntersectionObserver` approach on mobile
+(`setupExpandableModeTouchInteractions()` in `js/player.js`) is unrelated to
+either of the above - it has no hover to peek from at all, so a touch
+visitor goes straight from collapsed to fully expanded, logo/hover-text
+peek styling included (see card.css's `.expanded` rules mirroring `:hover`).
 But `player.js`'s actual `expandPlayer()`/`collapsePlayer()` aren't callable
 for this: they're wired directly into that one reel's own wavesurfer/video-
 crossfade/idle-manager state and a resize height keyed to the *reel's own*

@@ -1,5 +1,8 @@
-/* card.css - Project Cards chrome (banner + Info/Listen tabs), loaded only
-   by player.html for a card embed (player?id=<cardId>&type=card).
+/* card.css - Project Cards chrome (banner + Info/Listen tabs). Loaded by
+   player.html for a real card embed (player?id=<cardId>&type=card) and by
+   index.html for the Project Cards tab's own live preview pane (both call
+   the same js/modules/cardChrome.js renderCardChrome() - see its own
+   header comment).
    Deliberately NOT a byte-for-byte port of docs/project-cards/
    boxed-ape-source/project-card.css - that file hand-tunes absolute-pixel
    positioning for one fixed card size in a masonry grid; this uses flexbox
@@ -7,8 +10,25 @@
    rest of this codebase avoids magic-number positioning where layout can
    do the job. Visual intent (banner + gradient + centered logo + hover
    partner logos + Info/Listen tabs) is the same; exact pixel values differ.
-   See docs/project-cards/PLAN.md §5 for what's deferred (banner video
-   crossfade, mobile scroll-band expand, full theme parity).
+
+   The image/video/gradient layers ARE ported as genuinely full-card
+   backdrops though (direct children of .project-card, not
+   .project-card-banner) - matching the original's own .project-card-main,
+   which sits behind the whole card so it visibly stretches/reveals more of
+   itself as the card grows on expand, rather than staying a fixed-height
+   strip above a separate flat panel. .project-card-banner is now just a
+   content-positioning box for the logo/hover-text/buttons.
+
+   Also ported: the two-stage hover (peek)/click (expand) interaction model
+   (see js/modules/cardChrome.js's desktop branch), the whole-card hover
+   lift, the logo hover slide+scale, hover-only pulsing Info/Listen
+   buttons with a `(hover: none)` touch fallback, the tab icon
+   opacity-crossfade, and the staggered expand/collapse reveal on the Info
+   panel's children (see docs/project-cards/PLAN.md §5's "Interaction
+   model" section for why the earlier "don't port this" call was reversed).
+   Not ported: the original's reverse-order .collapsing stagger (needs a
+   JS-lifecycle class cardChrome.js doesn't have - this just fades back out
+   symmetrically instead).
 
    Card-chrome colors are the cardOverrides whitelist from PLAN.md §3 -
    --card-gradient-top/-bottom, --card-tab-toggle-bg, --card-tab-active-bg,
@@ -19,41 +39,37 @@
   position: relative;
   width: 100%;
   border-radius: 10px;
+  border: 3px solid rgba(255, 255, 255, 0.08);
   overflow: hidden;
   background: #1a1a1a;
   box-shadow: 0 4px 24px rgba(0, 0, 0, 0.3);
   font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, sans-serif;
   color: var(--card-text-primary, #fff);
+  transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), box-shadow 0.3s cubic-bezier(0.4, 0, 0.2, 1);
 }
 
-.project-card-banner {
-  position: relative;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: flex-end;
-  min-height: 200px;
-  padding: 1.5rem 1rem 1rem;
-  cursor: pointer;
-  background: #111 center / cover no-repeat;
+.project-card:hover {
+  transform: translateY(-10px);
+  box-shadow: 0 10px 35px rgba(0, 0, 0, 0.35);
 }
 
-.project-card-banner-img {
-  position: absolute;
-  inset: 0;
-  width: 100%;
-  height: 100%;
-  object-fit: cover;
-  z-index: 0;
+@media (prefers-reduced-motion: reduce) {
+  .project-card {
+    transition: none;
+  }
 }
 
-/* Desktop-hover-only preview (js/modules/cardChrome.js's
-   previewBannerVideo()) - same z-index as the static image above it, so
-   normal DOM order (this element comes after it in the template) puts it
-   on top without needing an explicit stacking bump. Starts at opacity:0
-   regardless of hover state - .video-ready (added only once the video is
-   genuinely ready to play smoothly, never just on hover) is what actually
-   reveals it, so a still-buffering video never fades in half-stuttering. */
+/* Image/video/gradient are full-card backdrops (direct children of
+   .project-card, absolute inset:0) - ported from the original's own
+   .project-card-main layer, which sits behind the WHOLE card, collapsed or
+   expanded, so it visibly stretches and reveals more of itself as the card
+   grows on expand (.project-card's own height is already driven by
+   .project-card-banner + .project-card-extra stacked in normal flow - see
+   the grid-rows comment below - these absolutely-positioned layers just
+   track whatever that computed height currently is, every frame, for
+   free). .project-card-banner (below) is now just a content-positioning
+   box for the logo/hover-text/buttons - it paints no image of its own. */
+.project-card-banner-img,
 .project-card-banner-video {
   position: absolute;
   inset: 0;
@@ -63,30 +79,126 @@
   z-index: 0;
   opacity: 0;
   transition: opacity 0.5s ease;
-  pointer-events: none;
 }
 
-.project-card-banner.video-ready .project-card-banner-video {
+/* Two of these can be stacked (data-banner-tab="info"/"listen") for the
+   Info<->Listen crossfade (js/modules/cardChrome.js's switchTab()) -
+   ported from the original's .project-card-image-info/-listen swap. Both
+   start opacity:0; the template always marks the "info" one .active at
+   render, so the plain single-image case (no listenImage set - no
+   "listen"-tagged element exists at all) still just shows it immediately. */
+.project-card-banner-img.active {
   opacity: 1;
 }
 
-.project-card-banner::after {
+/* Desktop-hover-only preview (js/modules/cardChrome.js's
+   previewBannerVideo()). Starts at opacity:0 regardless of hover state -
+   .video-ready (added only once the video is genuinely ready to play
+   smoothly, never just on hover) is what actually reveals it, so a
+   still-buffering video never fades in half-stuttering. */
+.project-card-banner-video {
+  pointer-events: none;
+}
+
+.project-card.video-ready .project-card-banner-video {
+  opacity: 1;
+}
+
+/* Fades the video out just before expand() adds .expanded (see
+   js/modules/cardChrome.js's VIDEO_FADE_OUT_MS) - ported from the
+   original's own .video-fading-out, so a click mid-preview settles back to
+   the static image first instead of cutting the video off instantly. */
+.project-card.video-fading-out .project-card-banner-video {
+  opacity: 0;
+  transition: opacity 0.15s ease-out;
+}
+
+.project-card.expanded .project-card-banner-video {
+  opacity: 0 !important;
+}
+
+/* Two crossfading gradients, ported from the original's .project-card-main
+   ::before/::after pair: ::before is the lighter collapsed-state gradient
+   (--card-gradient-top), ::after the darker one for text legibility over
+   the expanded Info panel (--card-gradient-bottom). Now on .project-card
+   itself (not .project-card-banner) since the image/video they sit above
+   are full-card backdrops too. */
+.project-card::before {
+  content: "";
+  position: absolute;
+  inset: 0;
+  z-index: 1;
+  pointer-events: none;
+  background: var(--card-gradient-top, linear-gradient(to top, rgba(0, 0, 0, 0.75) 0%, rgba(0, 0, 0, 0) 70%));
+  opacity: 1;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-card::after {
   content: "";
   position: absolute;
   inset: 0;
   z-index: 1;
   pointer-events: none;
   background: var(--card-gradient-bottom, linear-gradient(to top, rgba(0, 0, 0, 0.9) 0%, rgba(0, 0, 0, 0.5) 45%, rgba(0, 0, 0, 0.05) 100%));
+  opacity: 0;
+  transition: opacity 0.5s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-card.expanded::before {
+  opacity: 0;
+}
+
+.project-card.expanded::after {
+  opacity: 1;
+}
+
+/* Content-positioning box for the logo/hover-text/buttons - paints no
+   background of its own (the layers above show through). z-index:2 so it
+   stacks above the image/gradient (0/1) but below the Info/Listen panel
+   (10, below) - all three need an explicit z-index since mixing
+   non-positioned in-flow boxes with absolutely-positioned siblings
+   otherwise paints the positioned ones on top regardless of DOM order. */
+.project-card-banner {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-end;
+  min-height: 200px;
+  padding: 1.5rem 1rem 1rem;
+  cursor: pointer;
 }
 
 .project-card-logo {
   position: relative;
   z-index: 2;
-  max-width: 60%;
-  max-height: 80px;
+  width: 60%;
+  height: auto;
   margin-bottom: 0.75rem;
   filter: drop-shadow(0 2px 12px rgba(0, 0, 0, 0.8));
   pointer-events: none;
+  transition: transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Ported from the original's logo hover animation - slides up (translateY,
+   the original uses an absolute `top` offset instead, but this file's logo
+   stays in normal flex flow - see this file's header comment on why layout
+   is flex, not absolute-overlay) and scales up. Also applies on .expanded
+   (not just :hover), matching the original's own `.project-card.expanded
+   .project-card-logo { opacity:1 !important; ... }` override - touch never
+   triggers :hover at all, so without this the logo would never "peek" on a
+   touch-expanded card. */
+.project-card:hover .project-card-logo,
+.project-card.expanded .project-card-logo {
+  transform: translateY(-20px) scale(1.08);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-card-logo {
+    transition: none;
+  }
 }
 
 .project-card-hover-text {
@@ -103,7 +215,8 @@
   pointer-events: none;
 }
 
-.project-card:hover .project-card-hover-text {
+.project-card:hover .project-card-hover-text,
+.project-card.expanded .project-card-hover-text {
   opacity: 1;
   transform: translateY(0);
 }
@@ -115,7 +228,7 @@
 }
 
 .project-card-hover-text .hover-logos img {
-  height: 20px;
+  height: 32px;
   width: auto;
   filter: drop-shadow(0 1px 4px rgba(0, 0, 0, 0.8));
 }
@@ -126,29 +239,121 @@
   text-shadow: 0 1px 4px rgba(0, 0, 0, 0.8);
 }
 
-.project-card-banner-buttons {
-  position: relative;
-  z-index: 2;
-  display: flex;
-  gap: 0.5rem;
+/* Collapsed-banner Info/Listen buttons - icon-only circles, hidden until
+   hover with a pulse cue, ported from the original's .expand-icon/.info-
+   btn/.listen-btn. Absolutely positioned within .project-card-banner
+   (position:relative - see below), bottom corners, same as the original -
+   NOT scoped to the whole .project-card the way the original's is, since
+   this file's banner is its own box rather than covering the whole
+   collapsed card (see this file's header comment on the flex-vs-overlay
+   layout difference).
+   Touch has no hover to reveal these from, so `(hover: none)` keeps them
+   always visible there instead - the click handling that opens the card
+   (js/modules/cardChrome.js's `[data-tab]` listener) is unaffected either
+   way, this is purely the visibility/animation layer (.project-card-banner
+   is already position:relative, declared near the top of this file). */
+@keyframes card-icon-pulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(0.85); }
 }
 
 .card-banner-btn {
-  min-height: 44px;
-  min-width: 44px;
-  padding: 0.5rem 1rem;
-  background: rgba(0, 0, 0, 0.4);
-  border: 1px solid rgba(255, 255, 255, 0.3);
-  border-radius: 20px;
-  color: #fff;
-  font-size: 0.85rem;
-  font-weight: 600;
+  position: absolute;
+  bottom: 12px;
+  z-index: 3;
+  width: 32px;
+  height: 32px;
+  padding: 0;
+  border: none;
+  background: transparent;
+  border-radius: 50%;
   cursor: pointer;
-  transition: background 0.2s ease;
+  opacity: 0;
+  transition: opacity 0.3s ease-out, transform 0.2s cubic-bezier(0.34, 1.56, 0.64, 1);
+}
+
+.card-banner-btn-info {
+  left: 12px;
+}
+
+.card-banner-btn-listen {
+  right: 12px;
+}
+
+.card-banner-btn img {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  transition: opacity 0.15s ease-out;
+  filter: var(--card-icon-filter, brightness(0) invert(1));
+}
+
+.card-banner-btn .expand-icon-filled {
+  opacity: 0;
+}
+
+.project-card:hover .card-banner-btn {
+  opacity: 0.85;
+  animation: card-icon-pulse 2s ease-in-out infinite;
 }
 
 .card-banner-btn:hover {
-  background: rgba(255, 255, 255, 0.2);
+  opacity: 1 !important;
+  transform: scale(1.25);
+  animation: none !important;
+}
+
+.card-banner-btn:hover .expand-icon-outline {
+  opacity: 0;
+}
+
+.card-banner-btn:hover .expand-icon-filled {
+  opacity: 1;
+}
+
+.card-banner-btn-label {
+  position: absolute;
+  left: 50%;
+  bottom: calc(100% + 6px);
+  transform: translateX(-50%) translateY(4px);
+  white-space: nowrap;
+  font-size: 0.6rem;
+  font-weight: 600;
+  letter-spacing: 0.05em;
+  text-transform: uppercase;
+  color: rgba(255, 255, 255, 0.95);
+  opacity: 0;
+  pointer-events: none;
+  transition: opacity 0.2s ease-out, transform 0.2s ease-out;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.5);
+}
+
+.card-banner-btn:hover .card-banner-btn-label {
+  opacity: 1;
+  transform: translateX(-50%) translateY(0);
+}
+
+/* Buttons switch to the tab-toggle row once expanded - hide the redundant
+   collapsed-state ones (matches the original's own .expanded rule). */
+.project-card.expanded .card-banner-btn {
+  opacity: 0 !important;
+  animation: none;
+  pointer-events: none;
+}
+
+@media (hover: none) {
+  .card-banner-btn {
+    opacity: 0.85;
+    animation: none;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .project-card:hover .card-banner-btn,
+  .card-banner-btn:hover {
+    animation: none;
+  }
 }
 
 /* Expanded content - animated height via the CSS Grid 0fr/1fr trick
@@ -160,6 +365,8 @@
    lives on the inner element, not here, since padding on the *container*
    would stay visibly present even at a 0fr row height. */
 .project-card-extra {
+  position: relative;
+  z-index: 10;
   display: grid;
   grid-template-rows: 0fr;
   transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
@@ -182,7 +389,81 @@
 .project-card-extra-inner {
   overflow: hidden;
   min-height: 0;
+}
+
+/* Padding lives here, one level deeper than .project-card-extra-inner -
+   padding can never compress below its own value (this is true regardless
+   of box-sizing: a 0-height box with padding still renders at least
+   padding-top + padding-bottom tall, since content-box can't go negative),
+   so putting it directly on the row-collapsing grid item (-inner, above)
+   made the "collapsed" row sit at ~40px instead of 0 - just small enough
+   to go unnoticed at a glance, but enough for the tab-toggle icon to still
+   peek through a "closed" card. This wrapper has no size constraint of its
+   own, so -inner's `overflow:hidden` can clip it to genuinely 0px. */
+.project-card-extra-content {
   padding: 1.25rem;
+}
+
+/* Staggered reveal on expand, ported from the original's own h3/p/
+   .extra-stats/.extra-links cascade (0.1s -> 0.45s delays). The base rule
+   (opacity:0, unset until .expanded) is what makes collapse fade back out
+   too - it just reverts via this same transition with no delay, not the
+   original's separate reverse-order .collapsing stagger (a JS-lifecycle
+   nicety this skips; see js/modules/cardChrome.js). Scoped to the Info tab
+   specifically (not `.tab-content` generally) so it never touches the
+   Listen tab's mounted player. */
+[data-tab-content="info"] > h3,
+[data-tab-content="info"] > p,
+[data-tab-content="info"] > .extra-stats,
+[data-tab-content="info"] > .extra-links {
+  opacity: 0;
+  transform: translateY(10px);
+  transition: opacity 0.4s cubic-bezier(0.4, 0, 0.2, 1), transform 0.4s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.project-card.expanded [data-tab-content="info"] > h3 {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.1s;
+}
+
+.project-card.expanded [data-tab-content="info"] > p:nth-of-type(1) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.2s;
+}
+
+.project-card.expanded [data-tab-content="info"] > p:nth-of-type(2) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.3s;
+}
+
+.project-card.expanded [data-tab-content="info"] > p:nth-of-type(3) {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.35s;
+}
+
+.project-card.expanded [data-tab-content="info"] > .extra-stats {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.4s;
+}
+
+.project-card.expanded [data-tab-content="info"] > .extra-links {
+  opacity: 1;
+  transform: translateY(0);
+  transition-delay: 0.45s;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  [data-tab-content="info"] > h3,
+  [data-tab-content="info"] > p,
+  [data-tab-content="info"] > .extra-stats,
+  [data-tab-content="info"] > .extra-links {
+    transition: none;
+  }
 }
 
 .project-card-extra h3 {
@@ -212,6 +493,7 @@
 }
 
 .tab-btn {
+  position: relative;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -225,13 +507,27 @@
   transition: background 0.2s ease;
 }
 
+/* Outline/filled crossfade via opacity (matches the original), not a
+   display:none swap - both icons stay stacked (position:absolute) so the
+   transition actually has something to animate between. */
 .tab-btn img {
-  width: 100%;
-  height: 100%;
+  position: absolute;
+  inset: 6px;
+  width: calc(100% - 12px);
+  height: calc(100% - 12px);
+  transition: opacity 0.2s ease;
+}
+
+.tab-btn .tab-icon-outline {
+  opacity: 0.6;
 }
 
 .tab-btn .tab-icon-filled {
-  display: none;
+  opacity: 0;
+}
+
+.tab-btn:hover .tab-icon-outline {
+  opacity: 0.85;
 }
 
 .tab-btn.active {
@@ -239,11 +535,11 @@
 }
 
 .tab-btn.active .tab-icon-outline {
-  display: none;
+  opacity: 0;
 }
 
 .tab-btn.active .tab-icon-filled {
-  display: block;
+  opacity: 1;
   filter: var(--card-icon-filter, brightness(0) invert(1));
 }
 

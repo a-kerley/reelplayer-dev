@@ -8,13 +8,18 @@
 // interaction below is new code, NOT a reuse of js/player.js's
 // expandPlayer()/collapsePlayer() (those are wired into one reel's own
 // wavesurfer/video-crossfade/idle-manager state, none of which exists for
-// a card wrapper whose reel always renders mode:"static") - it's modeled
-// on the same desktop-hover UX so a card feels like a reel expanding.
+// a card wrapper whose reel always renders mode:"static").
 //
-// Desktop gets hover-driven expand/collapse + banner video preview; touch
-// devices get the IntersectionObserver scroll-band behavior instead (no
-// hover to trigger a video preview from, so touch visitors only ever see
-// the static banner image) - see isTouchDevice() branch below.
+// Desktop uses the original's own two-stage model (ported, not just
+// "inspired by" - see the desktop branch below): hovering alone only
+// "peeks" (video preview + logo/partner-logos/composers reveal, pure CSS
+// :hover), it does NOT expand the Info/Listen panel - only an explicit
+// click does that (the card body, or an Info/Listen button). Collapsing
+// on mouseleave has a short grace-period delay so briefly crossing the
+// card edge doesn't slam it shut. Touch devices get the IntersectionObserver
+// scroll-band behavior instead (no hover to peek from at all, so touch
+// visitors only ever see the static banner image pre-expand) - see
+// isTouchDevice() branch below.
 
 // cardOverrides whitelist (PLAN.md §3) that maps onto the reel's own
 // settings fields, winning over whatever the reel itself has set. Two of
@@ -86,22 +91,22 @@ function isTouchDevice() {
 // it and there's exactly one video per card - the simplest place that's
 // still reachable from both functions without threading extra state
 // through renderCardChrome()'s own closure.
-function previewBannerVideo(videoEl, banner) {
+function previewBannerVideo(videoEl, card) {
   if (!videoEl) return;
   videoEl.play().catch(() => {}); // autoplay rejection -> stays on the static image, not an error
   if (videoEl.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
-    banner.classList.add("video-ready");
+    card.classList.add("video-ready");
     return;
   }
-  const onReady = () => banner.classList.add("video-ready");
+  const onReady = () => card.classList.add("video-ready");
   videoEl._pendingRevealListener = onReady;
   videoEl.addEventListener("canplaythrough", onReady, { once: true });
 }
 
-function stopBannerVideoPreview(videoEl, banner) {
+function stopBannerVideoPreview(videoEl, card) {
   if (!videoEl) return;
   videoEl.pause();
-  banner.classList.remove("video-ready");
+  card.classList.remove("video-ready");
   if (videoEl._pendingRevealListener) {
     videoEl.removeEventListener("canplaythrough", videoEl._pendingRevealListener);
     videoEl._pendingRevealListener = null;
@@ -182,53 +187,78 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
   const hasReel = !!(cardData.reel && cardData.reel.playlist && cardData.reel.playlist.length);
   const bannerImage = resolveBannerImage(cardData);
   const bannerVideo = resolveBannerVideo(cardData);
+  // Only rendered as a second crossfade layer when the author actually set
+  // one - resolveListenImage()'s image-or-bannerImage fallback is for
+  // initAudioPlayer()-equivalent consumers that need *a* value, not for
+  // deciding whether a crossfade is worth having two DOM layers for.
+  const listenImage = cardData.listenImage || "";
   const listenContainerId = "cardListenPlayer";
 
   container.innerHTML = `
     <div class="project-card">
-      <div class="project-card-banner" style="${bannerImage ? `background-image:url('${escapeHtml(bannerImage)}')` : ""}">
-        ${bannerImage ? `<img class="project-card-banner-img" src="${escapeHtml(bannerImage)}" alt="" />` : ""}
-        ${bannerVideo ? `<video class="project-card-banner-video" src="${escapeHtml(bannerVideo)}" muted loop playsinline preload="metadata"></video>` : ""}
+      ${bannerImage ? `<img class="project-card-banner-img active" data-banner-tab="info" src="${escapeHtml(bannerImage)}" alt="" />` : ""}
+      ${listenImage ? `<img class="project-card-banner-img" data-banner-tab="listen" src="${escapeHtml(listenImage)}" alt="" />` : ""}
+      ${bannerVideo ? `<video class="project-card-banner-video" src="${escapeHtml(bannerVideo)}" muted loop playsinline preload="metadata"></video>` : ""}
+      <div class="project-card-banner">
         ${cardData.logo ? `<img class="project-card-logo" src="${escapeHtml(cardData.logo)}" alt="${escapeHtml(cardData.logoAlt || cardData.title || "")}" />` : ""}
         <div class="project-card-hover-text">
           <div class="hover-logos">${renderPartnerLogos(cardData.partnerLogos)}</div>
           ${cardData.composers ? `<span class="project-card-composers">Music by ${escapeHtml(cardData.composers)}</span>` : ""}
         </div>
-        <div class="project-card-banner-buttons">
-          <button type="button" class="card-banner-btn" data-tab="info">Info</button>
-          ${hasReel ? `<button type="button" class="card-banner-btn" data-tab="listen">Listen</button>` : ""}
-        </div>
+        <button type="button" class="card-banner-btn card-banner-btn-info" data-tab="info" aria-label="Info">
+          <img class="expand-icon-outline" src="/assets/card-icons/info-icon.svg" alt="" />
+          <img class="expand-icon-filled" src="/assets/card-icons/info-icon-filled.svg" alt="" />
+          <span class="card-banner-btn-label">Info</span>
+        </button>
+        ${hasReel ? `
+        <button type="button" class="card-banner-btn card-banner-btn-listen" data-tab="listen" aria-label="Listen">
+          <img class="expand-icon-outline" src="/assets/card-icons/play-circle-icon.svg" alt="" />
+          <img class="expand-icon-filled" src="/assets/card-icons/play-circle-icon-filled.svg" alt="" />
+          <span class="card-banner-btn-label">Listen</span>
+        </button>
+        ` : ""}
       </div>
       <div class="project-card-extra">
         <div class="project-card-extra-inner">
-          <div class="tab-toggle">
-            <button type="button" class="tab-btn active" data-tab="info">
-              <img class="tab-icon-outline" src="/assets/card-icons/tab-info-icon.svg" alt="Info" />
-              <img class="tab-icon-filled" src="/assets/card-icons/tab-info-icon-filled.svg" alt="Info" />
-            </button>
+          <div class="project-card-extra-content">
+            <div class="tab-toggle">
+              <button type="button" class="tab-btn active" data-tab="info">
+                <img class="tab-icon-outline" src="/assets/card-icons/tab-info-icon.svg" alt="Info" />
+                <img class="tab-icon-filled" src="/assets/card-icons/tab-info-icon-filled.svg" alt="Info" />
+              </button>
+              ${hasReel ? `
+              <button type="button" class="tab-btn" data-tab="listen">
+                <img class="tab-icon-outline" src="/assets/card-icons/tab-listen-icon.svg" alt="Listen" />
+                <img class="tab-icon-filled" src="/assets/card-icons/tab-listen-icon-filled.svg" alt="Listen" />
+              </button>
+              ` : ""}
+            </div>
+            <div class="tab-content active" data-tab-content="info">
+              ${cardData.title ? `<h3>${escapeHtml(cardData.title)}</h3>` : ""}
+              ${renderDescription(cardData.description)}
+              <div class="extra-stats">${renderStats(cardData.stats)}</div>
+              ${renderLinks(cardData.links)}
+            </div>
             ${hasReel ? `
-            <button type="button" class="tab-btn" data-tab="listen">
-              <img class="tab-icon-outline" src="/assets/card-icons/tab-listen-icon.svg" alt="Listen" />
-              <img class="tab-icon-filled" src="/assets/card-icons/tab-listen-icon-filled.svg" alt="Listen" />
-            </button>
+            <div class="tab-content" data-tab-content="listen">
+              <div id="${listenContainerId}" class="card-listen-player"></div>
+            </div>
             ` : ""}
           </div>
-          <div class="tab-content active" data-tab-content="info">
-            ${cardData.title ? `<h3>${escapeHtml(cardData.title)}</h3>` : ""}
-            ${renderDescription(cardData.description)}
-            <div class="extra-stats">${renderStats(cardData.stats)}</div>
-            ${renderLinks(cardData.links)}
-          </div>
-          ${hasReel ? `
-          <div class="tab-content" data-tab-content="listen">
-            <div id="${listenContainerId}" class="card-listen-player"></div>
-          </div>
-          ` : ""}
         </div>
       </div>
     </div>
   `;
 
+  // The static image/video are now direct children of .project-card (a
+  // full-card backdrop, position:absolute inset:0 in card.css) rather than
+  // scoped to .project-card-banner - ported from the original's own
+  // .project-card-main layer, which sits behind the whole card (collapsed
+  // AND expanded) so it visibly stretches/reveals more of itself as the
+  // card grows on expand, instead of staying a fixed-height strip with a
+  // separate flat panel below it. .project-card-banner is now just a
+  // content-positioning box for the logo/hover-text/buttons, painting no
+  // image of its own.
   const card = container.querySelector(".project-card");
   const banner = container.querySelector(".project-card-banner");
 
@@ -320,10 +350,20 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     setTimeout(stop, transitionDuration + 150);
   }
 
+  // Ported from the original's own expand(): fade the banner video out
+  // first (VIDEO_FADE_OUT_MS), then reveal the Info/Listen panel - without
+  // this, an expand mid-video-preview cuts the video off instantly instead
+  // of settling back to the static image first.
+  const VIDEO_FADE_OUT_MS = 150;
+
   function expand() {
-    if (card.classList.contains("expanded")) return;
-    card.classList.add("expanded");
-    postResize();
+    if (card.classList.contains("expanded") || card.classList.contains("video-fading-out")) return;
+    card.classList.add("video-fading-out");
+    setTimeout(() => {
+      card.classList.remove("video-fading-out");
+      card.classList.add("expanded");
+      postResize();
+    }, VIDEO_FADE_OUT_MS);
   }
 
   function collapse() {
@@ -366,15 +406,41 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     }, { threshold: 0, rootMargin: "-33% 0px -33% 0px" });
     observer.observe(card);
   } else {
-    // Desktop hover.
-    const bannerVideoEl = banner.querySelector(".project-card-banner-video");
+    // Desktop: a real two-stage model, ported from the original's own
+    // handleMouseEnter()/handleMouseLeave() - hovering alone only "peeks"
+    // (video preview + logo/partner-logos/composers reveal, all pure CSS
+    // :hover in card.css), it does NOT expand the Info/Listen panel by
+    // itself. Only an explicit click (the card body, or an Info/Listen
+    // button - wired below) expands it. Collapsing on mouseleave has a
+    // grace-period delay (ported from the original's
+    // ANIMATION_TIMINGS.MOUSE_LEAVE_DELAY/projectConfig.mouseLeaveDelay),
+    // so briefly crossing the card edge doesn't instantly slam it shut.
+    // This is safe to reintroduce despite PLAN.md §5's earlier rejection of
+    // the original's hover-timeout system - that rejection was about touch
+    // getting stuck with no hover to leave from, and touch never reaches
+    // this branch at all (its own IntersectionObserver path above is
+    // entirely separate).
+    const MOUSE_LEAVE_COLLAPSE_DELAY_MS = 1000;
+    const bannerVideoEl = card.querySelector(".project-card-banner-video");
+    let collapseTimer = null;
+
     card.addEventListener("mouseenter", () => {
-      expand();
-      previewBannerVideo(bannerVideoEl, banner);
+      clearTimeout(collapseTimer);
+      previewBannerVideo(bannerVideoEl, card);
     });
     card.addEventListener("mouseleave", () => {
-      collapse();
-      stopBannerVideoPreview(bannerVideoEl, banner);
+      stopBannerVideoPreview(bannerVideoEl, card);
+      if (card.classList.contains("expanded")) {
+        collapseTimer = setTimeout(collapse, MOUSE_LEAVE_COLLAPSE_DELAY_MS);
+      }
+    });
+    // Click anywhere on a still-collapsed card expands it (matching the
+    // original's own card-level click listener) - a click that landed on
+    // an Info/Listen/tab button is handled by the [data-tab] listener
+    // below instead, which also calls expand() (plus switchTab()), so
+    // nothing here needs to special-case those targets.
+    card.addEventListener("click", () => {
+      if (!card.classList.contains("expanded")) expand();
     });
   }
 
@@ -386,6 +452,16 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     container.querySelectorAll(".tab-content").forEach((content) => {
       content.classList.toggle("active", content.dataset.tabContent === tabName);
     });
+    // Banner image crossfade - only when a listenImage layer actually
+    // exists (the single-image common case has just one, permanently-active
+    // [data-banner-tab="info"] image and nothing to crossfade to, so this
+    // must not touch it or the banner would fade to blank on "listen").
+    // Ported from the original's own info/listen image swap.
+    if (container.querySelector('[data-banner-tab="listen"]')) {
+      container.querySelectorAll("[data-banner-tab]").forEach((img) => {
+        img.classList.toggle("active", img.dataset.bannerTab === tabName);
+      });
+    }
     if (tabName === "listen" && !listenActivated) {
       listenActivated = true;
       onActivateListen?.();
@@ -432,10 +508,18 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
   // once per player.html page load (never re-invoked to re-render a
   // different card in the same document), so there's nothing to leak.
   let resizeDebounce;
-  window.addEventListener("resize", () => {
+  const onWindowResize = () => {
     clearTimeout(resizeDebounce);
     resizeDebounce = setTimeout(postResize, 150);
-  });
+  };
+  window.addEventListener("resize", onWindowResize);
 
-  return { listenContainerId };
+  return {
+    listenContainerId,
+    // Call before re-rendering this same container again (the builder's
+    // own live Card preview does - unlike player.html, which renders a
+    // card exactly once per page load) so repeated calls don't stack a
+    // fresh "resize" listener on `window` every time.
+    destroy: () => window.removeEventListener("resize", onWindowResize),
+  };
 }

@@ -281,26 +281,35 @@ const playerAppCore = {
   },
 
   cacheElements() {
-    this.elements.waveform = document.getElementById("waveform");
-    this.elements.playPauseBtn = document.getElementById("playPause");
-    this.elements.volumeControl = document.querySelector(".volume-control");
-    this.elements.volumeToggle = document.getElementById("volumeToggle");
-    this.elements.volumeSlider = document.getElementById("volumeSlider");
-    this.elements.hoverOverlay = document.querySelector(".hover-overlay");
-    this.elements.hoverTime = document.querySelector(".hover-time");
-    this.elements.playheadTime = document.querySelector(".playhead-time");
-    this.elements.loadingIndicator = document.getElementById("loading");
-    this.elements.trackInfo = document.querySelector(".track-info");
-    this.elements.totalTime = document.getElementById("total-time");
-    this.elements.playlist = document.getElementById("playlist");
-    this.elements.playerWrapper = document.querySelector(".player-wrapper");
-    this.elements.projectTitleOverlay = document.querySelector(".project-title-overlay");
-    
+    // Scoped to this.playerContainer (set by renderPlayer() just before
+    // calling this), NOT plain document.getElementById/querySelector -
+    // those grab the FIRST match anywhere on the page, which silently
+    // returns a *different* player instance's elements whenever more than
+    // one player-wrapper exists in the same document at once (e.g. the
+    // builder's own hidden Reels-tab preview pane still has its own
+    // #waveform/#playlist/etc sitting in the DOM even while a Project
+    // Card's Listen tab is what's actually being rendered right now).
+    const root = this.playerContainer || document;
+    this.elements.waveform = root.querySelector("#waveform");
+    this.elements.playPauseBtn = root.querySelector("#playPause");
+    this.elements.volumeControl = root.querySelector(".volume-control");
+    this.elements.volumeToggle = root.querySelector("#volumeToggle");
+    this.elements.volumeSlider = root.querySelector("#volumeSlider");
+    this.elements.hoverOverlay = root.querySelector(".hover-overlay");
+    this.elements.hoverTime = root.querySelector(".hover-time");
+    this.elements.playheadTime = root.querySelector(".playhead-time");
+    this.elements.loadingIndicator = root.querySelector("#loading");
+    this.elements.trackInfo = root.querySelector(".track-info");
+    this.elements.totalTime = root.querySelector("#total-time");
+    this.elements.playlist = root.querySelector("#playlist");
+    this.elements.playerWrapper = root.querySelector(".player-wrapper");
+    this.elements.projectTitleOverlay = root.querySelector(".project-title-overlay");
+
     // Cache video elements - dual layer architecture
-    this.videoState.mainVideoA = document.querySelector(".main-video-a");
-    this.videoState.mainVideoB = document.querySelector(".main-video-b");
-    this.videoState.trackVideoA = document.querySelector(".track-video-a");
-    this.videoState.trackVideoB = document.querySelector(".track-video-b");
+    this.videoState.mainVideoA = root.querySelector(".main-video-a");
+    this.videoState.mainVideoB = root.querySelector(".main-video-b");
+    this.videoState.trackVideoA = root.querySelector(".track-video-a");
+    this.videoState.trackVideoB = root.querySelector(".track-video-b");
   },
 
   preloadDurations(playlist) {
@@ -470,8 +479,7 @@ const playerAppCore = {
     
     // Fade out current waveform before loading new track
     // Find the WaveSurfer wrapper (last child div without a class/id)
-    const waveformContainer = document.querySelector("#waveform");
-    const waveformWrapper = Array.from(waveformContainer?.children || [])
+    const waveformWrapper = Array.from(this.elements.waveform?.children || [])
       .find(child => child.tagName === 'DIV' && !child.className && !child.id);
     
     
@@ -534,8 +542,8 @@ const playerAppCore = {
 
   updateTrackBackground(trackIndex) {
     // Get both track background layer elements
-    const layerA = document.querySelector('.track-bg-layer-a');
-    const layerB = document.querySelector('.track-bg-layer-b');
+    const layerA = this.playerContainer?.querySelector('.track-bg-layer-a');
+    const layerB = this.playerContainer?.querySelector('.track-bg-layer-b');
     if (!layerA || !layerB) return;
     
     // Initialize current layer tracker if not exists
@@ -650,12 +658,13 @@ const playerAppCore = {
   },
 
   updateActivePlaylistItem(index) {
+    if (!this.elements.playlist) return;
     // Remove active class from all items
-    const allItems = document.querySelectorAll('.playlist-item');
+    const allItems = this.elements.playlist.querySelectorAll('.playlist-item');
     allItems.forEach(item => item.classList.remove('active'));
-    
+
     // Add active class to current item
-    const activeItem = document.querySelector(`.playlist-item[data-index="${index}"]`);
+    const activeItem = this.elements.playlist.querySelector(`.playlist-item[data-index="${index}"]`);
     if (activeItem) {
       activeItem.classList.add('active');
     }
@@ -907,8 +916,7 @@ const playerAppCore = {
       if (volumeControl) volumeControl.classList.remove("hidden");
       
       // Find the WaveSurfer wrapper element (div without class/id)
-      const waveformContainer = document.querySelector("#waveform");
-      const waveformWrapper = Array.from(waveformContainer?.children || [])
+      const waveformWrapper = Array.from(this.elements.waveform?.children || [])
         .find(child => child.tagName === 'DIV' && !child.className && !child.id);
       
       
@@ -1219,11 +1227,13 @@ const playerAppCore = {
       .getPropertyValue("--waveform-unplayed")
       .trim();
     
-    // Smooth waveform configuration
-    const waveformContainer = document.querySelector("#waveform");
-    
+    // Pass the actual (already container-scoped, see cacheElements()) element,
+    // not a "#waveform" selector string - WaveSurfer would resolve that via
+    // a plain document.querySelector internally, which finds whichever
+    // #waveform happens to be first in the document rather than this
+    // specific render's own one.
     this.wavesurfer = WaveSurfer.create({
-      container: "#waveform",
+      container: this.elements.waveform,
       waveColor: unplayedColor,
       progressColor: accentColor,
       cursorWidth: 1,
@@ -1245,7 +1255,7 @@ const playerAppCore = {
     
     // Fix Safari-specific sub-pixel rendering gap at origin line
     this.wavesurfer.on("ready", () => {
-      const canvases = document.querySelectorAll("#waveform canvas");
+      const canvases = this.elements.waveform.querySelectorAll("canvas");
       canvases.forEach(canvas => {
         const ctx = canvas.getContext('2d');
         if (ctx) {
@@ -1259,7 +1269,7 @@ const playerAppCore = {
       });
       
       // In expandable mode, ensure canvases fill width but prevent resize loops
-      if (this.expandable.enabled && waveformContainer) {
+      if (this.expandable.enabled && this.elements.waveform) {
         canvases.forEach(canvas => {
           canvas.style.width = '100%'; // Fill the container width
           canvas.style.height = '100%'; // Fill the container height
@@ -2027,7 +2037,15 @@ const playerAppCore = {
 
     const container = document.getElementById(containerId);
     if (!container) return;
-    
+    // cacheElements()/setupWaveSurfer() below need this to scope their own
+    // lookups to THIS render's container - see cacheElements()'s own
+    // comment for why a plain document-wide query is wrong once more than
+    // one player-wrapper can exist in the same document (e.g. a Project
+    // Card's Listen tab mounted alongside the builder's own hidden Reels-
+    // tab preview pane, which still has its own #waveform/#playlist/etc in
+    // the DOM even while not visible).
+    this.playerContainer = container;
+
     const shouldHideTitle = !(showTitle && title && title.trim());
     
     // Determine player wrapper classes

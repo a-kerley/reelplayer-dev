@@ -29,49 +29,50 @@ export function createColorPickers(reel, onChange) {
   const pickrConfigs = [
     {
       id: "pickr-ui-accent",
-      var: "--ui-accent",
       default: reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent,
-      reelKey: "varUiAccent",
+      onCommit: (value) => { reel.varUiAccent = value; },
     },
     {
       id: "pickr-waveform-unplayed",
-      var: "--waveform-unplayed",
       default: reel.varWaveformUnplayed || REEL_COLOR_DEFAULTS.waveformUnplayed,
-      reelKey: "varWaveformUnplayed",
+      onCommit: (value) => { reel.varWaveformUnplayed = value; },
     },
     {
       id: "pickr-waveform-hover",
-      var: "--waveform-hover",
       default: reel.varWaveformHover || REEL_COLOR_DEFAULTS.waveformHoverHex,
-      reelKey: "varWaveformHover",
-      alpha: 0.13,
+      onCommit: (value) => { reel.varWaveformHover = value; },
     },
     {
       id: "pickr-background-color",
-      var: "--background-color",
       default: reel.backgroundColor || REEL_COLOR_DEFAULTS.backgroundColor,
-      reelKey: "backgroundColor",
+      onCommit: (value) => { reel.backgroundColor = value; },
     },
     {
       id: "pickr-outline-color",
-      var: "--player-outline-color",
       default: reel.playerOutlineColor || REEL_COLOR_DEFAULTS.outlineColor,
-      reelKey: "playerOutlineColor",
+      onCommit: (value) => { reel.playerOutlineColor = value; },
     },
     {
       id: "pickr-overlay-color",
-      var: "--overlay-color",
       default: reel.overlayColor || REEL_COLOR_DEFAULTS.overlayColor,
-      reelKey: "overlayColor",
+      onCommit: (value) => { reel.overlayColor = value; },
     },
     {
       id: "pickr-player-closed-idle-overlay-color",
-      var: "--player-closed-idle-overlay-base-color",
       default: reel.playerClosedIdleOverlayColor || REEL_COLOR_DEFAULTS.playerClosedIdleOverlayColor,
-      reelKey: "playerClosedIdleOverlayColor",
+      onCommit: (value) => { reel.playerClosedIdleOverlayColor = value; },
     },
   ];
 
+  initPickrs(pickrConfigs, onChange);
+}
+
+// Generic Pickr-instantiation core, shared by createColorPickers() (reel
+// fields) and any other caller wiring up `.color-row`/eyedropButtonHTML
+// markup (e.g. cardsController.js's Card Style Overrides section) - each
+// config just needs {id, default, onCommit(value)} instead of a reel field
+// name, so this isn't reel-shaped at all.
+function initPickrs(pickrConfigs, onChange) {
   // Create Pickr instances with a small delay for DOM readiness
   setTimeout(() => {
     pickrConfigs.forEach((cfg) => {
@@ -126,7 +127,7 @@ export function createColorPickers(reel, onChange) {
         pickr.on("change", (color) => {
           const value = color.toRGBA().toString();
           btn.style.background = value;
-          reel[cfg.reelKey] = value;
+          cfg.onCommit(value);
           if (window.schedulePreviewRefresh) window.schedulePreviewRefresh();
         });
 
@@ -138,7 +139,7 @@ export function createColorPickers(reel, onChange) {
         pickr.on("save", (color) => {
           const value = color.toRGBA().toString();
           btn.style.background = value;
-          reel[cfg.reelKey] = value;
+          cfg.onCommit(value);
           onChange();
           pickr.hide();
         });
@@ -165,7 +166,7 @@ export function createColorPickers(reel, onChange) {
                 pickr.setColor(result.sRGBHex);
                 const value = pickr.getColor().toRGBA().toString();
                 btn.style.background = value;
-                reel[cfg.reelKey] = value;
+                cfg.onCommit(value);
                 onChange();
               } catch (e) {
                 // User pressed Escape or otherwise cancelled the sampler -
@@ -191,6 +192,16 @@ function cleanupPickrButton(btn, defaultColor) {
   Object.keys(btn.dataset).forEach((key) => delete btn.dataset[key]);
   delete btn._pickr;
   btn.style.background = defaultColor;
+}
+
+/**
+ * Same Pickr wiring as createColorPickers(), for callers with no reel object
+ * to write into (e.g. a Project Card's cardOverrides colors).
+ * @param {{id: string, default: string, onCommit: (value: string) => void}[]} pickrConfigs
+ * @param {Function} onChange
+ */
+export function createGenericColorPickers(pickrConfigs, onChange) {
+  initPickrs(pickrConfigs, onChange);
 }
 
 export function applyPresetToPickrs(preset, reel) {

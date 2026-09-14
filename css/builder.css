@@ -570,6 +570,17 @@ body {
   margin-bottom: 4rem;
 }
 
+/* Project Cards tab's own live preview - stacked below the form, same
+   pattern as #reelPlayerPreview above (not the Pages tab's side-by-side
+   resizable #pagePreviewPane - the user asked for Reels-tab parity). Capped
+   to a plausible card width so it doesn't stretch edge-to-edge like the
+   full-bleed reel player preview does. */
+.card-preview-pane {
+  margin-top: 4rem;
+  margin-bottom: 4rem;
+  max-width: 420px;
+}
+
 /* ==============================================
    TRACKS EDITOR SECTION
    ============================================== */
@@ -685,6 +696,7 @@ body {
 #previewPageBtn,
 #customizeTextStylesBtn,
 #refreshPreviewBtn,
+#refreshCardPreviewBtn,
 #cardPublishBtn {
   background: var(--builder-accent);
   color: white;
@@ -703,6 +715,7 @@ body {
 #managePagesBtn,
 #previewPageBtn,
 #customizeTextStylesBtn,
+#refreshCardPreviewBtn,
 #cardPublishBtn {
   font-size: var(--builder-text-md);
   padding: 0.4rem 0.8rem;
@@ -716,6 +729,7 @@ body {
 #previewPageBtn:hover,
 #customizeTextStylesBtn:hover,
 #refreshPreviewBtn:hover,
+#refreshCardPreviewBtn:hover,
 #cardPublishBtn:hover {
   background: var(--builder-hover);
 }

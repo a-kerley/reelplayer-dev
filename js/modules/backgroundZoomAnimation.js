@@ -160,8 +160,8 @@ export const backgroundZoomAnimation = {
     }
 
     // Play active track layer animations
-    const layerA = document.querySelector('.track-bg-layer-a');
-    const layerB = document.querySelector('.track-bg-layer-b');
+    const layerA = this.playerContainer?.querySelector('.track-bg-layer-a');
+    const layerB = this.playerContainer?.querySelector('.track-bg-layer-b');
 
     if (layerA?.classList.contains('active') || layerA?.classList.contains('fading-out')) {
       const promise = this.startAnimation(this.backgroundAnimations.layerA, smooth, duration);

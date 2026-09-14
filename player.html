@@ -277,6 +277,15 @@
             // background to the *card's* #embedPlayer container instead of
             // the card's own banner/chrome background.
             applyReelStyleVars(reel);
+            // PLAN.md §3 "Ignored in a card": playerHeight is a standalone-
+            // embed setting (this reel's own reelData.playerHeight, e.g.
+            // 500px) that applyReelStyleVars() always sets regardless of
+            // context - a card's Listen tab should fill its own box
+            // instead (see css/card.css's .card-listen-player), so clear
+            // it back to the css/player.css var(--player-height, auto)
+            // fallback rather than pinning the mounted player to a height
+            // that has nothing to do with the card's own layout.
+            document.documentElement.style.removeProperty('--player-height');
 
             const flatReel = { ...reel, ...(reel.settings || {}) };
             playerApp.renderPlayer({

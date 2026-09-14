@@ -3,37 +3,35 @@
 // storeReelData(). Modeled on the reel side (content-hash id, no slug/
 // rename machinery), not js/modules/pagePublish.js - see
 // docs/project-cards/PLAN.md §1/§4.
-//
-// v1 shortcut (PLAN.md §3): the builder form is just a reel picker + one
-// raw-JSON textarea for every other card field (description/stats/links/
-// cardOverrides/etc.) - publishCard() merges that parsed JSON with the
-// fields the form itself owns (id/title/reelId/analyticsEnabled) before
-// POSTing, so the Worker still stores one flat card object either way.
 import { WORKER_BASE_URL } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
 
+// Card-only fields (docs/project-cards/PLAN.md §3) - everything but the
+// bookkeeping fields (id/publishedEmbedId/publishedAt/createdAt/_stub) that
+// cardDraftStore.js/cardsController.js own.
+const CARD_CONTENT_FIELDS = [
+  "title", "order", "reelId", "logo", "logoAlt", "listenImage", "partnerLogos",
+  "composers", "description", "stats", "links", "cardOverrides", "analyticsEnabled",
+];
+
+function contentFor(card) {
+  return Object.fromEntries(CARD_CONTENT_FIELDS.map((k) => [k, card[k]]));
+}
+
 export function generateCardId(card) {
-  return hashContent({ reelId: card.reelId, rawJson: card.rawJson });
+  return hashContent(contentFor(card));
 }
 
 /**
  * @param {Object} card - a card draft (see js/modules/cardDraftStore.js)
  * @returns {Promise<{cardId: string, cardData: Object}>}
- * @throws if card.rawJson isn't valid JSON, no password is set, or the
- *   Worker request fails.
+ * @throws if no password is set or the Worker request fails.
  */
 export async function publishCard(card) {
-  let extra;
-  try {
-    extra = JSON.parse(card.rawJson || "{}");
-  } catch {
-    throw new Error("The card data JSON isn't valid - fix it before publishing.");
-  }
-
   const cardId = generateCardId(card);
   const cardData = {
-    ...extra,
+    ...contentFor(card),
     id: cardId,
     title: card.title || "",
     reelId: card.reelId || null,

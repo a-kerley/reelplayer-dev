@@ -7,14 +7,21 @@
 import { createDraftStore } from "./draftStoreFactory.js";
 
 // Fills in fields that didn't exist when a card draft was first saved under
-// an older schema - mirrors pageDraftStore.js's normalizePage(). rawJson is
-// the v1-shortcut free-form textarea (description/stats/links/
-// cardOverrides/etc. - see docs/project-cards/PLAN.md §3) that
-// js/modules/cardPublish.js merges into the published card body; it's
-// replaced by real per-field form controls once the spine (§7) is proven.
+// an older schema - mirrors pageDraftStore.js's normalizePage(). Field list
+// per docs/project-cards/PLAN.md §3 (the real repeater-based form, §7.6 -
+// the earlier v1 raw-JSON-textarea shortcut is retired).
 function normalizeCard(card) {
+  if (card.order === undefined) card.order = 0;
   if (card.reelId === undefined) card.reelId = null;
-  if (card.rawJson === undefined) card.rawJson = "{}";
+  if (card.logo === undefined) card.logo = "";
+  if (card.logoAlt === undefined) card.logoAlt = "";
+  if (card.listenImage === undefined) card.listenImage = "";
+  if (card.partnerLogos === undefined) card.partnerLogos = [];
+  if (card.composers === undefined) card.composers = "";
+  if (card.description === undefined) card.description = [];
+  if (card.stats === undefined) card.stats = [];
+  if (card.links === undefined) card.links = [];
+  if (card.cardOverrides === undefined) card.cardOverrides = {};
   if (card.analyticsEnabled === undefined) card.analyticsEnabled = false;
   if (card.publishedEmbedId === undefined) card.publishedEmbedId = null;
   if (card.publishedAt === undefined) card.publishedAt = null;

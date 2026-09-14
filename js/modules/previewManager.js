@@ -84,10 +84,24 @@ function textUnitStyleVars(varPrefix, resolved) {
   };
 }
 
+// Tracks what's actually applied to document.documentElement right now -
+// module-level, not per-instance, because it's a genuinely global, shared
+// resource: the Reels tab (js/main.js) and the Project Cards tab
+// (js/cardsController.js's cardPreviewStyles) each construct their own
+// PreviewManager, but both write to the SAME document.documentElement.
+// Each instance previously kept its own private currentStyles cache, so
+// switching tabs could leave a stale value behind - e.g. the Reels tab's
+// own preview believing --ui-accent was already "white" (its own last
+// write) and skipping the update after the Cards tab had since changed
+// the DOM's actual value to a card's own accent color, silently leaving
+// the wrong color applied until some OTHER property happened to differ
+// and force a write. A single shared cache means whichever instance
+// wrote last is always the source every instance compares against.
+const appliedPreviewStyles = {};
+
 export class PreviewManager {
   constructor() {
     this.container = null;
-    this.currentStyles = {};
     this.noTracksTemplate = `
       <div class="builder-empty-state builder-empty-state--block">
         No tracks available. Please add some tracks in the builder.
@@ -139,23 +153,26 @@ export class PreviewManager {
   applyPreviewStyles(reel) {
     const newStyles = this.generateStyleConfig(reel);
 
-    // Only update CSS properties that have changed. A value of undefined
-    // (title/track-name font-family/size/weight/color when nothing's
-    // resolved - see resolveTextUnit()) means "unset this override, let
-    // the CSS fallback apply" - explicitly removeProperty rather than
+    // Only update CSS properties that have actually changed since the last
+    // write from ANY PreviewManager instance (see appliedPreviewStyles'
+    // own comment above - this used to be a per-instance this.currentStyles,
+    // which caused stale cross-tab values). A value of undefined (title/
+    // track-name font-family/size/weight/color when nothing's resolved -
+    // see resolveTextUnit()) means "unset this override, let the CSS
+    // fallback apply" - explicitly removeProperty rather than
     // setProperty(..., undefined), which would otherwise write the
     // literal string "undefined" as the property's value. Needed because
-    // this object is long-lived across re-renders (this.currentStyles) -
-    // a property that WAS set (e.g. switched to a role) and now resolves
-    // to nothing must actually be cleared, not just skipped.
+    // this cache is long-lived across re-renders - a property that WAS set
+    // (e.g. switched to a role) and now resolves to nothing must actually
+    // be cleared, not just skipped.
     Object.entries(newStyles).forEach(([property, value]) => {
-      if (this.currentStyles[property] === value) return;
+      if (appliedPreviewStyles[property] === value) return;
       if (value === undefined) {
         document.documentElement.style.removeProperty(property);
       } else {
         document.documentElement.style.setProperty(property, value);
       }
-      this.currentStyles[property] = value;
+      appliedPreviewStyles[property] = value;
     });
   }
 
@@ -296,11 +313,13 @@ export class PreviewManager {
     }
   }
 
-  // Reset all applied styles
+  // Reset all applied styles - clears the shared cache (see
+  // appliedPreviewStyles' own comment), so this affects every
+  // PreviewManager instance, not just this one.
   resetStyles() {
-    Object.keys(this.currentStyles).forEach(property => {
+    Object.keys(appliedPreviewStyles).forEach(property => {
       document.documentElement.style.removeProperty(property);
+      delete appliedPreviewStyles[property];
     });
-    this.currentStyles = {};
   }
 }
