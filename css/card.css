@@ -47,6 +47,29 @@
   z-index: 0;
 }
 
+/* Desktop-hover-only preview (js/modules/cardChrome.js's
+   previewBannerVideo()) - same z-index as the static image above it, so
+   normal DOM order (this element comes after it in the template) puts it
+   on top without needing an explicit stacking bump. Starts at opacity:0
+   regardless of hover state - .video-ready (added only once the video is
+   genuinely ready to play smoothly, never just on hover) is what actually
+   reveals it, so a still-buffering video never fades in half-stuttering. */
+.project-card-banner-video {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  z-index: 0;
+  opacity: 0;
+  transition: opacity 0.5s ease;
+  pointer-events: none;
+}
+
+.project-card-banner.video-ready .project-card-banner-video {
+  opacity: 1;
+}
+
 .project-card-banner::after {
   content: "";
   position: absolute;

@@ -11,15 +11,16 @@
 // a card wrapper whose reel always renders mode:"static") - it's modeled
 // on the same desktop-hover UX so a card feels like a reel expanding.
 //
-// This first slice is desktop-hover only, per PLAN.md's mobile-parity
-// section - the scroll-band IntersectionObserver mobile behavior is a
-// separate follow-up slice, not built here yet.
+// Desktop gets hover-driven expand/collapse + banner video preview; touch
+// devices get the IntersectionObserver scroll-band behavior instead (no
+// hover to trigger a video preview from, so touch visitors only ever see
+// the static banner image) - see isTouchDevice() branch below.
 
 // cardOverrides whitelist (PLAN.md §3) that maps onto the reel's own
 // settings fields, winning over whatever the reel itself has set. Two of
 // the whitelist's other keys are handled elsewhere, not here:
-// - bannerImage/bannerVideo: banner-only, resolveBannerImage() below
-//   (bannerVideo isn't rendered at all yet - no crossfade slice yet)
+// - bannerImage/bannerVideo: banner-only, resolveBannerImage()/
+//   resolveBannerVideo() below
 // - textStyles: NOT handled by this function - needs a new top tier in
 //   the previewManager.js/player.html text-style resolver pair (its own
 //   separate slice, PLAN.md §5's "second drift pair" note), not a plain
@@ -69,6 +70,44 @@ function isTouchDevice() {
   return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
 }
 
+// Banner video hover-preview (desktop only - see the isTouchDevice()
+// branch below). Calls play() immediately on hover (harmless while the
+// video stays at opacity:0 - a rejected autoplay promise, e.g. a strict
+// browser policy, just means it never reaches readiness and the static
+// image stays showing, which is a safe fallback either way), but only
+// reveals it once genuinely ready to play smoothly
+// (HAVE_ENOUGH_DATA/canplaythrough) - never fades in a video that's about
+// to stutter on a still-buffering preload="metadata" source. Matches this
+// project's own "gate the start of visible playback on real readiness,
+// don't force it on partial data" convention (js/modules/videoPlayback.js).
+// videoEl._pendingRevealListener stashes the in-flight listener directly
+// on the element (rather than a closure-captured variable, a Map, or a
+// WeakMap) since these two functions are the only code that ever touches
+// it and there's exactly one video per card - the simplest place that's
+// still reachable from both functions without threading extra state
+// through renderCardChrome()'s own closure.
+function previewBannerVideo(videoEl, banner) {
+  if (!videoEl) return;
+  videoEl.play().catch(() => {}); // autoplay rejection -> stays on the static image, not an error
+  if (videoEl.readyState >= HTMLMediaElement.HAVE_ENOUGH_DATA) {
+    banner.classList.add("video-ready");
+    return;
+  }
+  const onReady = () => banner.classList.add("video-ready");
+  videoEl._pendingRevealListener = onReady;
+  videoEl.addEventListener("canplaythrough", onReady, { once: true });
+}
+
+function stopBannerVideoPreview(videoEl, banner) {
+  if (!videoEl) return;
+  videoEl.pause();
+  banner.classList.remove("video-ready");
+  if (videoEl._pendingRevealListener) {
+    videoEl.removeEventListener("canplaythrough", videoEl._pendingRevealListener);
+    videoEl._pendingRevealListener = null;
+  }
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -77,14 +116,28 @@ function escapeHtml(value) {
 
 // PLAN.md §3 "Banner visual" fallback chain: cardOverrides.bannerImage wins,
 // else the reel's own backgroundImage (if enabled), else its first track's
-// backgroundImage. Video banners (cardOverrides.bannerVideo /
-// reel backgroundVideo) aren't implemented in this slice - image only.
+// backgroundImage. The static image is always rendered when resolved (even
+// if a video is also present) - it's the video's poster/fallback for
+// browsers that never reveal the video (mobile has no hover trigger for
+// it - see the video-preview setup below) and the base layer under it
+// while the video is still loading on desktop.
 function resolveBannerImage(cardData) {
   const overrides = cardData.cardOverrides || {};
   if (overrides.bannerImage) return overrides.bannerImage;
   const settings = cardData.reel?.settings || {};
   if (settings.backgroundImageEnabled && settings.backgroundImage) return settings.backgroundImage;
   return cardData.reel?.playlist?.[0]?.backgroundImage || "";
+}
+
+// Same fallback shape as resolveBannerImage() above, for the reel's own
+// backgroundVideo instead. Returns "" (no video) when neither the card nor
+// its reel has one - the banner then stays a plain static image.
+function resolveBannerVideo(cardData) {
+  const overrides = cardData.cardOverrides || {};
+  if (overrides.bannerVideo) return overrides.bannerVideo;
+  const settings = cardData.reel?.settings || {};
+  if (settings.backgroundVideoEnabled && settings.backgroundVideo) return settings.backgroundVideo;
+  return "";
 }
 
 function renderStats(stats) {
@@ -128,12 +181,14 @@ function renderDescription(description) {
 export function renderCardChrome(container, cardData, { onActivateListen }) {
   const hasReel = !!(cardData.reel && cardData.reel.playlist && cardData.reel.playlist.length);
   const bannerImage = resolveBannerImage(cardData);
+  const bannerVideo = resolveBannerVideo(cardData);
   const listenContainerId = "cardListenPlayer";
 
   container.innerHTML = `
     <div class="project-card">
       <div class="project-card-banner" style="${bannerImage ? `background-image:url('${escapeHtml(bannerImage)}')` : ""}">
         ${bannerImage ? `<img class="project-card-banner-img" src="${escapeHtml(bannerImage)}" alt="" />` : ""}
+        ${bannerVideo ? `<video class="project-card-banner-video" src="${escapeHtml(bannerVideo)}" muted loop playsinline preload="metadata"></video>` : ""}
         ${cardData.logo ? `<img class="project-card-logo" src="${escapeHtml(cardData.logo)}" alt="${escapeHtml(cardData.logoAlt || cardData.title || "")}" />` : ""}
         <div class="project-card-hover-text">
           <div class="hover-logos">${renderPartnerLogos(cardData.partnerLogos)}</div>
@@ -293,9 +348,12 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     // setupExpandableModeTouchInteractions(): a card expands as it scrolls
     // into the middle third of the viewport, and collapses once it fully
     // leaves that band. Deliberately simpler than the reel's own version -
-    // no top-half tracking / scroll-compensation-on-collapse (accepted gap,
-    // not built here; the card's own collapse is a much smaller height
-    // change than a full reel player's, so an uncompensated jump is minor).
+    // no top-half tracking (accepted gap, a pure optimization the reel
+    // skips off the bottom - see compensateScrollForCollapse()'s own
+    // comment for why this always compensates instead). No hover here
+    // means no banner-video preview either - touch visitors only ever see
+    // the static banner image, which is also why PLAN.md's mobile-parity
+    // note calls for preload="metadata" over "auto".
     const observer = new IntersectionObserver((entries) => {
       entries.forEach((entry) => {
         if (Date.now() < manualOverrideUntil) return;
@@ -309,8 +367,15 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     observer.observe(card);
   } else {
     // Desktop hover.
-    card.addEventListener("mouseenter", expand);
-    card.addEventListener("mouseleave", collapse);
+    const bannerVideoEl = banner.querySelector(".project-card-banner-video");
+    card.addEventListener("mouseenter", () => {
+      expand();
+      previewBannerVideo(bannerVideoEl, banner);
+    });
+    card.addEventListener("mouseleave", () => {
+      collapse();
+      stopBannerVideoPreview(bannerVideoEl, banner);
+    });
   }
 
   let listenActivated = false;

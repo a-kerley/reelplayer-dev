@@ -109,16 +109,36 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   while `scrollY` tracked it in lockstep frame by frame. No console
   errors; Listen tab + lazy reel mount re-verified working with the new
   markup structure.
+- Banner video crossfade (2026-09-14): `resolveBannerVideo()` mirrors
+  `resolveBannerImage()`'s fallback chain (`cardOverrides.bannerVideo` →
+  the reel's own `backgroundVideo`/`backgroundVideoEnabled`). Desktop-hover
+  only - `preload="metadata"` (not `"auto"`, per PLAN.md's mobile-parity
+  note - N cards pulling full videos on load would be wasteful) means the
+  video usually isn't fully buffered yet when a hover starts, so
+  `previewBannerVideo()` calls `.play()` immediately (harmless while still
+  at `opacity:0`) but only reveals it (`.video-ready` class, CSS fades
+  opacity in) once `readyState >= HAVE_ENOUGH_DATA`/`canplaythrough` -
+  matches this project's own convention of gating visible playback start
+  on real readiness rather than forcing a partial-data start
+  (`js/modules/videoPlayback.js`). Touch devices never trigger this at all
+  (no hover) - banner stays the static image there, consistent with why
+  `preload="metadata"` matters. Verified against the real "Horizon Call of
+  the Mountain" banner video (already on production R2): hover reveals and
+  plays it, hover-away pauses and hides it back to the static image, and a
+  card with no banner video at all (the null-guarded common case) shows no
+  regression - no console errors either way.
 - `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
   `mergeCardOverrides()` applies the whitelist's reel-facing fields
   (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/
   playerBackground/showReelTitle) onto the reel before it renders, and
   `renderCardChrome()` applies every `--card-*` key straight onto the card
-  element as inline CSS custom properties. `bannerImage` was already wired
-  (banner fallback chain); `bannerVideo` and `textStyles` are explicitly
-  NOT handled by this - the former needs the video-crossfade slice, the
-  latter needs its own new tier in the previewManager.js/player.html
-  text-style resolver pair (§5's "second drift pair"). Verified against a
+  element as inline CSS custom properties. `bannerImage`/`bannerVideo` are
+  handled by `resolveBannerImage()`/`resolveBannerVideo()` in the banner
+  itself, not here (see the banner-video-crossfade entry below - built
+  the same day, after this one). `textStyles` is still explicitly NOT
+  handled anywhere yet - needs its own new tier in the previewManager.js/
+  player.html text-style resolver pair (§5's "second drift pair").
+  Verified against a
   local card with deliberately conflicting reel vs. card-override values
   (different accent colors, outline, background, title) - every override
   won cleanly, all via the browser, no console errors.
@@ -136,9 +156,9 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   the v1 stub form) hasn't been published yet - see chat history for the
   full JSON blob, not saved to a repo file.
 
-Not started: banner video crossfade, the text-style-resolver new tier,
-analytics wiring, §7.6 (real repeater form), and all of §6 (boxed-ape-site
-injector). §7a (not scheduled) notes a possible future contextual-hint UX
+Not started: the text-style-resolver new tier, analytics wiring, §7.6
+(real repeater form), and all of §6 (boxed-ape-site injector). §7a (not
+scheduled) notes a possible future contextual-hint UX
 for reel fields a card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
