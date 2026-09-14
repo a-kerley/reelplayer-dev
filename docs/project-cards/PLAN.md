@@ -39,15 +39,37 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   affordance (hover has `mouseleave` for this, touch has nothing
   equivalent) guarded by a 500ms manual-tap cooldown so a deliberate tap
   isn't immediately undone by the observer re-firing. Deliberately
-  simpler than the reel's version: no top-half tracking / scroll-
-  compensation-on-collapse (accepted gap - the card's own collapse is a
-  much smaller height change than a full reel player's). `.tab-btn` also
+  simpler than the reel's version: no top-half tracking (a real accepted
+  gap - the reel skips compensating a collapse that exits off the bottom
+  of the screen as a pure optimization, this always compensates, which is
+  harmless but slightly more work than strictly needed). Scroll
+  compensation on collapse IS implemented, just with a simpler mechanism
+  than the reel's - `js/player.js`'s compensateScrollDuringCollapse()
+  watches a CSS *transition* frame-by-frame via ResizeObserver, but
+  `card.css` doesn't animate the collapse (a plain `display` toggle, not a
+  transitioned height), so there's no multi-frame shrink to track - a
+  single before/after height measurement one frame after the class
+  toggle is the equivalent fix for an instant change. `.tab-btn` also
   bumped to the 44px touch-target minimum (`.card-banner-btn` already
   met it). Verified by forcing the touch media query and scrolling a
   tall test page - auto-expand entering the band, auto-collapse leaving
   it, and both directions of the manual tap-toggle, all confirmed
   through the browser with no console errors; desktop hover re-verified
   unaffected on a real (non-forced) run right after.
+- Scroll compensation follow-up (2026-09-14, same day): the "accepted
+  gap" above initially skipped compensation entirely - reconsidered after
+  a correctness question about whether a card's collapse height delta is
+  really smaller than the reel's, per the note above it isn't necessarily
+  (a full Info panel or Listen tab can be 500px+, comparable to or bigger
+  than the reel's own). Implemented and verified two ways: (1) directly,
+  measuring an on-page marker element's screen position before/after a
+  manual collapse with real scroll headroom - drifted <1px vs. the raw
+  247px height delta; (2) through a real iframe with a host page running
+  the actual `reelplayer:resize`/`reelplayer:scrollCompensate` listener
+  pair (PLAN.md §6's future injector will need this same pair) - iframe
+  correctly resized 493px→240px and the host page's own marker element
+  drifted only ~6px against a 247px collapse. No known gap remains beyond
+  the accepted top-half-tracking optimization above.
 - `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
   `mergeCardOverrides()` applies the whitelist's reel-facing fields
   (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/

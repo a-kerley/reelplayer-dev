@@ -191,6 +191,33 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     });
   }
 
+  // Collapsing retracts height that everything below the card was resting
+  // on - uncompensated, whatever's below (in a masonry grid, likely other
+  // cards) visibly jumps upward as that space disappears, exactly the bug
+  // js/player.js's own compensateScrollDuringCollapse() exists to prevent
+  // for the reel. A card's collapse isn't CSS-transitioned (card.css toggles
+  // .project-card-extra's display, not an animated height), so this is a
+  // single before/after measurement on the next frame rather than that
+  // function's ResizeObserver-per-frame version - simpler because there's
+  // no multi-frame transition to track, not a lesser fix. Same
+  // "scrollBy directly, or ask the host via postMessage when in an iframe"
+  // split - a real card embed's host page needs its own
+  // reelplayer:scrollCompensate listener (PLAN.md §6, copied from
+  // embedExporter.js's resizeScript - not built yet, so this is a no-op
+  // until then in a real embed, exactly like the reel's own handshake was
+  // before embedExporter.js existed).
+  function compensateScrollForCollapse(beforeHeight) {
+    requestAnimationFrame(() => {
+      const delta = beforeHeight - card.getBoundingClientRect().height;
+      if (delta === 0) return;
+      if (window.self !== window.top) {
+        window.parent.postMessage({ type: "reelplayer:scrollCompensate", delta: -delta }, "*");
+      } else {
+        window.scrollBy(0, -delta);
+      }
+    });
+  }
+
   function expand() {
     if (card.classList.contains("expanded")) return;
     card.classList.add("expanded");
@@ -199,7 +226,9 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
 
   function collapse() {
     if (!card.classList.contains("expanded")) return;
+    const beforeHeight = card.getBoundingClientRect().height;
     card.classList.remove("expanded");
+    compensateScrollForCollapse(beforeHeight);
     postResize();
   }
 
