@@ -342,6 +342,29 @@ match any card iframe by id prefix.
 
 ---
 
+## 7a. Future UX idea: contextual hint for card-ignored reel fields
+
+Not scheduled, no slice assigned yet - noted 2026-09-14 so it isn't lost.
+
+A reel author who already knows they're building specifically for a card
+has no way to tell, while editing, that Player Mode/Height/Closed-idle
+settings are ignored once that reel is referenced by a card (§3 "Data
+boundary"). Considered adding a third "Project Card" mode alongside
+Static/Expandable to strip those fields - rejected: a reel is meant to be
+reused (the same reel can back a standalone embed *and* several cards at
+once), so permanently hiding fields based on "how is this used" breaks
+the moment that reel is also used somewhere they matter.
+
+Preferred direction instead: once a reel is referenced by at least one
+published card (`card_*` scan, same shape as the existing dangling-
+reference warn on reel delete - §4), show a small inline notice next to
+the Player Mode/Static-or-Expandable-settings/Closed-idle sections in the
+Reels tab ("Ignored when this reel is embedded in a card") - informational
+only, never removes/disables anything, so a reel used both standalone and
+in a card still shows every field for its standalone use.
+
+---
+
 ## 8. Resolved decisions
 
 Settled 2026-09-09.
