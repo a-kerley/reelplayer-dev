@@ -14,7 +14,8 @@ done.** What's left is the "Manage Published Cards" modal (needed before a
 Stats button can be wired up) and the boxed-ape-site embedding side (§6).
 Detailed implementation notes below; git history (`git log --oneline --
 docs/project-cards js/modules/cardChrome.js css/card.css
-js/cardsController.js`) has the turn-by-turn story if needed.
+js/cardsController.js js/player.js js/modules/previewManager.js`) has the
+turn-by-turn story if needed.
 
 ### Worker (§7.1)
 `/cards/:id` (public GET inlines the referenced reel, `reel: null` on a
@@ -29,10 +30,17 @@ why). The form is the real repeater UI, not the original v1 raw-JSON-
 textarea stub (retired - see git history for it):
 `js/cardsController.js`, `js/modules/cardDraftStore.js`,
 `js/modules/cardPublish.js`. Covers every schema field in §3 below except
-`cardOverrides.textStyles` (still deferred, see §5) - reel picker, logo +
-alt, listen-tab banner image, composers, description, Stats/Links/Partner
-Logos repeaters (modeled on `tracksEditor.js`'s add/remove-row pattern, no
-drag-reorder), analytics toggle, `order`, and a "Card Style Overrides"
+`cardOverrides.textStyles` (still deferred, see §5) - reel picker (laid
+out identically to every other asset-picker row - a read-only text field
+showing the picked reel's title, plus the shared folder-icon browse
+button; `domUtils.js`'s `createUrlInputRow()` grew an `onPickerClick`
+escape hatch so it can open `reelPicker.js`'s dialog instead of the media
+`openFilePicker()`, with a small "✕" clear button alongside for the
+"no reel / Info-only" case that a read-only field can't support by just
+deleting text), logo + alt, listen-tab banner image, composers,
+description, Stats/Links/Partner Logos repeaters (modeled on
+`tracksEditor.js`'s add/remove-row pattern, no drag-reorder), analytics
+toggle, `order`, and a "Card Style Overrides"
 fieldset with real Pickr color swatches (`js/modules/colorPicker.js`'s
 Pickr setup was generalized into `createGenericColorPickers()` for this,
 zero behavior change to the reel builder's own colors) for both the
@@ -114,6 +122,36 @@ Verified through a real iframe: resizing the iframe element's own width
 description text to more lines correctly reported a taller target height
 (451px → 493px) and the host's iframe grew to match. No console errors.
 
+### Fixed: four bugs surfaced by building the real form + a working reel+card pair
+
+Found and fixed 2026-09-14, while building §7.6 and actually exercising a
+card whose reel plays for the first time. Full writeups are in the root
+`CLAUDE.md` (search each heading there) since they're general `js/player.js`/
+`previewManager.js`/CSS-Grid pitfalls, not Project-Cards-specific ones - only
+summarized here:
+- **`js/player.js`'s `cacheElements()`/`setupWaveSurfer()` used unscoped
+  `document.querySelector`/`getElementById`** instead of scoping to the
+  container `renderPlayer()` was just given - silently wired a card's Listen
+  tab to the Reels tab's own hidden preview instance instead of itself
+  whenever both existed in the same document. See CLAUDE.md's "`cacheElements()`
+  must be scoped to its own render's container".
+- **`previewManager.js`'s style-diffing cache was per-instance**, not
+  scoped to the actually-shared `document.documentElement` it writes to -
+  switching between the Reels tab's own preview and a card's preview could
+  leave a stale CSS var applied. See CLAUDE.md's "don't cache 'what did I
+  last set' per-instance for a shared global target".
+- **`--player-height` (a standalone-embed-only setting) leaked into a
+  card's Listen tab** - PLAN.md already said this should be ignored there
+  (§3 "Ignored in a card"), but no code ever actually did it. Fixed in both
+  `player.html`'s real card render path and `cardsController.js`'s builder
+  preview: `document.documentElement.style.removeProperty('--player-height')`
+  right after `applyReelStyleVars()`/`applyPreviewStyles()`.
+- **`.project-card-extra-inner`'s padding sat on the CSS Grid `0fr`-collapsing
+  element itself**, which can never compress below its own padding - left a
+  "closed" card at ~40px instead of 0px, so the Info tab-toggle icon
+  visibly peeked through. See CLAUDE.md's "padding on a CSS Grid
+  `0fr`-collapsing element can't compress below itself".
+
 ### Also
 - `js/config.js` points `WORKER_BASE_URL` at `localhost:8787`
   automatically when served from `localhost` - local dev never touches
@@ -122,19 +160,23 @@ description text to more lines correctly reported a taller target height
   *root* `wrangler.jsonc` otherwise, see `worker/README.md`) alongside
   `python3 dev-server.py` for a fully local loop.
 - A real (non-test) example is live: "Horizon Call of the Mountain" reel
-  published to production as reel id `hcotm` (6 real tracks, real
+  published to **production** as reel id `hcotm` (6 real tracks, real
   per-track background images); all its card assets (banner image/video,
   logo, 4 partner logos, 6 audio tracks) are on production R2 under
-  `images|video|audio/project-cards/hcotm/`. The card record itself
-  (description/stats/links/cardOverrides JSON) hasn't been published
-  yet - the full JSON blob was handed to the user in chat, not saved to
-  a repo file.
+  `images|video|audio/project-cards/hcotm/`. The card record itself was
+  fully built and exercised end-to-end in the real §7.6 form, but only
+  ever against the **local** Worker (`card-hcotm` draft, plus a
+  from-scratch local republish of the reel under its own draft id
+  `reel-hcotm-draft`/published id `oihma0`, to prove the builder's own
+  reel↔card reference model - see §8 "Reel ↔ card is a reference, not a
+  live link" below) - neither the card nor that second reel copy has
+  been published to **production** KV.
 
 ### Not started
-§7.6 (real repeater form + "Manage Published Cards" modal) and all of §6
-(boxed-ape-site injector - the actual embedding mechanism). §7a (not
-scheduled) notes a possible future contextual-hint UX for reel fields a
-card ignores.
+All of §6 (boxed-ape-site injector - the actual embedding mechanism) and
+the "Manage Published Cards" modal (needed before a Stats button can be
+wired up - see the Builder section above). §7a (not scheduled) notes a
+possible future contextual-hint UX for reel fields a card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).
@@ -496,6 +538,18 @@ Settled 2026-09-09.
   (`reelPicker.js`, already built) + an optional override block. Cost: the
   reference can dangle (handled — GET returns `reel: null` → Info-only, plus
   a builder warn on reel delete).
+
+  **"Editing the reel updates every card" only means once it's republished
+  AND every affected card's `reelId` points at that new publish** — not
+  live editing. A reel's *published* id is a content hash of its own
+  title/playlist/settings (`embedExporter.js`'s `generateReelId()`),
+  regenerated fresh on every publish; the reel *draft* you edit in the
+  Reels tab keeps its own separate, stable draft id the whole time. So
+  tweaking a reel's draft and republishing produces a **new** published
+  id, and every card still points at the *old* one until its reel picker
+  is manually re-pointed at the fresh id. There's no live link between an
+  open reel draft and a card's preview — confirmed by building and testing
+  this exact loop against a real reel+card pair (§ above).
 
 - **Reel renders static inside a card; `cardOverrides` is the consistency
   layer.** The card owns collapse/expand, so the reel's `mode` +

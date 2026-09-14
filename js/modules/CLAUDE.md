@@ -35,3 +35,18 @@ Weight/Color/Reset" table). Between them these back:
 Same reasoning as the mediaBrowser.js note above: extend this shared
 toolkit and thread through the relevant getter/setter/`defs` params,
 don't re-fork the table- or toolbar-building code a third or fourth time.
+
+# One shared "label + text field + browse button" row, not per-field markup
+
+`domUtils.js`'s `createUrlInputRow()` is the single row builder behind
+every "label: [value.........] [📁]" field in both builders - reel
+background image/video, a Project Card's logo/banner/listen-image fields,
+*and* (via the `onPickerClick` option) the Project Card's reel picker
+field (`cardsController.js`), even though that last one opens
+`reelPicker.js`'s dialog instead of the media `openFilePicker()` the
+`pickerOptions` param wires up by default. `onPickerClick` exists
+specifically so a new "pick something that isn't a media file" row can
+still get the identical row layout for free, rather than hand-rolling the
+label/input/button markup again - if you need a browse button that opens
+something else entirely, add another `onPickerClick`-style caller, don't
+copy this function's markup.

@@ -26,10 +26,11 @@ dependencies to install for the app itself.
   a card is a reference to a reel (not a copy), rendered as banner +
   Info/Listen tabs around that reel via `js/modules/cardChrome.js` +
   `css/card.css`. Build status/design decisions:
-  `docs/project-cards/PLAN.md`. In-progress: the render side is done, the
-  builder's own authoring form is still a v1 raw-JSON stub (§7.6 not
-  started), and the actual boxed-ape-site embedding mechanism doesn't
-  exist yet (§6 not started).
+  `docs/project-cards/PLAN.md`. The spine, render side, and the real
+  builder form (§7.6 - reel picker, repeaters, live preview, Pickr
+  overrides) are all done, including a close-parity pass against the
+  original boxed-ape-site card's animations/interaction model. Not
+  started: the actual boxed-ape-site embedding mechanism (§6).
 
 Pages and reels are separate content types stored in the same Worker/KV
 namespace under different key prefixes (`page_<slug>`/`draft_page_<id>` vs
@@ -127,6 +128,65 @@ tier - a card is never also inside a reelplayer Page, so the two sources
 can't collide. Needed zero changes to `resolveTextUnit()` itself in
 either file; if you ever do need to change the resolver logic, both
 files still need the identical edit as always.
+
+## Gotcha: `js/player.js`'s `cacheElements()` must be scoped to its own render's container
+
+`cacheElements()` (and `setupWaveSurfer()`'s `WaveSurfer.create()` call)
+used to look up its elements with plain `document.getElementById("waveform")`/
+`document.querySelector(".player-wrapper")` etc - fine as long as only one
+`.player-wrapper` ever existed in the document at once, which was true right
+up until a Project Card's Listen tab could mount a *second* real
+`renderPlayer()` instance alongside the Reels tab's own (merely hidden, not
+removed) preview pane. When that happens, `document.querySelector(...)`
+silently returns whichever instance's markup happens to be first in the DOM
+- not necessarily the one `renderPlayer()` was just asked to fill - so the
+card's own playlist/waveform/controls silently wired themselves to the
+*other*, invisible instance instead. No error, just an empty-looking player.
+
+Fixed by having `renderPlayer()` stash the actual container element
+(`this.playerContainer`) and scoping every one of `cacheElements()`'s
+lookups, `setupWaveSurfer()`'s `WaveSurfer.create({ container: ... })`, and
+a few other `document.querySelector(".track-bg-layer-a")`-style spot
+lookups (`updateTrackBackground()`, `updateActivePlaylistItem()`,
+`backgroundZoomAnimation.js`'s `playBackgroundAnimations()`) to
+`this.playerContainer`/`this.elements.*` instead of `document`. If you add
+a new method that needs to find "the" waveform/playlist/etc element, scope
+it the same way - never a bare `document.querySelector` for anything that's
+meant to belong to one specific rendered player instance.
+
+## Gotcha: don't cache "what did I last set" per-instance for a shared global target
+
+`previewManager.js`'s `applyPreviewStyles()` skips re-writing a CSS custom
+property on `document.documentElement` when the new value matches what it
+last wrote - a redundant-write optimization. That cache used to live on
+`this` (per `PreviewManager` instance), but the Reels tab and the Project
+Cards tab each construct their *own* `PreviewManager`, and both target the
+same `document.documentElement`. Switching tabs could leave a stale value
+behind: the Reels tab's own preview would "remember" having already set
+`--ui-accent` to its own reel's color, and skip re-applying it after the
+Cards tab had since changed the DOM's actual value to a card's own accent -
+silently showing the wrong color until some *other* property happened to
+differ and forced a real write. Fixed by moving the cache to a single
+module-level `appliedPreviewStyles` object shared by every instance. The
+general lesson: a "skip if unchanged" cache is only safe when it's scoped
+to the same lifetime as whatever it's actually comparing against - if the
+write target is a shared/global resource, the cache needs to be shared too.
+
+## Gotcha: padding on a CSS Grid `0fr`-collapsing element can't compress below itself
+
+The `0fr`/`1fr` `grid-template-rows` accordion trick (`css/card.css`'s
+`.project-card-extra`, `css/expandable.css`'s reel equivalent) only
+actually reaches 0px if *nothing* between the grid item and its content has
+its own padding - a box's padding is never compressible below its specified
+value regardless of `box-sizing`, so a "collapsed" 0fr row with a padded
+child still renders at least `padding-top + padding-bottom` tall. This
+bit Project Cards concretely: `.project-card-extra-inner`'s own
+`padding: 1.25rem` kept the "closed" card sitting at ~40px instead of 0,
+letting the Info tab-toggle icon visibly peek through a closed card. Fix
+is always the same shape: keep the grid item itself (the one whose
+`overflow: hidden` does the actual clipping) padding-free, and put the
+padding on a further-nested child instead - it can be clipped away
+entirely rather than fighting the collapse.
 
 ## Builder dark theme — scope boundary
 
