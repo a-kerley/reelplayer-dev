@@ -7,200 +7,112 @@ in among non-reelplayer content, so each card must be fully self-contained,
 lazy-loadable, and placeable anywhere. (A reelplayer *Page* is not an option
 here: the host pages are hand-authored, not reelplayer-rendered.)
 
-Status: spine in progress (§7). Done so far, 2026-09-13:
-- §7.1 Worker routes: `/cards/:id` (with reel inlining + dangling-reference
-  →Info-only fallback), `/drafts/cards/:id`, both list routes, `/stats/card/:id`.
-- §7.2 (partial) Builder: Project Cards tab exists (grouped with Reels/Pages;
-  Media Library moved to its own pinned sidebar section, no longer competing
-  for tab-row space). v1 stub form: reel picker + one raw-JSON textarea for
-  everything else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
-  `js/modules/cardPublish.js`).
-- §7.4 `player.html?id=<cardId>&type=card` fetches the card and renders
-  its chrome via `js/modules/cardChrome.js`: banner (image only - no video
-  crossfade yet) with logo/partner-logos-on-hover/composers, Info/Listen
-  tab toggle, Info tab (title/description/stats/links, icons served from
-  `assets/card-icons/`), and a Listen tab that lazily mounts the inlined
-  reel (forced `mode:"static"`) via `playerApp.renderPlayer()` the first
-  time it's opened - never a second render copy. Desktop-hover expand/
-  collapse only (new code modeled on, not reusing, the reel's own
-  expandable-mode UX - see §5's updated note) with a working
-  `reelplayer:resize` handshake verified through a real iframe.
-  `applyReelStyles()` was split into `applyReelStyleVars()` (CSS vars only,
-  used by a card's mounted reel) vs. the container-background half (plain
-  reel embeds only) so a card's own banner background doesn't get
-  clobbered by its reel's.
-  Not yet done: banner video and analytics.
-- Mobile scroll-band expand/collapse (2026-09-14): `js/modules/
-  cardChrome.js` branches on the same `isTouchDevice()` media-query check
-  `js/player.js` uses. Touch devices get an `IntersectionObserver` on the
-  card (`-33% 0px -33% 0px` rootMargin - the same middle-third band the
-  reel's own `setupExpandableModeTouchInteractions()` uses) that expands
-  on entry and collapses on exit, plus a tap-the-active-tab-again-to-close
-  affordance (hover has `mouseleave` for this, touch has nothing
-  equivalent) guarded by a 500ms manual-tap cooldown so a deliberate tap
-  isn't immediately undone by the observer re-firing. Deliberately
-  simpler than the reel's version: no top-half tracking (a real accepted
-  gap - the reel skips compensating a collapse that exits off the bottom
-  of the screen as a pure optimization, this always compensates, which is
-  harmless but slightly more work than strictly needed). Scroll
-  compensation on collapse IS implemented, just with a simpler mechanism
-  than the reel's - `js/player.js`'s compensateScrollDuringCollapse()
-  watches a CSS *transition* frame-by-frame via ResizeObserver, but
-  `card.css` doesn't animate the collapse (a plain `display` toggle, not a
-  transitioned height), so there's no multi-frame shrink to track - a
-  single before/after height measurement one frame after the class
-  toggle is the equivalent fix for an instant change. `.tab-btn` also
-  bumped to the 44px touch-target minimum (`.card-banner-btn` already
-  met it). Verified by forcing the touch media query and scrolling a
-  tall test page - auto-expand entering the band, auto-collapse leaving
-  it, and both directions of the manual tap-toggle, all confirmed
-  through the browser with no console errors; desktop hover re-verified
-  unaffected on a real (non-forced) run right after.
-- Scroll compensation follow-up (2026-09-14, same day): the "accepted
-  gap" above initially skipped compensation entirely - reconsidered after
-  a correctness question about whether a card's collapse height delta is
-  really smaller than the reel's, per the note above it isn't necessarily
-  (a full Info panel or Listen tab can be 500px+, comparable to or bigger
-  than the reel's own). Implemented and verified two ways: (1) directly,
-  measuring an on-page marker element's screen position before/after a
-  manual collapse with real scroll headroom - drifted <1px vs. the raw
-  247px height delta; (2) through a real iframe with a host page running
-  the actual `reelplayer:resize`/`reelplayer:scrollCompensate` listener
-  pair (PLAN.md §6's future injector will need this same pair) - iframe
-  correctly resized 493px→240px and the host page's own marker element
-  drifted only ~6px against a 247px collapse. No known gap remains beyond
-  the accepted top-half-tracking optimization above.
-- Card open/close animation (2026-09-14, same day): the card had NO
-  expand animation at all until this point - `.project-card-extra` just
-  snapped between `display:none`/`block`. Replaced with the CSS Grid
-  `grid-template-rows: 0fr → 1fr` trick on `.project-card-extra` itself
-  (a `.project-card-extra-inner` child holds the padding/content, clipped
-  by `overflow:hidden` while its row is near-0) - handles arbitrary/
-  variable content height correctly without JS measuring anything, and
-  respects `prefers-reduced-motion` matching this codebase's existing
-  convention (`css/page.css`) of defining the transition unconditionally
-  then stripping it in a `(prefers-reduced-motion: reduce)` override.
-  This exposed two things needing fixes, not just new CSS:
-  - `postResize()` used to read the *animating* element's own
-    `scrollHeight` for the target iframe height - correct when the
-    change was instant, wrong mid-transition (it'd report whatever
-    height the animation happened to be at that instant). Now computes
-    the target directly from `banner.offsetHeight +
-    extraInner.scrollHeight` (the inner element's full natural content
-    height is unaffected by the outer grid row's current clipped size),
-    and posts that single target once - the same "host CSS transitions
-    the iframe smoothly toward one target number" pattern
-    `embedExporter.js`'s generated markup already uses for reels (PLAN.md
-    §6's injector needs the same `transition: height` on its own
-    wrapper).
-  - `compensateScrollForCollapse()`'s previous single before/after
-    measurement (correct for an instant snap) would now leave a visible
-    jump at either end of a real multi-frame transition. Upgraded to the
-    same `ResizeObserver`-per-frame technique `js/player.js`'s
-    `compensateScrollDuringCollapse()` already uses - watches the card's
-    actual rendered height on every frame of the shrink and scrolls by
-    the same delta each time, so content below stays anchored throughout
-    the whole animation, not just at the ends.
-  Verified: sampled `card.getBoundingClientRect().height` every 40ms
-  through both expand (280px→487px over ~330ms, progressive, not an
-  instant jump) and collapse, and re-ran the marker-drift test through
-  the full animated collapse this time (not just an instant one) - marker
-  stayed within ~22px throughout the entire 487px→280px animated shrink
-  while `scrollY` tracked it in lockstep frame by frame. No console
-  errors; Listen tab + lazy reel mount re-verified working with the new
-  markup structure.
-- Analytics wiring (2026-09-14): `player.html`'s module-level
-  `analyticsReelId` generalized to `analyticsStatsType`/`analyticsStatsId`,
-  set by `loadAndRenderCard()` to `'card'`/`cardId` (never the card's
-  *referenced* reelId) right after fetching the card, so both the
-  immediate "view" beacon and the later "play" segment tracking inside
-  `onActivateListen` (which reads the same module-level vars) correctly
-  target `/stats/card/<cardId>` - PLAN.md §8: a card's plays are the
-  marketing unit's own stats, not the underlying reel's. `endListenSegment()`
-  now sends through these generic vars instead of a hardcoded `'reel'`.
-  `js/modules/statsViewer.js`'s `openStatsModal()`/`fetchStats()` needed
-  zero code changes - already fully generic on `targetType`, just a stale
-  JSDoc (`'reel'|'page'`, now includes `'card'`) - no "Manage Published
-  Cards" modal exists yet to wire a Stats button into, that's part of the
-  real form/management UI (§7.6), not this slice. Verified against the
-  Worker's stored stat events directly: `view` fires on card load,
-  `play` fires with correct track index/title/duration after a full
-  play-through, targeted at `stat_card_<id>_*` - and confirmed the
-  referenced reel's own `stat_reel_*` stayed empty (correctly isolated).
-  Also had to clear this browser's `reelplayer_operator` localStorage
-  self-exclusion flag (set by every builder page load) to get a beacon to
-  fire in testing at all - restored after.
-- `textStyles` resolver tier (2026-09-14): turned out much smaller than
-  expected - `previewManager.js`'s `resolveTextUnit()` already takes a
-  generic "highest-precedence role style source" parameter
-  (`pageRoleStyles`), and doesn't care whether that source is a page or a
-  card; a card is never also inside a reelplayer Page player block (§1 -
-  pages aren't an option for cards), so `pageTextStylesParam` and a card's
-  `cardOverrides.textStyles` can never both apply to the same
-  `player.html` render. So no changes were needed to either file's
-  `resolveTextUnit()`/`textUnitStyleVars()` at all - `player.html`'s card
-  path just sets the same module-level `pageRoleStyles` variable to
-  `cardData.cardOverrides?.textStyles` right before calling
-  `applyReelStyleVars()`, reusing the exact tier PLAN.md called for
-  instead of needing a fourth one. `previewManager.js` needed zero
-  changes (the Reels-tab builder preview never has card context).
-  Verified with deliberately conflicting values (reel fallback: blue
-  30px; card override: orange 40px/900 weight) - card override rendered
-  correctly, no console errors.
-- Banner video crossfade (2026-09-14): `resolveBannerVideo()` mirrors
-  `resolveBannerImage()`'s fallback chain (`cardOverrides.bannerVideo` →
-  the reel's own `backgroundVideo`/`backgroundVideoEnabled`). Desktop-hover
-  only - `preload="metadata"` (not `"auto"`, per PLAN.md's mobile-parity
-  note - N cards pulling full videos on load would be wasteful) means the
-  video usually isn't fully buffered yet when a hover starts, so
-  `previewBannerVideo()` calls `.play()` immediately (harmless while still
-  at `opacity:0`) but only reveals it (`.video-ready` class, CSS fades
-  opacity in) once `readyState >= HAVE_ENOUGH_DATA`/`canplaythrough` -
-  matches this project's own convention of gating visible playback start
-  on real readiness rather than forcing a partial-data start
-  (`js/modules/videoPlayback.js`). Touch devices never trigger this at all
-  (no hover) - banner stays the static image there, consistent with why
-  `preload="metadata"` matters. Verified against the real "Horizon Call of
-  the Mountain" banner video (already on production R2): hover reveals and
-  plays it, hover-away pauses and hides it back to the static image, and a
-  card with no banner video at all (the null-guarded common case) shows no
-  regression - no console errors either way.
-- `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
-  `mergeCardOverrides()` applies the whitelist's reel-facing fields
-  (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/
-  playerBackground/showReelTitle) onto the reel before it renders, and
-  `renderCardChrome()` applies every `--card-*` key straight onto the card
-  element as inline CSS custom properties. `bannerImage`/`bannerVideo` are
-  handled by `resolveBannerImage()`/`resolveBannerVideo()` in the banner
-  itself, not here (see the banner-video-crossfade entry below - built
-  the same day, after this one). `textStyles` is still explicitly NOT
-  handled anywhere yet - needs its own new tier in the previewManager.js/
-  player.html text-style resolver pair (§5's "second drift pair").
-  Verified against a
-  local card with deliberately conflicting reel vs. card-override values
-  (different accent colors, outline, background, title) - every override
-  won cleanly, all via the browser, no console errors.
-- Also: `js/config.js` now points `WORKER_BASE_URL` at `localhost:8787`
-  automatically when served from `localhost`, so local dev never touches
-  production KV - run `npx wrangler dev` (from `worker/`, or pass
-  `--config wrangler.toml` explicitly - see worker/README.md for why) +
-  `python3 dev-server.py` together for a fully local loop.
-- A real (non-test) example is live: the "Horizon Call of the Mountain"
-  reel is published to production as reel id `hcotm` (6 real tracks, real
-  per-track background images), and all of its card assets (banner image/
-  video, logo, 4 partner logos, 6 audio tracks) are uploaded to production
-  R2 under `images|video|audio/project-cards/hcotm/`. The card record
-  itself (description/stats/links/cardOverrides JSON, ready to paste into
-  the v1 stub form) hasn't been published yet - see chat history for the
-  full JSON blob, not saved to a repo file.
+## Status (as of 2026-09-14)
 
-Not started: §7.6 (real repeater form, including a "Manage Published
-Cards" modal with its own Stats button), and all of §6 (boxed-ape-site
-injector). §7a (not scheduled) notes a possible future contextual-hint UX
-for reel fields a card ignores.
+**§7.1-§7.4 (the whole spine + render slice) are done, with one known
+gap** (resize-on-viewport-change, see below). What's left otherwise is
+entirely builder-side UI (§7.6) and the boxed-ape-site embedding side
+(§6). Detailed implementation notes below; git history
+(`git log --oneline -- docs/project-cards js/modules/cardChrome.js
+css/card.css`) has the turn-by-turn story if needed.
 
-**Everything in §5 (the render slice) is now done.** What's left is
-entirely builder-side UI (§7.6) and the boxed-ape-site injector (§6).
+### Worker (§7.1)
+`/cards/:id` (public GET inlines the referenced reel, `reel: null` on a
+missing/unpublished reference rather than 404ing - Info-only fallback),
+`/drafts/cards/:id`, both list routes, `/stats/card/:id`. Mirrors
+`/reels/:id` (content-hash id, no slug), not `/pages/:slug`.
+
+### Builder (§7.2, v1 stub only)
+Project Cards tab exists, grouped with Reels/Pages (Media Library moved
+to its own pinned sidebar section - see §7's original notes below for
+why). Form is a stub: reel picker + one raw-JSON textarea for everything
+else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
+`js/modules/cardPublish.js`). **Not yet built**: the real repeater form
+(§7.6) and a "Manage Published Cards" modal (needed before a Stats button
+can be wired up - `statsViewer.js` itself is already fully generic on
+`targetType`, no code changes needed there).
+
+### `player.html?id=<cardId>&type=card` render (§7.4/§5 - done, one known gap below)
+`js/modules/cardChrome.js` + `css/card.css` render the full card chrome:
+- **Banner**: static image (`resolveBannerImage()`, fallback chain
+  `cardOverrides.bannerImage` → reel's own `backgroundImage` → first
+  track's `backgroundImage`) plus a desktop-hover-only video crossfade
+  (`resolveBannerVideo()`, same fallback shape) - `preload="metadata"`,
+  revealed only once `readyState >= HAVE_ENOUGH_DATA`/`canplaythrough`
+  fires (never fades in a still-buffering video), never triggered on
+  touch (no hover).
+- **Info/Listen tabs**: Info shows title/description/stats/links (icons
+  from `assets/card-icons/`); Listen lazily mounts the referenced reel
+  (forced `mode:"static"`) via the same `playerApp.renderPlayer()` the
+  builder's own Reels-tab preview uses - never a second render copy.
+  `renderPlayer()` was generalized to take a `containerId` param
+  (defaults to the builder's own preview pane) to make this possible.
+- **Expand/collapse**: new code modeled on (not reusing) the reel's own
+  `expandPlayer()`/`collapsePlayer()`, which are wired into that one
+  reel's own wavesurfer/video-crossfade/idle-manager state and don't
+  apply to a card wrapper. Desktop hover; touch gets an
+  `IntersectionObserver` on the same middle-third viewport band the
+  reel's `setupExpandableModeTouchInteractions()` uses, plus a
+  tap-active-tab-again-to-close affordance (touch has no `mouseleave`).
+  Animated via the CSS Grid `grid-template-rows: 0fr → 1fr` trick
+  (`prefers-reduced-motion`-aware), with frame-by-frame scroll
+  compensation during collapse (`ResizeObserver`, mirroring
+  `js/player.js`'s `compensateScrollDuringCollapse()`) so content below a
+  collapsing card in a masonry grid doesn't visibly jump.
+- **`cardOverrides` merge**: `mergeCardOverrides()` applies the
+  reel-facing whitelist fields (accent/waveform/outline/
+  playerBackground/showReelTitle); `renderCardChrome()` applies every
+  `--card-*` key as inline CSS vars; `textStyles` reuses the exact
+  `pageRoleStyles` tier `resolveTextUnit()` already had for reelplayer
+  Pages (a card is never also inside a Page, so the two can't collide -
+  needed zero changes to the resolver itself, in either file).
+- **Analytics**: `view`/`play` beacons target `/stats/card/<cardId>`
+  (never the referenced reel's own stats) - `player.html`'s
+  `analyticsReelId` was generalized to `analyticsStatsType`/
+  `analyticsStatsId` to support this alongside the plain reel path.
+- **`applyReelStyles()` split**: into `applyReelStyleVars()` (CSS vars
+  only - what a card's mounted reel calls) vs. the original function
+  (also sets `#embedPlayer`'s own background/min-height - correct only
+  for a plain reel embed, where `#embedPlayer` IS the reel, not a card's
+  container).
+
+### Known gap: `reelplayer:resize` doesn't re-fire on viewport resize
+
+Found 2026-09-14 during a documentation stock-take, not yet fixed.
+§5's mobile-parity checklist calls for `reelplayer:resize` to re-fire "on
+viewport resize, orientation change, and mobile address-bar show/hide" -
+`cardChrome.js`'s `postResize()` is currently only called from
+`expand()`/`collapse()`/`switchTab()`, never from a `window resize`
+listener. This matters for a real responsive host page: if the host
+resizes the card's iframe *width* (e.g. a masonry grid recalculating
+columns), the card's own content can reflow to a different natural
+height (more/fewer lines of description text), but nothing re-measures
+and re-posts to tell the host iframe to match - it'd stay at whatever
+height was last posted. Fix would mirror `js/player.js`'s
+`setupWaveformWidthTracking()` pattern: a debounced `window`
+`resize` listener calling `postResize()`. Small, not done yet.
+
+### Also
+- `js/config.js` points `WORKER_BASE_URL` at `localhost:8787`
+  automatically when served from `localhost` - local dev never touches
+  production KV. Run `npx wrangler dev` (from `worker/`, or pass
+  `--config wrangler.toml` explicitly - it can silently pick up the
+  *root* `wrangler.jsonc` otherwise, see `worker/README.md`) alongside
+  `python3 dev-server.py` for a fully local loop.
+- A real (non-test) example is live: "Horizon Call of the Mountain" reel
+  published to production as reel id `hcotm` (6 real tracks, real
+  per-track background images); all its card assets (banner image/video,
+  logo, 4 partner logos, 6 audio tracks) are on production R2 under
+  `images|video|audio/project-cards/hcotm/`. The card record itself
+  (description/stats/links/cardOverrides JSON) hasn't been published
+  yet - the full JSON blob was handed to the user in chat, not saved to
+  a repo file.
+
+### Not started
+§7.6 (real repeater form + "Manage Published Cards" modal) and all of §6
+(boxed-ape-site injector - the actual embedding mechanism). §7a (not
+scheduled) notes a possible future contextual-hint UX for reel fields a
+card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).

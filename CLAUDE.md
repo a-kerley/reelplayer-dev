@@ -22,6 +22,14 @@ dependencies to install for the app itself.
   reusing `player.html` completely unmodified rather than re-implementing
   reel playback a third time (see `js/modules/embedExporter.js`, which
   already generates that exact markup for third-party embeds).
+- **Project Cards** (`player?id=<cardId>&type=card`, same `player.html`) —
+  a card is a reference to a reel (not a copy), rendered as banner +
+  Info/Listen tabs around that reel via `js/modules/cardChrome.js` +
+  `css/card.css`. Build status/design decisions:
+  `docs/project-cards/PLAN.md`. In-progress: the render side is done, the
+  builder's own authoring form is still a v1 raw-JSON stub (§7.6 not
+  started), and the actual boxed-ape-site embedding mechanism doesn't
+  exist yet (§6 not started).
 
 Pages and reels are separate content types stored in the same Worker/KV
 namespace under different key prefixes (`page_<slug>`/`draft_page_<id>` vs
@@ -30,7 +38,8 @@ namespace under different key prefixes (`page_<slug>`/`draft_page_<id>` vs
 `slug` is a stable, user-editable public identifier that survives content
 edits — `js/modules/pagePublish.js`/`worker/src/index.js`'s `POST
 /pages/:slug` handle the resulting rename/collision mechanics that reels
-have no equivalent of.
+have no equivalent of. Cards follow the reel convention (content-hash id,
+`card_<id>`/`draft_card_<id>`), not the page one.
 
 ## `player.html`'s embed bootstrap duplicates `js/player.js`, and drifts
 
@@ -40,6 +49,12 @@ own `renderPlayer()` for a real embed - it has its own hand-written
 `cacheElements()`, mode setup, event listeners, etc.) that are meant to be
 equivalent to what `renderPlayer()` does for the builder's live preview, but
 are a **separate, manually-kept-in-sync copy**, not the same code path.
+
+(The Project Cards render path added later deliberately avoids repeating
+this - a card's Listen tab calls the actual `renderPlayer()`, generalized
+to take a `containerId` param instead of hardcoding the builder's own
+preview pane. See `js/modules/cardChrome.js`. Don't add a fourth
+hand-written copy here if you touch the card path.)
 
 This has already caused three real, hard-to-spot bugs (all worked in the
 builder preview, all silently wrong only in a real embed):
@@ -104,6 +119,14 @@ i.e. "Custom" mode) → `css/player.css`'s hardcoded default. A reel isn't
 tied to any one page, so the fallback tier exists specifically for the
 Reels tab's own preview and any third-party embed with no page context at
 all.
+
+A Project Card's `cardOverrides.textStyles` slots into that same
+top-precedence `page.textStyleDefs` tier (`player.html`'s card path just
+sets the same `pageRoleStyles` variable) rather than adding a fourth
+tier - a card is never also inside a reelplayer Page, so the two sources
+can't collide. Needed zero changes to `resolveTextUnit()` itself in
+either file; if you ever do need to change the resolver logic, both
+files still need the identical edit as always.
 
 ## Builder dark theme — scope boundary
 
