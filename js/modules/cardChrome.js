@@ -145,29 +145,31 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
         </div>
       </div>
       <div class="project-card-extra">
-        <div class="tab-toggle">
-          <button type="button" class="tab-btn active" data-tab="info">
-            <img class="tab-icon-outline" src="/assets/card-icons/tab-info-icon.svg" alt="Info" />
-            <img class="tab-icon-filled" src="/assets/card-icons/tab-info-icon-filled.svg" alt="Info" />
-          </button>
+        <div class="project-card-extra-inner">
+          <div class="tab-toggle">
+            <button type="button" class="tab-btn active" data-tab="info">
+              <img class="tab-icon-outline" src="/assets/card-icons/tab-info-icon.svg" alt="Info" />
+              <img class="tab-icon-filled" src="/assets/card-icons/tab-info-icon-filled.svg" alt="Info" />
+            </button>
+            ${hasReel ? `
+            <button type="button" class="tab-btn" data-tab="listen">
+              <img class="tab-icon-outline" src="/assets/card-icons/tab-listen-icon.svg" alt="Listen" />
+              <img class="tab-icon-filled" src="/assets/card-icons/tab-listen-icon-filled.svg" alt="Listen" />
+            </button>
+            ` : ""}
+          </div>
+          <div class="tab-content active" data-tab-content="info">
+            ${cardData.title ? `<h3>${escapeHtml(cardData.title)}</h3>` : ""}
+            ${renderDescription(cardData.description)}
+            <div class="extra-stats">${renderStats(cardData.stats)}</div>
+            ${renderLinks(cardData.links)}
+          </div>
           ${hasReel ? `
-          <button type="button" class="tab-btn" data-tab="listen">
-            <img class="tab-icon-outline" src="/assets/card-icons/tab-listen-icon.svg" alt="Listen" />
-            <img class="tab-icon-filled" src="/assets/card-icons/tab-listen-icon-filled.svg" alt="Listen" />
-          </button>
+          <div class="tab-content" data-tab-content="listen">
+            <div id="${listenContainerId}" class="card-listen-player"></div>
+          </div>
           ` : ""}
         </div>
-        <div class="tab-content active" data-tab-content="info">
-          ${cardData.title ? `<h3>${escapeHtml(cardData.title)}</h3>` : ""}
-          ${renderDescription(cardData.description)}
-          <div class="extra-stats">${renderStats(cardData.stats)}</div>
-          ${renderLinks(cardData.links)}
-        </div>
-        ${hasReel ? `
-        <div class="tab-content" data-tab-content="listen">
-          <div id="${listenContainerId}" class="card-listen-player"></div>
-        </div>
-        ` : ""}
       </div>
     </div>
   `;
@@ -183,10 +185,24 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     if (key.startsWith("--")) card.style.setProperty(key, value);
   });
 
+  const extraInner = container.querySelector(".project-card-extra-inner");
+
+  // The *target* height, not whatever .project-card-extra's grid row
+  // currently measures mid-transition (see card.css's header comment on
+  // the 0fr/1fr trick) - extraInner.scrollHeight is its full natural
+  // content height regardless of the outer row's current animated size,
+  // since overflow:hidden clips the rendered box without affecting
+  // scrollHeight. A real host iframe's own CSS (see embedExporter.js's
+  // generated `transition: height 0.3s ease` on the wrapping div, and
+  // PLAN.md §6 - the boxed-ape injector needs the same) is what actually
+  // animates smoothly toward this target; this only ever needs to post
+  // the one final number, not a value per frame.
   function postResize() {
     if (window.self === window.top) return;
     requestAnimationFrame(() => {
-      const height = card.classList.contains("expanded") ? card.scrollHeight : banner.offsetHeight;
+      const height = card.classList.contains("expanded")
+        ? banner.offsetHeight + extraInner.scrollHeight
+        : banner.offsetHeight;
       window.parent.postMessage({ type: "reelplayer:resize", height }, "*");
     });
   }
@@ -195,27 +211,58 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
   // on - uncompensated, whatever's below (in a masonry grid, likely other
   // cards) visibly jumps upward as that space disappears, exactly the bug
   // js/player.js's own compensateScrollDuringCollapse() exists to prevent
-  // for the reel. A card's collapse isn't CSS-transitioned (card.css toggles
-  // .project-card-extra's display, not an animated height), so this is a
-  // single before/after measurement on the next frame rather than that
-  // function's ResizeObserver-per-frame version - simpler because there's
-  // no multi-frame transition to track, not a lesser fix. Same
-  // "scrollBy directly, or ask the host via postMessage when in an iframe"
-  // split - a real card embed's host page needs its own
+  // for the reel. Same technique here, adapted for the card wrapper: watch
+  // the card's *actual rendered* height via ResizeObserver as the CSS
+  // grid-template-rows transition plays (card.css), and scroll by the
+  // same delta on each reported change so content below stays visually
+  // anchored throughout the whole animation, not just before/after it -
+  // a single before/after measurement would still leave a visible jump at
+  // either end now that the collapse is a real multi-frame transition,
+  // not the instant snap this function used to compensate for. Same
+  // "scrollBy directly, or ask the host via postMessage when in an
+  // iframe" split - a real card embed's host page needs its own
   // reelplayer:scrollCompensate listener (PLAN.md §6, copied from
   // embedExporter.js's resizeScript - not built yet, so this is a no-op
   // until then in a real embed, exactly like the reel's own handshake was
   // before embedExporter.js existed).
-  function compensateScrollForCollapse(beforeHeight) {
-    requestAnimationFrame(() => {
-      const delta = beforeHeight - card.getBoundingClientRect().height;
+  function compensateScrollForCollapse() {
+    const inIframe = window.self !== window.top;
+    let previousHeight = card.getBoundingClientRect().height;
+
+    const applyDelta = (delta) => {
       if (delta === 0) return;
-      if (window.self !== window.top) {
+      if (inIframe) {
         window.parent.postMessage({ type: "reelplayer:scrollCompensate", delta: -delta }, "*");
       } else {
         window.scrollBy(0, -delta);
       }
+    };
+
+    const resizeObserver = new ResizeObserver((entries) => {
+      const currentHeight = entries[entries.length - 1].contentRect.height;
+      applyDelta(previousHeight - currentHeight);
+      previousHeight = currentHeight;
     });
+
+    const stop = () => {
+      resizeObserver.disconnect();
+      card.removeEventListener("transitionend", onTransitionEnd);
+    };
+    const onTransitionEnd = (e) => {
+      if (e.target === extraInner?.parentElement && e.propertyName === "grid-template-rows") stop();
+    };
+    card.addEventListener("transitionend", onTransitionEnd);
+    resizeObserver.observe(card);
+
+    // Fallback in case transitionend never fires (reduced-motion strips
+    // the transition entirely, or an interrupted transition) - stop
+    // regardless shortly after the CSS transition's own configured
+    // duration (card.css's grid-template-rows transition, 0.35s).
+    // The transition lives on .project-card-extra (its grid-template-rows),
+    // not on .project-card itself.
+    const extra = container.querySelector(".project-card-extra");
+    const transitionDuration = (parseFloat(getComputedStyle(extra).transitionDuration) || 0.35) * 1000;
+    setTimeout(stop, transitionDuration + 150);
   }
 
   function expand() {
@@ -226,9 +273,12 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
 
   function collapse() {
     if (!card.classList.contains("expanded")) return;
-    const beforeHeight = card.getBoundingClientRect().height;
+    // Start observing BEFORE removing "expanded" - that removal is what
+    // triggers the CSS transition, so the observer needs to already be
+    // watching to catch the very first frame of the shrink (same ordering
+    // js/player.js's own collapsePlayer() uses for the identical reason).
+    compensateScrollForCollapse();
     card.classList.remove("expanded");
-    compensateScrollForCollapse(beforeHeight);
     postResize();
   }
 

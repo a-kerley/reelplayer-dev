@@ -70,6 +70,45 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   correctly resized 493px→240px and the host page's own marker element
   drifted only ~6px against a 247px collapse. No known gap remains beyond
   the accepted top-half-tracking optimization above.
+- Card open/close animation (2026-09-14, same day): the card had NO
+  expand animation at all until this point - `.project-card-extra` just
+  snapped between `display:none`/`block`. Replaced with the CSS Grid
+  `grid-template-rows: 0fr → 1fr` trick on `.project-card-extra` itself
+  (a `.project-card-extra-inner` child holds the padding/content, clipped
+  by `overflow:hidden` while its row is near-0) - handles arbitrary/
+  variable content height correctly without JS measuring anything, and
+  respects `prefers-reduced-motion` matching this codebase's existing
+  convention (`css/page.css`) of defining the transition unconditionally
+  then stripping it in a `(prefers-reduced-motion: reduce)` override.
+  This exposed two things needing fixes, not just new CSS:
+  - `postResize()` used to read the *animating* element's own
+    `scrollHeight` for the target iframe height - correct when the
+    change was instant, wrong mid-transition (it'd report whatever
+    height the animation happened to be at that instant). Now computes
+    the target directly from `banner.offsetHeight +
+    extraInner.scrollHeight` (the inner element's full natural content
+    height is unaffected by the outer grid row's current clipped size),
+    and posts that single target once - the same "host CSS transitions
+    the iframe smoothly toward one target number" pattern
+    `embedExporter.js`'s generated markup already uses for reels (PLAN.md
+    §6's injector needs the same `transition: height` on its own
+    wrapper).
+  - `compensateScrollForCollapse()`'s previous single before/after
+    measurement (correct for an instant snap) would now leave a visible
+    jump at either end of a real multi-frame transition. Upgraded to the
+    same `ResizeObserver`-per-frame technique `js/player.js`'s
+    `compensateScrollDuringCollapse()` already uses - watches the card's
+    actual rendered height on every frame of the shrink and scrolls by
+    the same delta each time, so content below stays anchored throughout
+    the whole animation, not just at the ends.
+  Verified: sampled `card.getBoundingClientRect().height` every 40ms
+  through both expand (280px→487px over ~330ms, progressive, not an
+  instant jump) and collapse, and re-ran the marker-drift test through
+  the full animated collapse this time (not just an instant one) - marker
+  stayed within ~22px throughout the entire 487px→280px animated shrink
+  while `scrollY` tracked it in lockstep frame by frame. No console
+  errors; Listen tab + lazy reel mount re-verified working with the new
+  markup structure.
 - `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
   `mergeCardOverrides()` applies the whitelist's reel-facing fields
   (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/

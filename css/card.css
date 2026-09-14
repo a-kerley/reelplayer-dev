@@ -128,20 +128,38 @@
   background: rgba(255, 255, 255, 0.2);
 }
 
-/* Expanded content - hidden until .project-card.expanded */
+/* Expanded content - animated height via the CSS Grid 0fr/1fr trick
+   (transitioning grid-template-rows, not max-height/height) - handles
+   arbitrary/variable content height correctly without JS measuring it,
+   unlike a fixed max-height guess. .project-card-extra is always
+   display:grid with a single grid-item child (.project-card-extra-inner,
+   overflow:hidden so it's clipped while its row is near-0) - padding
+   lives on the inner element, not here, since padding on the *container*
+   would stay visibly present even at a 0fr row height. */
 .project-card-extra {
-  display: none;
-  padding: 1.25rem;
+  display: grid;
+  grid-template-rows: 0fr;
+  transition: grid-template-rows 0.35s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Matches this codebase's existing reduced-motion convention (see
+   css/page.css) - define the transition unconditionally above, strip it
+   here. collapsed/expanded still snap instantly to the correct state
+   either way, only the transition between them is skipped. */
+@media (prefers-reduced-motion: reduce) {
+  .project-card-extra {
+    transition: none;
+  }
 }
 
 .project-card.expanded .project-card-extra {
-  display: block;
-  animation: card-fade-in 0.3s ease-out;
+  grid-template-rows: 1fr;
 }
 
-@keyframes card-fade-in {
-  from { opacity: 0; transform: translateY(6px); }
-  to { opacity: 1; transform: translateY(0); }
+.project-card-extra-inner {
+  overflow: hidden;
+  min-height: 0;
+  padding: 1.25rem;
 }
 
 .project-card-extra h3 {
