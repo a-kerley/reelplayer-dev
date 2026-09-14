@@ -9,8 +9,7 @@ here: the host pages are hand-authored, not reelplayer-rendered.)
 
 ## Status (as of 2026-09-14)
 
-**§7.1-§7.4 (the whole spine + render slice) are done, with one known
-gap** (resize-on-viewport-change, see below). What's left otherwise is
+**§7.1-§7.4 (the whole spine + render slice) are done.** What's left is
 entirely builder-side UI (§7.6) and the boxed-ape-site embedding side
 (§6). Detailed implementation notes below; git history
 (`git log --oneline -- docs/project-cards js/modules/cardChrome.js
@@ -32,7 +31,7 @@ else (`js/cardsController.js`, `js/modules/cardDraftStore.js`,
 can be wired up - `statsViewer.js` itself is already fully generic on
 `targetType`, no code changes needed there).
 
-### `player.html?id=<cardId>&type=card` render (§7.4/§5 - done, one known gap below)
+### `player.html?id=<cardId>&type=card` render (§7.4/§5 - done)
 `js/modules/cardChrome.js` + `css/card.css` render the full card chrome:
 - **Banner**: static image (`resolveBannerImage()`, fallback chain
   `cardOverrides.bannerImage` → reel's own `backgroundImage` → first
@@ -76,21 +75,25 @@ can be wired up - `statsViewer.js` itself is already fully generic on
   for a plain reel embed, where `#embedPlayer` IS the reel, not a card's
   container).
 
-### Known gap: `reelplayer:resize` doesn't re-fire on viewport resize
+### Fixed: `reelplayer:resize` now re-fires on viewport resize
 
-Found 2026-09-14 during a documentation stock-take, not yet fixed.
-§5's mobile-parity checklist calls for `reelplayer:resize` to re-fire "on
-viewport resize, orientation change, and mobile address-bar show/hide" -
-`cardChrome.js`'s `postResize()` is currently only called from
-`expand()`/`collapse()`/`switchTab()`, never from a `window resize`
-listener. This matters for a real responsive host page: if the host
-resizes the card's iframe *width* (e.g. a masonry grid recalculating
-columns), the card's own content can reflow to a different natural
-height (more/fewer lines of description text), but nothing re-measures
-and re-posts to tell the host iframe to match - it'd stay at whatever
-height was last posted. Fix would mirror `js/player.js`'s
-`setupWaveformWidthTracking()` pattern: a debounced `window`
-`resize` listener calling `postResize()`. Small, not done yet.
+Found and fixed 2026-09-14. §5's mobile-parity checklist calls for
+`reelplayer:resize` to re-fire "on viewport resize, orientation change,
+and mobile address-bar show/hide" - `cardChrome.js`'s `postResize()` was
+previously only called from `expand()`/`collapse()`/`switchTab()`. Added
+a debounced (150ms) `window resize` listener calling `postResize()`,
+mirroring `js/player.js`'s `setupWaveformWidthTracking()` pattern (no
+`orientationchange` listener needed separately - resizing the window
+already fires `resize`, same convention that function relies on). No
+cleanup/`removeEventListener` - `renderCardChrome()` runs exactly once
+per `player.html` page load, never re-invoked for a different card in
+the same document, so there's nothing to leak.
+
+Verified through a real iframe: resizing the iframe element's own width
+(simulating a host masonry grid recalculating columns) fired a fresh
+`reelplayer:resize` message; narrowing it enough to wrap the Info tab's
+description text to more lines correctly reported a taller target height
+(451px → 493px) and the host's iframe grew to match. No console errors.
 
 ### Also
 - `js/config.js` points `WORKER_BASE_URL` at `localhost:8787`

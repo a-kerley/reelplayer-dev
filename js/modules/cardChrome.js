@@ -418,5 +418,24 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
 
   postResize(); // initial (collapsed) height
 
+  // PLAN.md §5's mobile-parity checklist: reelplayer:resize must also
+  // re-fire on viewport resize/orientation change, not just
+  // expand/collapse/tab-switch - a real responsive host page can resize
+  // the card's iframe *width* (e.g. a masonry grid recalculating
+  // columns), which can reflow the card's own content to a different
+  // natural height (more/fewer lines of description text) with nothing
+  // otherwise telling the host iframe to match. Debounced (150ms),
+  // mirroring js/player.js's setupWaveformWidthTracking() - a continuous
+  // resize/orientation-change gesture should only trigger one
+  // re-measure at the end, not one per intermediate frame. No
+  // removeEventListener/cleanup here: renderCardChrome() runs exactly
+  // once per player.html page load (never re-invoked to re-render a
+  // different card in the same document), so there's nothing to leak.
+  let resizeDebounce;
+  window.addEventListener("resize", () => {
+    clearTimeout(resizeDebounce);
+    resizeDebounce = setTimeout(postResize, 150);
+  });
+
   return { listenContainerId };
 }
