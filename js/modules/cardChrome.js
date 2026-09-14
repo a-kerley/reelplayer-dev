@@ -62,6 +62,13 @@ export function mergeCardOverrides(reel, cardOverrides) {
   return merged;
 }
 
+// Same detection method as js/player.js's isTouchDevice(), kept
+// independent (not imported) since that one's a playerApp method, not a
+// standalone export.
+function isTouchDevice() {
+  return window.matchMedia("(hover: none) and (pointer: coarse)").matches;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -196,9 +203,36 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     postResize();
   }
 
-  // Desktop hover only for this slice - see this file's header comment.
-  card.addEventListener("mouseenter", expand);
-  card.addEventListener("mouseleave", collapse);
+  // manualOverrideUntil guards against the mobile scroll observer below
+  // immediately re-firing on (and undoing) a deliberate tap - harmless to
+  // set on desktop too, since nothing reads it there.
+  let manualOverrideUntil = 0;
+  const TAP_COOLDOWN_MS = 500;
+
+  if (isTouchDevice()) {
+    // Mobile has no hover - mirrors js/player.js's
+    // setupExpandableModeTouchInteractions(): a card expands as it scrolls
+    // into the middle third of the viewport, and collapses once it fully
+    // leaves that band. Deliberately simpler than the reel's own version -
+    // no top-half tracking / scroll-compensation-on-collapse (accepted gap,
+    // not built here; the card's own collapse is a much smaller height
+    // change than a full reel player's, so an uncompensated jump is minor).
+    const observer = new IntersectionObserver((entries) => {
+      entries.forEach((entry) => {
+        if (Date.now() < manualOverrideUntil) return;
+        if (entry.isIntersecting) {
+          expand();
+        } else if (card.classList.contains("expanded")) {
+          collapse();
+        }
+      });
+    }, { threshold: 0, rootMargin: "-33% 0px -33% 0px" });
+    observer.observe(card);
+  } else {
+    // Desktop hover.
+    card.addEventListener("mouseenter", expand);
+    card.addEventListener("mouseleave", collapse);
+  }
 
   let listenActivated = false;
   function switchTab(tabName) {
@@ -215,11 +249,26 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
     postResize();
   }
 
+  // A tap on the already-active tab while expanded closes the card again -
+  // hover has mouseleave for this, touch has no equivalent, so without this
+  // a touch visitor could open but never manually close it (the scroll
+  // observer above only reacts to leaving the middle-third band, not to a
+  // second tap on the same spot).
   container.querySelectorAll("[data-tab]").forEach((btn) => {
     btn.addEventListener("click", (e) => {
       e.stopPropagation();
+      const tabName = btn.dataset.tab;
+      manualOverrideUntil = Date.now() + TAP_COOLDOWN_MS;
+
+      const alreadyActive = container
+        .querySelector(`.tab-content[data-tab-content="${tabName}"]`)
+        ?.classList.contains("active");
+      if (card.classList.contains("expanded") && alreadyActive) {
+        collapse();
+        return;
+      }
       expand();
-      switchTab(btn.dataset.tab);
+      switchTab(tabName);
     });
   });
 

@@ -29,7 +29,25 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   used by a card's mounted reel) vs. the container-background half (plain
   reel embeds only) so a card's own banner background doesn't get
   clobbered by its reel's.
-  Not yet done: mobile scroll-band expand, banner video, and analytics.
+  Not yet done: banner video and analytics.
+- Mobile scroll-band expand/collapse (2026-09-14): `js/modules/
+  cardChrome.js` branches on the same `isTouchDevice()` media-query check
+  `js/player.js` uses. Touch devices get an `IntersectionObserver` on the
+  card (`-33% 0px -33% 0px` rootMargin - the same middle-third band the
+  reel's own `setupExpandableModeTouchInteractions()` uses) that expands
+  on entry and collapses on exit, plus a tap-the-active-tab-again-to-close
+  affordance (hover has `mouseleave` for this, touch has nothing
+  equivalent) guarded by a 500ms manual-tap cooldown so a deliberate tap
+  isn't immediately undone by the observer re-firing. Deliberately
+  simpler than the reel's version: no top-half tracking / scroll-
+  compensation-on-collapse (accepted gap - the card's own collapse is a
+  much smaller height change than a full reel player's). `.tab-btn` also
+  bumped to the 44px touch-target minimum (`.card-banner-btn` already
+  met it). Verified by forcing the touch media query and scrolling a
+  tall test page - auto-expand entering the band, auto-collapse leaving
+  it, and both directions of the manual tap-toggle, all confirmed
+  through the browser with no console errors; desktop hover re-verified
+  unaffected on a real (non-forced) run right after.
 - `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
   `mergeCardOverrides()` applies the whitelist's reel-facing fields
   (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/
@@ -57,10 +75,10 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   the v1 stub form) hasn't been published yet - see chat history for the
   full JSON blob, not saved to a repo file.
 
-Not started: mobile scroll-band expand/collapse, banner video crossfade,
-the text-style-resolver new tier, analytics wiring, §7.6 (real repeater
-form), and all of §6 (boxed-ape-site injector). §7a (not scheduled) notes
-a possible future contextual-hint UX for reel fields a card ignores.
+Not started: banner video crossfade, the text-style-resolver new tier,
+analytics wiring, §7.6 (real repeater form), and all of §6 (boxed-ape-site
+injector). §7a (not scheduled) notes a possible future contextual-hint UX
+for reel fields a card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).
