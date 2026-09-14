@@ -15,6 +15,53 @@
 // section - the scroll-band IntersectionObserver mobile behavior is a
 // separate follow-up slice, not built here yet.
 
+// cardOverrides whitelist (PLAN.md §3) that maps onto the reel's own
+// settings fields, winning over whatever the reel itself has set. Two of
+// the whitelist's other keys are handled elsewhere, not here:
+// - bannerImage/bannerVideo: banner-only, resolveBannerImage() below
+//   (bannerVideo isn't rendered at all yet - no crossfade slice yet)
+// - textStyles: NOT handled by this function - needs a new top tier in
+//   the previewManager.js/player.html text-style resolver pair (its own
+//   separate slice, PLAN.md §5's "second drift pair" note), not a plain
+//   settings-field override like the rest of this whitelist.
+const OVERRIDE_SETTINGS_FIELD = {
+  accent: "varUiAccent",
+  waveformUnplayed: "varWaveformUnplayed",
+  waveformHover: "varWaveformHover",
+  outlineWidth: "playerOutlineWidth",
+  outlineColor: "playerOutlineColor",
+};
+
+/**
+ * Applies a card's cardOverrides onto its (already mode:"static"-forced)
+ * reel, returning a new reel object - never mutates the input, since
+ * cardData.reel may be read again elsewhere. Reel field names differ from
+ * the cardOverrides key names (e.g. accent -> varUiAccent) because the
+ * whitelist names things from the *card author's* perspective, not the
+ * reel schema's.
+ */
+export function mergeCardOverrides(reel, cardOverrides) {
+  if (!cardOverrides) return reel;
+
+  const settings = { ...(reel.settings || {}) };
+  for (const [overrideKey, settingsField] of Object.entries(OVERRIDE_SETTINGS_FIELD)) {
+    if (cardOverrides[overrideKey] !== undefined) settings[settingsField] = cardOverrides[overrideKey];
+  }
+  // outlineWidth alone doesn't turn the outline on - playerOutlineEnabled
+  // is a separate flag applyReelStyleVars() reads (mirrors the reel
+  // builder's own "outlineWidth > 0 implies enabled" convention).
+  if (cardOverrides.outlineWidth !== undefined) settings.playerOutlineEnabled = cardOverrides.outlineWidth > 0;
+
+  const merged = { ...reel, settings };
+  // backgroundColor/showTitle are read top-level (not under .settings) by
+  // applyReelStyleVars()/renderPlayer() respectively - see js/player.js's
+  // own reelData.backgroundColor-before-settings.backgroundColor fallback.
+  if (cardOverrides.playerBackground !== undefined) merged.backgroundColor = cardOverrides.playerBackground;
+  if (cardOverrides.showReelTitle !== undefined) merged.showTitle = cardOverrides.showReelTitle;
+
+  return merged;
+}
+
 function escapeHtml(value) {
   return String(value ?? "").replace(/[&<>"']/g, (c) => ({
     "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
@@ -120,6 +167,14 @@ export function renderCardChrome(container, cardData, { onActivateListen }) {
 
   const card = container.querySelector(".project-card");
   const banner = container.querySelector(".project-card-banner");
+
+  // Card-chrome CSS vars from cardOverrides (PLAN.md §3 whitelist) - the
+  // remaining, non-CSS-var half of the whitelist (accent/waveform/
+  // outline/playerBackground/showReelTitle) is applied to the reel itself
+  // by mergeCardOverrides() above, not here.
+  Object.entries(cardData.cardOverrides || {}).forEach(([key, value]) => {
+    if (key.startsWith("--")) card.style.setProperty(key, value);
+  });
 
   function postResize() {
     if (window.self === window.top) return;

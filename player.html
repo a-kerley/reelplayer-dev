@@ -86,7 +86,7 @@
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
     import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './js/modules/pageTextStyles.js';
-    import { renderCardChrome } from './js/modules/cardChrome.js';
+    import { renderCardChrome, mergeCardOverrides } from './js/modules/cardChrome.js';
 
     // Opt-in per-reel analytics (see js/modules/statsBeacon.js /
     // worker/CLAUDE.md) - set once loadAndRenderReel() confirms
@@ -227,8 +227,12 @@
         const { listenContainerId } = renderCardChrome(container, cardData, {
           onActivateListen: () => {
             // A card's reel always renders static (the card owns collapse,
-            // not the reel) - see PLAN.md §3's "Data boundary".
-            const reel = { ...cardData.reel, mode: 'static' };
+            // not the reel) - see PLAN.md §3's "Data boundary". Card
+            // overrides (accent/waveform/outline/background/title - the
+            // textStyles/banner-media parts of the whitelist are handled
+            // elsewhere, see mergeCardOverrides()'s own comment) win over
+            // whatever the reel itself has set.
+            const reel = mergeCardOverrides({ ...cardData.reel, mode: 'static' }, cardData.cardOverrides);
 
             // Only the CSS vars a mounted reel reads (accent, waveform
             // colors, text styles, ...) - NOT applyReelStyles()'s

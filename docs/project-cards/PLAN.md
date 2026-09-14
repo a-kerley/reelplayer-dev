@@ -29,17 +29,38 @@ Status: spine in progress (§7). Done so far, 2026-09-13:
   used by a card's mounted reel) vs. the container-background half (plain
   reel embeds only) so a card's own banner background doesn't get
   clobbered by its reel's.
-  Not yet done: mobile scroll-band expand, `cardOverrides` merge, banner
-  video, and analytics.
+  Not yet done: mobile scroll-band expand, banner video, and analytics.
+- `cardOverrides` merge (2026-09-14): `js/modules/cardChrome.js`'s
+  `mergeCardOverrides()` applies the whitelist's reel-facing fields
+  (accent/waveformUnplayed/waveformHover/outlineWidth/outlineColor/
+  playerBackground/showReelTitle) onto the reel before it renders, and
+  `renderCardChrome()` applies every `--card-*` key straight onto the card
+  element as inline CSS custom properties. `bannerImage` was already wired
+  (banner fallback chain); `bannerVideo` and `textStyles` are explicitly
+  NOT handled by this - the former needs the video-crossfade slice, the
+  latter needs its own new tier in the previewManager.js/player.html
+  text-style resolver pair (§5's "second drift pair"). Verified against a
+  local card with deliberately conflicting reel vs. card-override values
+  (different accent colors, outline, background, title) - every override
+  won cleanly, all via the browser, no console errors.
 - Also: `js/config.js` now points `WORKER_BASE_URL` at `localhost:8787`
   automatically when served from `localhost`, so local dev never touches
   production KV - run `npx wrangler dev` (from `worker/`, or pass
   `--config wrangler.toml` explicitly - see worker/README.md for why) +
   `python3 dev-server.py` together for a fully local loop.
+- A real (non-test) example is live: the "Horizon Call of the Mountain"
+  reel is published to production as reel id `hcotm` (6 real tracks, real
+  per-track background images), and all of its card assets (banner image/
+  video, logo, 4 partner logos, 6 audio tracks) are uploaded to production
+  R2 under `images|video|audio/project-cards/hcotm/`. The card record
+  itself (description/stats/links/cardOverrides JSON, ready to paste into
+  the v1 stub form) hasn't been published yet - see chat history for the
+  full JSON blob, not saved to a repo file.
 
-Not started: mobile scroll-band expand/collapse, `cardOverrides` merge,
-banner video crossfade, the text-style-resolver new tier, analytics
-wiring, §7.6 (real repeater form), and all of §6 (boxed-ape-site injector).
+Not started: mobile scroll-band expand/collapse, banner video crossfade,
+the text-style-resolver new tier, analytics wiring, §7.6 (real repeater
+form), and all of §6 (boxed-ape-site injector). §7a (not scheduled) notes
+a possible future contextual-hint UX for reel fields a card ignores.
 
 Source snapshot from boxed-ape-site is in `boxed-ape-source/` (see its
 README for provenance + a per-file guide).
