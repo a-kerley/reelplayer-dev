@@ -203,47 +203,60 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       li.ondragend = () => li.classList.remove('dragging');
     }
 
-    if (opts.onMoveToFolder || opts.onDuplicate || opts.getPublicUrl) {
-      li.oncontextmenu = (e) => {
-        e.preventDefault();
-        e.stopPropagation();
-        const menuItems = [];
+    li.oncontextmenu = (e) => {
+      e.preventDefault();
+      e.stopPropagation();
+      const menuItems = [];
 
-        if (opts.onMoveToFolder) {
-          const submenuItems = folderNames
-            .filter((name) => name !== item.folder)
-            .map((name) => ({ label: name, onClick: () => opts.onMoveToFolder(item.id, name) }));
-          submenuItems.push({
-            label: 'New folder…',
-            onClick: async () => {
-              const name = await createFolder(folderMeta);
-              if (name) opts.onMoveToFolder(item.id, name);
-            },
-          });
-          if (item.folder) {
-            submenuItems.push({ label: 'Remove from folder', onClick: () => opts.onMoveToFolder(item.id, null) });
-          }
-          menuItems.push({ label: 'Move to…', submenu: submenuItems });
+      if (onToggleLock) {
+        menuItems.push({
+          label: item.locked ? 'Unlock' : 'Lock',
+          onClick: () => onToggleLock(item.id),
+        });
+      }
+
+      if (opts.onMoveToFolder) {
+        const submenuItems = folderNames
+          .filter((name) => name !== item.folder)
+          .map((name) => ({ label: name, onClick: () => opts.onMoveToFolder(item.id, name) }));
+        submenuItems.push({
+          label: 'New folder…',
+          onClick: async () => {
+            const name = await createFolder(folderMeta);
+            if (name) opts.onMoveToFolder(item.id, name);
+          },
+        });
+        if (item.folder) {
+          submenuItems.push({ label: 'Remove from folder', onClick: () => opts.onMoveToFolder(item.id, null) });
         }
+        menuItems.push({ label: 'Move to…', submenu: submenuItems });
+      }
 
-        if (opts.onDuplicate) {
-          menuItems.push({ label: 'Duplicate', onClick: () => opts.onDuplicate(item.id) });
-        }
+      if (opts.onDuplicate) {
+        menuItems.push({ label: 'Duplicate', onClick: () => opts.onDuplicate(item.id) });
+      }
 
-        if (opts.getPublicUrl) {
-          const url = opts.getPublicUrl(item);
-          menuItems.push({
-            label: 'Copy Link',
-            disabled: !url,
-            onClick: () => navigator.clipboard.writeText(url)
-              .then(() => showToast('Link copied'))
-              .catch(() => dialog.alert(`Couldn't copy to clipboard. Link: ${url}`)),
-          });
-        }
+      if (opts.getPublicUrl) {
+        const url = opts.getPublicUrl(item);
+        menuItems.push({
+          label: 'Copy Link',
+          disabled: !url,
+          onClick: () => navigator.clipboard.writeText(url)
+            .then(() => showToast('Link copied'))
+            .catch(() => dialog.alert(`Couldn't copy to clipboard. Link: ${url}`)),
+        });
+      }
 
-        openContextMenu(li, menuItems);
-      };
-    }
+      menuItems.push({
+        label: 'Delete',
+        danger: true,
+        onClick: () => dialog.confirm(opts.deleteConfirmMessage || 'Delete this item?', 'Delete', 'Cancel').then((confirmed) => {
+          if (confirmed) onDelete(item.id);
+        }),
+      });
+
+      openContextMenu(li, menuItems);
+    };
 
     const titleSpan = document.createElement('span');
     titleSpan.className = 'sidebar-item-title';
