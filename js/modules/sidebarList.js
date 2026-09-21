@@ -8,6 +8,21 @@ import { dialog } from './dialogSystem.js';
 import { openContextMenu } from './contextMenu.js';
 import { loadFolderMeta, saveFolderMeta } from './folderMeta.js';
 
+// openContextMenu() positions relative to an anchor element's own
+// bounding box - fine for a small row/header anchor, but wrong for a
+// right-click on open list space, where the "anchor" (the whole <ul>) can
+// be much taller than the viewport and the menu would land far from the
+// actual click. A zero-size point element at the cursor gives it a
+// same-size-as-click "anchor" instead; removed immediately after, since
+// openContextMenu only reads its rect synchronously during positioning.
+function openContextMenuAtCursor(e, items) {
+  const point = document.createElement('div');
+  point.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:0;height:0;`;
+  document.body.appendChild(point);
+  openContextMenu(point, items);
+  point.remove();
+}
+
 // Folder grouping. `item.folder` is a plain string tag an item carries, but
 // a folder's NAME persists independently via /folder-meta/:type (see
 // folderMeta.js) - that's what lets an empty folder (created but nothing
@@ -321,7 +336,7 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
     list.oncontextmenu = (e) => {
       if (e.target !== list) return;
       e.preventDefault();
-      openContextMenu(list, [{
+      openContextMenuAtCursor(e, [{
         label: 'New Folder…',
         onClick: () => createFolder(folderMeta).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
       }]);
