@@ -7,7 +7,7 @@
 import { WORKER_BASE_URL, R2_PUBLIC_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
-import { openContextMenu } from "./contextMenu.js";
+import { openContextMenuAtCursor } from "./contextMenu.js";
 
 const ICONS = {
   FOLDER: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;height:18px;">
@@ -576,15 +576,16 @@ export async function renderMediaBrowser(container, options = {}) {
     countsDiv.textContent = counts.total;
     row.appendChild(countsDiv);
 
-    // Only real, named folders (not the special "Unfiled"/"All Media" rows,
-    // and not the protected audio/images/video roots every file-picker
-    // targets by fixed path) get rename/delete actions, and only in manage
-    // mode. Right-click the row itself instead of a dedicated "..." button -
-    // same convention as js/modules/sidebarList.js's folder headers.
-    if (mode === 'manage' && path && !PROTECTED_ROOT_FOLDERS[path]) {
+    // Every real, named folder gets a right-click menu in manage mode
+    // (not the special "Unfiled"/"All Media" rows, which have no path) -
+    // including the protected audio/images/video roots, whose Rename/Delete
+    // are shown greyed out (see showFolderMenu()) rather than the row
+    // having no menu at all. Anchored at the cursor, not the row, since a
+    // wide row's own bounding box would put the menu far from the click.
+    if (mode === 'manage' && path) {
       row.oncontextmenu = (e) => {
         e.preventDefault();
-        showFolderMenu(path, row);
+        showFolderMenu(path, e);
       };
     }
 
@@ -670,14 +671,19 @@ export async function renderMediaBrowser(container, options = {}) {
     });
   }
 
-  function showFolderMenu(path, anchorEl) {
-    if (PROTECTED_ROOT_FOLDERS[path]) return; // belt-and-suspenders; the menu button itself is already omitted for these
+  function showFolderMenu(path, e) {
+    // The protected audio/images/video roots still get a menu (consistent
+    // right-click affordance on every folder row), but Rename/Delete are
+    // greyed out rather than the row having no menu at all - these paths
+    // are fixed targets every file-picker/upload flow depends on existing.
+    const isProtected = !!PROTECTED_ROOT_FOLDERS[path];
     const currentName = path.split('/').filter(Boolean).pop();
     const parentPath = folderOf(path.slice(0, -1));
 
-    openContextMenu(anchorEl, [
+    openContextMenuAtCursor(e, [
       {
         label: "Rename",
+        disabled: isProtected,
         onClick: async () => {
           const newName = await promptForText("Rename folder", currentName);
           if (!newName || newName === currentName) return;
@@ -704,6 +710,7 @@ export async function renderMediaBrowser(container, options = {}) {
       {
         label: "Delete",
         danger: true,
+        disabled: isProtected,
         onClick: async () => {
           const filesToDelete = state.files.filter(f => f.key.startsWith(path));
           const confirmed = await dialog.confirm(
@@ -1043,7 +1050,7 @@ export async function renderMediaBrowser(container, options = {}) {
       // js/modules/sidebarList.js's item rows.
       row.oncontextmenu = (e) => {
         e.preventDefault();
-        showRowMenu(file, row);
+        showRowMenu(file, e);
       };
     }
 
@@ -1108,8 +1115,8 @@ export async function renderMediaBrowser(container, options = {}) {
     return row;
   }
 
-  function showRowMenu(file, anchorEl) {
-    openContextMenu(anchorEl, [
+  function showRowMenu(file, e) {
+    openContextMenuAtCursor(e, [
       {
         label: "Copy URL",
         onClick: async () => {

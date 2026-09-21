@@ -18,6 +18,22 @@ export function closeContextMenu() {
   }
 }
 
+// openContextMenu() positions relative to an anchor element's own bounding
+// box - fine for a small, click-sized anchor (a button, a narrow list row),
+// but wrong for a right-click on something wide (a table row spanning the
+// full content width, open empty space), where the menu would land at the
+// anchor's far edge instead of near the actual click. A zero-size point
+// element at the cursor gives it a same-size-as-click "anchor" instead;
+// removed immediately after, since openContextMenu only reads its rect
+// synchronously during positioning.
+export function openContextMenuAtCursor(e, items, opts) {
+  const point = document.createElement('div');
+  point.style.cssText = `position:fixed;left:${e.clientX}px;top:${e.clientY}px;width:0;height:0;`;
+  document.body.appendChild(point);
+  openContextMenu(point, items, opts);
+  point.remove();
+}
+
 function closeSubmenu() {
   if (openSubmenuCleanup) {
     openSubmenuCleanup();
