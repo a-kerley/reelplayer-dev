@@ -338,6 +338,7 @@ function createColorPickersSection() {
           </button>
         </div>
       </div>
+      ${backgroundOpacityRow}
       <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">
         <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" title="Set a different background image/video per track, overriding the reel's own background for that track." onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
           <div style="display:flex;align-items:center;gap:0.2rem;">
@@ -348,7 +349,6 @@ function createColorPickersSection() {
         </div>
         <div id="perTrackBackgroundsList" style="display:none;margin-top:0.2rem;"></div>
       </div>
-      ${backgroundOpacityRow}
       ${backgroundBlurRow}
       <div class="color-row">
         <span>Overlay Colour:</span>
