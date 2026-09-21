@@ -366,6 +366,7 @@ export function initPagesController() {
       slot.appendChild(createToggleSwitch({
         id: "pageAnalyticsEnabled",
         checked: !!page.analyticsEnabled,
+        tooltip: "Track how many times this page is opened. See stats via Manage Published Pages.",
         onChange: (e) => {
           page.analyticsEnabled = e.target.checked;
           updateCurrentPage();
@@ -386,6 +387,7 @@ export function initPagesController() {
       toggleSlot.appendChild(createToggleSwitch({
         id: "pageBackgroundEnabled",
         checked: !!page.backgroundImageEnabled,
+        tooltip: "Show a full-page background image behind this page's content.",
         onChange: (e) => {
           page.backgroundImageEnabled = e.target.checked;
           updateCurrentPage();
@@ -401,6 +403,7 @@ export function initPagesController() {
         label: "Image:",
         value: page.backgroundImage || "",
         placeholder: "Paste an image URL or select from Media Library",
+        tooltip: "Image shown full-page behind this page's content, cropped/blurred per the settings below.",
         pickerOptions: {
           directory: "assets/images/page-backgrounds",
           extensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
@@ -431,6 +434,7 @@ export function initPagesController() {
       overlayToggleSlot.appendChild(createToggleSwitch({
         id: "pageBackgroundOverlayEnabled",
         checked: !!page.backgroundOverlayEnabled,
+        tooltip: "Show the solid color swatch behind the background image (fills transparent/blurred edges).",
         onChange: (e) => {
           page.backgroundOverlayEnabled = e.target.checked;
           updateCurrentPage();
@@ -469,6 +473,7 @@ export function initPagesController() {
         max: 60,
         step: 1,
         unit: "px",
+        tooltip: "Gaussian blur applied to the background image.",
       });
       blurInput.addEventListener("input", () => {
         const val = parseInt(blurInput.value, 10);
@@ -502,6 +507,7 @@ export function initPagesController() {
         max: 100,
         step: 1,
         unit: "%",
+        tooltip: "How opaque the Content Background color tint is over the page content.",
       });
       opacityInput.addEventListener("input", () => {
         const val = parseInt(opacityInput.value, 10);
@@ -533,6 +539,7 @@ export function initPagesController() {
       fullBleedSlot.appendChild(createToggleSwitch({
         id: "pageContentOverlayFullBleed",
         checked: !!page.contentOverlayFullBleed,
+        tooltip: "Stretch the Content Background tint to the very top/bottom of the page, hiding the Vertical Margin field below.",
         onChange: (e) => {
           page.contentOverlayFullBleed = e.target.checked;
           updateMarginVerticalVisibility();
@@ -551,6 +558,7 @@ export function initPagesController() {
         max: 300,
         step: 5,
         unit: "px",
+        tooltip: "Gap above/below the Content Background tint. Has no effect while Extend to top/bottom is on.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);
@@ -573,6 +581,7 @@ export function initPagesController() {
         max: 300,
         step: 5,
         unit: "px",
+        tooltip: "Gap left/right of the Content Background tint.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);
@@ -602,6 +611,7 @@ export function initPagesController() {
         max: 1600,
         step: 10,
         unit: "px",
+        tooltip: "Maximum width of the page's content column - wider viewports fill the rest with the background.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);
@@ -624,6 +634,7 @@ export function initPagesController() {
         max: 300,
         step: 5,
         unit: "px",
+        tooltip: "Empty space above the page's content column, before its first block.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);
@@ -646,6 +657,7 @@ export function initPagesController() {
         max: 300,
         step: 5,
         unit: "px",
+        tooltip: "Empty space below the page's content column, after its last block.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);
@@ -742,36 +754,36 @@ export function initPagesController() {
       <form id="pageForm" autocomplete="off">
         <label>
           Title:
-          <input type="text" id="pageTitle" class="filename-display" />
+          <input type="text" id="pageTitle" class="filename-display" title="The page's display title, shown on the page itself." />
         </label>
         <div class="color-row" style="margin-top:0.6rem;">
           <span>URL slug:</span>
-          <input type="text" id="pageSlugInput" placeholder="auto-generated from title" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" />
-          <button type="button" id="publishPageBtn" class="page-block-add-btn">Publish</button>
+          <input type="text" id="pageSlugInput" placeholder="auto-generated from title" title="The page's stable public URL identifier - unlike a reel embed id, it stays the same across edits and can be changed here." style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" />
+          <button type="button" id="publishPageBtn" class="page-block-add-btn" title="Publish this page live at its slug URL, or update it if already published.">Publish</button>
         </div>
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
-        <button type="button" id="previewPageBtn">Preview Page</button>
-        <button type="button" id="managePagesBtn">Manage Published Pages</button>
-        <button type="button" id="customizeTextStylesBtn">Customize Text Styles...</button>
+        <button type="button" id="previewPageBtn" title="Open this page in a new tab as it currently looks, without publishing it.">Preview Page</button>
+        <button type="button" id="managePagesBtn" title="View and manage all pages you've published, including their stats and unpublishing.">Manage Published Pages</button>
+        <button type="button" id="customizeTextStylesBtn" title="Define reusable text style roles (font, size, weight, color) this page's blocks can reference.">Customize Text Styles...</button>
         <div class="color-row" style="margin-top:0.6rem;">
-          <label for="pageAnalyticsEnabled" style="cursor:pointer;">Track Analytics (opens)</label>
+          <label for="pageAnalyticsEnabled" style="cursor:pointer;" title="Track how many times this page is opened. See stats via Manage Published Pages.">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
         </div>
         <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
           <legend class="builder-section-legend">Background Image</legend>
           <div class="color-row">
-            <label for="pageBackgroundEnabled" style="cursor:pointer;">Enable</label>
+            <label for="pageBackgroundEnabled" style="cursor:pointer;" title="Show a full-page background image behind this page's content.">Enable</label>
             <span id="pageBackgroundToggleSlot"></span>
           </div>
           <div id="pageBackgroundUrlRowSlot"></div>
           <div class="color-row" style="margin-top:0.6rem;">
-            <label for="pageBackgroundOverlayEnabled" style="cursor:pointer;">Overlay behind image</label>
+            <label for="pageBackgroundOverlayEnabled" style="cursor:pointer;" title="Show the solid color swatch behind the background image (fills transparent/blurred edges).">Overlay behind image</label>
             <span id="pageBackgroundOverlayToggleSlot"></span>
-            <input type="color" id="pageBackgroundOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+            <input type="color" id="pageBackgroundOverlayColor" title="Solid color shown behind the background image - fills transparent gaps or blurred edges." style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
           </div>
           <div class="color-row" style="margin-top:0.6rem;">
             <span>Scroll behavior:</span>
-            <select id="pageBackgroundParallaxMode" class="builder-select">
+            <select id="pageBackgroundParallaxMode" class="builder-select" title="Fixed keeps the background stationary as the page scrolls; Scroll moves it at a different rate for a parallax effect.">
               <option value="fixed">Fixed</option>
               <option value="scroll">Scroll (parallax)</option>
             </select>
@@ -781,11 +793,11 @@ export function initPagesController() {
             <div class="builder-section-legend">Content Background</div>
             <div class="color-row">
               <span>Color:</span>
-              <input type="color" id="pageContentOverlayColor" style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+              <input type="color" id="pageContentOverlayColor" title="Tint color shown behind the page content, on top of the background image." style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
             </div>
             <div id="pageContentOverlayOpacitySlot"></div>
             <div class="color-row" style="margin-top:0.6rem;">
-              <label for="pageContentOverlayFullBleed" style="cursor:pointer;">Extend to top/bottom of page</label>
+              <label for="pageContentOverlayFullBleed" style="cursor:pointer;" title="Stretch the Content Background tint to the very top/bottom of the page, hiding the Vertical Margin field below.">Extend to top/bottom of page</label>
               <span id="pageContentOverlayFullBleedToggleSlot"></span>
             </div>
             <div id="pageContentOverlayMarginVerticalSlot" style="margin-top:0.6rem;"></div>

@@ -201,6 +201,7 @@ function createCollapseButton(block, row) {
   collapseBtn.type = "button";
   collapseBtn.className = "page-block-collapse-btn";
   collapseBtn.setAttribute("aria-label", "Collapse block");
+  collapseBtn.title = "Collapse or expand this block's settings.";
   collapseBtn.innerHTML = `
     <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:20px;height:20px;">
       <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
@@ -375,6 +376,7 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
     label: "Image:",
     value: block.imageUrl,
     placeholder: "Paste an image URL or select from Media Library",
+    tooltip: "The banner image shown for this block, at full content width.",
     pickerOptions: {
       directory: "assets/images/page-banners",
       extensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
@@ -397,6 +399,7 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
   const captionInput = document.createElement("input");
   captionInput.type = "text";
   captionInput.value = block.caption || "";
+  captionInput.title = "Optional caption text shown below the banner image.";
   captionInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
   captionInput.oninput = () => { block.caption = captionInput.value; };
   captionInput.onblur = () => { refreshPreview(); onChange(); };
@@ -415,6 +418,7 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
     max: 1600,
     step: 10,
     unit: "px",
+    tooltip: "Caps how tall the banner can render - only affects unusually tall (portrait) images.",
   });
   maxHeightInput.addEventListener("input", () => {
     const val = parseInt(maxHeightInput.value, 10);
@@ -460,6 +464,7 @@ function createTextConfig(block, page, onChange, refreshPreview, { editableClass
   // style, the same mechanism document.execCommand()-based toolbars
   // always rely on.
   const styleBtn = createDropdownMenuButton("Apply style...");
+  styleBtn.title = "Apply a block-level style (heading or body) to the selected text.";
   styleBtn.addEventListener("mousedown", (e) => e.preventDefault());
   styleBtn.onclick = () => {
     // Block-level styles only (headings + plain body) - Bold/Italic/
@@ -1190,21 +1195,24 @@ function createTextConfig(block, page, onChange, refreshPreview, { editableClass
   // "Body" while some of that text quietly no longer looks like Body at
   // all. MIXED is left alone (it's already an unambiguous "more than one
   // thing going on" signal on its own).
+  const STYLE_BTN_BASE_TITLE = "Apply a block-level style (heading or body) to the selected text.";
+
   function setStyleBtnLabel(role, overridden) {
     if (role === MIXED) {
       setDropdownLabel(styleBtn, "Mixed");
-      styleBtn.title = "";
+      styleBtn.title = STYLE_BTN_BASE_TITLE;
       return;
     }
     const label = role ? ROLE_LABELS[role] : "Apply style...";
     setDropdownLabel(styleBtn, role && overridden ? `${label} •` : label);
     styleBtn.title = role && overridden
       ? `This text has custom formatting on top of its ${label} style - editing ${label} in Customize Text Styles won't change it.`
-      : "";
+      : STYLE_BTN_BASE_TITLE;
   }
 
   const fontBtn = createDropdownMenuButton("Font...");
   fontBtn.classList.add("font-picker-btn");
+  fontBtn.title = "Set the font family for the selected text.";
   fontBtn.addEventListener("mousedown", (e) => e.preventDefault());
   fontBtn.onclick = () => {
     saveSelection();
@@ -1525,6 +1533,7 @@ function createTextConfig(block, page, onChange, refreshPreview, { editableClass
   customizeBtn.type = "button";
   customizeBtn.className = "page-block-add-btn";
   customizeBtn.textContent = "Customize Styles...";
+  customizeBtn.title = "Edit this page's Title/Body/Heading style roles, used by any text block set to that style.";
   // No margin-left:auto and no leading divider - in a flex-wrap toolbar that
   // auto margin snapped the button between the align-icons row and a right-
   // aligned row of its own (resizing the gap before it) every time the panel
@@ -1764,6 +1773,7 @@ function createImageConfig(block, onChange, refreshPreview) {
     label: "Image:",
     value: block.imageUrl,
     placeholder: "Paste an image URL or select from Media Library",
+    tooltip: "The image shown for this block.",
     pickerOptions: {
       directory: "assets/images/page-blocks",
       extensions: [".jpg", ".jpeg", ".png", ".webp", ".gif"],
@@ -1785,6 +1795,7 @@ function createImageConfig(block, onChange, refreshPreview) {
   widthLabel.textContent = "Width:";
   const widthSelect = document.createElement("select");
   widthSelect.className = "builder-select";
+  widthSelect.title = "How wide this image renders within the content column.";
   ["full", "medium", "small"].forEach((v) => {
     const opt = document.createElement("option");
     opt.value = v;
@@ -1825,6 +1836,7 @@ function createPlayerConfig(block, onChange, refreshPreview) {
   pickBtn.type = "button";
   pickBtn.className = "page-block-add-btn";
   pickBtn.textContent = block.reelId ? "Change" : "Select Reel";
+  pickBtn.title = "Choose the reel this player block embeds.";
   pickBtn.onclick = () => {
     openReelPicker({
       onSelect: (reelId, reelTitle) => {
@@ -1909,6 +1921,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   urlInput.type = "url";
   urlInput.value = block.videoUrl || "";
   urlInput.placeholder = "Paste a YouTube, Vimeo, or Cloudflare Stream link";
+  urlInput.title = "The video this block embeds - a YouTube, Vimeo, or Cloudflare Stream URL.";
   urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
 
   // Cog: per-provider "Advanced Embed Settings" (controls, related videos,
@@ -1977,6 +1990,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   aspectLabel.textContent = "Aspect ratio:";
   const aspectSelect = document.createElement("select");
   aspectSelect.className = "builder-select";
+  aspectSelect.title = "The video player's width-to-height ratio.";
   [["16:9", "Widescreen (16:9)"], ["4:3", "Standard (4:3)"], ["1:1", "Square (1:1)"], ["9:16", "Vertical (9:16)"]].forEach(([v, text]) => {
     const opt = document.createElement("option");
     opt.value = v;
@@ -2005,6 +2019,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   const expToggle = createToggleSwitch({
     id: `${block.blockId}-ev-expandable`,
     checked: block.expandable === true,
+    tooltip: "Collapse this video to a smaller preview that expands on hover/tap instead of playing inline at full size.",
     onChange: () => {
       block.expandable = expToggle.querySelector("input").checked;
       if (block.expandable) ensureExpandableVideoDefaults(block);
@@ -2047,6 +2062,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   closedBgModeLabel.textContent = "Collapsed background:";
   const closedBgModeSelect = document.createElement("select");
   closedBgModeSelect.className = "builder-select";
+  closedBgModeSelect.title = "What's shown behind the collapsed video before it's expanded.";
   closedBgModeSelect.onchange = () => {
     block.closedBgMode = closedBgModeSelect.value;
     syncExpandableVisibility();
@@ -2084,6 +2100,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     label: "Collapsed Image:",
     value: block.closedBgImage || "",
     placeholder: "Paste an image URL or select from Media Library",
+    tooltip: "Custom image shown behind the collapsed video, used when Collapsed Background is set to Custom image.",
     pickerOptions: {
       directory: "assets/images/page-blocks",
       extensions: IMAGE_PICKER_EXTENSIONS,
@@ -2113,6 +2130,8 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     toolbarPickrInstances,
     { opacity: true },
   );
+  overlayTintPickr.btn.title = "Colour tint over the collapsed background; fades away as the block expands.";
+  overlayTintPickr.btn.setAttribute("aria-label", "Collapsed overlay colour");
 
   function applyOverlayTintEnabled() {
     const on = block.closedOverlayColorEnabled === true;
@@ -2123,6 +2142,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   const overlayTintToggle = createToggleSwitch({
     id: `${block.blockId}-ev-overlayTintEnabled`,
     checked: block.closedOverlayColorEnabled === true,
+    tooltip: "Show the colour tint over the collapsed background.",
     onChange: () => {
       block.closedOverlayColorEnabled = overlayTintToggle.querySelector("input").checked;
       applyOverlayTintEnabled();
@@ -2160,6 +2180,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
   overlayModeLabel.textContent = "Overlay:";
   const overlayModeSelect = document.createElement("select");
   overlayModeSelect.className = "builder-select";
+  overlayModeSelect.title = "What's shown on top of the collapsed video: nothing, an image, or text.";
   [["none", "None"], ["image", "Image"], ["text", "Text"]].forEach(([v, text]) => {
     const opt = document.createElement("option");
     opt.value = v;
@@ -2181,6 +2202,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     label: "Overlay Image:",
     value: block.overlayImage || "",
     placeholder: "Paste an image URL or select from Media Library",
+    tooltip: "Image shown on top of the collapsed video, used when Overlay is set to Image.",
     pickerOptions: {
       directory: "assets/images/page-blocks",
       extensions: IMAGE_PICKER_EXTENSIONS,
@@ -2260,6 +2282,7 @@ function createButtonConfig(block, page, onChange, refreshPreview) {
   labelInput.type = "text";
   labelInput.value = block.label || "";
   labelInput.placeholder = "Click Here";
+  labelInput.title = "The text shown on the button.";
   labelInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
   labelInput.oninput = () => { block.label = labelInput.value; };
   labelInput.onblur = () => { refreshPreview(); onChange(); };
@@ -2275,6 +2298,7 @@ function createButtonConfig(block, page, onChange, refreshPreview) {
   urlInput.type = "url";
   urlInput.value = block.url || "";
   urlInput.placeholder = "https://example.com";
+  urlInput.title = "Where clicking the button leads - opens in a new tab.";
   urlInput.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
   // Always opens in a new tab (renderButtonBlock() sets target="_blank"
   // unconditionally, no per-block toggle) - the scheme is normalized the
@@ -2371,6 +2395,8 @@ function createButtonConfig(block, page, onChange, refreshPreview) {
     refreshPreview();
     onChange();
   }, toolbarPickrInstances);
+  bgPickr.btn.title = "The button's fill color.";
+  bgPickr.btn.setAttribute("aria-label", "Button background color");
   bgRow.appendChild(bgPickr.btn);
   wrap.appendChild(bgRow);
 
