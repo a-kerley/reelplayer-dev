@@ -1,0 +1,65 @@
+/* tailwind-src.css - source input for the builder's Tailwind/daisyUI build.
+   Compiled to css/tailwind.css via `npm run build:css` - see "Tailwind /
+   daisyUI (builder only)" in CLAUDE.md before touching this file. Never
+   edit css/tailwind.css by hand, it's generated output. */
+/* Preflight (Tailwind's global button/input/heading/list reset) deliberately
+   skipped - this project already has its own comprehensive hand-written
+   resets (css/player.css's `button {}`, native dark form controls via
+   `color-scheme: dark`, `#reelList` etc.'s own `list-style: none`, ...) and
+   Preflight would fight all of it. Only theme variables + utility classes +
+   plugin (daisyUI) output are imported - see
+   https://tailwindcss.com/docs/preflight#disabling-preflight. */
+@layer theme, base, components, utilities;
+@import "tailwindcss/theme.css" layer(theme);
+@import "tailwindcss/utilities.css" layer(utilities);
+@plugin "daisyui";
+
+/* Only scan for class usage in the builder's own files - never
+   player.html/page.html (Tailwind/daisyUI is builder-chrome-only, see
+   CLAUDE.md) or node_modules. */
+@source "../index.html";
+@source "../js/**/*.js";
+
+/* Custom theme matching this project's existing --builder-* palette
+   (css/variables.css) and dark palette (CLAUDE.md's "Builder dark theme"
+   section), so daisyUI components look native to the builder instead of
+   clashing with daisyUI's own default theme colors. Values are a first
+   pass - expect to retune radius/spacing as specific components get
+   adopted, but the base/primary/error colors should match exactly. */
+@plugin "daisyui/theme" {
+  name: "reelplayer-builder";
+  default: true;
+  color-scheme: dark;
+
+  --color-base-100: #2f2f2f;   /* panel bg (--builder-bg) */
+  --color-base-200: #252525;   /* nested panel bg */
+  --color-base-300: #1e1e1e;   /* input bg */
+  --color-base-content: #ffffff;
+
+  --color-primary: #4a90e2;    /* --builder-accent */
+  --color-primary-content: #ffffff;
+  --color-secondary: #5aa0f2;  /* --builder-hover */
+  --color-secondary-content: #ffffff;
+  --color-accent: #4a90e2;     /* no distinct 3rd brand color exists yet - alias to primary rather than invent one */
+  --color-accent-content: #ffffff;
+  --color-neutral: #3a3a3a;    /* dimmed/disabled surfaces */
+  --color-neutral-content: #ffffff;
+
+  --color-info: #5aa0f2;
+  --color-info-content: #ffffff;
+  --color-success: #4caf80;    /* matches .draft-save-status[data-status="saved"] */
+  --color-success-content: #ffffff;
+  --color-warning: #e2a03f;    /* matches .lock-reel-btn.locked */
+  --color-warning-content: #1e1e1e;
+  --color-error: #dc3545;      /* --builder-delete-hover */
+  --color-error-content: #ffffff;
+
+  --radius-selector: 4px;
+  --radius-field: 5px;
+  --radius-box: 8px;
+  --size-selector: 0.25rem;
+  --size-field: 0.25rem;
+  --border: 1px;
+  --depth: 0;
+  --noise: 0;
+}

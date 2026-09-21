@@ -2,7 +2,9 @@
 
 Vanilla JS/CSS embeddable audio/video player builder. No build tooling — plain
 `<script type="module">` ES modules, no bundler, no framework, no package.json
-dependencies to install for the app itself.
+dependencies to install for the app itself. One exception: `package.json`
+holds devDependencies for a Tailwind/daisyUI CSS build, builder-chrome-only —
+see "Tailwind / daisyUI (builder only)" below before touching it.
 
 ## Three apps in one repo
 
@@ -216,6 +218,53 @@ to native chrome under this, which picks up the OS accent color (seen twice:
 `#manageEmbedsBtn` and `.crop-preview-btn` both shipped with no matching CSS
 rule and rendered as a jarring purple/maroon blob until one was added). If a
 new button looks oddly colored, this is the first thing to check.
+
+## Tailwind / daisyUI (builder only)
+
+Added 2026-09-21 to hand-port specific daisyUI component designs (starting
+with the range slider) into the builder without adopting daisyUI's actual
+classes/markup wholesale - see `js/modules/valueControl.js`'s
+`updateSliderFill()` for the first result. This is the **first Node/npm
+dependency this repo has ever had** - everything else is still plain
+`<script type="module">` with no bundler (see top of this file). Scope is
+deliberately narrow: a CSS build step only, never touching how the app's
+own JS is written or loaded.
+
+**Files:**
+- `package.json` - devDependencies only (`@tailwindcss/cli`, `daisyui`),
+  `npm run build:css` / `npm run watch:css`.
+- `css/tailwind-src.css` - the actual source: Preflight explicitly
+  disabled (see the comment in that file - it would fight this project's
+  own hand-written resets, e.g. `css/player.css`'s `button {}`,
+  `color-scheme: dark`, `#reelList`'s own `list-style: none`), a custom
+  `reelplayer-builder` daisyUI theme matching the palette in "Builder dark
+  theme" above, and `@source` directives scoped to `index.html`/`js/**/*.js`
+  only.
+- `css/tailwind.css` - **generated output, never hand-edit** - regenerate
+  with `npm run build:css` after touching `tailwind-src.css`. **Must be
+  committed** (unlike `node_modules/`, which is gitignored) - the
+  Cloudflare static-assets deploy (see `worker/CLAUDE.md`) has no build
+  step of its own, it just serves whatever's in the repo, so an
+  uncommitted `tailwind.css` would 404 in production.
+
+**Scope boundary - same rule as the dark theme above:** the `<link>` for
+`css/tailwind.css` belongs in `index.html` only. Never add it to
+`player.html`/`page.html` - those are the actual per-reel output surfaces,
+not builder chrome.
+
+**Workflow:** there's no watch process running by default. After adding or
+changing a Tailwind/daisyUI class anywhere in `index.html`/`js/**/*.js`,
+run `npm run build:css` (or `npm run watch:css` while iterating) before
+the change shows up - unlike the rest of this codebase, this one corner
+does need a build step.
+
+Considered and rejected: the CDN path (`@tailwindcss/browser` script tag)
+recompiles Tailwind from the live DOM on every page load, which Tailwind's
+own docs call a prototyping tool, not for production - a poor fit for a
+builder that gets reopened constantly. The standalone Tailwind CLI binary
+(no Node needed) was also considered, but it only bundles Tailwind's own
+first-party plugins - daisyUI is third-party and still needs
+`npm i daisyui` to resolve, so it doesn't actually avoid Node/npm.
 
 ## Tooltips: native `title=` only, on every settings control
 

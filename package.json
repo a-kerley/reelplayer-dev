@@ -1,0 +1,13 @@
+{
+  "name": "reelplayer-tailwind",
+  "private": true,
+  "description": "Build-only devDependencies for the builder's Tailwind/daisyUI CSS - see 'Tailwind / daisyUI (builder only)' in CLAUDE.md. Not a package for the app itself: index.html/player.html still load plain <script type=\"module\"> with no bundler.",
+  "scripts": {
+    "build:css": "tailwindcss -i css/tailwind-src.css -o css/tailwind.css --minify",
+    "watch:css": "tailwindcss -i css/tailwind-src.css -o css/tailwind.css --watch"
+  },
+  "devDependencies": {
+    "@tailwindcss/cli": "^4.3.3",
+    "daisyui": "^5.7.43"
+  }
+}
