@@ -912,7 +912,6 @@ const playerAppCore = {
       // whatever's current, which is correct/idempotent either way.
       this.updateWaveformWidth();
       this.showLoading(false);
-      playPauseBtn.style.display = "inline-block";
       if (volumeControl) volumeControl.classList.remove("hidden");
       
       // Find the WaveSurfer wrapper element (div without class/id)
