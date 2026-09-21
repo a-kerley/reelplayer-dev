@@ -519,7 +519,11 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
         if (isFolderReorderTarget && e.dataTransfer.types.includes('application/x-folder-name')) {
           header.classList.remove('drag-over');
           showDropIndicator(list, header, folderName === lastNamedFolder);
-        } else {
+        } else if (e.dataTransfer.types.includes('text/plain')) {
+          // Only an actual item drag gets the "drop here to move it into
+          // this folder" highlight - a folder being dragged over a header
+          // that isn't a valid reorder target (Uncategorised, or this same
+          // header) should show neither the highlight nor the indicator.
           header.classList.add('drag-over');
         }
       };
