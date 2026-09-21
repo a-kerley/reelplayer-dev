@@ -941,6 +941,32 @@ body {
   transform: rotate(90deg);
 }
 
+/* Border/padding fade with the same timing as .section-body's height
+   animation below - see makeSectionCollapsible() (js/modules/domUtils.js)
+   for why these are animated separately (fixed-value transitions vs. a
+   JS-measured height). */
+.collapsible-section {
+  transition: border-color 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding-top 0.3s cubic-bezier(0.4, 0, 0.2, 1),
+    padding-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+/* Height is set to a real measured px value (or 'auto' once settled open)
+   by makeSectionCollapsible() - the CSS Grid 0fr/1fr trick used elsewhere
+   in this codebase (css/card.css's .project-card-extra) doesn't hold up
+   here; see that function's own comment for why. */
+.section-body {
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .collapsible-section,
+  .section-body {
+    transition: none;
+  }
+}
+
 .pickr-button,
 .pcr-button {
   width: 20px !important;

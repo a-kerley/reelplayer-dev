@@ -46,6 +46,15 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
   const legend = fieldset.querySelector(":scope > legend");
   if (!legend || legend.dataset.collapsible === "true") return;
 
+  // .section-body's height is animated as a JS-measured pixel value, not
+  // via the CSS Grid 0fr/1fr trick (css/card.css's .project-card-extra) -
+  // tried that first here, but this codebase's real settings-group content
+  // (color pickers, value-control sliders, nested rows) collapses that
+  // trick to 0 regardless of 0fr/1fr/auto/max-content (confirmed: a plain
+  // block-display readout of the same content measures correctly, so some
+  // descendant's percentage-based sizing is breaking the grid intrinsic-
+  // sizing algorithm's height contribution). Measuring scrollHeight
+  // directly sidesteps that.
   const body = document.createElement("div");
   body.className = "section-body";
   while (legend.nextSibling) body.appendChild(legend.nextSibling);
@@ -55,12 +64,51 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
   legend.classList.add("collapsible-legend");
   legend.tabIndex = 0;
   legend.setAttribute("role", "button");
+  fieldset.classList.add("collapsible-section");
+
+  // Every section's border/padding is set inline (createFieldset() and the
+  // hand-built sections both do `section.style.border/padding = ...`), so a
+  // CSS class alone can't override it while collapsed - toggle the same
+  // inline properties instead of fighting specificity. Left/right padding
+  // stays fixed in both states (only the border color and vertical padding
+  // change) so the legend/title never shifts horizontally on toggle - only
+  // making the border invisible (not removing it) keeps that same box
+  // width rather than collapsing it by the border's own thickness too.
+  // Padding/border-color are ordinary two-value transitions (unlike the
+  // row height above), so plain CSS `transition` on .collapsible-section
+  // animates them with no extra JS.
+  const openPadding = fieldset.style.padding;
+  fieldset.style.padding = "";
+  fieldset.style.paddingLeft = openPadding;
+  fieldset.style.paddingRight = openPadding;
 
   const setOpen = (open) => {
-    body.style.display = open ? "" : "none";
     legend.setAttribute("aria-expanded", String(open));
+    fieldset.classList.toggle("section-collapsed", !open);
+    fieldset.style.borderColor = open ? "" : "transparent";
+    fieldset.style.paddingTop = open ? openPadding : "0";
+    fieldset.style.paddingBottom = open ? openPadding : "0";
+
+    if (open) {
+      body.style.height = body.scrollHeight + "px";
+    } else {
+      // Pin to a real pixel height first (in case it's currently 'auto')
+      // so there's a defined starting point to transition down from.
+      body.style.height = body.scrollHeight + "px";
+      void body.offsetHeight;
+      body.style.height = "0px";
+    }
   };
   setOpen(defaultOpen);
+
+  // Once fully open, switch to 'auto' so content that changes size while
+  // expanded (e.g. a sub-toggle revealing another row) isn't clipped by
+  // the last measured pixel height.
+  body.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "height" && legend.getAttribute("aria-expanded") === "true") {
+      body.style.height = "auto";
+    }
+  });
 
   const toggle = (e) => {
     if (e.target.closest("button, a, input, select, textarea")) return;
