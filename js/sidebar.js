@@ -12,7 +12,7 @@
 import { renderSidebarList } from './modules/sidebarList.js';
 import { publicReelPlayerUrl } from './modules/embedExporter.js';
 
-export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate) {
+export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate, onReorderItems) {
   renderSidebarList(
     {
       listElId: 'reelList',
@@ -24,6 +24,7 @@ export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onTog
       onMoveToFolder,
       onRenameFolder,
       onDuplicate,
+      onReorderItems,
       getPublicUrl: (reel) => reel.publishedEmbedId ? publicReelPlayerUrl(reel.publishedEmbedId) : null,
     },
     reels, currentId, onSelect, onNew, onDelete,

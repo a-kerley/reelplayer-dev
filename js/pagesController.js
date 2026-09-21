@@ -191,7 +191,7 @@ export function initPagesController() {
       renderPagePreview(current);
       updatePublishStatus(current);
     }
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage, reorderPages);
   }
 
   // Mirrors js/main.js's toggleReelLock() - toggling lock has to persist
@@ -287,6 +287,35 @@ export function initPagesController() {
         }
       }
       page.folder = newName;
+      schedulePageDraftSave(page);
+    }
+    hideLoading();
+    await render();
+  }
+
+  // Drag-to-reorder within one sidebar group (js/modules/sidebarList.js's
+  // reorderItem()) - orderedIds is every page in that one group, in its
+  // new order. Same stub-hydration requirement as the other per-page
+  // actions above.
+  async function reorderPages(orderedIds) {
+    showLoading();
+    for (let i = 0; i < orderedIds.length; i++) {
+      const idx = pages.findIndex((p) => p.id === orderedIds[i]);
+      if (idx === -1) continue;
+      let page = pages[idx];
+      if (page._stub) {
+        try {
+          const full = await loadPageDraft(page.id);
+          if (!full) continue; // deleted server-side elsewhere; skip
+          pages[idx] = full;
+          page = full;
+        } catch (e) {
+          hideLoading();
+          dialog.alert(`Couldn't load "${page.title || '(untitled page)'}" while reordering: ${e.message}`);
+          return;
+        }
+      }
+      page.order = i;
       schedulePageDraftSave(page);
     }
     hideLoading();
@@ -853,7 +882,7 @@ export function initPagesController() {
   }
 
   async function render() {
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage, reorderPages);
 
     if (!pages.length) {
       hideLoading(); // init()'s showLoading() has no stub-load branch to pair with when there's nothing to load

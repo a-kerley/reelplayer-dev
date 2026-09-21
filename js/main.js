@@ -53,9 +53,9 @@ document.addEventListener("DOMContentLoaded", async () => {
     // Data model: `reels` holds one entry per draft, but only the currently
     // open one is ever a full object - every other entry is a lightweight
     // stub `{id,title,createdAt,updatedAt,locked,publishedEmbedId,
-    // publishedAt,folder,_stub:true}` (all renderSidebar() ever needs,
-    // including folder grouping without loading every draft's full body).
-    // The full body is fetched on demand when selected.
+    // publishedAt,folder,order,_stub:true}` (all renderSidebar() ever
+    // needs, including folder grouping/drag-reorder without loading every
+    // draft's full body). The full body is fetched on demand when selected.
     let reels = [];
     let currentId = null;
 
@@ -354,6 +354,35 @@ document.addEventListener("DOMContentLoaded", async () => {
       await render();
     }
 
+    // Drag-to-reorder within one sidebar group (js/modules/sidebarList.js's
+    // reorderItem()) - orderedIds is every reel in that one group, in its
+    // new order. Same stub-hydration requirement as the other per-reel
+    // actions above.
+    async function reorderReels(orderedIds) {
+      showBuilderLoading();
+      for (let i = 0; i < orderedIds.length; i++) {
+        const idx = reels.findIndex((r) => r.id === orderedIds[i]);
+        if (idx === -1) continue;
+        let reel = reels[idx];
+        if (reel._stub) {
+          try {
+            const full = await loadDraft(reel.id);
+            if (!full) continue; // deleted server-side elsewhere; skip
+            reels[idx] = full;
+            reel = full;
+          } catch (e) {
+            hideBuilderLoading();
+            dialog.alert(`Couldn't load "${reel.title || '(untitled reel)'}" while reordering: ${e.message}`);
+            return;
+          }
+        }
+        reel.order = i;
+      }
+      saveReels(reels);
+      hideBuilderLoading();
+      await render();
+    }
+
     async function createNew() {
       const newReel = createEmptyReel();
       reels.push(newReel);
@@ -441,7 +470,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel); // re-render sidebar with updated titles
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel, reorderReels); // re-render sidebar with updated titles
       updateReelPublishStatus(reels.find((r) => r.id === currentId));
       // Don't re-render builder here - it destroys form elements and causes issues
       // Preview refresh is debounced so rapid field commits (e.g. tabbing
@@ -450,7 +479,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function render() {
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel);
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel, reorderReels);
 
       const idx = reels.findIndex((r) => r.id === currentId);
       let current = reels[idx];

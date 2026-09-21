@@ -111,6 +111,36 @@ function reorderFolder(state, draggedName, targetName, insertAfter) {
   persistFolderMeta(state);
 }
 
+// Splices `draggedId` to sit before/after `targetId` within `folderItems`
+// (already in their current display order), then hands the caller the
+// full new id order for that one group to persist as each item's `order`
+// field (0, 1, 2, ... matching the new sequence) - renumbering the whole
+// group at once, not just the two that moved, so every item's `order` is
+// always a clean dense sequence rather than accumulating gaps or ties.
+function reorderItem(folderItems, draggedId, targetId, insertAfter, opts) {
+  const ids = folderItems.map(([id]) => id);
+  const from = ids.indexOf(draggedId);
+  if (from === -1) return;
+  ids.splice(from, 1);
+  let to = ids.indexOf(targetId);
+  if (to === -1) return;
+  if (insertAfter) to += 1;
+  ids.splice(to, 0, draggedId);
+  opts.onReorderItems?.(ids);
+}
+
+// A brand new item never has `order` set - it sorts by createdAt (newest
+// first, this list's original behaviour) ahead of every item that DOES
+// have one (only ever assigned by an actual drag-reorder, which stamps
+// every item then in the same group at once - see reorderItem()).
+function compareItemOrder([, a], [, b]) {
+  const aOrdered = a.order !== undefined;
+  const bOrdered = b.order !== undefined;
+  if (aOrdered !== bOrdered) return aOrdered ? 1 : -1;
+  if (aOrdered) return a.order - b.order;
+  return (b.createdAt || 0) - (a.createdAt || 0);
+}
+
 function groupByFolder(sortedItems, persistedNames) {
   const groups = new Map(); // folderName -> [[id, item], ...]
   groups.set(UNCATEGORISED, []);
@@ -120,6 +150,13 @@ function groupByFolder(sortedItems, persistedNames) {
     if (!groups.has(folder)) groups.set(folder, []);
     groups.get(folder).push(entry);
   }
+  // Sort each group independently - a drag-reorder (see reorderItem())
+  // only ever assigns `order` to the items within one group, so order
+  // values are only ever compared within that same group, never across
+  // groups. A brand new item has no `order` yet, so it sorts to the top
+  // by createdAt (this list's original convention) ahead of any item
+  // that's been manually positioned, until the next reorder folds it in.
+  for (const arr of groups.values()) arr.sort(compareItemOrder);
   // Uncategorised always last. Named folders in their persisted custom
   // order (drag-to-reorder splices `persistedNames` directly); an ad-hoc
   // folder name (an item references it but it's missing from
@@ -174,6 +211,8 @@ export const ICONS = {
  *   button's dropdown "Duplicate Current"
  * @param {(item: Object) => string|null} [opts.getPublicUrl] - shareable URL for a published
  *   item, or null/undefined if unpublished; enables the row's "Copy Link" item when present
+ * @param {(orderedIds: string[]) => void} [opts.onReorderItems] - drag-to-reorder within one
+ *   group; called with every item id in that group, in its new order, to persist as `order`
  */
 export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle, onToggleLock) {
   const list = document.getElementById(opts.listElId);
@@ -196,7 +235,7 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
   const folderNames = [...new Set([...folderMeta.names, ...sortedItems.map(([, it]) => it.folder).filter(Boolean)])]
     .sort((a, b) => a.localeCompare(b));
 
-  const renderItem = ([id, item]) => {
+  const renderItem = ([id, item], folderItems) => {
     const li = document.createElement('li');
     li.className = item.id === currentId ? 'active' : '';
     // The row itself is the "select this item" control - role="button" +
@@ -228,6 +267,34 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
         li.classList.add('dragging');
       };
       li.ondragend = () => li.classList.remove('dragging');
+
+      // Reordering within the same group is a separate gesture from
+      // moving between groups (that's drag-onto-a-header, or the context
+      // menu below) - dropping this item onto another one only reorders
+      // if they're already in the same folder; dropping across folders
+      // here is a silent no-op rather than also moving it, so there's
+      // never ambiguity about what a single drag-and-drop does.
+      li.ondragover = (e) => {
+        e.preventDefault();
+        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        const indicator = document.createElement('li');
+        indicator.className = 'drop-indicator';
+        const isLastInGroup = folderItems[folderItems.length - 1]?.[0] === item.id;
+        if (isLastInGroup) li.after(indicator);
+        else li.before(indicator);
+      };
+      li.ondragleave = () => list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+      li.ondrop = (e) => {
+        e.preventDefault();
+        e.stopPropagation(); // don't also let this bubble to a folder header's own ondrop
+        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        const draggedId = e.dataTransfer.getData('text/plain');
+        if (!draggedId || draggedId === item.id) return;
+        const draggedInGroup = folderItems.some(([entryId]) => entryId === draggedId);
+        if (!draggedInGroup) return; // different folder - not this gesture's job
+        const isLastInGroup = folderItems[folderItems.length - 1]?.[0] === item.id;
+        reorderItem(folderItems, draggedId, item.id, isLastInGroup, opts);
+      };
     }
 
     li.oncontextmenu = (e) => {
@@ -470,7 +537,7 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
     list.appendChild(header);
 
     if (!isCollapsed) {
-      folderItems.forEach((entry) => list.appendChild(renderItem(entry)));
+      folderItems.forEach((entry) => list.appendChild(renderItem(entry, folderItems)));
     }
   }
 

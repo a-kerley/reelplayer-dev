@@ -17,7 +17,7 @@
 //                               legitimate anonymous consumer), returns the stored draft JSON or 404
 //   POST   /drafts/:id        - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt,
-//                               publishedEmbedId, publishedAt, locked, folder} for every draft
+//                               publishedEmbedId, publishedAt, locked, folder, order} for every draft
 //   DELETE /drafts/:id        - password-gated, removes the entry
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
@@ -35,7 +35,7 @@
 //   GET    /drafts/pages/:id  - password-gated, same visibility rules as /drafts/:id
 //   POST   /drafts/pages/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt,
-//                               publishedSlug, locked, folder}
+//                               publishedSlug, locked, folder, order}
 //   DELETE /drafts/pages/:id  - password-gated, removes the entry
 //   GET    /cards/:id         - public, returns the stored card JSON with its referenced reel
 //                               inlined - {...card, reel: <reelData|null>} ("reel" is null when
@@ -49,7 +49,7 @@
 //   GET    /drafts/cards/:id  - password-gated, same visibility rules as /drafts/:id
 //   POST   /drafts/cards/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts/cards      - password-gated, lists {id, title, createdAt, updatedAt,
-//                               publishedEmbedId, publishedAt, locked, folder} - same shape as GET
+//                               publishedEmbedId, publishedAt, locked, folder, order} - same shape as GET
 //                               /drafts (reel drafts), since cards are id-based like reels, not
 //                               slug-based like pages
 //   DELETE /drafts/cards/:id  - password-gated, removes the entry
@@ -303,7 +303,7 @@ export default {
       const entries = await listEntries(env, "draft_", (r) => ({
         id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
         publishedEmbedId: r.publishedEmbedId, publishedAt: r.publishedAt, locked: r.locked,
-        folder: r.folder,
+        folder: r.folder, order: r.order,
       }), ["draft_page_", "draft_card_"]);
       return jsonResponse(entries);
     }
@@ -318,7 +318,7 @@ export default {
 
       const entries = await listEntries(env, "draft_page_", (p) => ({
         id: p.id, title: p.title, slug: p.slug, createdAt: p.createdAt, updatedAt: p.updatedAt,
-        publishedSlug: p.publishedSlug, locked: p.locked, folder: p.folder,
+        publishedSlug: p.publishedSlug, locked: p.locked, folder: p.folder, order: p.order,
       }));
       return jsonResponse(entries);
     }
@@ -333,7 +333,7 @@ export default {
       const entries = await listEntries(env, "draft_card_", (c) => ({
         id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
         publishedEmbedId: c.publishedEmbedId, publishedAt: c.publishedAt, locked: c.locked,
-        folder: c.folder,
+        folder: c.folder, order: c.order,
       }));
       return jsonResponse(entries);
     }

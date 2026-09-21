@@ -7,7 +7,7 @@
 import { renderSidebarList } from './modules/sidebarList.js';
 import { publicPageUrl } from './modules/pagePublish.js';
 
-export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate) {
+export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate, onReorderItems) {
   renderSidebarList(
     {
       listElId: 'pageList',
@@ -19,6 +19,7 @@ export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, 
       onMoveToFolder,
       onRenameFolder,
       onDuplicate,
+      onReorderItems,
       getPublicUrl: (page) => page.publishedSlug ? publicPageUrl(page.publishedSlug) : null,
     },
     pages, currentId, onSelect, onNew, onDelete,

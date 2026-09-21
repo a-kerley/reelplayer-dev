@@ -316,6 +316,32 @@ export function initCardsController() {
     await render();
   }
 
+  // Drag-to-reorder within one sidebar group (js/modules/sidebarList.js's
+  // reorderItem()) - orderedIds is every card in that one group, in its
+  // new order. Same stub-hydration requirement as the other per-card
+  // actions above.
+  async function reorderCards(orderedIds) {
+    for (let i = 0; i < orderedIds.length; i++) {
+      const idx = cards.findIndex((c) => c.id === orderedIds[i]);
+      if (idx === -1) continue;
+      let card = cards[idx];
+      if (card._stub) {
+        try {
+          const full = await loadCardDraft(card.id);
+          if (!full) continue; // deleted server-side elsewhere; skip
+          cards[idx] = full;
+          card = full;
+        } catch (e) {
+          dialog.alert(`Couldn't load "${card.title || '(untitled card)'}" while reordering: ${e.message}`);
+          return;
+        }
+      }
+      card.order = i;
+      scheduleCardDraftSave(card);
+    }
+    await render();
+  }
+
   // Called on every settle point (field blur/change) - persists the draft,
   // refreshes the sidebar row (title/reel subtitle), and debounces a
   // preview refresh (rapid field commits, e.g. tabbing through several
@@ -326,7 +352,7 @@ export function initCardsController() {
       scheduleCardDraftSave(current);
       scheduleCardPreviewRefresh(current);
     }
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard, reorderCards);
   }
 
   // --- Repeater sections (partnerLogos / stats / links) -------------------
@@ -798,7 +824,7 @@ export function initCardsController() {
   }
 
   async function render() {
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard, reorderCards);
 
     if (!cards.length) {
       renderEditor(null);
@@ -818,7 +844,7 @@ export function initCardsController() {
           // The sidebar row above was rendered from the stub (listCardDrafts()
           // only returns {id,title,createdAt,updatedAt} - no reelId), so its
           // subtitle needs a second pass now that the full card is in.
-          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
+          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard, reorderCards);
         } else {
           // 404 - deleted server-side elsewhere; drop it, pick another.
           cards.splice(idx, 1);

@@ -4,7 +4,7 @@
 import { renderSidebarList } from "./modules/sidebarList.js";
 import { publicCardPlayerUrl } from "./modules/cardPublish.js";
 
-export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete, onMoveToFolder, onRenameFolder, onDuplicate) {
+export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete, onMoveToFolder, onRenameFolder, onDuplicate, onReorderItems) {
   renderSidebarList(
     {
       listElId: "cardList",
@@ -16,6 +16,7 @@ export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete, 
       onMoveToFolder,
       onRenameFolder,
       onDuplicate,
+      onReorderItems,
       getPublicUrl: (card) => card.publishedEmbedId ? publicCardPlayerUrl(card.publishedEmbedId) : null,
     },
     cards, currentId, onSelect, onNew, onDelete,
