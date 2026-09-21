@@ -267,6 +267,11 @@ body {
   box-sizing: border-box;
   display: flex;
   flex-direction: column;
+  /* Rows must not shrink to fit - #reelList's flex-direction:column with a
+     capped height needs its children to overflow (triggering its
+     overflow-y:auto scrollbar) instead of every row silently compressing
+     to squeeze the list in, which is flexbox's default (flex-shrink:1). */
+  flex-shrink: 0;
   padding: 0.3rem 0.7rem;
   /* Inset via margin/width, not padding - so the active/hover background
      itself is the indented box, not just the text inside a full-width one.
