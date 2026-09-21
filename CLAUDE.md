@@ -240,12 +240,14 @@ own JS is written or loaded.
   `reelplayer-builder` daisyUI theme matching the palette in "Builder dark
   theme" above, and `@source` directives scoped to `index.html`/`js/**/*.js`
   only.
-- `css/tailwind.css` - **generated output, never hand-edit** - regenerate
-  with `npm run build:css` after touching `tailwind-src.css`. **Must be
-  committed** (unlike `node_modules/`, which is gitignored) - the
-  Cloudflare static-assets deploy (see `worker/CLAUDE.md`) has no build
-  step of its own, it just serves whatever's in the repo, so an
-  uncommitted `tailwind.css` would 404 in production.
+- `css/tailwind.css` - **generated output, never hand-edit, and gitignored**
+  (added 2026-09-21) - Cloudflare's Workers Builds now runs `npm install &&
+  npm run build:css` as this project's dashboard-configured Build command
+  (Settings > Build in the `reelplayer-app` Worker; per Cloudflare's own
+  docs this can only be set there, `wrangler.jsonc` has no equivalent
+  field) before every deploy, so the committed repo never needs the built
+  file. Still regenerate it locally with `npm run build:css` to see changes
+  in `dev-server.py` - it just won't show up in `git status` anymore.
 
 **Scope boundary - same rule as the dark theme above:** the `<link>` for
 `css/tailwind.css` belongs in `index.html` only. Never add it to
