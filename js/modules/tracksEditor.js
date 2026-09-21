@@ -86,6 +86,11 @@ function createDragHandle(row) {
 function createTitleField(track, onChange) {
   const titleField = document.createElement("input");
   titleField.type = "text";
+  // Shared dark-input look every other text field in the builder uses
+  // (css/builder.css's FILENAME DISPLAY & INPUT section) - this element had
+  // no class at all before, so it rendered with the browser's native input
+  // chrome instead (visible as a plain grey/inset-bordered box).
+  titleField.className = "filename-display";
   titleField.setAttribute("inputmode", "text");
   titleField.setAttribute("autocomplete", "off");
   titleField.placeholder = "Track Title (optional, overrides file name)";
@@ -122,43 +127,21 @@ function createUrlField(track, onChange) {
     fileNameSpan.classList.remove("placeholder");
   }
   
-  // Styling - match title field styling
-  Object.assign(fileNameSpan.style, {
-    flex: "2",
-    minWidth: "14rem",
-    maxWidth: "100%",
-    boxSizing: "border-box",
-    padding: "0.35em 0.7em",
-    fontFamily: "inherit",
-    fontSize: "0.8rem",
-    fontWeight: "400",
-    border: "1px solid #444",
-    borderRadius: "4px",
-    backgroundColor: "#1e1e1e"
-  });
+  // Row-specific layout only - visual styling (padding/font/border/bg) is
+  // .filename-display's job, not duplicated here (this used to hand-copy
+  // every one of those properties inline, which had already drifted from
+  // the class - 4px border-radius here vs. the class's actual 3px).
+  fileNameSpan.style.flex = "2";
   fileNameSpan.tabIndex = 0;
 
   // Hidden URL input field
   const urlField = document.createElement("input");
   urlField.type = "text";
+  urlField.className = "filename-display";
   urlField.value = track.url;
   urlField.placeholder = "Paste an audio file URL or select from Media Library";
-  
-  Object.assign(urlField.style, {
-    flex: "2",
-    minWidth: "14rem",
-    maxWidth: "100%",
-    boxSizing: "border-box",
-    padding: "0.35em 0.7em",
-    fontFamily: "inherit",
-    fontSize: "0.8rem",
-    fontWeight: "400",
-    display: "none",
-    background: "#1e1e1e",
-    color: "#fff",
-    border: "1px solid #444",
-    borderRadius: "4px"
-  });
+  urlField.style.flex = "2";
+  urlField.style.display = "none";
 
   // Click filename to edit URL
   fileNameSpan.onclick = () => {
