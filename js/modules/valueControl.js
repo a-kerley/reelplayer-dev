@@ -57,12 +57,13 @@ function measureWidth() {
  * call wireValueControl() on the mounted result.
  * @returns {{row: HTMLDivElement, control: HTMLDivElement, input: HTMLInputElement, slider: HTMLInputElement, labelEl: HTMLSpanElement}}
  */
-export function buildValueControl({ id, label, value, min, max, step = 1, unit = '' }) {
+export function buildValueControl({ id, label, value, min, max, step = 1, unit = '', tooltip = '' }) {
   const row = document.createElement('div');
   row.className = 'color-row value-control-row';
 
   const labelEl = document.createElement('span');
   labelEl.textContent = label;
+  if (tooltip) labelEl.title = tooltip;
 
   const control = document.createElement('div');
   control.className = 'value-control';
@@ -251,7 +252,6 @@ export function wireValueControl(control) {
  */
 export function createValueControl(options) {
   const { row, control, input, slider, labelEl } = buildValueControl(options);
-  if (options.tooltip) labelEl.dataset.tooltip = options.tooltip;
   wireValueControl(control);
   return { row, control, input, slider };
 }

@@ -35,16 +35,18 @@ export function createFieldset({ id, legend, content, styles = {} }) {
  * @param {Object} options - Configuration options
  * @param {string} options.label - Label text
  * @param {string} options.buttonId - Button element ID
+ * @param {string} options.tooltip - Optional title attribute for the label
  * @param {HTMLElement[]} options.additionalElements - Optional additional elements to include
  * @returns {HTMLDivElement}
  */
-export function createColorRow({ label, buttonId, additionalElements = [] }) {
+export function createColorRow({ label, buttonId, tooltip = "", additionalElements = [] }) {
   const row = document.createElement("div");
   row.className = "color-row";
-  
+
   const labelSpan = document.createElement("span");
   labelSpan.textContent = label;
-  
+  if (tooltip) labelSpan.title = tooltip;
+
   const button = document.createElement("button");
   button.id = buttonId;
   button.className = "pickr-button";
@@ -63,13 +65,15 @@ export function createColorRow({ label, buttonId, additionalElements = [] }) {
  * @param {string} options.id - Input element ID
  * @param {boolean} options.checked - Initial checked state
  * @param {Function} options.onChange - Change event handler
+ * @param {string} options.tooltip - Optional title attribute for the switch
  * @returns {HTMLLabelElement}
  */
-export function createToggleSwitch({ id, checked = false, onChange = null }) {
+export function createToggleSwitch({ id, checked = false, onChange = null, tooltip = "" }) {
   const label = document.createElement("label");
   label.className = "toggle-switch";
   label.style.marginRight = "0.5rem";
-  
+  if (tooltip) label.title = tooltip;
+
   const input = document.createElement("input");
   input.type = "checkbox";
   input.id = id;
@@ -103,7 +107,7 @@ export function createFilePickerButton({ id, ariaLabel, title, disabled = false 
   if (id) button.id = id;
   button.className = "file-picker-btn";
   button.setAttribute("aria-label", ariaLabel);
-  button.dataset.tooltip = title;
+  button.title = title;
   button.disabled = disabled;
   
   button.innerHTML = `
@@ -154,7 +158,7 @@ export function createCropPreviewButton({ id, disabled = false }) {
   button.id = id;
   button.className = "crop-preview-btn";
   button.setAttribute("aria-label", "Preview & Crop");
-  button.dataset.tooltip = "Preview & Crop";
+  button.title = "Preview & Crop";
   button.disabled = disabled;
   
   button.innerHTML = `
@@ -190,8 +194,9 @@ export function createClearButton({ onClick }) {
   const button = document.createElement("button");
   button.type = "button";
   button.innerHTML = "✕";
-  button.dataset.tooltip = "Clear";
-  
+  button.title = "Clear";
+  button.setAttribute("aria-label", "Clear");
+
   button.style.cssText = "background:transparent;border:none;color:#ccc;font-size:0.9rem;cursor:pointer;padding:0.2rem 0.3rem;transition:color 0.2s;flex-shrink:0;line-height:1;";
 
   button.addEventListener("mouseenter", () => button.style.color = "#dc3545");
@@ -234,7 +239,7 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   const labelSpan = document.createElement(toggle ? "label" : "span");
   labelSpan.textContent = label;
   if (tooltip) {
-    labelSpan.dataset.tooltip = tooltip;
+    labelSpan.title = tooltip;
   }
   row.appendChild(labelSpan);
 

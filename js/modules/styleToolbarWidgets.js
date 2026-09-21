@@ -172,6 +172,7 @@ function weightLabelFor(weight) {
 export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWeight, onCommit }) {
   const wrap = document.createElement("span");
   wrap.className = "weight-control-wrap";
+  wrap.title = "Font weight for the selected text";
 
   function render() {
     wrap.innerHTML = "";
@@ -195,7 +196,7 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
       btn.classList.add("weight-picker-btn");
       // The numeric value's still one hover away, now that the label
       // itself only shows the name.
-      btn.title = current;
+      btn.title = `Font weight: ${current}`;
       btn.onclick = () => {
         openContextMenu(btn, weights.map((w) => ({
           label: weightLabelFor(w),
@@ -203,7 +204,7 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
           onClick: () => {
             setWeight(w);
             setDropdownLabel(btn, weightLabelFor(w));
-            btn.title = w;
+            btn.title = `Font weight: ${w}`;
             onCommit();
           },
         })));
