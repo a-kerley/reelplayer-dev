@@ -52,8 +52,10 @@ document.addEventListener("DOMContentLoaded", async () => {
     //
     // Data model: `reels` holds one entry per draft, but only the currently
     // open one is ever a full object - every other entry is a lightweight
-    // stub `{id,title,createdAt,updatedAt,_stub:true}` (all renderSidebar()
-    // ever needs). The full body is fetched on demand when selected.
+    // stub `{id,title,createdAt,updatedAt,locked,publishedEmbedId,
+    // publishedAt,folder,_stub:true}` (all renderSidebar() ever needs,
+    // including folder grouping without loading every draft's full body).
+    // The full body is fetched on demand when selected.
     let reels = [];
     let currentId = null;
 
@@ -292,6 +294,66 @@ document.addEventListener("DOMContentLoaded", async () => {
       await render();
     }
 
+    // Same stub-hydration requirement as toggleReelLock() just above -
+    // saving a still-stub reel would overwrite its real draft body with the
+    // stub's few fields.
+    async function moveReelToFolder(id, folder) {
+      const idx = reels.findIndex((r) => r.id === id);
+      if (idx === -1) return;
+      let reel = reels[idx];
+
+      if (reel._stub) {
+        showBuilderLoading();
+        try {
+          const full = await loadDraft(id);
+          if (!full) {
+            reels.splice(idx, 1);
+            hideBuilderLoading();
+            await render();
+            return;
+          }
+          reels[idx] = full;
+          reel = full;
+        } catch (e) {
+          hideBuilderLoading();
+          dialog.alert(`Couldn't load this reel (offline or server error): ${e.message}`);
+          return;
+        }
+        hideBuilderLoading();
+      }
+
+      reel.folder = folder;
+      saveReels(reels);
+      await render();
+    }
+
+    // Bulk version of moveReelToFolder()'s own stub-hydration requirement -
+    // every reel tagged with oldName needs its real body loaded before its
+    // folder field can be safely rewritten and saved.
+    async function renameReelFolder(oldName, newName) {
+      showBuilderLoading();
+      for (let idx = 0; idx < reels.length; idx++) {
+        if (reels[idx].folder !== oldName) continue;
+        let reel = reels[idx];
+        if (reel._stub) {
+          try {
+            const full = await loadDraft(reel.id);
+            if (!full) continue; // deleted server-side elsewhere; skip
+            reels[idx] = full;
+            reel = full;
+          } catch (e) {
+            hideBuilderLoading();
+            dialog.alert(`Couldn't load "${reel.title || '(untitled reel)'}" while renaming its folder: ${e.message}`);
+            return;
+          }
+        }
+        reel.folder = newName;
+      }
+      saveReels(reels);
+      hideBuilderLoading();
+      await render();
+    }
+
     async function createNew() {
       const newReel = createEmptyReel();
       reels.push(newReel);
@@ -343,7 +405,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock); // re-render sidebar with updated titles
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder); // re-render sidebar with updated titles
       updateReelPublishStatus(reels.find((r) => r.id === currentId));
       // Don't re-render builder here - it destroys form elements and causes issues
       // Preview refresh is debounced so rapid field commits (e.g. tabbing
@@ -352,7 +414,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function render() {
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock);
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder);
 
       const idx = reels.findIndex((r) => r.id === currentId);
       let current = reels[idx];

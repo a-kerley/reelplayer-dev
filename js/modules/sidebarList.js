@@ -5,16 +5,107 @@
 // button - only the container id, "untitled" placeholder, and "+ New"
 // button id/label differ, so those are the only things callers pass in.
 import { dialog } from './dialogSystem.js';
+import { openContextMenu } from './contextMenu.js';
+import { loadFolderMeta, saveFolderMeta } from './folderMeta.js';
+
+// Folder grouping. `item.folder` is a plain string tag an item carries, but
+// a folder's NAME persists independently via /folder-meta/:type (see
+// folderMeta.js) - that's what lets an empty folder (created but nothing
+// moved into it yet) survive a reload instead of disappearing the moment
+// nothing references it. Items with no folder (new items default to this)
+// group under the fixed, always-present "Uncategorised" header, which is
+// never itself a real folder name an item can be tagged with or rename.
+const UNCATEGORISED = 'Uncategorised';
+
+// Per-list (#reelList/#pageList/#cardList) state: the persisted folder
+// names + collapsed set (synced via opts.folderMetaType, once loaded), and
+// the args needed to re-render after any change - self-contained here so
+// none of this requires every caller to thread extra re-render plumbing
+// through just for this.
+const folderMetaByList = new Map(); // listElId -> {type, names: Set, collapsed: Set, loaded: bool}
+const lastRenderArgs = new Map(); // listElId -> arguments array
+
+function getFolderMetaState(opts) {
+  if (!folderMetaByList.has(opts.listElId)) {
+    folderMetaByList.set(opts.listElId, { type: opts.folderMetaType, names: new Set(), collapsed: new Set(), loaded: false });
+  }
+  const state = folderMetaByList.get(opts.listElId);
+  if (opts.folderMetaType && !state.loaded && !state.loading) {
+    state.loading = loadFolderMeta(opts.folderMetaType).then((meta) => {
+      meta.names.forEach((n) => state.names.add(n));
+      meta.collapsed.forEach((n) => state.collapsed.add(n));
+      state.loaded = true;
+      const args = lastRenderArgs.get(opts.listElId);
+      if (args) renderSidebarList(...args);
+    });
+  }
+  return state;
+}
+
+function persistFolderMeta(state) {
+  if (!state.type) return;
+  saveFolderMeta(state.type, { names: [...state.names], collapsed: [...state.collapsed] });
+}
+
+// Shared by the "New folder..." item (inside an item's Move-to submenu) and
+// the empty-space "New Folder" action - same prompt, same collision check,
+// same persistence. Returns the created name, or null if cancelled/rejected.
+async function createFolder(state) {
+  const name = await dialog.prompt('New folder name:');
+  if (!name) return null;
+  if (name === UNCATEGORISED || state.names.has(name)) {
+    await dialog.alert(`A folder named "${name}" already exists.`);
+    return null;
+  }
+  state.names.add(name);
+  persistFolderMeta(state);
+  return name;
+}
+
+async function renameFolder(state, oldName, opts) {
+  const newName = await dialog.prompt('Rename folder:', oldName);
+  if (!newName || newName === oldName) return;
+  if (newName === UNCATEGORISED || state.names.has(newName)) {
+    await dialog.alert(`A folder named "${newName}" already exists.`);
+    return;
+  }
+  state.names.delete(oldName);
+  state.names.add(newName);
+  if (state.collapsed.has(oldName)) {
+    state.collapsed.delete(oldName);
+    state.collapsed.add(newName);
+  }
+  persistFolderMeta(state);
+  opts.onRenameFolder?.(oldName, newName);
+}
+
+function groupByFolder(sortedItems, persistedNames) {
+  const groups = new Map(); // folderName -> [[id, item], ...]
+  groups.set(UNCATEGORISED, []);
+  for (const name of persistedNames) groups.set(name, []);
+  for (const entry of sortedItems) {
+    const folder = entry[1].folder || UNCATEGORISED;
+    if (!groups.has(folder)) groups.set(folder, []);
+    groups.get(folder).push(entry);
+  }
+  // Uncategorised first, then every named folder (persisted or ad-hoc)
+  // alphabetically - an empty one still shows, unlike before.
+  return [...groups.entries()].sort(([a], [b]) => {
+    if (a === UNCATEGORISED) return -1;
+    if (b === UNCATEGORISED) return 1;
+    return a.localeCompare(b);
+  });
+}
 
 // Heroicons (MIT license, heroicons.com) 24x24 solid lock-closed/lock-open,
 // inlined per this codebase's existing convention of embedding raw SVG
 // markup directly (see e.g. js/modules/pageBlocksEditor.js) rather than
 // loading an icon font/library.
 export const ICONS = {
-  lockClosed: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+  lockClosed: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:18px;height:18px;">
     <path fill-rule="evenodd" d="M12 1.5a5.25 5.25 0 0 0-5.25 5.25v3a3 3 0 0 0-3 3v6.75a3 3 0 0 0 3 3h10.5a3 3 0 0 0 3-3v-6.75a3 3 0 0 0-3-3v-3c0-2.9-2.35-5.25-5.25-5.25Zm3.75 8.25v-3a3.75 3.75 0 1 0-7.5 0v3h7.5Z" clip-rule="evenodd" />
   </svg>`,
-  lockOpen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:18px;height:18px;">
+  lockOpen: `<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:18px;height:18px;">
     <path d="M18 1.5c2.9 0 5.25 2.35 5.25 5.25v3.75a.75.75 0 0 1-1.5 0V6.75a3.75 3.75 0 1 0-7.5 0v3a3 3 0 0 1 3 3v6.75a3 3 0 0 1-3 3H3.75a3 3 0 0 1-3-3v-6.75a3 3 0 0 1 3-3h9v-3c0-2.9 2.35-5.25 5.25-5.25Z" />
   </svg>`,
 };
@@ -33,11 +124,19 @@ export const ICONS = {
  * @param {(id: string) => void} onDelete
  * @param {(item: Object) => string} [renderSubtitle] - optional per-item subtitle line
  * @param {(id: string) => void} [onToggleLock] - optional lock/unlock icon button per row
+ * @param {"reel"|"page"|"card"} [opts.folderMetaType] - enables folder grouping/rename/create,
+ *   synced via /folder-meta/:type (folderMeta.js). Omit to render a flat list with no folders.
+ * @param {(id: string, folder: string|null) => void} [opts.onMoveToFolder] - per-item move/remove
+ * @param {(oldName: string, newName: string) => void} [opts.onRenameFolder] - bulk-rewrites every
+ *   item currently tagged with oldName to newName; called after the collision check passes
  */
 export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle, onToggleLock) {
   const list = document.getElementById(opts.listElId);
   if (!list) return;
   list.innerHTML = '';
+  lastRenderArgs.set(opts.listElId, [opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle, onToggleLock]);
+  const folderMeta = getFolderMetaState(opts);
+  const collapsed = folderMeta.collapsed;
 
   // Sort by most recent (descending createdAt), fallback to 0. Same
   // de-dupe-by-id-then-sort shape as the original renderSidebar() - kept in
@@ -49,21 +148,67 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
     }, {})
   ).sort((a, b) => (b[1].createdAt || 0) - (a[1].createdAt || 0));
 
-  sortedItems.forEach(([id, item]) => {
+  const folderNames = [...new Set([...folderMeta.names, ...sortedItems.map(([, it]) => it.folder).filter(Boolean)])]
+    .sort((a, b) => a.localeCompare(b));
+
+  const renderItem = ([id, item]) => {
     const li = document.createElement('li');
     li.className = item.id === currentId ? 'active' : '';
+    // The row itself is the "select this item" control - role="button" +
+    // tabindex make it keyboard-reachable/operable, since previously only
+    // the lock/delete icon buttons inside it were. Child buttons already
+    // call e.stopPropagation() in their own onclick, so this doesn't
+    // double-fire selection when clicking those.
+    li.setAttribute('role', 'button');
+    li.tabIndex = 0;
+    if (item.id === currentId) li.setAttribute('aria-current', 'true');
+    li.onclick = () => onSelect(item.id);
+    li.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        onSelect(item.id);
+      }
+    };
+
+    if (opts.onMoveToFolder) {
+      li.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        const submenuItems = folderNames
+          .filter((name) => name !== item.folder)
+          .map((name) => ({ label: name, onClick: () => opts.onMoveToFolder(item.id, name) }));
+        submenuItems.push({
+          label: 'New folder…',
+          onClick: async () => {
+            const name = await createFolder(folderMeta);
+            if (name) opts.onMoveToFolder(item.id, name);
+          },
+        });
+        if (item.folder) {
+          submenuItems.push({ label: 'Remove from folder', onClick: () => opts.onMoveToFolder(item.id, null) });
+        }
+        openContextMenu(li, [{ label: 'Move to…', submenu: submenuItems }]);
+      };
+    }
 
     const titleSpan = document.createElement('span');
+    titleSpan.className = 'sidebar-item-title';
     titleSpan.textContent = item.title || opts.emptyTitlePlaceholder;
-    titleSpan.onclick = () => onSelect(item.id);
     li.appendChild(titleSpan);
+
+    // Subtitle + lock/delete buttons share one row under the title, instead
+    // of the buttons sitting on the title's own line - keeps the row to two
+    // lines total instead of three, and the buttons no longer force the
+    // title line's height up to icon size.
+    const metaRow = document.createElement('div');
+    metaRow.className = 'sidebar-item-meta-row';
+    li.appendChild(metaRow);
 
     if (renderSubtitle) {
       const subtitleSpan = document.createElement('span');
       subtitleSpan.className = 'sidebar-item-subtitle';
       subtitleSpan.textContent = renderSubtitle(item);
-      subtitleSpan.onclick = () => onSelect(item.id);
-      li.appendChild(subtitleSpan);
+      metaRow.appendChild(subtitleSpan);
     }
 
     if (onToggleLock) {
@@ -85,14 +230,15 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
         e.stopPropagation();
         onToggleLock(item.id);
       };
-      li.appendChild(lockBtn);
+      metaRow.appendChild(lockBtn);
     }
 
     const delBtn = document.createElement('button');
     delBtn.type = 'button';
     delBtn.className = 'delete-reel-btn';
+    delBtn.setAttribute('aria-label', `Delete ${item.title || opts.emptyTitlePlaceholder}`);
     delBtn.innerHTML = `
-      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="width:22px;height:22px;">
+      <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" aria-hidden="true" style="width:22px;height:22px;">
         <path fill-rule="evenodd" d="M16.5 4.478v.227a48.816 48.816 0 0 1 3.878.512.75.75 0 1 1-.256 1.478l-.209-.035-1.005 13.07a3 3 0 0 1-2.991 2.77H8.084a3 3 0 0 1-2.991-2.77L4.087 6.66l-.209.035a.75.75 0 0 1-.256-1.478A48.567 48.567 0 0 1 7.5 4.705v-.227c0-1.564 1.213-2.9 2.816-2.951a52.662 52.662 0 0 1 3.369 0c1.603.051 2.815 1.387 2.815 2.951Zm-6.136-1.452a51.196 51.196 0 0 1 3.273 0C14.39 3.05 15 3.684 15 4.478v.113a49.488 49.488 0 0 0-6 0v-.113c0-.794.609-1.428 1.364-1.452Zm-.355 5.945a.75.75 0 1 0-1.5.058l.347 9a.75.75 0 1 0 1.499-.058l-.346-9Zm5.48.058a.75.75 0 1 0-1.498-.058l-.347 9a.75.75 0 0 0 1.5.058l.345-9Z" clip-rule="evenodd" />
       </svg>
     `;
@@ -105,9 +251,82 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       }
     };
 
-    li.appendChild(delBtn);
-    list.appendChild(li);
-  });
+    metaRow.appendChild(delBtn);
+    return li;
+  };
+
+  for (const [folderName, folderItems] of groupByFolder(sortedItems, folderMeta.names)) {
+    const isCollapsed = collapsed.has(folderName);
+
+    const header = document.createElement('li');
+    header.className = 'sidebar-folder-header';
+    header.setAttribute('role', 'button');
+    header.tabIndex = 0;
+    header.setAttribute('aria-expanded', String(!isCollapsed));
+
+    const chevron = document.createElement('span');
+    chevron.className = 'sidebar-folder-chevron' + (isCollapsed ? ' collapsed' : '');
+    chevron.setAttribute('aria-hidden', 'true');
+    chevron.textContent = '▾'; // ▾, rotated via CSS to ▸ when collapsed
+    header.appendChild(chevron);
+
+    const name = document.createElement('span');
+    name.className = 'sidebar-folder-name';
+    name.textContent = folderName;
+    header.appendChild(name);
+
+    const count = document.createElement('span');
+    count.className = 'sidebar-folder-count';
+    count.textContent = String(folderItems.length);
+    header.appendChild(count);
+
+    const toggle = () => {
+      if (collapsed.has(folderName)) collapsed.delete(folderName);
+      else collapsed.add(folderName);
+      persistFolderMeta(folderMeta);
+      renderSidebarList(...lastRenderArgs.get(opts.listElId));
+    };
+    header.onclick = toggle;
+    header.onkeydown = (e) => {
+      if (e.key === 'Enter' || e.key === ' ') {
+        e.preventDefault();
+        toggle();
+      }
+    };
+
+    if (opts.onRenameFolder) {
+      header.oncontextmenu = (e) => {
+        e.preventDefault();
+        e.stopPropagation();
+        openContextMenu(header, [{
+          label: 'Rename',
+          disabled: folderName === UNCATEGORISED,
+          onClick: () => renameFolder(folderMeta, folderName, opts).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
+        }]);
+      };
+    }
+
+    list.appendChild(header);
+
+    if (!isCollapsed) {
+      folderItems.forEach((entry) => list.appendChild(renderItem(entry)));
+    }
+  }
+
+  // Right-click on empty space below the rendered rows (not bubbled from a
+  // row or header - both call stopPropagation() in their own handlers) -
+  // "New Folder" here doesn't need to move any item, just register the name
+  // so it shows up (empty) right away.
+  if (opts.folderMetaType) {
+    list.oncontextmenu = (e) => {
+      if (e.target !== list) return;
+      e.preventDefault();
+      openContextMenu(list, [{
+        label: 'New Folder…',
+        onClick: () => createFolder(folderMeta).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
+      }]);
+    };
+  }
 
   const newBtn = document.getElementById(opts.newBtnId);
   if (newBtn) {

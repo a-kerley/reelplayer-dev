@@ -7,8 +7,10 @@
 // a second hand-copy of it.
 let openMenuCleanup = null;
 let openMenuAnchor = null;
+let openSubmenuCleanup = null; // closed whenever the parent menu closes, or another item's submenu opens
 
 export function closeContextMenu() {
+  closeSubmenu();
   if (openMenuCleanup) {
     openMenuCleanup();
     openMenuCleanup = null;
@@ -16,10 +18,25 @@ export function closeContextMenu() {
   }
 }
 
+function closeSubmenu() {
+  if (openSubmenuCleanup) {
+    openSubmenuCleanup();
+    openSubmenuCleanup = null;
+  }
+}
+
 /**
  * @param {HTMLElement} anchorEl - element the menu is positioned relative to
- * @param {Array<{label: string, icon?: string, danger?: boolean, style?: string, onClick: () => void}>} items
+ * @param {Array<{label: string, icon?: string, danger?: boolean, disabled?: boolean, style?: string,
+ *   submenu?: Array<same shape>, onClick?: () => void}>} items
  *   `icon`, if given, is raw inline SVG markup shown before the label.
+ *   `disabled`, if true, greys the item out and makes it inert - e.g. a
+ *   "Rename" option that exists for consistency but doesn't apply to the
+ *   current target (see js/modules/sidebarList.js's Uncategorised header).
+ *   `submenu`, if given (and `onClick` omitted), makes this a flyout item -
+ *   hovering or clicking it opens a second anchored menu of its own items
+ *   instead of firing an action directly (see js/modules/sidebarList.js's
+ *   "Move to..." item).
  *   `style`, if given, is a CSS text string applied to the item's own
  *   button (e.g. `font-family: 'Merriweather', serif` for a font picker
  *   menu, so each entry previews in its own typeface) - see
@@ -61,13 +78,34 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     }
     if (item.style) btn.style.cssText = item.style;
     btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
+
+    if (item.disabled) {
+      btn.disabled = true;
+      menu.appendChild(btn);
+      return;
+    }
+
     if (opts.preventFocusSteal) {
       btn.addEventListener("mousedown", (e) => e.preventDefault());
     }
-    btn.onclick = () => {
-      closeContextMenu();
-      item.onClick();
-    };
+
+    if (item.submenu) {
+      btn.classList.add("has-submenu");
+      const chevron = document.createElement("span");
+      chevron.className = "submenu-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "▸"; // ▸
+      btn.appendChild(chevron);
+      const openThisSubmenu = () => openSubmenu(btn, item.submenu, opts);
+      btn.addEventListener("mouseenter", openThisSubmenu);
+      btn.onclick = openThisSubmenu;
+    } else {
+      btn.addEventListener("mouseenter", closeSubmenu); // hovering away from the flyout item closes it
+      btn.onclick = () => {
+        closeContextMenu();
+        item.onClick();
+      };
+    }
     menu.appendChild(btn);
   });
   document.body.appendChild(menu);
@@ -86,8 +124,12 @@ export function openContextMenu(anchorEl, items, opts = {}) {
   const onOutsideClick = (e) => {
     // A click on the anchor (or anything inside it, e.g. the label span / caret
     // svg) is left for the anchor's own handler to toggle - closing here first
-    // would make that handler always see "not open" and reopen instead.
-    if (!menu.contains(e.target) && !anchorEl.contains(e.target)) closeContextMenu();
+    // would make that handler always see "not open" and reopen instead. A
+    // click inside an open submenu is *not* outside this parent menu either -
+    // the submenu is a separate DOM node, appended straight to <body>.
+    if (menu.contains(e.target) || anchorEl.contains(e.target)) return;
+    if (openSubmenuEl && openSubmenuEl.contains(e.target)) return;
+    closeContextMenu();
   };
   const onKeydown = (e) => { if (e.key === "Escape") closeContextMenu(); };
   const onScroll = () => closeContextMenu();
@@ -106,5 +148,54 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     document.removeEventListener("mousedown", onOutsideClick);
     document.removeEventListener("keydown", onKeydown);
     window.removeEventListener("scroll", onScroll, true);
+  };
+}
+
+let openSubmenuEl = null;
+
+// One flyout level only (no submenu-of-a-submenu) - anchored to the item
+// button that opened it, to its right, flipping left/up if that would
+// overflow the viewport. Positioned/closed independently of the parent
+// menu's own lifecycle, except closeContextMenu() always closes both.
+function openSubmenu(anchorEl, items, parentOpts) {
+  closeSubmenu();
+
+  const submenu = document.createElement("div");
+  submenu.className = "app-context-menu";
+  items.forEach(item => {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = item.danger ? "danger" : "";
+    if (item.style) btn.style.cssText = item.style;
+    btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
+    if (item.disabled) {
+      btn.disabled = true;
+      submenu.appendChild(btn);
+      return;
+    }
+    if (parentOpts.preventFocusSteal) {
+      btn.addEventListener("mousedown", (e) => e.preventDefault());
+    }
+    btn.onclick = () => {
+      closeContextMenu();
+      item.onClick();
+    };
+    submenu.appendChild(btn);
+  });
+  document.body.appendChild(submenu);
+
+  const anchorRect = anchorEl.getBoundingClientRect();
+  const subRect = submenu.getBoundingClientRect();
+  let left = anchorRect.right + 2;
+  if (left + subRect.width > window.innerWidth - 4) left = anchorRect.left - subRect.width - 2;
+  let top = anchorRect.top;
+  if (top + subRect.height > window.innerHeight - 4) top = window.innerHeight - subRect.height - 4;
+  submenu.style.left = `${left}px`;
+  submenu.style.top = `${top}px`;
+
+  openSubmenuEl = submenu;
+  openSubmenuCleanup = () => {
+    submenu.remove();
+    openSubmenuEl = null;
   };
 }

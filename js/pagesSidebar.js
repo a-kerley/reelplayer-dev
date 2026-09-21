@@ -6,7 +6,7 @@
 // identifier to surface here.
 import { renderSidebarList } from './modules/sidebarList.js';
 
-export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock) {
+export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder) {
   renderSidebarList(
     {
       listElId: 'pageList',
@@ -14,6 +14,9 @@ export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, 
       newBtnLabel: '+ New Page',
       emptyTitlePlaceholder: '(untitled page)',
       deleteConfirmMessage: 'Delete this page?',
+      folderMetaType: 'page',
+      onMoveToFolder,
+      onRenameFolder,
     },
     pages, currentId, onSelect, onNew, onDelete,
     (page) => page.publishedSlug ? `/page?slug=${page.publishedSlug}` : 'not yet published',

@@ -3,7 +3,7 @@
 // Storage lives in js/modules/cardDraftStore.js.
 import { renderSidebarList } from "./modules/sidebarList.js";
 
-export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete) {
+export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete, onMoveToFolder, onRenameFolder) {
   renderSidebarList(
     {
       listElId: "cardList",
@@ -11,6 +11,9 @@ export function renderCardsSidebar(cards, currentId, onSelect, onNew, onDelete) 
       newBtnLabel: "+ New Card",
       emptyTitlePlaceholder: "(untitled card)",
       deleteConfirmMessage: "Delete this card?",
+      folderMetaType: 'card',
+      onMoveToFolder,
+      onRenameFolder,
     },
     cards, currentId, onSelect, onNew, onDelete,
     (card) => (card.reelId ? `reel: ${card.reelId}` : "no reel picked")

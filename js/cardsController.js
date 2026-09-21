@@ -231,6 +231,59 @@ export function initCardsController() {
     await render();
   }
 
+  // Same stub-hydration requirement as render()'s own loadCardDraft() call
+  // above - saving a still-stub card would overwrite its real draft body
+  // with the stub's few fields.
+  async function moveCardToFolder(id, folder) {
+    const idx = cards.findIndex((c) => c.id === id);
+    if (idx === -1) return;
+    let card = cards[idx];
+
+    if (card._stub) {
+      try {
+        const full = await loadCardDraft(id);
+        if (!full) {
+          cards.splice(idx, 1);
+          await render();
+          return;
+        }
+        cards[idx] = full;
+        card = full;
+      } catch (e) {
+        dialog.alert(`Couldn't load this card (offline or server error): ${e.message}`);
+        return;
+      }
+    }
+
+    card.folder = folder;
+    scheduleCardDraftSave(card);
+    await render();
+  }
+
+  // Bulk version of moveCardToFolder()'s own stub-hydration requirement -
+  // every card tagged with oldName needs its real body loaded before its
+  // folder field can be safely rewritten and saved.
+  async function renameCardFolder(oldName, newName) {
+    for (let idx = 0; idx < cards.length; idx++) {
+      if (cards[idx].folder !== oldName) continue;
+      let card = cards[idx];
+      if (card._stub) {
+        try {
+          const full = await loadCardDraft(card.id);
+          if (!full) continue; // deleted server-side elsewhere; skip
+          cards[idx] = full;
+          card = full;
+        } catch (e) {
+          dialog.alert(`Couldn't load "${card.title || '(untitled card)'}" while renaming its folder: ${e.message}`);
+          return;
+        }
+      }
+      card.folder = newName;
+      scheduleCardDraftSave(card);
+    }
+    await render();
+  }
+
   // Called on every settle point (field blur/change) - persists the draft,
   // refreshes the sidebar row (title/reel subtitle), and debounces a
   // preview refresh (rapid field commits, e.g. tabbing through several
@@ -241,7 +294,7 @@ export function initCardsController() {
       scheduleCardDraftSave(current);
       scheduleCardPreviewRefresh(current);
     }
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
   }
 
   // --- Repeater sections (partnerLogos / stats / links) -------------------
@@ -705,7 +758,7 @@ export function initCardsController() {
   }
 
   async function render() {
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
 
     if (!cards.length) {
       renderEditor(null);
@@ -725,7 +778,7 @@ export function initCardsController() {
           // The sidebar row above was rendered from the stub (listCardDrafts()
           // only returns {id,title,createdAt,updatedAt} - no reelId), so its
           // subtitle needs a second pass now that the full card is in.
-          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete);
+          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
         } else {
           // 404 - deleted server-side elsewhere; drop it, pick another.
           cards.splice(idx, 1);

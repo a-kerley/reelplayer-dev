@@ -147,7 +147,22 @@ body {
   flex-direction: column;
   flex: 1 1 auto;
   min-height: 0;
-  overflow-y: auto;
+  /* No overflow here - only the active panel's own <ul> (#reelList/
+     #pageList/#cardList) scrolls now, so the "+ New X" button and its
+     draft-save-status line stay pinned above it instead of scrolling away
+     with the list - see the panel/list rules below. */
+}
+
+/* Whichever panel is active (tabController sets style.display = "" on it,
+   which falls back to this) becomes the flex column that gives its <ul>
+   the remaining height to scroll within. */
+#reelsPanel,
+#pagesPanel,
+#cardsPanel {
+  display: flex;
+  flex-direction: column;
+  flex: 1 1 auto;
+  min-height: 0;
 }
 
 .sidebar-tabs {
@@ -217,6 +232,18 @@ body {
   padding: 0;
   width: 100%;
   box-sizing: border-box;
+  display: flex;
+  flex-direction: column;
+  gap: 0.3rem;
+  /* Only this list scrolls - the "+ New X" button and draft-save-status
+     above it (siblings in the panel, not inside this <ul>) stay pinned.
+     Divider mirrors .sidebar-media-section's own border-top below. */
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow-y: auto;
+  border-top: 1px solid var(--builder-border);
+  padding-top: 0.75rem;
+  margin-top: 0.75rem;
 }
 
 #reelList li.active,
@@ -239,9 +266,14 @@ body {
   width: 100%;
   box-sizing: border-box;
   display: flex;
-  align-items: center;
-  justify-content: space-between; /* ensures right-align */
-  padding: 0.5rem 0.7rem;
+  flex-direction: column;
+  padding: 0.3rem 0.7rem;
+  /* Inset via margin/width, not padding - so the active/hover background
+     itself is the indented box, not just the text inside a full-width one.
+     Matches the folder header's own 0.7rem padding for aligned text, offset
+     right by this margin instead. */
+  margin-left: 1.3rem;
+  width: calc(100% - 1.3rem);
   border-radius: 6px;
   cursor: pointer;
   font-size: var(--builder-text-md);
@@ -253,39 +285,42 @@ body {
   overflow: hidden;
 }
 
-#reelList li span,
-#cardList li span,
-#pageList li span {
-  flex: 1 1 auto;
-  min-width: 0;
+#reelList li .sidebar-item-title,
+#cardList li .sidebar-item-title,
+#pageList li .sidebar-item-title {
+  display: block;
+  width: 100%;
+  box-sizing: border-box;
   cursor: pointer;
-  margin: 0;
   padding-right: 0.6rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
 
-/* The "/page?slug=..." / "not yet published" line under a page's title,
-   and the "Published" / "not yet published" line under a reel's title
-   (js/pagesSidebar.js and js/sidebar.js's respective renderSubtitle
-   callbacks, both rendered by the shared js/modules/sidebarList.js). */
-#reelList li,
-#cardList li,
-#pageList li {
-  flex-wrap: wrap;
+/* The subtitle ("Published"/"not yet published", "/page?slug=...", or
+   "reel: <id>") shares a row with the lock/delete icon buttons instead of
+   sitting under them on a third line - see js/modules/sidebarList.js's
+   metaRow. */
+#reelList li .sidebar-item-meta-row,
+#cardList li .sidebar-item-meta-row,
+#pageList li .sidebar-item-meta-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.4rem;
+  margin-top: 0.1rem;
 }
 
 #reelList li .sidebar-item-subtitle,
 #cardList li .sidebar-item-subtitle,
 #pageList li .sidebar-item-subtitle {
-  flex-basis: 100%;
+  flex: 1 1 auto;
   min-width: 0;
   font-size: var(--builder-text-sm);
   font-weight: var(--builder-weight-medium);
   color: inherit;
   opacity: 0.7;
-  margin-top: 0.1rem;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
@@ -362,6 +397,67 @@ body {
 #pageList li .delete-reel-btn:hover svg {
   color: var(--builder-delete-hover);
   transform: scale(1.23);
+}
+
+/* Folder group headers ("Uncategorised" + any named folder) - an <li> like
+   any row (so it's valid inside the <ul>, and gets the same hover/base
+   styling for free), overridden to a row layout instead of the item rows'
+   column one. */
+#reelList li.sidebar-folder-header,
+#cardList li.sidebar-folder-header,
+#pageList li.sidebar-folder-header {
+  flex-direction: row;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: var(--builder-text-sm);
+  font-weight: var(--builder-weight-semibold);
+  color: #999;
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+  padding: 0.35rem 0.7rem;
+  margin-left: 0;
+  width: 100%;
+}
+
+/* Folder headers only open/close - they're never a selectable destination -
+   so hover brightens the text instead of the item rows' filled background,
+   which would wrongly suggest the header itself is clickable-to-select. */
+#reelList li.sidebar-folder-header:hover,
+#cardList li.sidebar-folder-header:hover,
+#pageList li.sidebar-folder-header:hover {
+  color: #fff;
+  background: none;
+}
+
+#reelList .sidebar-folder-chevron,
+#cardList .sidebar-folder-chevron,
+#pageList .sidebar-folder-chevron {
+  display: inline-block;
+  transition: transform 0.15s;
+  flex-shrink: 0;
+}
+
+#reelList .sidebar-folder-chevron.collapsed,
+#cardList .sidebar-folder-chevron.collapsed,
+#pageList .sidebar-folder-chevron.collapsed {
+  transform: rotate(-90deg);
+}
+
+#reelList .sidebar-folder-name,
+#cardList .sidebar-folder-name,
+#pageList .sidebar-folder-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+#reelList .sidebar-folder-count,
+#cardList .sidebar-folder-count,
+#pageList .sidebar-folder-count {
+  flex-shrink: 0;
+  opacity: 0.7;
 }
 
 /* ==============================================

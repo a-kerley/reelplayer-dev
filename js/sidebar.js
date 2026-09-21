@@ -11,7 +11,7 @@
 // for existing js/main.js call sites.
 import { renderSidebarList } from './modules/sidebarList.js';
 
-export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock) {
+export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder) {
   renderSidebarList(
     {
       listElId: 'reelList',
@@ -19,6 +19,9 @@ export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onTog
       newBtnLabel: '+ New Reel',
       emptyTitlePlaceholder: '(untitled reel)',
       deleteConfirmMessage: 'Delete this reel?',
+      folderMetaType: 'reel',
+      onMoveToFolder,
+      onRenameFolder,
     },
     reels, currentId, onSelect, onNew, onDelete,
     // Mirrors js/pagesSidebar.js's own publish-status subtitle - keyed on

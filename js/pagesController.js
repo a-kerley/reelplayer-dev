@@ -152,7 +152,7 @@ export function initPagesController() {
       renderPagePreview(current);
       updatePublishStatus(current);
     }
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder);
   }
 
   // Mirrors js/main.js's toggleReelLock() - toggling lock has to persist
@@ -191,6 +191,66 @@ export function initPagesController() {
 
     page.locked = !page.locked;
     schedulePageDraftSave(page);
+    await render();
+  }
+
+  // Same stub-hydration requirement as togglePageLock() just above - saving
+  // a still-stub page would overwrite its real draft body with the stub's
+  // few fields.
+  async function movePageToFolder(id, folder) {
+    const idx = pages.findIndex((p) => p.id === id);
+    if (idx === -1) return;
+    let page = pages[idx];
+
+    if (page._stub) {
+      showLoading();
+      try {
+        const full = await loadPageDraft(id);
+        if (!full) {
+          pages.splice(idx, 1);
+          hideLoading();
+          await render();
+          return;
+        }
+        pages[idx] = full;
+        page = full;
+      } catch (e) {
+        hideLoading();
+        dialog.alert(`Couldn't load this page (offline or server error): ${e.message}`);
+        return;
+      }
+      hideLoading();
+    }
+
+    page.folder = folder;
+    schedulePageDraftSave(page);
+    await render();
+  }
+
+  // Bulk version of movePageToFolder()'s own stub-hydration requirement -
+  // every page tagged with oldName needs its real body loaded before its
+  // folder field can be safely rewritten and saved.
+  async function renamePageFolder(oldName, newName) {
+    showLoading();
+    for (let idx = 0; idx < pages.length; idx++) {
+      if (pages[idx].folder !== oldName) continue;
+      let page = pages[idx];
+      if (page._stub) {
+        try {
+          const full = await loadPageDraft(page.id);
+          if (!full) continue; // deleted server-side elsewhere; skip
+          pages[idx] = full;
+          page = full;
+        } catch (e) {
+          hideLoading();
+          dialog.alert(`Couldn't load "${page.title || '(untitled page)'}" while renaming its folder: ${e.message}`);
+          return;
+        }
+      }
+      page.folder = newName;
+      schedulePageDraftSave(page);
+    }
+    hideLoading();
     await render();
   }
 
@@ -742,7 +802,7 @@ export function initPagesController() {
   }
 
   async function render() {
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder);
 
     if (!pages.length) {
       hideLoading(); // init()'s showLoading() has no stub-load branch to pair with when there's nothing to load

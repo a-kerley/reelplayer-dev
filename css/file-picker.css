@@ -533,6 +533,26 @@
   color: #fff;
 }
 
+.app-context-menu button:disabled {
+  color: #666;
+  cursor: default;
+}
+
+.app-context-menu button:disabled:hover {
+  background: transparent;
+  color: #666;
+}
+
+/* Flyout submenu items (e.g. "Move to..." expanding into a folder list) -
+   the chevron is pushed to the item's own right edge via margin-left:auto
+   on the label span it wraps, not a separate flex slot, since only some
+   items in a given menu have one. */
+.app-context-menu button.has-submenu .submenu-chevron {
+  margin-left: auto;
+  padding-left: 0.6rem;
+  opacity: 0.6;
+}
+
 .media-browser-grid {
   display: grid;
   grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));

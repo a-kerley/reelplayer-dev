@@ -17,7 +17,7 @@
 //                               legitimate anonymous consumer), returns the stored draft JSON or 404
 //   POST   /drafts/:id        - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts            - password-gated, lists {id, title, createdAt, updatedAt,
-//                               publishedEmbedId, publishedAt, locked} for every draft
+//                               publishedEmbedId, publishedAt, locked, folder} for every draft
 //   DELETE /drafts/:id        - password-gated, removes the entry
 //   GET    /pages/:slug       - public, returns the stored published-page JSON or 404
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
@@ -35,7 +35,7 @@
 //   GET    /drafts/pages/:id  - password-gated, same visibility rules as /drafts/:id
 //   POST   /drafts/pages/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts/pages      - password-gated, lists {id, title, slug, createdAt, updatedAt,
-//                               publishedSlug, locked}
+//                               publishedSlug, locked, folder}
 //   DELETE /drafts/pages/:id  - password-gated, removes the entry
 //   GET    /cards/:id         - public, returns the stored card JSON with its referenced reel
 //                               inlined - {...card, reel: <reelData|null>} ("reel" is null when
@@ -49,7 +49,7 @@
 //   GET    /drafts/cards/:id  - password-gated, same visibility rules as /drafts/:id
 //   POST   /drafts/cards/:id  - password-gated, stores the JSON body (stamps updatedAt server-side)
 //   GET    /drafts/cards      - password-gated, lists {id, title, createdAt, updatedAt,
-//                               publishedEmbedId, publishedAt, locked} - same shape as GET
+//                               publishedEmbedId, publishedAt, locked, folder} - same shape as GET
 //                               /drafts (reel drafts), since cards are id-based like reels, not
 //                               slug-based like pages
 //   DELETE /drafts/cards/:id  - password-gated, removes the entry
@@ -67,6 +67,9 @@
 //                               no write) unless the target exists and has analyticsEnabled=true.
 //   GET    /stats/:type/:id   - password-gated, lists every raw stat event for that target,
 //                               newest first - the builder aggregates client-side.
+//   GET    /folder-meta/:type - password-gated, :type is "reel"/"page"/"card", returns
+//                               {names: string[], collapsed: string[]} (sidebar folder grouping).
+//   POST   /folder-meta/:type - password-gated, replaces the stored {names, collapsed} wholesale.
 //
 // Drafts (in-progress builder reels/pages/cards, auto-saved as the user
 // edits) use a separate `draft_<id>` / `draft_page_<id>` / `draft_card_<id>`
@@ -300,6 +303,7 @@ export default {
       const entries = await listEntries(env, "draft_", (r) => ({
         id: r.id, title: r.title, createdAt: r.createdAt, updatedAt: r.updatedAt,
         publishedEmbedId: r.publishedEmbedId, publishedAt: r.publishedAt, locked: r.locked,
+        folder: r.folder,
       }), ["draft_page_", "draft_card_"]);
       return jsonResponse(entries);
     }
@@ -314,7 +318,7 @@ export default {
 
       const entries = await listEntries(env, "draft_page_", (p) => ({
         id: p.id, title: p.title, slug: p.slug, createdAt: p.createdAt, updatedAt: p.updatedAt,
-        publishedSlug: p.publishedSlug, locked: p.locked,
+        publishedSlug: p.publishedSlug, locked: p.locked, folder: p.folder,
       }));
       return jsonResponse(entries);
     }
@@ -329,6 +333,7 @@ export default {
       const entries = await listEntries(env, "draft_card_", (c) => ({
         id: c.id, title: c.title, createdAt: c.createdAt, updatedAt: c.updatedAt,
         publishedEmbedId: c.publishedEmbedId, publishedAt: c.publishedAt, locked: c.locked,
+        folder: c.folder,
       }));
       return jsonResponse(entries);
     }
@@ -655,6 +660,41 @@ export default {
         const entries = await listEntries(env, `stat_${targetType}_${targetId}_`, (r) => r);
         entries.sort((a, b) => (a.ts < b.ts ? 1 : -1));
         return jsonResponse(entries);
+      }
+    }
+
+    // /folder-meta/:type - sidebar folder grouping metadata for the Reels/
+    // Pages/Project Cards lists (js/modules/sidebarList.js). A folder isn't
+    // its own stored entity keyed by id - this is the one place its name
+    // persists independent of any item referencing it, so an empty folder
+    // (created but nothing moved into it yet) survives a reload. `collapsed`
+    // is which folder names (including the fixed "Uncategorised" one) are
+    // currently collapsed, synced here instead of localStorage so it's the
+    // same across devices/browsers on this shared builder. Password-gated
+    // like every other builder management endpoint - never anonymous.
+    const folderMetaMatch = pathname.match(/^\/folder-meta\/(reel|page|card)$/);
+    if (folderMetaMatch) {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+      const key = `folder_meta_${folderMetaMatch[1]}`;
+
+      if (request.method === "GET") {
+        const value = await env.REELS.get(key);
+        if (!value) return jsonResponse({ names: [], collapsed: [] });
+        try {
+          return jsonResponse(JSON.parse(value));
+        } catch {
+          return jsonResponse({ names: [], collapsed: [] });
+        }
+      }
+
+      if (request.method === "POST") {
+        const { body, error } = await parseJsonBody(request);
+        if (error) return error;
+        const names = Array.isArray(body?.names) ? body.names.filter((n) => typeof n === "string") : [];
+        const collapsed = Array.isArray(body?.collapsed) ? body.collapsed.filter((n) => typeof n === "string") : [];
+        await env.REELS.put(key, JSON.stringify({ names, collapsed }));
+        return jsonResponse({ ok: true });
       }
     }
 
