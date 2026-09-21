@@ -20,8 +20,9 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
   const presets = loadColourPresets();
   
   function makeSwatch(preset) {
+    const loadTitle = `Load "${preset.name || '(untitled)'}"`;
     return `
-      <div class="preset-swatch" style="display:inline-block;width:38px;height:22px;border-radius:5px;border:1.5px solid #ccc;vertical-align:middle;background:linear-gradient(to right,${preset.varUiAccent||REEL_COLOR_DEFAULTS.uiAccent},${preset.varWaveformUnplayed||REEL_COLOR_DEFAULTS.waveformUnplayed},${preset.varWaveformHover||REEL_COLOR_DEFAULTS.waveformHoverRgba})"></div>
+      <div class="preset-swatch" title="${loadTitle}" aria-label="${loadTitle}" style="display:inline-block;width:38px;height:22px;border-radius:5px;border:1.5px solid #ccc;vertical-align:middle;background:linear-gradient(to right,${preset.varUiAccent||REEL_COLOR_DEFAULTS.uiAccent},${preset.varWaveformUnplayed||REEL_COLOR_DEFAULTS.waveformUnplayed},${preset.varWaveformHover||REEL_COLOR_DEFAULTS.waveformHoverRgba})"></div>
     `;
   }
   
@@ -51,7 +52,7 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
     <div class="preset-modal-content">
       <div class="preset-modal-header" style="display:flex;justify-content:space-between;align-items:center;margin-bottom:1.1em;">
         <span style="font-size:1.15rem;font-weight:700;color:#fff;">Colour Presets</span>
-        <button type="button" class="close-preset-modal" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#888;padding:0 0.5em;">&times;</button>
+        <button type="button" class="close-preset-modal" title="Close" aria-label="Close" style="background:none;border:none;font-size:1.5rem;cursor:pointer;color:#888;padding:0 0.5em;">&times;</button>
       </div>
       <div class="preset-list" style="max-height:260px;overflow-y:auto;">
   `;
@@ -64,7 +65,7 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
         <div class="preset-row" data-idx="${idx}">
           ${makeSwatch(preset)}
           <div class="preset-name-col">
-            <span class="preset-name">${preset.name||'(untitled)'}</span>
+            <span class="preset-name" title="Load &quot;${preset.name||'(untitled)'}&quot;">${preset.name||'(untitled)'}</span>
           </div>
           <div class="preset-actions">
             ${starIcon(!!preset.isDefault)}
@@ -80,7 +81,7 @@ export function renderColourPresetModal(currentPickrValues, reel, colourPresetMo
   html += `
       </div>
       <div style="margin-top:1.2em;text-align:right;">
-        <button type="button" class="save-current-preset-btn" style="background:var(--builder-accent,#000);color:#fff;font-weight:600;padding:0.5em 1.1em;border-radius:5px;border:none;cursor:pointer;">Save current as preset</button>
+        <button type="button" class="save-current-preset-btn" title="Save the current colour swatches as a new reusable preset" style="background:var(--builder-accent,#000);color:#fff;font-weight:600;padding:0.5em 1.1em;border-radius:5px;border:none;cursor:pointer;">Save current as preset</button>
       </div>
     </div>
   `;
@@ -218,6 +219,7 @@ function handlePresetRename(row, preset, currentPickrValues, reel, colourPresetM
   const input = document.createElement("input");
   input.type = "text";
   input.value = oldName;
+  input.title = "Rename this preset";
   input.style.width = "100%";
   input.style.boxSizing = "border-box";
   input.style.display = "block";

@@ -120,9 +120,9 @@ export function createPlayerTextStylesSection(reel, onChange) {
 
   section.innerHTML = `
     <legend class="builder-section-legend">Player Text Styles</legend>
-    <button type="button" id="editFallbackTextStylesBtn" class="page-block-add-btn">Edit Fallback Text Styles...</button>
+    <button type="button" id="editFallbackTextStylesBtn" class="page-block-add-btn" title="Set the default Font/Size/Weight/Color used when a text unit inherits a role and this reel has no page context.">Edit Fallback Text Styles...</button>
     <div class="color-row" style="margin-top:0.8rem;">
-      <label for="reelShowTitle" style="cursor:pointer;">Display Reel Title in Player</label>
+      <label for="reelShowTitle" style="cursor:pointer;" title="Show the reel title as a heading at the top of the player.">Display Reel Title in Player</label>
       <span id="reelShowTitleToggleSlot"></span>
     </div>
 
@@ -133,10 +133,10 @@ export function createPlayerTextStylesSection(reel, onChange) {
         <label class="appearance-option" style="display:flex;align-items:center;gap:0.7em;">
           Align:
           <span class="icon-toggle-group">
-            <span id="reelTitleAlignLeft" class="align-icon" title="Left">
+            <span id="reelTitleAlignLeft" class="align-icon" title="Align title text to the left" aria-label="Align title text to the left">
               <span class="material-symbols-outlined">format_align_left</span>
             </span>
-            <span id="reelTitleAlignCenter" class="align-icon" title="Center">
+            <span id="reelTitleAlignCenter" class="align-icon" title="Center the title text" aria-label="Center the title text">
               <span class="material-symbols-outlined">format_align_center</span>
             </span>
           </span>
@@ -184,6 +184,10 @@ export function createPlayerTextStylesSection(reel, onChange) {
     step: 1,
     unit: "px",
   });
+  // `tooltip` would only land on the (unused, since only `.control` gets
+  // inserted below) label element - set title directly on what's actually
+  // mounted instead.
+  paddingControl.control.title = "Space below the title, between it and the rest of the player.";
   section.querySelector("#paddingControlSlot").replaceWith(paddingControl.control);
 
   const defaultColor = () => reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent;

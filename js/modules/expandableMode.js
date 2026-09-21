@@ -33,6 +33,8 @@ export function createPlayerModeSection(reel, onChange) {
   staticLabel.style.gap = '0.5rem';
   staticLabel.style.cursor = 'pointer';
 
+  staticLabel.title = 'Switch to a fixed-height player with all controls always visible.';
+
   const staticRadio = document.createElement('input');
   staticRadio.type = 'radio';
   staticRadio.name = 'playerMode';
@@ -52,6 +54,8 @@ export function createPlayerModeSection(reel, onChange) {
   expandableLabel.style.alignItems = 'center';
   expandableLabel.style.gap = '0.5rem';
   expandableLabel.style.cursor = 'pointer';
+
+  expandableLabel.title = 'Switch to a player that starts collapsed as a banner and expands on hover.';
 
   const expandableRadio = document.createElement('input');
   expandableRadio.type = 'radio';
@@ -526,6 +530,8 @@ function createColorPickerRow(label, buttonId, tooltip, toggle = null) {
   button.id = buttonId;
   button.className = 'pickr-button';
   button.type = 'button';
+  button.setAttribute('aria-label', label.replace(/:$/, ''));
+  if (tooltip) button.title = tooltip;
   if (toggle && !toggle.checked) {
     button.disabled = true;
     button.style.opacity = '0.5';

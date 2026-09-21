@@ -308,6 +308,7 @@ export function createTextStyleToolbar({
   toolbar.className = "text-style-toolbar";
 
   const styleBtn = createDropdownMenuButton(getRole() ? ROLE_LABELS[getRole()] : "Custom");
+  styleBtn.title = "Inherit a named text style, or choose Custom to set font/size/weight/color yourself.";
   styleBtn.onclick = () => {
     openContextMenu(styleBtn, roleMenuItems(roleDefs, selectRole));
   };
@@ -327,6 +328,7 @@ export function createTextStyleToolbar({
 
   const fontBtn = createDropdownMenuButton(fontLabelFor(getFontFamily()));
   fontBtn.classList.add("font-picker-btn");
+  fontBtn.title = "Font family for this text";
   fontBtn.onclick = () => {
     openContextMenu(fontBtn, fontMenuItems((f) => {
       setFontFamily(f.value === "system" ? undefined : f.value);
@@ -352,6 +354,9 @@ export function createTextStyleToolbar({
     step: 1,
     unit: "px",
   });
+  // `tooltip` above would only land on the (unused - only `.control` is
+  // appended below) label element - set title directly on the control.
+  sizeControl.control.title = "Font size in pixels";
   sizeControl.control.classList.add("text-style-toolbar-size-control");
   sizeControl.input.addEventListener("input", () => {
     const val = parseInt(sizeControl.input.value, 10);
@@ -516,6 +521,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     fontTd.style.cssText = cellStyle;
     const fontBtn = createDropdownMenuButton(fontLabelForValue(def.fontFamily));
     fontBtn.classList.add("font-picker-btn");
+    fontBtn.title = "Font family for this role";
     fontBtn.onclick = () => {
       openContextMenu(fontBtn, fontMenuItems((f) => {
         if (fontsLinked) {
@@ -546,6 +552,9 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       // overflowed the cell into the Weight dropdown next to it. The "Size"
       // header already says what the number is.
     });
+    // `tooltip` would only land on the (unused) label element - only
+    // `.control` is appended to the cell, so set title on that directly.
+    sizeControl.control.title = "Font size in pixels for this role";
     sizeControl.control.classList.add("customize-styles-size-control");
     sizeControl.input.addEventListener("input", () => {
       const val = parseInt(sizeControl.input.value, 10);
@@ -578,6 +587,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       max: 3,
       step: 0.1,
     });
+    lineControl.control.title = "Line height for this role, as a multiple of its font size";
     lineControl.control.classList.add("customize-styles-size-control");
     lineControl.input.addEventListener("input", () => {
       const val = parseFloat(lineControl.input.value);
@@ -590,6 +600,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     const colorTd = document.createElement("td");
     colorTd.style.cssText = cellStyle;
     const colorPickr = createColorPickrButton(def.color || ROLE_DEFAULT_COLOR[role], (hex) => { def.color = hex; commitAll(); }, pickrInstances);
+    colorPickr.btn.title = "Text color for this role";
     colorTd.appendChild(colorPickr.btn);
     tr.appendChild(colorTd);
 
@@ -603,6 +614,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     const resetBtn = document.createElement("button");
     resetBtn.type = "button";
     resetBtn.textContent = "Reset";
+    resetBtn.title = "Clear this row's font, size, weight, and color back to defaults";
     // Not .media-browser-delete-btn - that class only has a background
     // rule scoped under .media-browser-bulk-bar (css/file-picker.css), so
     // used bare here it fell through to native dark-mode button chrome
@@ -657,11 +669,13 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
   const fontLinkToggle = document.createElement("span");
   fontLinkToggle.className = "format-icon";
   fontLinkToggle.title = "Link font across all styles";
+  fontLinkToggle.setAttribute("aria-label", "Link font across all styles");
   fontLinkToggle.innerHTML = `<span class="material-symbols-outlined">link</span>`;
   fontLinkToggle.onclick = () => {
     fontsLinked = !fontsLinked;
     fontLinkToggle.classList.toggle("active", fontsLinked);
     fontLinkToggle.title = fontsLinked ? "Unlink font per style" : "Link font across all styles";
+    fontLinkToggle.setAttribute("aria-label", fontLinkToggle.title);
     if (fontsLinked && fontRows.length) syncLinkedFonts(fontRows[0].def.fontFamily || "system");
   };
   document.getElementById("fontLinkToggleSlot")?.replaceWith(fontLinkToggle);

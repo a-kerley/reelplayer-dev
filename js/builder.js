@@ -203,7 +203,8 @@ function createColorPickersSection() {
     min: 0,
     max: 100,
     step: 5,
-    unit: '%'
+    unit: '%',
+    tooltip: 'Opacity of the static background colour/image/video behind the player.'
   }).row.outerHTML;
 
   const backgroundBlurRow = buildValueControl({
@@ -213,7 +214,8 @@ function createColorPickersSection() {
     min: 0,
     max: 50,
     step: 1,
-    unit: 'px'
+    unit: 'px',
+    tooltip: 'Backdrop blur strength applied over the background image/video.'
   }).row.outerHTML;
 
   const hoverDarkenAmountBuilt = buildValueControl({
@@ -227,6 +229,11 @@ function createColorPickersSection() {
   });
   hoverDarkenAmountBuilt.input.disabled = true;
   hoverDarkenAmountBuilt.slider.disabled = true;
+  // buildValueControl()'s own `tooltip` option only lands on the label
+  // element, which .control.outerHTML below never includes (it's just the
+  // input+slider, not the row) - set title directly on the pieces that
+  // actually get serialized instead.
+  hoverDarkenAmountBuilt.control.title = 'How much darker the background gets while hovering the player.';
   const hoverDarkenAmountRow = hoverDarkenAmountBuilt.control.outerHTML;
 
   const idleUnblurAmountBuilt = buildValueControl({
@@ -240,9 +247,10 @@ function createColorPickersSection() {
   });
   idleUnblurAmountBuilt.input.disabled = true;
   idleUnblurAmountBuilt.slider.disabled = true;
+  idleUnblurAmountBuilt.control.title = 'How much the background blur reduces while the player sits idle.';
   const idleUnblurAmountRow = idleUnblurAmountBuilt.control.outerHTML;
 
-  const outlineWidthControl = buildValueControl({
+  const outlineWidthBuilt = buildValueControl({
     id: 'playerOutlineWidth',
     label: '',
     value: 0,
@@ -250,33 +258,35 @@ function createColorPickersSection() {
     max: 20,
     step: 1,
     unit: 'px'
-  }).control.outerHTML;
+  });
+  outlineWidthBuilt.control.title = 'Thickness of the border drawn around the player.';
+  const outlineWidthControl = outlineWidthBuilt.control.outerHTML;
 
   const content = `
     <div class="color-row">
       <span>UI Accent Colour:</span>
-      <button id="pickr-ui-accent" class="pickr-button" type="button"></button>
+      <button id="pickr-ui-accent" class="pickr-button" type="button" aria-label="UI Accent Colour" title="Primary accent colour used for buttons, highlights, and controls in the player."></button>
       ${eyedropButtonHTML('pickr-ui-accent')}
     </div>
     <div class="color-row">
       <span>Waveform Unplayed Colour:</span>
-      <button id="pickr-waveform-unplayed" class="pickr-button" type="button"></button>
+      <button id="pickr-waveform-unplayed" class="pickr-button" type="button" aria-label="Waveform Unplayed Colour" title="Colour of the waveform for the portion of the track not yet played."></button>
       ${eyedropButtonHTML('pickr-waveform-unplayed')}
     </div>
     <div class="color-row">
       <span>Waveform Hover Colour:</span>
-      <button id="pickr-waveform-hover" class="pickr-button" type="button"></button>
+      <button id="pickr-waveform-hover" class="pickr-button" type="button" aria-label="Waveform Hover Colour" title="Colour the waveform shows under the cursor when hovering to scrub."></button>
       ${eyedropButtonHTML('pickr-waveform-hover')}
     </div>
     <div class="blend-modes-section" style="margin-top:1rem;padding-top:1rem;border-top:1px solid #444;">
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Player Outline</h4>
       <div class="color-row">
         <span>Outline:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;">
+        <label class="toggle-switch" style="margin-right:0.5rem;" title="Draw a border around the player.">
           <input type="checkbox" id="playerOutlineEnabled" />
           <span class="toggle-slider"></span>
         </label>
-        <button id="pickr-outline-color" class="pickr-button" type="button" disabled style="opacity:0.5;"></button>
+        <button id="pickr-outline-color" class="pickr-button" type="button" disabled style="opacity:0.5;" aria-label="Outline Colour" title="Colour of the player's border."></button>
         ${eyedropButtonHTML('pickr-outline-color')}
         ${outlineWidthControl}
       </div>
@@ -285,17 +295,17 @@ function createColorPickersSection() {
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Image & Effects</h4>
       <div class="color-row">
         <span>Static Background Colour:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;">
+        <label class="toggle-switch" style="margin-right:0.5rem;" title="Fill the player background with a solid colour.">
           <input type="checkbox" id="backgroundColorEnabled" />
           <span class="toggle-slider"></span>
         </label>
-        <button id="pickr-background-color" class="pickr-button" type="button"></button>
+        <button id="pickr-background-color" class="pickr-button" type="button" aria-label="Static Background Colour" title="Solid background colour shown behind the player."></button>
         ${eyedropButtonHTML('pickr-background-color')}
       </div>
       <div id="backgroundImageRowWrapper">
         <div class="color-row" id="backgroundImageRow">
           <span>Background Image:</span>
-          <label class="toggle-switch" style="margin-right:0.5rem;">
+          <label class="toggle-switch" style="margin-right:0.5rem;" title="Show an image behind the player instead of/under the solid background colour.">
             <input type="checkbox" id="backgroundImageEnabled" />
             <span class="toggle-slider"></span>
           </label>
@@ -316,7 +326,7 @@ function createColorPickersSection() {
       <div id="backgroundVideoRowWrapper">
         <div class="color-row" id="backgroundVideoRow">
           <span>Background Video:</span>
-          <label class="toggle-switch" style="margin-right:0.5rem;">
+          <label class="toggle-switch" style="margin-right:0.5rem;" title="Play a looping video behind the player instead of/under the static background.">
             <input type="checkbox" id="backgroundVideoEnabled" />
             <span class="toggle-slider"></span>
           </label>
@@ -329,7 +339,7 @@ function createColorPickersSection() {
         </div>
       </div>
       <div class="per-track-backgrounds-section" style="margin-top:0.0rem;">
-        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
+        <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" title="Set a different background image/video per track, overriding the reel's own background for that track." onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
           <div style="display:flex;align-items:center;gap:0.2rem;">
             <span class="expand-arrow" style="font-size:0.8rem;transition:transform 0.2s;display:inline-block;">▶</span>
             <span>Per-Track Backgrounds:</span>
@@ -342,16 +352,16 @@ function createColorPickersSection() {
       ${backgroundBlurRow}
       <div class="color-row">
         <span>Overlay Colour:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;">
+        <label class="toggle-switch" style="margin-right:0.5rem;" title="Tint the background with a semi-transparent colour.">
           <input type="checkbox" id="overlayColorEnabled" />
           <span class="toggle-slider"></span>
         </label>
-        <button id="pickr-overlay-color" class="pickr-button" type="button" disabled style="opacity:0.5;"></button>
+        <button id="pickr-overlay-color" class="pickr-button" type="button" disabled style="opacity:0.5;" aria-label="Overlay Colour" title="Tint colour (with opacity) applied over the background."></button>
         ${eyedropButtonHTML('pickr-overlay-color')}
       </div>
       <div class="color-row">
         <span>Darken on Hover:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;">
+        <label class="toggle-switch" style="margin-right:0.5rem;" title="Darken the background while the player is hovered.">
           <input type="checkbox" id="hoverDarkenEnabled" />
           <span class="toggle-slider"></span>
         </label>
@@ -359,7 +369,7 @@ function createColorPickersSection() {
       </div>
       <div class="color-row">
         <span>Unblur on Idle:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;">
+        <label class="toggle-switch" style="margin-right:0.5rem;" title="Gradually reduce the background blur while the player sits idle.">
           <input type="checkbox" id="idleUnblurEnabled" />
           <span class="toggle-slider"></span>
         </label>

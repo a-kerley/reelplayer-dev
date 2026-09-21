@@ -44,6 +44,10 @@ export function createExpandablePreview(imageUrl, reel, zoom = 1) {
     step: 10,
     unit: '%'
   });
+  // `tooltip` above only lands on the (here, empty) label element - this
+  // markup only ever embeds `.control.outerHTML` (see below), so set title
+  // directly on the piece that's actually serialized.
+  zoomControl.control.title = 'Zoom level applied to this background image in the preview.';
 
   return `
     <div style="display:flex;flex-direction:column;gap:1rem;">
@@ -158,6 +162,7 @@ export function createFilenameDisplay({ filename, placeholder, urlInput }) {
   display.classList.add("filename-display");
   display.textContent = filename || placeholder;
   display.tabIndex = 0;
+  display.title = "Click to edit the URL directly.";
   display.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #444;border-radius:3px;font-size:0.75rem;background:#1e1e1e;color:#fff;cursor:text;";
   
   if (filename === placeholder || !filename) {
@@ -189,6 +194,7 @@ export function createUrlInput({ value, placeholder, filenameDisplay, onUpdate, 
   input.type = "url";
   input.placeholder = placeholder;
   input.value = value || "";
+  input.title = placeholder;
   input.style.cssText = "flex:1;min-width:0;padding:0.3rem 0.4rem;border:1px solid #444;border-radius:3px;font-size:0.75rem;background:#1e1e1e;color:#fff;display:none;";
   
   // Update on blur

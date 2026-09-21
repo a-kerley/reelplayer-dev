@@ -77,8 +77,10 @@ function renderListHTML(entries, currentEmbedId) {
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
             <button type="button" class="embed-manager-stats-btn" data-id="${entry.id}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+              title="View opens/plays/listen-time analytics for this published embed"
               style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
             <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
+              title="Permanently delete this published embed"
               style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
           </div>
         </div>
