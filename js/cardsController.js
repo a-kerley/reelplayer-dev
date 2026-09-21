@@ -23,6 +23,7 @@ import {
   createUrlInputRow,
   createFilePickerButton,
   createClearButton,
+  makeSectionCollapsible,
 } from "./modules/domUtils.js";
 import {
   destroyPickrInstances,
@@ -412,9 +413,14 @@ export function initCardsController() {
   }
 
   function buildRepeaterHTML(legend, id, rowsHTML, addLabel) {
+    // collapsible: false - this fieldset's `.outerHTML` gets re-parsed into
+    // cardEditorPane's innerHTML below, which would discard any listeners
+    // wired to this throwaway in-memory node. renderEditor() re-wires the
+    // real, mounted fieldset with makeSectionCollapsible() once it exists.
     return createFieldset({
       id,
       legend,
+      collapsible: false,
       content: `
         <div class="${id}-rows">${rowsHTML.join("")}</div>
         <div class="phantom-track-row" style="display:flex;justify-content:flex-end;margin-top:0.25rem;">
@@ -452,7 +458,11 @@ export function initCardsController() {
       tooltip: "Override the player's outline width for this card (0 = use the reel's own).",
     }).row.outerHTML;
 
-    const overridesHTML = `
+    // Split into the same shape as the Reels tab's own sections (a focused
+    // fieldset per concern, e.g. "Player Colours & Effects") rather than
+    // one catch-all "Card Style Overrides" fieldset with an ad-hoc <h4>
+    // partway through it for the chrome-colour subgroup.
+    const playerOverridesHTML = `
       ${OVERRIDE_COLOR_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
@@ -467,7 +477,9 @@ export function initCardsController() {
       <div id="cardBannerImageRowSlot"></div>
       <div id="cardBannerVideoRowSlot"></div>
       <div id="cardListenImageRowSlot"></div>
-      <h4 style="margin:1rem 0 0.5rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Card Chrome Colours</h4>
+    `;
+
+    const chromeOverridesHTML = `
       ${CARD_CHROME_COLOR_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
@@ -477,8 +489,31 @@ export function initCardsController() {
       ${CARD_CHROME_TEXT_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
-          <input type="text" class="card-chrome-text-input" data-key="${f.key}" placeholder="${f.placeholder}" title="${f.tooltip}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+          <input type="text" class="card-chrome-text-input filename-display" data-key="${f.key}" placeholder="${f.placeholder}" title="${f.tooltip}" style="flex:1;" />
         </div>`).join("")}
+    `;
+
+    // Everything below Title/Reel that isn't a repeater or an override -
+    // same "one fieldset per concern" reasoning as the split above, instead
+    // of five bare, individually-margined <label> rows.
+    const cardInfoHTML = `
+      <label class="builder-field-row">
+        Order (sidebar sort only, not layout):
+        <input type="number" id="cardOrderInput" class="filename-display" title="Controls this card's position in the sidebar list only, not its page layout." style="width:6rem;" />
+      </label>
+      <div id="cardLogoRowSlot"></div>
+      <label class="builder-field-row">
+        Logo Alt Text:
+        <input type="text" id="cardLogoAltInput" class="filename-display" title="Alt text for the logo image, for accessibility." />
+      </label>
+      <label class="builder-field-row">
+        Composers ("Music by …"):
+        <input type="text" id="cardComposersInput" class="filename-display" title="Optional 'Music by …' credit line shown on the card." />
+      </label>
+      <label class="builder-field-row">
+        Description (blank line between paragraphs):
+        <textarea id="cardDescriptionInput" class="filename-display" rows="6" title="Card description text; leave a blank line between paragraphs."></textarea>
+      </label>
     `;
 
     cardEditorPane.innerHTML = `
@@ -486,40 +521,31 @@ export function initCardsController() {
         Title:
         <input type="text" id="cardTitleInput" class="filename-display" title="The card's title, shown on its banner." />
       </label>
-      <label style="display: block; margin-top: 1rem;">
-        Order (sidebar sort only, not layout):
-        <input type="number" id="cardOrderInput" title="Controls this card's position in the sidebar list only, not its page layout." style="width:6rem;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
-      </label>
-      <div id="cardLogoRowSlot" style="margin-top: 1rem;"></div>
-      <label style="display: block; margin-top: 1rem;">
-        Logo Alt Text:
-        <input type="text" id="cardLogoAltInput" title="Alt text for the logo image, for accessibility." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
-      </label>
-      <label style="display: block; margin-top: 1rem;">
-        Composers ("Music by …"):
-        <input type="text" id="cardComposersInput" title="Optional 'Music by …' credit line shown on the card." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
-      </label>
-      <label style="display: block; margin-top: 1rem;">
-        Description (blank line between paragraphs):
-        <textarea id="cardDescriptionInput" rows="6" title="Card description text; leave a blank line between paragraphs." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;"></textarea>
-      </label>
 
+      <div id="cardReelFieldSlot" style="margin-top: 1rem;"></div>
+
+      ${createFieldset({ id: "cardInfoFieldset", legend: "Card Info", content: cardInfoHTML, collapsible: false }).outerHTML}
       ${buildRepeaterHTML("Tags", "cardStats", (card.stats || []).map(statRowHTML), "Add tag")}
       ${buildRepeaterHTML("Links", "cardLinks", (card.links || []).map(linkRowHTML), "Add link")}
       ${buildRepeaterHTML("Partner Logos", "cardPartnerLogos", (card.partnerLogos || []).map(partnerLogoRowHTML), "Add partner logo")}
-
-      <div id="cardReelFieldSlot" style="margin-top: 1rem;"></div>
+      ${createFieldset({ id: "cardPlayerOverridesFieldset", legend: "Player Overrides", content: playerOverridesHTML, collapsible: false }).outerHTML}
+      ${createFieldset({ id: "cardChromeOverridesFieldset", legend: "Card Chrome Colours", content: chromeOverridesHTML, collapsible: false }).outerHTML}
 
       <div class="color-row" style="margin-top: 1rem;">
         <label for="cardAnalyticsEnabled" title="Track plays/engagement analytics for this card.">Analytics Enabled:</label>
         <span id="cardAnalyticsSlot"></span>
       </div>
 
-      ${createFieldset({ id: "cardOverridesFieldset", legend: "Card Style Overrides", content: overridesHTML }).outerHTML}
-
       <button type="button" id="cardPublishBtn" title="Publish this card so it can be embedded on boxedape.com." style="margin-top: 1rem;">Publish Card</button>
       <p id="cardPublishResult" style="margin-top: 0.75rem;"></p>
     `;
+
+    // Every fieldset above was built via createFieldset()/buildRepeaterHTML()
+    // and inserted as a string (collapsible: false on each) - wire the real,
+    // mounted nodes up now, same pattern as pagesController.js's own
+    // post-innerHTML makeSectionCollapsible() calls.
+    ["cardInfoFieldset", "cardStats", "cardLinks", "cardPartnerLogos", "cardPlayerOverridesFieldset", "cardChromeOverridesFieldset"]
+      .forEach((id) => makeSectionCollapsible(document.getElementById(id)));
 
     // --- Title / reel picker -------------------------------------------
     const titleInput = document.getElementById("cardTitleInput");

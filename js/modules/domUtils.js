@@ -7,9 +7,17 @@
  * @param {string} options.legend - Legend text
  * @param {string} options.content - Inner HTML content
  * @param {Object} options.styles - Optional CSS styles
+ * @param {boolean} [options.collapsible=true] - Pass false when the caller
+ *   is going to read `.outerHTML` and re-parse it elsewhere (e.g. embedded
+ *   in a larger template string) rather than insert this actual node -
+ *   makeSectionCollapsible()'s event listeners would otherwise be wired to
+ *   a node that gets thrown away, leaving the real (re-parsed) copy inert.
+ *   Call makeSectionCollapsible() again on the real, mounted element in
+ *   that case (see js/pagesController.js/js/cardsController.js for the
+ *   pattern).
  * @returns {HTMLFieldSetElement}
  */
-export function createFieldset({ id, legend, content, styles = {} }) {
+export function createFieldset({ id, legend, content, styles = {}, collapsible = true }) {
   const fieldset = document.createElement("fieldset");
   fieldset.id = id;
 
@@ -27,7 +35,7 @@ export function createFieldset({ id, legend, content, styles = {} }) {
     ${content}
   `;
 
-  makeSectionCollapsible(fieldset);
+  if (collapsible) makeSectionCollapsible(fieldset);
 
   return fieldset;
 }

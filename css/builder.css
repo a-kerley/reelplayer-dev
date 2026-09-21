@@ -1182,6 +1182,24 @@ input.filename-display:focus {
   outline-offset: 2px;
 }
 
+/* Stacked "label above full-width input/textarea" row - the block-layout
+   counterpart to .color-row's horizontal flex row, same 0.6rem
+   margin-bottom single-source-of-truth for spacing between rows. Use with
+   .filename-display on the input/textarea itself for the shared field
+   look, rather than repeating filename-display's border/background/color
+   as one-off inline styles per field. */
+.builder-field-row {
+  display: block;
+  margin-bottom: 0.6rem;
+}
+
+.builder-field-row > input,
+.builder-field-row > textarea {
+  display: block;
+  width: 100%;
+  margin-top: 0.4rem;
+}
+
 /* ==============================================
    COLOUR PRESET MODAL
    ============================================== */
