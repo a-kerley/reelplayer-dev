@@ -217,6 +217,19 @@ to native chrome under this, which picks up the OS accent color (seen twice:
 rule and rendered as a jarring purple/maroon blob until one was added). If a
 new button looks oddly colored, this is the first thing to check.
 
+## Tooltips: native `title=` only
+
+Every icon-only button/control in the builder chrome needs a native
+`title="..."` attribute (plus a matching `aria-label` for screen readers,
+same text). There used to be a second, parallel tooltip system
+(`js/modules/tooltips.js`, a `data-tooltip` attribute + hover-triggered
+custom-styled popup) — it was removed 2026-09 because it only ended up
+covering 4 of the ~16 tooltippable elements in the builder while the rest
+used `title=` anyway, so the two systems just drifted out of sync with each
+other. Don't reintroduce a custom tooltip component; use `title=` for new
+icon buttons, and if you add an icon-only control, give it both `title` and
+`aria-label`.
+
 ## Layout gotcha: `.builder-main`'s 500px bottom padding
 
 `.builder-main` has `padding-bottom: 500px` — intentional, gives the reel

@@ -346,7 +346,7 @@ export function initCardsController() {
         <input type="text" class="partner-logo-src" placeholder="Logo URL" value="${(logo.src || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         ${pickerBtn.outerHTML}
         <input type="text" class="partner-logo-alt" placeholder="Alt text" value="${(logo.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <button type="button" class="track-remove-btn partner-logo-remove" aria-label="Remove partner logo">
+        <button type="button" class="track-remove-btn partner-logo-remove" title="Remove partner logo" aria-label="Remove partner logo">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
@@ -359,7 +359,7 @@ export function initCardsController() {
       <div class="color-row" data-index="${i}">
         <input type="text" class="stat-label" placeholder="Label (optional)" value="${(stat.label || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         <input type="text" class="stat-value" placeholder="Value" value="${(stat.value || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <button type="button" class="track-remove-btn stat-remove" aria-label="Remove tag">
+        <button type="button" class="track-remove-btn stat-remove" title="Remove tag" aria-label="Remove tag">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
@@ -377,7 +377,7 @@ export function initCardsController() {
           ${options}
         </select>
         <input type="text" class="link-alt" placeholder="Alt text" value="${(link.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <button type="button" class="track-remove-btn link-remove" aria-label="Remove link">
+        <button type="button" class="track-remove-btn link-remove" title="Remove link" aria-label="Remove link">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
           </svg>
@@ -392,7 +392,7 @@ export function initCardsController() {
       content: `
         <div class="${id}-rows">${rowsHTML.join("")}</div>
         <div class="phantom-track-row" style="display:flex;justify-content:flex-end;margin-top:0.25rem;">
-          <button type="button" class="track-remove-btn add-btn ${id}-add" aria-label="${addLabel}">
+          <button type="button" class="track-remove-btn add-btn ${id}-add" title="${addLabel}" aria-label="${addLabel}">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
               <path stroke-linecap="round" stroke-linejoin="round" d="M12 9v6m3-3H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
             </svg>
