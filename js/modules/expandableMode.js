@@ -146,11 +146,12 @@ export function createStaticModeSettings(reel, onChange) {
   const settingsContainer = document.createElement('div');
   settingsContainer.style.display = 'flex';
   settingsContainer.style.flexDirection = 'column';
-  // Matches .color-row's own default margin-bottom (css/builder.css) -
-  // this container used flex gap instead of that class's row margin, so
-  // it was a second, independently-drifting spacing value; now the same
-  // condensed-but-clear 0.6rem as everywhere else.
-  settingsContainer.style.gap = '0.6rem';
+  // No flex `gap` here - every row appended below already carries
+  // `.color-row`, whose own margin-bottom (css/builder.css, "the single
+  // source of truth for row spacing") is the real spacing value. A gap
+  // here on top of that doubled every row's spacing to ~1.2rem instead of
+  // the intended 0.6rem - only invisible in this particular section
+  // because it happens to hold just one row.
   settingsContainer.style.marginTop = '0.75rem';
 
   // Player Height
@@ -209,11 +210,14 @@ export function createExpandableModeSettings(reel, onChange) {
   const settingsContainer = document.createElement('div');
   settingsContainer.style.display = 'flex';
   settingsContainer.style.flexDirection = 'column';
-  // Matches .color-row's own default margin-bottom (css/builder.css) -
-  // this container used flex gap instead of that class's row margin, so
-  // it was a second, independently-drifting spacing value; now the same
-  // condensed-but-clear 0.6rem as everywhere else.
-  settingsContainer.style.gap = '0.6rem';
+  // No flex `gap` here - every row appended below already carries
+  // `.color-row`, whose own margin-bottom (css/builder.css, "the single
+  // source of truth for row spacing") is the real spacing value. A gap
+  // here on top of that doubled every row's spacing to ~1.2rem instead of
+  // the intended 0.6rem, which is exactly why this section's vertical
+  // rhythm looked noticeably looser than every other settings group (its
+  // 7 rows made the doubling obvious; css/builder.css's own comment on
+  // .color-row already flags this exact single-source-of-truth intent).
   settingsContainer.style.marginTop = '0.75rem';
 
   // Collapsed Height
