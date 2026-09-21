@@ -283,22 +283,6 @@
   color: #fff;
 }
 
-.media-browser-folder-menu-btn {
-  background: transparent;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  font-size: var(--builder-text-md);
-  padding: 0.1rem 0.4rem;
-  border-radius: 4px;
-  flex-shrink: 0;
-}
-
-.media-browser-folder-menu-btn:hover {
-  color: #fff;
-  background: rgba(255, 255, 255, 0.1);
-}
-
 /* File-type icon colouring - folders use amber above; these differentiate
    audio/image/video/other files in both the table and grid views. */
 .media-browser-icon-audio svg { color: #34d399; }
@@ -449,25 +433,12 @@
   text-decoration: underline;
 }
 
-.media-browser-row-menu-btn {
-  background: transparent;
-  border: none;
-  color: #999;
-  cursor: pointer;
-  font-size: var(--builder-text-md);
-  padding: 0.2rem 0.5rem;
-}
-
-.media-browser-row-menu-btn:hover {
-  color: #fff;
-}
-
-/* Small anchored dropdown menu (js/modules/contextMenu.js) - row "..." /
-   folder "..." in the media browser, "+ Add block" in the page editor,
-   etc. Replaces what used to be a full-screen dialog for a simple choice
-   list. Generic/shared, not media-browser-specific despite living in this
-   file (file-picker.css is already the "shared small builder widgets" CSS
-   file, loaded only by index.html). */
+/* Small anchored dropdown menu (js/modules/contextMenu.js) - opened via
+   right-click on a media browser row/folder, "+ Add block" in the page
+   editor, etc. Replaces what used to be a full-screen dialog for a simple
+   choice list. Generic/shared, not media-browser-specific despite living in
+   this file (file-picker.css is already the "shared small builder widgets"
+   CSS file, loaded only by index.html). */
 .app-context-menu {
   position: fixed;
   z-index: 10001; /* above the file-picker modal overlay (10000) */

@@ -578,19 +578,14 @@ export async function renderMediaBrowser(container, options = {}) {
 
     // Only real, named folders (not the special "Unfiled"/"All Media" rows,
     // and not the protected audio/images/video roots every file-picker
-    // targets by fixed path) get rename/delete actions, and only in manage mode.
+    // targets by fixed path) get rename/delete actions, and only in manage
+    // mode. Right-click the row itself instead of a dedicated "..." button -
+    // same convention as js/modules/sidebarList.js's folder headers.
     if (mode === 'manage' && path && !PROTECTED_ROOT_FOLDERS[path]) {
-      const menuBtn = document.createElement("button");
-      menuBtn.type = "button";
-      menuBtn.textContent = "⋮";
-      menuBtn.className = "media-browser-folder-menu-btn";
-      menuBtn.title = "Rename or delete this folder";
-      menuBtn.setAttribute("aria-label", "Folder options: rename or delete");
-      menuBtn.onclick = (e) => {
-        e.stopPropagation();
-        showFolderMenu(path, menuBtn);
+      row.oncontextmenu = (e) => {
+        e.preventDefault();
+        showFolderMenu(path, row);
       };
-      row.appendChild(menuBtn);
     }
 
     row.onclick = onClick;
@@ -1022,7 +1017,6 @@ export async function renderMediaBrowser(container, options = {}) {
     headRow.appendChild(trackTh);
     headRow.appendChild(sortHeader("Size", "size"));
     headRow.appendChild(sortHeader("Uploaded", "uploaded"));
-    if (mode === 'manage') headRow.appendChild(document.createElement("th"));
     thead.appendChild(headRow);
     table.appendChild(thead);
 
@@ -1044,6 +1038,13 @@ export async function renderMediaBrowser(container, options = {}) {
         e.dataTransfer.effectAllowed = "move";
         e.dataTransfer.setData("application/x-media-keys", JSON.stringify(dragKeysFor(file)));
       });
+      // Right-click the row itself instead of a dedicated "..." button -
+      // same convention as the folder rows above and
+      // js/modules/sidebarList.js's item rows.
+      row.oncontextmenu = (e) => {
+        e.preventDefault();
+        showRowMenu(file, row);
+      };
     }
 
     if (mode === 'manage') {
@@ -1103,21 +1104,6 @@ export async function renderMediaBrowser(container, options = {}) {
     const uploadedTd = document.createElement("td");
     uploadedTd.textContent = file.uploaded ? new Date(file.uploaded).toLocaleDateString() : "—";
     row.appendChild(uploadedTd);
-
-    if (mode === 'manage') {
-      const actionsTd = document.createElement("td");
-      if (!file.readOnly) {
-        const menuBtn = document.createElement("button");
-        menuBtn.type = "button";
-        menuBtn.textContent = "⋮";
-        menuBtn.className = "media-browser-row-menu-btn";
-        menuBtn.title = "File options: copy URL, rename, move, or delete";
-        menuBtn.setAttribute("aria-label", "File options: copy URL, rename, move, or delete");
-        menuBtn.onclick = () => showRowMenu(file, menuBtn);
-        actionsTd.appendChild(menuBtn);
-      }
-      row.appendChild(actionsTd);
-    }
 
     return row;
   }
