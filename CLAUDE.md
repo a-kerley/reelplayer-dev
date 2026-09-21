@@ -221,11 +221,19 @@ new button looks oddly colored, this is the first thing to check.
 
 ## Tailwind / daisyUI (builder only)
 
-Added 2026-09-21 to hand-port specific daisyUI component designs (starting
-with the range slider) into the builder without adopting daisyUI's actual
-classes/markup wholesale - see `js/modules/valueControl.js`'s
-`updateSliderFill()` for the first result. This is the **first Node/npm
-dependency this repo has ever had** - everything else is still plain
+Added 2026-09-21, initially to hand-port just the visual idea behind
+specific daisyUI components without their actual classes (a JS-driven
+`--range-fill` percentage feeding a CSS gradient, for the value-control
+slider) - once the real build pipeline existed, that was replaced with
+daisyUI's actual `range range-primary range-xs` classes instead (see
+`js/modules/valueControl.js`'s slider creation in `buildValueControl()`).
+Its filled-track look is pure CSS (a `box-shadow` anchored to the native
+thumb, clipped by the track's own `overflow:hidden`), so it needed no
+JS-tracked state at all - simpler than the hand-rolled version it replaced.
+Default to using daisyUI's real classes/markup going forward now that the
+pipeline exists; hand-porting is still the fallback for anything daisyUI
+doesn't have a component for. This is the **first Node/npm dependency
+this repo has ever had** - everything else is still plain
 `<script type="module">` with no bundler (see top of this file). Scope is
 deliberately narrow: a CSS build step only, never touching how the app's
 own JS is written or loaded.

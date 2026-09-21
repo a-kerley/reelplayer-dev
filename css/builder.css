@@ -1347,96 +1347,12 @@ input.filename-display:focus {
 
 /* ==============================================
    RANGE SLIDERS
+   Styling (track fill, thumb shape/color) is entirely daisyUI's `.range
+   range-primary range-xs` classes (js/modules/valueControl.js) - see
+   "Tailwind / daisyUI (builder only)" in CLAUDE.md. Only the hover-reveal
+   layout/interaction rules specific to this appearing-slider UX live
+   below, under VALUE CONTROL.
    ============================================== */
-input[type="range"] {
-  -webkit-appearance: none;
-  appearance: none;
-  height: 6px;
-  /* Filled track (0 -> current value) in the accent color, like daisyUI's
-     range component - native range inputs have no such "progress" concept
-     in Chrome/Safari on their own, so js/modules/valueControl.js's
-     updateSliderFill() drives this via --range-fill (a percentage) on the
-     element itself. Falls back to 0% (fully unfilled) for any range input
-     that doesn't set it. */
-  background: linear-gradient(to right,
-    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
-    #555 var(--range-fill, 0%), #555 100%);
-  border-radius: 6px;
-  outline: none;
-  cursor: pointer;
-  /* No transition on this gradient background - a background-image swap
-     (unlike a plain background-color) doesn't interpolate smoothly across
-     browsers, so it would just snap anyway. */
-}
-
-input[type="range"]:hover {
-  background: linear-gradient(to right,
-    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
-    #666 var(--range-fill, 0%), #666 100%);
-}
-
-input[type="range"]::-webkit-slider-thumb {
-  -webkit-appearance: none;
-  appearance: none;
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--builder-accent);
-  border: 2px solid #fff;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-}
-
-input[type="range"]::-webkit-slider-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-}
-
-input[type="range"]::-webkit-slider-thumb:active {
-  transform: scale(1.05);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-}
-
-input[type="range"]::-moz-range-thumb {
-  width: 20px;
-  height: 20px;
-  border-radius: 50%;
-  background: var(--builder-accent);
-  border: 2px solid #fff;
-  cursor: pointer;
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.2);
-  transition: transform 0.1s ease, box-shadow 0.1s ease;
-  border: none; /* Remove default border for Firefox */
-}
-
-input[type="range"]::-moz-range-thumb:hover {
-  transform: scale(1.1);
-  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.3);
-}
-
-input[type="range"]::-moz-range-thumb:active {
-  transform: scale(1.05);
-  box-shadow: 0 2px 4px rgba(0, 0, 0, 0.4);
-}
-
-input[type="range"]::-moz-range-track {
-  height: 6px;
-  background: linear-gradient(to right,
-    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
-    #555 var(--range-fill, 0%), #555 100%);
-  border-radius: 6px;
-  border: none;
-}
-
-input[type="range"]:focus {
-  outline: none;
-}
-
-input[type="range"]:focus::-webkit-slider-thumb,
-input[type="range"]:focus::-moz-range-thumb {
-  box-shadow: 0 0 0 3px rgba(0, 0, 0, 0.1), 0 2px 4px rgba(0, 0, 0, 0.2);
-}
 
 /* ==============================================
    VALUE CONTROL

@@ -29,19 +29,6 @@ function roundToStep(value, step) {
   return parseFloat(value.toFixed(decimals));
 }
 
-// Drives the filled-track look (css/builder.css's input[type="range"]
-// gradient background) - native range inputs have no "filled" portion in
-// Chrome/Safari on their own, so a --range-fill custom property feeds a
-// linear-gradient instead. Set on the slider element itself (not a class),
-// since it's a continuous per-instance value, not a state toggle.
-function updateSliderFill(slider) {
-  const min = parseFloat(slider.min);
-  const max = parseFloat(slider.max);
-  const value = parseFloat(slider.value);
-  const pct = max > min ? clamp(((value - min) / (max - min)) * 100, 0, 100) : 0;
-  slider.style.setProperty('--range-fill', `${pct}%`);
-}
-
 function effectiveStep(baseStep, e) {
   if (e.shiftKey) return baseStep * 10;
   if (e.ctrlKey) return baseStep / 10;
@@ -126,6 +113,11 @@ export function buildValueControl({ id, label, value, min, max, step = 1, unit =
   const slider = document.createElement('input');
   slider.type = 'range';
   slider.id = `${id}Slider`;
+  // daisyUI's range component (css/tailwind-src.css) - its filled-track
+  // look is pure CSS (a box-shadow anchored to the native thumb, clipped by
+  // the track's own overflow:hidden), so it needs no JS-tracked percentage
+  // unlike the hand-rolled --range-fill version this replaced.
+  slider.className = 'range range-primary range-xs';
   slider.min = String(min);
   slider.max = String(max);
   slider.step = String(step);
@@ -166,19 +158,15 @@ export function wireValueControl(control) {
   const max = parseFloat(input.max);
   const step = parseFloat(input.step) || 1;
 
-  updateSliderFill(slider);
-
   input.addEventListener('input', () => {
     const parsed = parseFloat(input.value);
     if (!isNaN(parsed)) {
       slider.value = String(clamp(parsed, min, max));
-      updateSliderFill(slider);
     }
   });
 
   slider.addEventListener('input', () => {
     input.value = slider.value;
-    updateSliderFill(slider);
     input.dispatchEvent(new Event('input', { bubbles: true }));
   });
   slider.addEventListener('change', () => {
