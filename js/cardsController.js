@@ -209,6 +209,38 @@ export function initCardsController() {
     render();
   }
 
+  // Same stub-hydration requirement as the other per-card actions above -
+  // need the real body to actually copy it, not just the sidebar stub's
+  // few fields. `reelId` is kept as-is (a reference to another reel, not
+  // data this card owns - see worker/CLAUDE.md).
+  async function duplicateCard(id) {
+    const source = cards.find((c) => c.id === id);
+    if (!source) return;
+
+    let full = source;
+    if (source._stub) {
+      try {
+        full = await loadCardDraft(id);
+      } catch (e) {
+        dialog.alert(`Couldn't load this card (offline or server error): ${e.message}`);
+        return;
+      }
+      if (!full) return; // deleted server-side elsewhere
+    }
+
+    const copy = structuredClone(full);
+    copy.id = "card-" + Date.now();
+    copy.title = full.title ? `${full.title} (Copy)` : full.title;
+    copy.createdAt = Date.now();
+    copy.publishedEmbedId = null;
+    copy.publishedAt = null;
+
+    cards.push(copy);
+    currentCardId = copy.id;
+    flushCardDraftSave(copy); // not awaited - one-shot, don't stall the UI
+    await render();
+  }
+
   async function handleDelete(id) {
     const idx = cards.findIndex((c) => c.id === id);
     if (idx === -1) return;
@@ -294,7 +326,7 @@ export function initCardsController() {
       scheduleCardDraftSave(current);
       scheduleCardPreviewRefresh(current);
     }
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
   }
 
   // --- Repeater sections (partnerLogos / stats / links) -------------------
@@ -758,7 +790,7 @@ export function initCardsController() {
   }
 
   async function render() {
-    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
+    renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
 
     if (!cards.length) {
       renderEditor(null);
@@ -778,7 +810,7 @@ export function initCardsController() {
           // The sidebar row above was rendered from the stub (listCardDrafts()
           // only returns {id,title,createdAt,updatedAt} - no reelId), so its
           // subtitle needs a second pass now that the full card is in.
-          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder);
+          renderCardsSidebar(cards, currentCardId, setCurrent, createNew, handleDelete, moveCardToFolder, renameCardFolder, duplicateCard);
         } else {
           // 404 - deleted server-side elsewhere; drop it, pick another.
           cards.splice(idx, 1);

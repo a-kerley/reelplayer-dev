@@ -10,8 +10,9 @@
 // specific labels/ids, keeping this exported function's signature unchanged
 // for existing js/main.js call sites.
 import { renderSidebarList } from './modules/sidebarList.js';
+import { publicReelPlayerUrl } from './modules/embedExporter.js';
 
-export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder) {
+export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate) {
   renderSidebarList(
     {
       listElId: 'reelList',
@@ -22,6 +23,8 @@ export function renderSidebar(reels, currentId, onSelect, onNew, onDelete, onTog
       folderMetaType: 'reel',
       onMoveToFolder,
       onRenameFolder,
+      onDuplicate,
+      getPublicUrl: (reel) => reel.publishedEmbedId ? publicReelPlayerUrl(reel.publishedEmbedId) : null,
     },
     reels, currentId, onSelect, onNew, onDelete,
     // Mirrors js/pagesSidebar.js's own publish-status subtitle - keyed on

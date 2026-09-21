@@ -218,3 +218,11 @@ export class EmbedExporter {
 }
 
 export const embedExporter = new EmbedExporter();
+
+/** The canonical, shareable public URL for a published reel embed id -
+ * same extensionless "player" convention as js/modules/pagePublish.js's
+ * publicPageUrl()/js/modules/cardPublish.js's publicCardPlayerUrl(). */
+export function publicReelPlayerUrl(reelId) {
+  const baseURL = (window.location.origin + window.location.pathname).replace(/index\.html$/, "");
+  return `${baseURL}player?id=${reelId}`;
+}

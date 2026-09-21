@@ -5,8 +5,9 @@
 // shows that the Reels list doesn't, since reels have no renameable public
 // identifier to surface here.
 import { renderSidebarList } from './modules/sidebarList.js';
+import { publicPageUrl } from './modules/pagePublish.js';
 
-export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder) {
+export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, onToggleLock, onMoveToFolder, onRenameFolder, onDuplicate) {
   renderSidebarList(
     {
       listElId: 'pageList',
@@ -17,6 +18,8 @@ export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, 
       folderMetaType: 'page',
       onMoveToFolder,
       onRenameFolder,
+      onDuplicate,
+      getPublicUrl: (page) => page.publishedSlug ? publicPageUrl(page.publishedSlug) : null,
     },
     pages, currentId, onSelect, onNew, onDelete,
     (page) => page.publishedSlug ? `/page?slug=${page.publishedSlug}` : 'not yet published',

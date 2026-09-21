@@ -362,6 +362,42 @@ document.addEventListener("DOMContentLoaded", async () => {
       await render();
     }
 
+    // Same stub-hydration requirement as the other per-reel actions above -
+    // need the real body to actually copy it, not just the sidebar stub's
+    // few fields. The copy is a distinct draft (own id, unpublished, never
+    // locked) even if the source was locked/published.
+    async function duplicateReel(id) {
+      const source = reels.find((r) => r.id === id);
+      if (!source) return;
+
+      let full = source;
+      if (source._stub) {
+        showBuilderLoading();
+        try {
+          full = await loadDraft(id);
+        } catch (e) {
+          hideBuilderLoading();
+          dialog.alert(`Couldn't load this reel (offline or server error): ${e.message}`);
+          return;
+        }
+        hideBuilderLoading();
+        if (!full) return; // deleted server-side elsewhere
+      }
+
+      const copy = structuredClone(full);
+      copy.id = "reel-" + Date.now();
+      copy.title = full.title ? `${full.title} (Copy)` : full.title;
+      copy.createdAt = Date.now();
+      copy.locked = false;
+      copy.publishedEmbedId = null;
+      copy.publishedAt = null;
+
+      reels.push(copy);
+      currentId = copy.id;
+      flushDraftSave(copy); // not awaited - one-shot, don't stall the UI
+      await render();
+    }
+
     async function handleDelete(id) {
       if (reels.length === 1) {
         dialog.alert("At least one reel must remain.", "OK");
@@ -405,7 +441,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       saveReels(reels);
       window.reels = reels; // Keep global reference updated
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder); // re-render sidebar with updated titles
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel); // re-render sidebar with updated titles
       updateReelPublishStatus(reels.find((r) => r.id === currentId));
       // Don't re-render builder here - it destroys form elements and causes issues
       // Preview refresh is debounced so rapid field commits (e.g. tabbing
@@ -414,7 +450,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     async function render() {
-      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder);
+      renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel);
 
       const idx = reels.findIndex((r) => r.id === currentId);
       let current = reels[idx];

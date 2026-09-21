@@ -7,6 +7,7 @@
 import { dialog } from './dialogSystem.js';
 import { openContextMenu } from './contextMenu.js';
 import { loadFolderMeta, saveFolderMeta } from './folderMeta.js';
+import { showToast } from './toast.js';
 
 // openContextMenu() positions relative to an anchor element's own
 // bounding box - fine for a small row/header anchor, but wrong for a
@@ -94,6 +95,18 @@ async function renameFolder(state, oldName, opts) {
   opts.onRenameFolder?.(oldName, newName);
 }
 
+// Ungroups every item currently in this folder (folder -> null, same as
+// "Remove from folder") rather than deleting them - reuses onRenameFolder's
+// existing bulk-rewrite, just targeting null instead of a new name.
+async function deleteFolder(state, name, opts) {
+  const confirmed = await dialog.confirm(`Delete "${name}"? Items inside move to Uncategorised.`, 'Delete', 'Cancel');
+  if (!confirmed) return;
+  state.names.delete(name);
+  state.collapsed.delete(name);
+  persistFolderMeta(state);
+  opts.onRenameFolder?.(name, null);
+}
+
 function groupByFolder(sortedItems, persistedNames) {
   const groups = new Map(); // folderName -> [[id, item], ...]
   groups.set(UNCATEGORISED, []);
@@ -142,8 +155,13 @@ export const ICONS = {
  * @param {"reel"|"page"|"card"} [opts.folderMetaType] - enables folder grouping/rename/create,
  *   synced via /folder-meta/:type (folderMeta.js). Omit to render a flat list with no folders.
  * @param {(id: string, folder: string|null) => void} [opts.onMoveToFolder] - per-item move/remove
- * @param {(oldName: string, newName: string) => void} [opts.onRenameFolder] - bulk-rewrites every
- *   item currently tagged with oldName to newName; called after the collision check passes
+ * @param {(oldName: string, newName: string|null) => void} [opts.onRenameFolder] - bulk-rewrites
+ *   every item currently tagged with oldName to newName (or null to ungroup); called after the
+ *   collision check passes (rename) or the confirm dialog is accepted (delete)
+ * @param {(id: string) => void} [opts.onDuplicate] - row context-menu "Duplicate" + the "+ New"
+ *   button's dropdown "Duplicate Current"
+ * @param {(item: Object) => string|null} [opts.getPublicUrl] - shareable URL for a published
+ *   item, or null/undefined if unpublished; enables the row's "Copy Link" item when present
  */
 export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDelete, renderSubtitle, onToggleLock) {
   const list = document.getElementById(opts.listElId);
@@ -185,24 +203,45 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       }
     };
 
-    if (opts.onMoveToFolder) {
+    if (opts.onMoveToFolder || opts.onDuplicate || opts.getPublicUrl) {
       li.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        const submenuItems = folderNames
-          .filter((name) => name !== item.folder)
-          .map((name) => ({ label: name, onClick: () => opts.onMoveToFolder(item.id, name) }));
-        submenuItems.push({
-          label: 'New folder…',
-          onClick: async () => {
-            const name = await createFolder(folderMeta);
-            if (name) opts.onMoveToFolder(item.id, name);
-          },
-        });
-        if (item.folder) {
-          submenuItems.push({ label: 'Remove from folder', onClick: () => opts.onMoveToFolder(item.id, null) });
+        const menuItems = [];
+
+        if (opts.onMoveToFolder) {
+          const submenuItems = folderNames
+            .filter((name) => name !== item.folder)
+            .map((name) => ({ label: name, onClick: () => opts.onMoveToFolder(item.id, name) }));
+          submenuItems.push({
+            label: 'New folder…',
+            onClick: async () => {
+              const name = await createFolder(folderMeta);
+              if (name) opts.onMoveToFolder(item.id, name);
+            },
+          });
+          if (item.folder) {
+            submenuItems.push({ label: 'Remove from folder', onClick: () => opts.onMoveToFolder(item.id, null) });
+          }
+          menuItems.push({ label: 'Move to…', submenu: submenuItems });
         }
-        openContextMenu(li, [{ label: 'Move to…', submenu: submenuItems }]);
+
+        if (opts.onDuplicate) {
+          menuItems.push({ label: 'Duplicate', onClick: () => opts.onDuplicate(item.id) });
+        }
+
+        if (opts.getPublicUrl) {
+          const url = opts.getPublicUrl(item);
+          menuItems.push({
+            label: 'Copy Link',
+            disabled: !url,
+            onClick: () => navigator.clipboard.writeText(url)
+              .then(() => showToast('Link copied'))
+              .catch(() => dialog.alert(`Couldn't copy to clipboard. Link: ${url}`)),
+          });
+        }
+
+        openContextMenu(li, menuItems);
       };
     }
 
@@ -270,7 +309,9 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
     return li;
   };
 
+  const allGroupNames = [];
   for (const [folderName, folderItems] of groupByFolder(sortedItems, folderMeta.names)) {
+    allGroupNames.push(folderName);
     const isCollapsed = collapsed.has(folderName);
 
     const header = document.createElement('li');
@@ -313,11 +354,20 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       header.oncontextmenu = (e) => {
         e.preventDefault();
         e.stopPropagation();
-        openContextMenu(header, [{
-          label: 'Rename',
-          disabled: folderName === UNCATEGORISED,
-          onClick: () => renameFolder(folderMeta, folderName, opts).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
-        }]);
+        const isUncategorised = folderName === UNCATEGORISED;
+        openContextMenu(header, [
+          {
+            label: 'Rename',
+            disabled: isUncategorised,
+            onClick: () => renameFolder(folderMeta, folderName, opts).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
+          },
+          {
+            label: 'Delete Folder',
+            disabled: isUncategorised,
+            danger: true,
+            onClick: () => deleteFolder(folderMeta, folderName, opts).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
+          },
+        ]);
       };
     }
 
@@ -336,16 +386,35 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
     list.oncontextmenu = (e) => {
       if (e.target !== list) return;
       e.preventDefault();
-      openContextMenuAtCursor(e, [{
-        label: 'New Folder…',
-        onClick: () => createFolder(folderMeta).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
-      }]);
+      const setAllCollapsed = (value) => {
+        allGroupNames.forEach((n) => (value ? collapsed.add(n) : collapsed.delete(n)));
+        persistFolderMeta(folderMeta);
+        renderSidebarList(...lastRenderArgs.get(opts.listElId));
+      };
+      openContextMenuAtCursor(e, [
+        {
+          label: 'New Folder…',
+          onClick: () => createFolder(folderMeta).then(() => renderSidebarList(...lastRenderArgs.get(opts.listElId))),
+        },
+        { label: 'Expand All', onClick: () => setAllCollapsed(false) },
+        { label: 'Collapse All', onClick: () => setAllCollapsed(true) },
+      ]);
     };
   }
 
   const newBtn = document.getElementById(opts.newBtnId);
   if (newBtn) {
     newBtn.textContent = opts.newBtnLabel;
-    newBtn.onclick = onNew;
+    if (opts.onDuplicate) {
+      // "+ New Reel" -> "New Reel" for the menu item's own label (the "+ "
+      // is button-chrome, not part of the action's name).
+      const newLabel = opts.newBtnLabel.replace(/^\+\s*/, '');
+      newBtn.onclick = () => openContextMenu(newBtn, [
+        { label: newLabel, onClick: onNew },
+        { label: 'Duplicate Current', disabled: !currentId, onClick: () => opts.onDuplicate(currentId) },
+      ]);
+    } else {
+      newBtn.onclick = onNew;
+    }
   }
 }

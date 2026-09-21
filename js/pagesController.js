@@ -117,6 +117,45 @@ export function initPagesController() {
     await render();
   }
 
+  // Same stub-hydration requirement as the other per-page actions above -
+  // need the real body to actually copy it, not just the sidebar stub's few
+  // fields. `slug` is reset to null (not just publishedSlug/
+  // publishedContentHash) since a page's slug is a stable, user-editable
+  // public identifier (see CLAUDE.md) - the copy needs its own, not the
+  // source's, even before either is ever published.
+  async function duplicatePage(id) {
+    const source = pages.find((p) => p.id === id);
+    if (!source) return;
+
+    let full = source;
+    if (source._stub) {
+      showLoading();
+      try {
+        full = await loadPageDraft(id);
+      } catch (e) {
+        hideLoading();
+        dialog.alert(`Couldn't load this page (offline or server error): ${e.message}`);
+        return;
+      }
+      hideLoading();
+      if (!full) return; // deleted server-side elsewhere
+    }
+
+    const copy = structuredClone(full);
+    copy.id = "page-" + Date.now();
+    copy.title = full.title ? `${full.title} (Copy)` : full.title;
+    copy.createdAt = Date.now();
+    copy.locked = false;
+    copy.slug = null;
+    copy.publishedSlug = null;
+    copy.publishedContentHash = null;
+
+    pages.push(copy);
+    currentPageId = copy.id;
+    flushPageDraftSave(copy); // not awaited - one-shot, don't stall the UI
+    await render();
+  }
+
   async function handleDelete(id) {
     const idx = pages.findIndex((p) => p.id === id);
     if (idx === -1) return;
@@ -152,7 +191,7 @@ export function initPagesController() {
       renderPagePreview(current);
       updatePublishStatus(current);
     }
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage);
   }
 
   // Mirrors js/main.js's toggleReelLock() - toggling lock has to persist
@@ -802,7 +841,7 @@ export function initPagesController() {
   }
 
   async function render() {
-    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder);
+    renderPagesSidebar(pages, currentPageId, setCurrent, createNew, handleDelete, togglePageLock, movePageToFolder, renamePageFolder, duplicatePage);
 
     if (!pages.length) {
       hideLoading(); // init()'s showLoading() has no stub-load branch to pair with when there's nothing to load
