@@ -1352,15 +1352,27 @@ input[type="range"] {
   -webkit-appearance: none;
   appearance: none;
   height: 6px;
-  background: #555;
+  /* Filled track (0 -> current value) in the accent color, like daisyUI's
+     range component - native range inputs have no such "progress" concept
+     in Chrome/Safari on their own, so js/modules/valueControl.js's
+     updateSliderFill() drives this via --range-fill (a percentage) on the
+     element itself. Falls back to 0% (fully unfilled) for any range input
+     that doesn't set it. */
+  background: linear-gradient(to right,
+    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
+    #555 var(--range-fill, 0%), #555 100%);
   border-radius: 6px;
   outline: none;
   cursor: pointer;
-  transition: background 0.2s ease;
+  /* No transition on this gradient background - a background-image swap
+     (unlike a plain background-color) doesn't interpolate smoothly across
+     browsers, so it would just snap anyway. */
 }
 
 input[type="range"]:hover {
-  background: #666;
+  background: linear-gradient(to right,
+    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
+    #666 var(--range-fill, 0%), #666 100%);
 }
 
 input[type="range"]::-webkit-slider-thumb {
@@ -1410,7 +1422,9 @@ input[type="range"]::-moz-range-thumb:active {
 
 input[type="range"]::-moz-range-track {
   height: 6px;
-  background: #555;
+  background: linear-gradient(to right,
+    var(--builder-accent) 0%, var(--builder-accent) var(--range-fill, 0%),
+    #555 var(--range-fill, 0%), #555 100%);
   border-radius: 6px;
   border: none;
 }
