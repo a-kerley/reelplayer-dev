@@ -22,18 +22,21 @@ const UNCATEGORISED = 'Uncategorised';
 // names + collapsed set (synced via opts.folderMetaType, once loaded), and
 // the args needed to re-render after any change - self-contained here so
 // none of this requires every caller to thread extra re-render plumbing
-// through just for this.
-const folderMetaByList = new Map(); // listElId -> {type, names: Set, collapsed: Set, loaded: bool}
+// through just for this. `names` is an ORDERED array, not a Set - its
+// element order IS the folder display order (drag-to-reorder splices it),
+// so renaming a folder must replace-in-place rather than delete+re-add
+// (which would silently bump it to the end).
+const folderMetaByList = new Map(); // listElId -> {type, names: string[], collapsed: Set, loaded: bool}
 const lastRenderArgs = new Map(); // listElId -> arguments array
 
 function getFolderMetaState(opts) {
   if (!folderMetaByList.has(opts.listElId)) {
-    folderMetaByList.set(opts.listElId, { type: opts.folderMetaType, names: new Set(), collapsed: new Set(), loaded: false });
+    folderMetaByList.set(opts.listElId, { type: opts.folderMetaType, names: [], collapsed: new Set(), loaded: false });
   }
   const state = folderMetaByList.get(opts.listElId);
   if (opts.folderMetaType && !state.loaded && !state.loading) {
     state.loading = loadFolderMeta(opts.folderMetaType).then((meta) => {
-      meta.names.forEach((n) => state.names.add(n));
+      state.names.push(...meta.names);
       meta.collapsed.forEach((n) => state.collapsed.add(n));
       state.loaded = true;
       const args = lastRenderArgs.get(opts.listElId);
@@ -45,20 +48,21 @@ function getFolderMetaState(opts) {
 
 function persistFolderMeta(state) {
   if (!state.type) return;
-  saveFolderMeta(state.type, { names: [...state.names], collapsed: [...state.collapsed] });
+  saveFolderMeta(state.type, { names: state.names, collapsed: [...state.collapsed] });
 }
 
 // Shared by the "New folder..." item (inside an item's Move-to submenu) and
 // the empty-space "New Folder" action - same prompt, same collision check,
-// same persistence. Returns the created name, or null if cancelled/rejected.
+// same persistence. New folders join at the end of the order. Returns the
+// created name, or null if cancelled/rejected.
 async function createFolder(state) {
   const name = await dialog.prompt('New folder name:');
   if (!name) return null;
-  if (name === UNCATEGORISED || state.names.has(name)) {
+  if (name === UNCATEGORISED || state.names.includes(name)) {
     await dialog.alert(`A folder named "${name}" already exists.`);
     return null;
   }
-  state.names.add(name);
+  state.names.push(name);
   persistFolderMeta(state);
   return name;
 }
@@ -66,12 +70,12 @@ async function createFolder(state) {
 async function renameFolder(state, oldName, opts) {
   const newName = await dialog.prompt('Rename folder:', oldName);
   if (!newName || newName === oldName) return;
-  if (newName === UNCATEGORISED || state.names.has(newName)) {
+  if (newName === UNCATEGORISED || state.names.includes(newName)) {
     await dialog.alert(`A folder named "${newName}" already exists.`);
     return;
   }
-  state.names.delete(oldName);
-  state.names.add(newName);
+  const idx = state.names.indexOf(oldName);
+  if (idx !== -1) state.names[idx] = newName; // in place - preserves its position in the order
   if (state.collapsed.has(oldName)) {
     state.collapsed.delete(oldName);
     state.collapsed.add(newName);
@@ -86,10 +90,25 @@ async function renameFolder(state, oldName, opts) {
 async function deleteFolder(state, name, opts) {
   const confirmed = await dialog.confirm(`Delete "${name}"? Items inside move to Uncategorised.`, 'Delete', 'Cancel');
   if (!confirmed) return;
-  state.names.delete(name);
+  state.names = state.names.filter((n) => n !== name);
   state.collapsed.delete(name);
   persistFolderMeta(state);
   opts.onRenameFolder?.(name, null);
+}
+
+// Moves `draggedName` to sit immediately before `targetName` in the order -
+// same "insert before, except dropping on the last one inserts after"
+// simplification js/modules/tracksEditor.js's own drag-reorder already
+// uses, rather than cursor-Y half-detection.
+function reorderFolder(state, draggedName, targetName, insertAfter) {
+  const from = state.names.indexOf(draggedName);
+  if (from === -1) return;
+  state.names.splice(from, 1);
+  let to = state.names.indexOf(targetName);
+  if (to === -1) return;
+  if (insertAfter) to += 1;
+  state.names.splice(to, 0, draggedName);
+  persistFolderMeta(state);
 }
 
 function groupByFolder(sortedItems, persistedNames) {
@@ -101,11 +120,19 @@ function groupByFolder(sortedItems, persistedNames) {
     if (!groups.has(folder)) groups.set(folder, []);
     groups.get(folder).push(entry);
   }
-  // Uncategorised first, then every named folder (persisted or ad-hoc)
-  // alphabetically - an empty one still shows, unlike before.
+  // Uncategorised always last. Named folders in their persisted custom
+  // order (drag-to-reorder splices `persistedNames` directly); an ad-hoc
+  // folder name (an item references it but it's missing from
+  // persistedNames - shouldn't normally happen, every creation path adds
+  // to the array) has no defined position, so it sorts after every
+  // explicitly-ordered folder, alphabetically among any others like it.
+  const orderIndex = new Map(persistedNames.map((name, i) => [name, i]));
   return [...groups.entries()].sort(([a], [b]) => {
-    if (a === UNCATEGORISED) return -1;
-    if (b === UNCATEGORISED) return 1;
+    if (a === UNCATEGORISED) return 1;
+    if (b === UNCATEGORISED) return -1;
+    const ai = orderIndex.has(a) ? orderIndex.get(a) : Infinity;
+    const bi = orderIndex.has(b) ? orderIndex.get(b) : Infinity;
+    if (ai !== bi) return ai - bi;
     return a.localeCompare(b);
   });
 }
@@ -324,7 +351,12 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
   };
 
   const allGroupNames = [];
-  for (const [folderName, folderItems] of groupByFolder(sortedItems, folderMeta.names)) {
+  const groupEntries = groupByFolder(sortedItems, folderMeta.names);
+  // The named folder immediately before Uncategorised (always last) - the
+  // one exception to "insert before the drop target" when reordering
+  // folders, same shape as js/modules/tracksEditor.js's own drag-reorder.
+  const lastNamedFolder = groupEntries.length > 1 ? groupEntries[groupEntries.length - 2][0] : null;
+  for (const [folderName, folderItems] of groupEntries) {
     allGroupNames.push(folderName);
     const isCollapsed = collapsed.has(folderName);
 
@@ -364,16 +396,51 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
       }
     };
 
+    // Folders reorder among themselves via drag (Uncategorised is pinned
+    // last, never draggable/a reorder target - it isn't a real stored
+    // folder). Separate from an ITEM dragged onto a header (moves it into
+    // that folder, handled below) - the two use different dataTransfer
+    // types so dragover can tell which is in flight before drop (only
+    // `.types` is readable mid-drag, not the actual payload).
+    if (opts.onRenameFolder && folderName !== UNCATEGORISED) {
+      header.draggable = true;
+      header.ondragstart = (e) => {
+        e.dataTransfer.effectAllowed = 'move';
+        e.dataTransfer.setData('application/x-folder-name', folderName);
+        header.classList.add('dragging');
+      };
+      header.ondragend = () => header.classList.remove('dragging');
+    }
+
     if (opts.onMoveToFolder) {
       const dropTargetName = folderName === UNCATEGORISED ? null : folderName;
+      const isFolderReorderTarget = folderName !== UNCATEGORISED;
       header.ondragover = (e) => {
         e.preventDefault(); // required for ondrop to fire at all
-        header.classList.add('drag-over');
+        if (isFolderReorderTarget && e.dataTransfer.types.includes('application/x-folder-name')) {
+          list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+          const indicator = document.createElement('li');
+          indicator.className = 'drop-indicator';
+          if (folderName === lastNamedFolder) header.after(indicator);
+          else header.before(indicator);
+        } else {
+          header.classList.add('drag-over');
+        }
       };
-      header.ondragleave = () => header.classList.remove('drag-over');
+      header.ondragleave = () => {
+        header.classList.remove('drag-over');
+        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+      };
       header.ondrop = (e) => {
         e.preventDefault();
         header.classList.remove('drag-over');
+        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        const draggedFolderName = e.dataTransfer.getData('application/x-folder-name');
+        if (isFolderReorderTarget && draggedFolderName && draggedFolderName !== folderName) {
+          reorderFolder(folderMeta, draggedFolderName, folderName, folderName === lastNamedFolder);
+          renderSidebarList(...lastRenderArgs.get(opts.listElId));
+          return;
+        }
         const draggedId = e.dataTransfer.getData('text/plain');
         if (draggedId) opts.onMoveToFolder(draggedId, dropTargetName);
       };
