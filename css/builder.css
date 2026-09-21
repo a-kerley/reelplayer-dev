@@ -1251,6 +1251,26 @@ input.filename-display:focus {
   pointer-events: none;
 }
 
+/* js/modules/sidebarList.js's drag-reorder indicator is an <li> (a plain
+   <div> isn't a valid direct child of <ul> - see the folder-header rule
+   just above for the same reasoning), so #reelList li's own item-row
+   styling (padding, margin-left, width, flex-direction, border-radius, ...)
+   otherwise wins the cascade over the plain .drop-indicator rule above -
+   #reelList li has an ID in its selector, .drop-indicator alone doesn't,
+   so ID+type beats a single class regardless of source order. Without
+   this override the indicator rendered as a padded, inset box instead of
+   a plain thin line. */
+#reelList li.drop-indicator,
+#cardList li.drop-indicator,
+#pageList li.drop-indicator {
+  display: block;
+  padding: 0;
+  margin: -2px 0 0 0;
+  width: 100%;
+  border-radius: 0;
+  background: none;
+}
+
 /* ==============================================
    MATERIAL ICONS & ALIGNMENT
    ============================================== */

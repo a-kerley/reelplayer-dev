@@ -9,6 +9,28 @@ import { openContextMenu, openContextMenuAtCursor } from './contextMenu.js';
 import { loadFolderMeta, saveFolderMeta } from './folderMeta.js';
 import { showToast } from './toast.js';
 
+// Shared by both item and folder drag-reorder. Only touches the DOM if the
+// indicator isn't already exactly where it needs to be - dragover fires
+// continuously while the pointer so much as twitches, and inserting/
+// removing a real <li> on every single firing shifts the row layout under
+// the cursor, which was retriggering dragover/dragleave in a tight loop
+// (worst right at the top of a group, with no row above to absorb the
+// shift - visible as the whole group jittering).
+function showDropIndicator(list, targetEl, insertAfter) {
+  const existing = list.querySelector('.drop-indicator');
+  const wantedSibling = insertAfter ? targetEl.nextElementSibling : targetEl.previousElementSibling;
+  if (existing && existing === wantedSibling) return;
+  if (existing) existing.remove();
+  const indicator = document.createElement('li');
+  indicator.className = 'drop-indicator';
+  if (insertAfter) targetEl.after(indicator);
+  else targetEl.before(indicator);
+}
+
+function clearDropIndicator(list) {
+  list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+}
+
 // Folder grouping. `item.folder` is a plain string tag an item carries, but
 // a folder's NAME persists independently via /folder-meta/:type (see
 // folderMeta.js) - that's what lets an empty folder (created but nothing
@@ -266,28 +288,30 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
         e.dataTransfer.setData('text/plain', item.id);
         li.classList.add('dragging');
       };
-      li.ondragend = () => li.classList.remove('dragging');
+      li.ondragend = () => {
+        li.classList.remove('dragging');
+        clearDropIndicator(list);
+      };
 
       // Reordering within the same group is a separate gesture from
       // moving between groups (that's drag-onto-a-header, or the context
       // menu below) - dropping this item onto another one only reorders
       // if they're already in the same folder; dropping across folders
       // here is a silent no-op rather than also moving it, so there's
-      // never ambiguity about what a single drag-and-drop does.
+      // never ambiguity about what a single drag-and-drop does. No
+      // dragleave handler here - removing the indicator on every leave
+      // (immediately followed by dragover re-adding it) is exactly the
+      // thrashing showDropIndicator()'s no-op check exists to avoid;
+      // cleanup instead happens once, on dragend/drop.
       li.ondragover = (e) => {
         e.preventDefault();
-        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
-        const indicator = document.createElement('li');
-        indicator.className = 'drop-indicator';
         const isLastInGroup = folderItems[folderItems.length - 1]?.[0] === item.id;
-        if (isLastInGroup) li.after(indicator);
-        else li.before(indicator);
+        showDropIndicator(list, li, isLastInGroup);
       };
-      li.ondragleave = () => list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
       li.ondrop = (e) => {
         e.preventDefault();
         e.stopPropagation(); // don't also let this bubble to a folder header's own ondrop
-        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        clearDropIndicator(list);
         const draggedId = e.dataTransfer.getData('text/plain');
         if (!draggedId || draggedId === item.id) return;
         const draggedInGroup = folderItems.some(([entryId]) => entryId === draggedId);
@@ -476,32 +500,33 @@ export function renderSidebarList(opts, items, currentId, onSelect, onNew, onDel
         e.dataTransfer.setData('application/x-folder-name', folderName);
         header.classList.add('dragging');
       };
-      header.ondragend = () => header.classList.remove('dragging');
+      header.ondragend = () => {
+        header.classList.remove('dragging');
+        clearDropIndicator(list);
+      };
     }
 
     if (opts.onMoveToFolder) {
       const dropTargetName = folderName === UNCATEGORISED ? null : folderName;
       const isFolderReorderTarget = folderName !== UNCATEGORISED;
+      // No dragleave handler here either, same reasoning as the item rows
+      // above - the drag-over highlight (.drag-over, for an item being
+      // dropped into this folder) doesn't shift layout so it's safe to
+      // toggle freely, but the reorder indicator only updates via
+      // showDropIndicator()'s no-op check, on dragend, or on drop.
       header.ondragover = (e) => {
         e.preventDefault(); // required for ondrop to fire at all
         if (isFolderReorderTarget && e.dataTransfer.types.includes('application/x-folder-name')) {
-          list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
-          const indicator = document.createElement('li');
-          indicator.className = 'drop-indicator';
-          if (folderName === lastNamedFolder) header.after(indicator);
-          else header.before(indicator);
+          header.classList.remove('drag-over');
+          showDropIndicator(list, header, folderName === lastNamedFolder);
         } else {
           header.classList.add('drag-over');
         }
       };
-      header.ondragleave = () => {
-        header.classList.remove('drag-over');
-        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
-      };
       header.ondrop = (e) => {
         e.preventDefault();
         header.classList.remove('drag-over');
-        list.querySelectorAll('.drop-indicator').forEach((el) => el.remove());
+        clearDropIndicator(list);
         const draggedFolderName = e.dataTransfer.getData('application/x-folder-name');
         if (isFolderReorderTarget && draggedFolderName && draggedFolderName !== folderName) {
           reorderFolder(folderMeta, draggedFolderName, folderName, folderName === lastNamedFolder);
