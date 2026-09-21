@@ -48,6 +48,7 @@ function createModalFooter(onClose) {
   const closeButton = document.createElement("button");
   closeButton.className = "file-picker-cancel-btn";
   closeButton.textContent = "Cancel";
+  closeButton.title = "Close without selecting a file";
   closeButton.addEventListener("click", onClose);
   footer.appendChild(closeButton);
   return footer;

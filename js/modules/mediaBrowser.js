@@ -413,6 +413,8 @@ export async function renderMediaBrowser(container, options = {}) {
   function renderResizeHandle() {
     const handle = document.createElement("div");
     handle.className = "media-browser-resize-handle";
+    handle.title = "Drag to resize the media sidebar";
+    handle.setAttribute("aria-label", "Drag to resize the media sidebar");
 
     const MIN_WIDTH = 140;
     const MAX_WIDTH = 480;
@@ -452,6 +454,8 @@ export async function renderMediaBrowser(container, options = {}) {
     search.type = "text";
     search.placeholder = "Search...";
     search.className = "media-browser-search";
+    search.title = "Search files by name";
+    search.setAttribute("aria-label", "Search files by name");
     search.value = state.search;
     search.oninput = () => { state.search = search.value; renderMainOnly(); };
     bar.appendChild(search);
@@ -460,12 +464,14 @@ export async function renderMediaBrowser(container, options = {}) {
     listBtn.type = "button";
     listBtn.textContent = "List";
     listBtn.className = `media-browser-view-btn${state.viewMode === 'list' ? ' active' : ''}`;
+    listBtn.title = "Show files as a list";
     listBtn.onclick = () => { state.viewMode = 'list'; persistPrefs(); render(); };
 
     const gridBtn = document.createElement("button");
     gridBtn.type = "button";
     gridBtn.textContent = "Grid";
     gridBtn.className = `media-browser-view-btn${state.viewMode === 'grid' ? ' active' : ''}`;
+    gridBtn.title = "Show files as a grid of thumbnails";
     gridBtn.onclick = () => { state.viewMode = 'grid'; persistPrefs(); render(); };
 
     bar.append(listBtn, gridBtn);
@@ -486,6 +492,7 @@ export async function renderMediaBrowser(container, options = {}) {
       newFolderBtn.type = "button";
       newFolderBtn.textContent = "+ New Folder";
       newFolderBtn.className = "media-browser-new-folder-btn";
+      newFolderBtn.title = "Create a new folder to organize files into";
       newFolderBtn.onclick = async () => {
         const name = await promptForText("New folder name (e.g. backgrounds/nature)");
         if (!name) return;
@@ -531,6 +538,11 @@ export async function renderMediaBrowser(container, options = {}) {
     const row = document.createElement("div");
     row.className = `media-browser-folder-row${isActive ? ' active' : ''}`;
     row.style.paddingLeft = `${0.75 + depth * 1}rem`;
+    row.title = path === null
+      ? "View every file across all folders"
+      : path === ''
+        ? "View files that aren't in any folder"
+        : `View files in "${label}"`;
 
     const labelDiv = document.createElement("div");
     labelDiv.className = "media-browser-folder-label";
@@ -572,6 +584,8 @@ export async function renderMediaBrowser(container, options = {}) {
       menuBtn.type = "button";
       menuBtn.textContent = "⋮";
       menuBtn.className = "media-browser-folder-menu-btn";
+      menuBtn.title = "Rename or delete this folder";
+      menuBtn.setAttribute("aria-label", "Folder options: rename or delete");
       menuBtn.onclick = (e) => {
         e.stopPropagation();
         showFolderMenu(path, menuBtn);
@@ -852,6 +866,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const link = document.createElement("a");
     link.href = "#";
     link.textContent = "click to upload";
+    link.title = "Choose files from your computer to upload";
     zone.appendChild(link);
 
     const input = document.createElement("input");
@@ -926,6 +941,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const moveBtn = document.createElement("button");
     moveBtn.type = "button";
     moveBtn.textContent = "Move to folder...";
+    moveBtn.title = "Move the selected files into a different folder";
     moveBtn.onclick = async () => {
       const dest = await promptForText("Move selected files to folder (e.g. backgrounds/nature):");
       if (dest === null) return;
@@ -937,6 +953,7 @@ export async function renderMediaBrowser(container, options = {}) {
     deleteBtn.type = "button";
     deleteBtn.textContent = "Delete Selected";
     deleteBtn.className = "media-browser-delete-btn";
+    deleteBtn.title = "Permanently delete the selected files";
     deleteBtn.onclick = async () => {
       const confirmed = await dialog.confirm(`Delete ${state.selected.size} file(s)? This cannot be undone.`, "Delete", "Cancel");
       if (!confirmed) return;
@@ -961,6 +978,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const arrow = state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : '';
     th.textContent = label + arrow;
     th.className = "media-browser-sortable";
+    th.title = `Sort by ${label.toLowerCase()} (click again to reverse order)`;
     th.onclick = () => {
       if (state.sortField === field) {
         state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
@@ -985,6 +1003,7 @@ export async function renderMediaBrowser(container, options = {}) {
       const selectAll = document.createElement("input");
       selectAll.type = "checkbox";
       selectAll.checked = files.length > 0 && files.every(f => state.selected.has(f.key));
+      selectAll.title = "Select all files";
       selectAll.onchange = () => {
         if (selectAll.checked) files.forEach(f => { if (!f.readOnly) state.selected.add(f.key); });
         else files.forEach(f => state.selected.delete(f.key));
@@ -1033,6 +1052,7 @@ export async function renderMediaBrowser(container, options = {}) {
       checkbox.type = "checkbox";
       checkbox.disabled = file.readOnly;
       checkbox.checked = state.selected.has(file.key);
+      checkbox.title = "Select this file";
       checkbox.onchange = () => {
         if (checkbox.checked) state.selected.add(file.key);
         else state.selected.delete(file.key);
@@ -1091,6 +1111,8 @@ export async function renderMediaBrowser(container, options = {}) {
         menuBtn.type = "button";
         menuBtn.textContent = "⋮";
         menuBtn.className = "media-browser-row-menu-btn";
+        menuBtn.title = "File options: copy URL, rename, move, or delete";
+        menuBtn.setAttribute("aria-label", "File options: copy URL, rename, move, or delete");
         menuBtn.onclick = () => showRowMenu(file, menuBtn);
         actionsTd.appendChild(menuBtn);
       }
