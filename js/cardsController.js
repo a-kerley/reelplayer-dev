@@ -52,11 +52,11 @@ const LINK_ICONS = [
 // cardOverrides whitelist (docs/project-cards/PLAN.md §3) that get their own
 // Pickr color swatch, matching js/builder.js's Colours & Effects section.
 const OVERRIDE_COLOR_FIELDS = [
-  { key: "accent", label: "Accent Colour", default: "#4a90e2" },
-  { key: "waveformUnplayed", label: "Waveform Unplayed Colour", default: "#4a4a4a" },
-  { key: "waveformHover", label: "Waveform Hover Colour", default: "#ffffff" },
-  { key: "playerBackground", label: "Player Background Colour", default: "#1a1a1a" },
-  { key: "outlineColor", label: "Outline Colour", default: "#ffffff" },
+  { key: "accent", label: "Accent Colour", default: "#4a90e2", tooltip: "Override this card's accent colour (default: the reel's own accent)." },
+  { key: "waveformUnplayed", label: "Waveform Unplayed Colour", default: "#4a4a4a", tooltip: "Override the waveform's unplayed-region colour for this card." },
+  { key: "waveformHover", label: "Waveform Hover Colour", default: "#ffffff", tooltip: "Override the waveform's hover colour for this card." },
+  { key: "playerBackground", label: "Player Background Colour", default: "#1a1a1a", tooltip: "Override the player background colour for this card's Listen tab." },
+  { key: "outlineColor", label: "Outline Colour", default: "#ffffff", tooltip: "Override the player's outline colour for this card." },
 ];
 
 // cardOverrides.OVERRIDE_COLOR_FIELDS above maps onto the reel's own
@@ -74,17 +74,17 @@ const OVERRIDE_COLOR_FIELDS = [
 // plain text inputs below instead of a Pickr swatch (see
 // CARD_CHROME_TEXT_FIELDS).
 const CARD_CHROME_COLOR_FIELDS = [
-  { key: "--card-text-primary", label: "Text Colour (Primary)", default: "#ffffff" },
-  { key: "--card-text-secondary", label: "Text Colour (Secondary)", default: "#cccccc" },
-  { key: "--card-tab-toggle-bg", label: "Tab Toggle Background", default: "rgba(0, 0, 0, 0.3)" },
-  { key: "--card-tab-active-bg", label: "Active Tab Background", default: "rgba(255, 255, 255, 0.15)" },
+  { key: "--card-text-primary", label: "Text Colour (Primary)", default: "#ffffff", tooltip: "Primary text colour for this card's chrome (title, tags, etc.)." },
+  { key: "--card-text-secondary", label: "Text Colour (Secondary)", default: "#cccccc", tooltip: "Secondary text colour for this card's chrome (description, composers, etc.)." },
+  { key: "--card-tab-toggle-bg", label: "Tab Toggle Background", default: "rgba(0, 0, 0, 0.3)", tooltip: "Background colour behind the Info/Listen tab toggle." },
+  { key: "--card-tab-active-bg", label: "Active Tab Background", default: "rgba(255, 255, 255, 0.15)", tooltip: "Background colour for the currently active tab." },
 ];
 
 // Raw CSS strings (gradients, filters) - plain text inputs, no Pickr.
 const CARD_CHROME_TEXT_FIELDS = [
-  { key: "--card-gradient-top", label: "Banner Gradient (Collapsed)", placeholder: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 70%)" },
-  { key: "--card-gradient-bottom", label: "Banner Gradient (Expanded)", placeholder: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 45%, rgba(0,0,0,0.05) 100%)" },
-  { key: "--card-icon-filter", label: "Icon Filter (CSS filter())", placeholder: "brightness(0) invert(1)" },
+  { key: "--card-gradient-top", label: "Banner Gradient (Collapsed)", placeholder: "linear-gradient(to top, rgba(0,0,0,0.75) 0%, rgba(0,0,0,0) 70%)", tooltip: "Raw CSS gradient() overlay on the banner while the card is collapsed." },
+  { key: "--card-gradient-bottom", label: "Banner Gradient (Expanded)", placeholder: "linear-gradient(to top, rgba(0,0,0,0.9) 0%, rgba(0,0,0,0.5) 45%, rgba(0,0,0,0.05) 100%)", tooltip: "Raw CSS gradient() overlay on the banner while the card is expanded." },
+  { key: "--card-icon-filter", label: "Icon Filter (CSS filter())", placeholder: "brightness(0) invert(1)", tooltip: "Raw CSS filter() applied to link/tab icons, e.g. to recolor them." },
 ];
 
 function createEmptyCard() {
@@ -343,9 +343,9 @@ export function initCardsController() {
     pickerBtn.classList.add("partner-logo-picker");
     return `
       <div class="color-row" data-index="${i}">
-        <input type="text" class="partner-logo-src" placeholder="Logo URL" value="${(logo.src || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="partner-logo-src" placeholder="Logo URL" title="Partner logo image URL." value="${(logo.src || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         ${pickerBtn.outerHTML}
-        <input type="text" class="partner-logo-alt" placeholder="Alt text" value="${(logo.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="partner-logo-alt" placeholder="Alt text" title="Alt text for this partner logo." value="${(logo.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         <button type="button" class="track-remove-btn partner-logo-remove" title="Remove partner logo" aria-label="Remove partner logo">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -357,8 +357,8 @@ export function initCardsController() {
   function statRowHTML(stat, i) {
     return `
       <div class="color-row" data-index="${i}">
-        <input type="text" class="stat-label" placeholder="Label (optional)" value="${(stat.label || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <input type="text" class="stat-value" placeholder="Value" value="${(stat.value || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="stat-label" placeholder="Label (optional)" title="Optional label for this tag (e.g. 'Genre')." value="${(stat.label || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="stat-value" placeholder="Value" title="Tag value shown on the card." value="${(stat.value || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         <button type="button" class="track-remove-btn stat-remove" title="Remove tag" aria-label="Remove tag">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -371,12 +371,12 @@ export function initCardsController() {
     const options = LINK_ICONS.map((f) => `<option value="${f}" ${link.icon === f ? "selected" : ""}>${f.replace(/\.svg$/, "")}</option>`).join("");
     return `
       <div class="color-row" data-index="${i}">
-        <input type="url" class="link-url" placeholder="https://…" value="${(link.url || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <select class="link-icon" style="padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;">
+        <input type="url" class="link-url" placeholder="https://…" title="Destination URL for this link." value="${(link.url || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <select class="link-icon" title="Icon shown next to this link." style="padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;">
           <option value="">(no icon)</option>
           ${options}
         </select>
-        <input type="text" class="link-alt" placeholder="Alt text" value="${(link.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="link-alt" placeholder="Alt text" title="Alt text for this link's icon." value="${(link.alt || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         <button type="button" class="track-remove-btn link-remove" title="Remove link" aria-label="Remove link">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -423,18 +423,19 @@ export function initCardsController() {
       max: 20,
       step: 1,
       unit: "px",
+      tooltip: "Override the player's outline width for this card (0 = use the reel's own).",
     }).row.outerHTML;
 
     const overridesHTML = `
       ${OVERRIDE_COLOR_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
-          <button id="card-pickr-${f.key}" class="pickr-button" type="button"></button>
+          <button id="card-pickr-${f.key}" class="pickr-button" type="button" title="${f.tooltip}" aria-label="${f.tooltip}"></button>
           ${eyedropButtonHTML(`card-pickr-${f.key}`)}
         </div>`).join("")}
       ${outlineWidthControl}
       <div class="color-row">
-        <label for="cardShowReelTitle">Show Reel Title:</label>
+        <label for="cardShowReelTitle" title="Show the reel's own title inside this card's Listen tab.">Show Reel Title:</label>
         <span id="cardShowReelTitleSlot"></span>
       </div>
       <div id="cardBannerImageRowSlot"></div>
@@ -444,37 +445,37 @@ export function initCardsController() {
       ${CARD_CHROME_COLOR_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
-          <button id="card-pickr-chrome-${f.key.replace(/^--/, "")}" class="pickr-button" type="button"></button>
+          <button id="card-pickr-chrome-${f.key.replace(/^--/, "")}" class="pickr-button" type="button" title="${f.tooltip}" aria-label="${f.tooltip}"></button>
           ${eyedropButtonHTML(`card-pickr-chrome-${f.key.replace(/^--/, "")}`)}
         </div>`).join("")}
       ${CARD_CHROME_TEXT_FIELDS.map((f) => `
         <div class="color-row">
           <span>${f.label}:</span>
-          <input type="text" class="card-chrome-text-input" data-key="${f.key}" placeholder="${f.placeholder}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+          <input type="text" class="card-chrome-text-input" data-key="${f.key}" placeholder="${f.placeholder}" title="${f.tooltip}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         </div>`).join("")}
     `;
 
     cardEditorPane.innerHTML = `
       <label>
         Title:
-        <input type="text" id="cardTitleInput" class="filename-display" />
+        <input type="text" id="cardTitleInput" class="filename-display" title="The card's title, shown on its banner." />
       </label>
       <label style="display: block; margin-top: 1rem;">
         Order (sidebar sort only, not layout):
-        <input type="number" id="cardOrderInput" style="width:6rem;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
+        <input type="number" id="cardOrderInput" title="Controls this card's position in the sidebar list only, not its page layout." style="width:6rem;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
       </label>
       <div id="cardLogoRowSlot" style="margin-top: 1rem;"></div>
       <label style="display: block; margin-top: 1rem;">
         Logo Alt Text:
-        <input type="text" id="cardLogoAltInput" style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
+        <input type="text" id="cardLogoAltInput" title="Alt text for the logo image, for accessibility." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
       </label>
       <label style="display: block; margin-top: 1rem;">
         Composers ("Music by …"):
-        <input type="text" id="cardComposersInput" style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
+        <input type="text" id="cardComposersInput" title="Optional 'Music by …' credit line shown on the card." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;" />
       </label>
       <label style="display: block; margin-top: 1rem;">
         Description (blank line between paragraphs):
-        <textarea id="cardDescriptionInput" rows="6" style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;"></textarea>
+        <textarea id="cardDescriptionInput" rows="6" title="Card description text; leave a blank line between paragraphs." style="width:100%;box-sizing:border-box;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;margin-top:0.4rem;"></textarea>
       </label>
 
       ${buildRepeaterHTML("Tags", "cardStats", (card.stats || []).map(statRowHTML), "Add tag")}
@@ -484,13 +485,13 @@ export function initCardsController() {
       <div id="cardReelFieldSlot" style="margin-top: 1rem;"></div>
 
       <div class="color-row" style="margin-top: 1rem;">
-        <label for="cardAnalyticsEnabled">Analytics Enabled:</label>
+        <label for="cardAnalyticsEnabled" title="Track plays/engagement analytics for this card.">Analytics Enabled:</label>
         <span id="cardAnalyticsSlot"></span>
       </div>
 
       ${createFieldset({ id: "cardOverridesFieldset", legend: "Card Style Overrides", content: overridesHTML }).outerHTML}
 
-      <button type="button" id="cardPublishBtn" style="margin-top: 1rem;">Publish Card</button>
+      <button type="button" id="cardPublishBtn" title="Publish this card so it can be embedded on boxedape.com." style="margin-top: 1rem;">Publish Card</button>
       <p id="cardPublishResult" style="margin-top: 0.75rem;"></p>
     `;
 
@@ -541,6 +542,7 @@ export function initCardsController() {
         label: "Reel:",
         value: card.reelId ? (title || card.reelId) : "",
         placeholder: "Choose a reel…",
+        tooltip: "The reel this card links to and plays in its Listen tab.",
         onPickerClick: openPicker,
       });
       input.readOnly = true;
@@ -581,6 +583,7 @@ export function initCardsController() {
       label: "Logo Image:",
       value: card.logo || "",
       placeholder: "https://example.com/logo.png",
+      tooltip: "Logo image shown on the card's banner.",
       pickerOptions: { directory: "assets/images/backgrounds", extensions: [".jpg", ".jpeg", ".png", ".svg", ".webp"], title: "Select Logo Image" },
       onInput: (e) => { card.logo = e.target.value; },
     });
@@ -680,6 +683,7 @@ export function initCardsController() {
     const analyticsToggle = createToggleSwitch({
       id: "cardAnalyticsEnabled",
       checked: card.analyticsEnabled === true,
+      tooltip: "Track plays/engagement analytics for this card.",
       onChange: (e) => { card.analyticsEnabled = e.target.checked; updateCurrentCard(); },
     });
     document.getElementById("cardAnalyticsSlot").replaceWith(analyticsToggle);
@@ -689,6 +693,7 @@ export function initCardsController() {
     const showReelTitleToggle = createToggleSwitch({
       id: "cardShowReelTitle",
       checked: overrides.showReelTitle === true,
+      tooltip: "Show the reel's own title inside this card's Listen tab.",
       onChange: (e) => { overrides.showReelTitle = e.target.checked; updateCurrentCard(); },
     });
     document.getElementById("cardShowReelTitleSlot").replaceWith(showReelTitleToggle);
@@ -699,6 +704,7 @@ export function initCardsController() {
       label: "Banner Image Override:",
       value: overrides.bannerImage || "",
       placeholder: "Defaults to the reel's own background",
+      tooltip: "Override the card banner image on the Info tab (default: the reel's own background).",
       pickerOptions: { directory: "assets/images/backgrounds", extensions: [".jpg", ".jpeg", ".png", ".webp"], title: "Select Banner Image" },
       onInput: (e) => { overrides.bannerImage = e.target.value; },
     });
@@ -711,6 +717,7 @@ export function initCardsController() {
       label: "Banner Video Override:",
       value: overrides.bannerVideo || "",
       placeholder: "Optional hover-preview video",
+      tooltip: "Optional video that plays over the banner image on hover, overriding the reel's own.",
       pickerOptions: { directory: "assets/video", extensions: [".mp4", ".webm", ".mov"], title: "Select Banner Video" },
       onInput: (e) => { overrides.bannerVideo = e.target.value; },
     });
@@ -726,6 +733,7 @@ export function initCardsController() {
       label: "Listen-Tab Banner Image:",
       value: card.listenImage || "",
       placeholder: "Optional - crossfades in when Listen tab opens",
+      tooltip: "Optional banner image that crossfades in when the Listen tab is opened.",
       pickerOptions: { directory: "assets/images/backgrounds", extensions: [".jpg", ".jpeg", ".png", ".webp"], title: "Select Listen-Tab Banner Image" },
       onInput: (e) => { card.listenImage = e.target.value; },
     });

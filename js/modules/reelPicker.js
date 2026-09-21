@@ -32,6 +32,7 @@ function renderListHTML(entries) {
     <div style="max-height:300px;overflow-y:auto;">
       ${entries.map(entry => `
         <div class="reel-picker-row" data-id="${entry.id}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+          title="Select this reel" role="button"
           style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;cursor:pointer;">
           <div>
             <div style="font-weight:600;">${entry.title || "(untitled)"}</div>
