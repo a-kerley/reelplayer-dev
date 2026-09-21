@@ -933,7 +933,12 @@ body {
 .builder-section-legend.collapsible-legend::before {
   content: "\25B8";
   display: inline-block;
-  margin-right: 0.5em;
+  font-size: 1.3em;
+  line-height: 1;
+  /* Spacing after the arrow comes from the legend's own flex `gap` (set in
+     makeSectionCollapsible()), not a margin here - a margin on top of that
+     gap is what previously doubled up the Player Colours & Effects
+     legend's arrow-to-text spacing since that one was already flex. */
   transition: transform 0.15s ease;
 }
 

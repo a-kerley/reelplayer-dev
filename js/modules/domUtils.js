@@ -64,19 +64,35 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
   legend.classList.add("collapsible-legend");
   legend.tabIndex = 0;
   legend.setAttribute("role", "button");
+  // Reset any per-site inline legend layout (expandableMode.js's own
+  // `padding: '0 0.5rem'`, builder.js's flex/gap for the Player Colours
+  // legend, etc.) so every legend's arrow/text/trailing-controls line up
+  // identically - the arrow's own spacing comes from CSS gap below, not a
+  // margin on top of it, so it doesn't double up with a legend that's
+  // already flex.
+  legend.style.padding = "";
+  legend.style.display = "flex";
+  legend.style.alignItems = "center";
+  legend.style.gap = "0.5em";
   fieldset.classList.add("collapsible-section");
 
-  // Every section's border/padding is set inline (createFieldset() and the
-  // hand-built sections both do `section.style.border/padding = ...`), so a
-  // CSS class alone can't override it while collapsed - toggle the same
-  // inline properties instead of fighting specificity. Left/right padding
-  // stays fixed in both states (only the border color and vertical padding
-  // change) so the legend/title never shifts horizontally on toggle - only
-  // making the border invisible (not removing it) keeps that same box
-  // width rather than collapsing it by the border's own thickness too.
-  // Padding/border-color are ordinary two-value transitions (unlike the
-  // row height above), so plain CSS `transition` on .collapsible-section
-  // animates them with no extra JS.
+  // Every section's margin/border/padding is set inline (createFieldset()
+  // and the hand-built sections both do `section.style.margin/border/
+  // padding = ...`, each with its own slightly different values), so a CSS
+  // class alone can't override it while collapsed - and the differing
+  // values are exactly why the gap between sections looked inconsistent.
+  // Normalize margin here too, not just toggle padding/border, so every
+  // section - regardless of which file created it - lines up the same way.
+  fieldset.style.marginTop = "1.5rem";
+  fieldset.style.marginBottom = "0";
+
+  // Left/right padding stays fixed in both states (only the border color
+  // and vertical padding change) so the legend/title never shifts
+  // horizontally on toggle - only making the border invisible (not
+  // removing it) keeps that same box width rather than collapsing it by
+  // the border's own thickness too. Padding/border-color are ordinary
+  // two-value transitions (unlike the row height above), so plain CSS
+  // `transition` on .collapsible-section animates them with no extra JS.
   const openPadding = fieldset.style.padding;
   fieldset.style.padding = "";
   fieldset.style.paddingLeft = openPadding;
