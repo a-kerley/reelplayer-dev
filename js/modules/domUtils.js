@@ -12,7 +12,7 @@
 export function createFieldset({ id, legend, content, styles = {} }) {
   const fieldset = document.createElement("fieldset");
   fieldset.id = id;
-  
+
   // Apply default styles
   Object.assign(fieldset.style, {
     marginTop: "2rem",
@@ -21,13 +21,59 @@ export function createFieldset({ id, legend, content, styles = {} }) {
     padding: "1rem",
     ...styles
   });
-  
+
   fieldset.innerHTML = `
     <legend class="builder-section-legend">${legend}</legend>
     ${content}
   `;
-  
+
+  makeSectionCollapsible(fieldset);
+
   return fieldset;
+}
+
+/**
+ * Makes a builder settings-group fieldset collapsible: everything after its
+ * (direct-child) <legend> is moved into a single wrapper div whose display
+ * the legend's click toggles. Works on both createFieldset() output and any
+ * hand-built `<fieldset><legend class="builder-section-legend">` section -
+ * call it once, right after the fieldset's real content is in place.
+ * @param {HTMLFieldSetElement} fieldset
+ * @param {Object} [options]
+ * @param {boolean} [options.defaultOpen=false]
+ */
+export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
+  const legend = fieldset.querySelector(":scope > legend");
+  if (!legend || legend.dataset.collapsible === "true") return;
+
+  const body = document.createElement("div");
+  body.className = "section-body";
+  while (legend.nextSibling) body.appendChild(legend.nextSibling);
+  fieldset.appendChild(body);
+
+  legend.dataset.collapsible = "true";
+  legend.classList.add("collapsible-legend");
+  legend.tabIndex = 0;
+  legend.setAttribute("role", "button");
+
+  const setOpen = (open) => {
+    body.style.display = open ? "" : "none";
+    legend.setAttribute("aria-expanded", String(open));
+  };
+  setOpen(defaultOpen);
+
+  const toggle = (e) => {
+    if (e.target.closest("button, a, input, select, textarea")) return;
+    setOpen(legend.getAttribute("aria-expanded") === "false");
+  };
+  legend.addEventListener("click", toggle);
+  legend.addEventListener("keydown", (e) => {
+    if (e.target !== legend) return;
+    if (e.key === "Enter" || e.key === " ") {
+      e.preventDefault();
+      toggle(e);
+    }
+  });
 }
 
 /**

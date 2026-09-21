@@ -19,7 +19,7 @@ import { updatePageBlocksEditor, openCustomizeStylesDialog } from "./modules/pag
 import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
-import { createToggleSwitch, createUrlInputRow } from "./modules/domUtils.js";
+import { createToggleSwitch, createUrlInputRow, makeSectionCollapsible } from "./modules/domUtils.js";
 import { createValueControl } from "./modules/valueControl.js";
 import { applyPageBackground } from "./modules/pageBackground.js";
 import { applyTextStyles } from "./modules/pageTextStyles.js";
@@ -798,7 +798,7 @@ export function initPagesController() {
           <label for="pageAnalyticsEnabled" style="cursor:pointer;" title="Track how many times this page is opened. See stats via Manage Published Pages.">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
         </div>
-        <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
+        <fieldset id="pageBackgroundFieldset" style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
           <legend class="builder-section-legend">Background Image</legend>
           <div class="color-row">
             <label for="pageBackgroundEnabled" style="cursor:pointer;" title="Show a full-page background image behind this page's content.">Enable</label>
@@ -833,7 +833,7 @@ export function initPagesController() {
             <div id="pageContentOverlayMarginHorizontalSlot" style="margin-top:0.6rem;"></div>
           </div>
         </fieldset>
-        <fieldset style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
+        <fieldset id="pageLayoutFieldset" style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
           <legend class="builder-section-legend">Page Layout</legend>
           <div id="pageContentMaxWidthSlot"></div>
           <div id="pageContentPaddingTopSlot" style="margin-top:0.6rem;"></div>
@@ -842,6 +842,8 @@ export function initPagesController() {
       </form>
       <div id="pageBlocksEditor" class="page-blocks-editor"></div>
     `;
+    makeSectionCollapsible(document.getElementById("pageBackgroundFieldset"));
+    makeSectionCollapsible(document.getElementById("pageLayoutFieldset"));
     const titleInput = document.getElementById("pageTitle");
     titleInput.value = page.title || "";
     titleInput.oninput = () => {

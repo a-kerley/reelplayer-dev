@@ -1,6 +1,6 @@
 // expandableMode.js - Handles expandable mode UI and controls in the builder
 
-import { createUrlInputRow, createToggleSwitch } from "./domUtils.js";
+import { createUrlInputRow, createToggleSwitch, makeSectionCollapsible } from "./domUtils.js";
 import { createValueControl } from "./valueControl.js";
 import { eyedropButtonHTML } from "./colorPicker.js";
 
@@ -86,6 +86,8 @@ export function createPlayerModeSection(reel, onChange) {
     : 'Static mode: Player displays at full height with all controls visible.';
   section.appendChild(description);
 
+  makeSectionCollapsible(section);
+
   return section;
 }
 
@@ -168,6 +170,8 @@ export function createStaticModeSettings(reel, onChange) {
   settingsContainer.appendChild(playerHeightRow);
 
   section.appendChild(settingsContainer);
+
+  makeSectionCollapsible(section);
 
   return section;
 }
@@ -327,6 +331,8 @@ export function createExpandableModeSettings(reel, onChange) {
   settingsContainer.appendChild(closedIdleOverlayRow);
 
   section.appendChild(settingsContainer);
+
+  makeSectionCollapsible(section);
 
   return section;
 }

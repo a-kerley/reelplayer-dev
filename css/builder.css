@@ -922,6 +922,25 @@ body {
   margin-bottom: 0.6em;
 }
 
+/* makeSectionCollapsible() (js/modules/domUtils.js) toggles the wrapped
+   section-body's display via JS; this just supplies the clickable
+   affordance and disclosure arrow on the legend it wires up. */
+.builder-section-legend.collapsible-legend {
+  cursor: pointer;
+  user-select: none;
+}
+
+.builder-section-legend.collapsible-legend::before {
+  content: "\25B8";
+  display: inline-block;
+  margin-right: 0.5em;
+  transition: transform 0.15s ease;
+}
+
+.builder-section-legend.collapsible-legend[aria-expanded="true"]::before {
+  transform: rotate(90deg);
+}
+
 .pickr-button,
 .pcr-button {
   width: 20px !important;

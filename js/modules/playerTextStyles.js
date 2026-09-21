@@ -27,7 +27,7 @@
 // with nothing configured" fallback used everywhere else in this feature.
 import { ValidationUtils } from "./validation.js";
 import { createValueControl } from "./valueControl.js";
-import { createToggleSwitch } from "./domUtils.js";
+import { createToggleSwitch, makeSectionCollapsible } from "./domUtils.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 import { createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 
@@ -249,6 +249,8 @@ export function createPlayerTextStylesSection(reel, onChange) {
     onCommit: onChange,
   });
   section.querySelector("#playlistStyleToolbarSlot").appendChild(playlistToolbar);
+
+  makeSectionCollapsible(section);
 
   return section;
 }
