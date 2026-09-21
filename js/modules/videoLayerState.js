@@ -23,14 +23,20 @@ export const videoLayerState = {
       }
     }
 
-    // Check main video second (high priority)
-    if (reel?.backgroundVideoEnabled && reel?.backgroundVideo && reel.backgroundVideo.trim()) {
-      return { url: reel.backgroundVideo.trim(), type: 'main' };
-    }
-
-    // Check track video as fallback
+    // Check track video second - a per-track background video overrides the
+    // reel's own global one for that track, same as updateTrackBackground()
+    // (js/player.js) already does unconditionally for per-track background
+    // images. This used to be checked *after* the reel's own video below,
+    // which meant a track override was silently ignored for every track
+    // whenever the reel had its own global video enabled at all - only ever
+    // taking effect on a reel with no global video set.
     if (track?.backgroundVideo && track.backgroundVideo.trim()) {
       return { url: track.backgroundVideo.trim(), type: 'track' };
+    }
+
+    // Fall back to the reel's own global background video.
+    if (reel?.backgroundVideoEnabled && reel?.backgroundVideo && reel.backgroundVideo.trim()) {
+      return { url: reel.backgroundVideo.trim(), type: 'main' };
     }
 
     return { url: null, type: null };
