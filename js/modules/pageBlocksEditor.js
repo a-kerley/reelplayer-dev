@@ -2033,7 +2033,11 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
 
   const expFields = document.createElement("div");
   expFields.style.flexDirection = "column";
-  expFields.style.gap = "0.6rem";
+  // No gap here - every row appended below carries .color-row, whose own
+  // margin-bottom is already this same 0.6rem (css/builder.css, "the
+  // single source of truth for row spacing"). A gap on top of that
+  // doubled every row's spacing - same bug as js/modules/expandableMode.js's
+  // Static/Expandable Mode Settings containers.
   expFields.style.marginTop = "0.6rem";
   wrap.appendChild(expFields);
 

@@ -61,7 +61,12 @@ export function openEmbedSettingsDialog({ provider, options, onChange }) {
 
   const pickrInstances = [];
   const form = document.createElement("div");
-  form.style.cssText = "display:flex;flex-direction:column;gap:0.6rem;text-align:left;";
+  // No gap - every row appended below (labelledRow()/createValueControl)
+  // carries .color-row, whose own margin-bottom is already this same
+  // 0.6rem (css/builder.css, "the single source of truth for row
+  // spacing"). A gap on top of that doubles every row's spacing - same
+  // bug as js/modules/expandableMode.js's Mode Settings containers.
+  form.style.cssText = "display:flex;flex-direction:column;text-align:left;";
 
   const commit = () => onChange();
   const setOrDelete = (key, value, isDefault) => {
