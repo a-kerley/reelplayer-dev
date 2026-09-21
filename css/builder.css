@@ -414,7 +414,7 @@ body {
   flex-direction: row;
   align-items: center;
   gap: 0.4rem;
-  font-size: var(--builder-text-sm);
+  font-size: var(--builder-text-base);
   font-weight: var(--builder-weight-semibold);
   color: #999;
   text-transform: uppercase;
