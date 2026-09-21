@@ -217,18 +217,26 @@ to native chrome under this, which picks up the OS accent color (seen twice:
 rule and rendered as a jarring purple/maroon blob until one was added). If a
 new button looks oddly colored, this is the first thing to check.
 
-## Tooltips: native `title=` only
+## Tooltips: native `title=` only, on every settings control
 
-Every icon-only button/control in the builder chrome needs a native
-`title="..."` attribute (plus a matching `aria-label` for screen readers,
-same text). There used to be a second, parallel tooltip system
-(`js/modules/tooltips.js`, a `data-tooltip` attribute + hover-triggered
-custom-styled popup) — it was removed 2026-09 because it only ended up
-covering 4 of the ~16 tooltippable elements in the builder while the rest
-used `title=` anyway, so the two systems just drifted out of sync with each
-other. Don't reintroduce a custom tooltip component; use `title=` for new
-icon buttons, and if you add an icon-only control, give it both `title` and
-`aria-label`.
+Every settings control in the builder chrome — not just icon buttons, but
+every checkbox/toggle, text/url/number input, select, color swatch, and
+slider across the Reels/Pages/Cards/Media Library tabs — gets a native
+`title="..."` attribute explaining what it does (icon-only controls also
+get a matching `aria-label`, same text). There used to be two separate dead
+tooltip mechanisms that made this easy to skip without noticing: a custom
+hover-tooltip system (`js/modules/tooltips.js`, a `data-tooltip` attribute
++ custom-styled popup, removed 2026-09) and a second `dataset.tooltip =`
+pattern that a handful of rows used expecting a tooltip to render, with
+nothing ever reading it (fixed 2026-09 by routing it through `title=` in
+`js/modules/domUtils.js`'s row-builder helpers and `js/modules/
+valueControl.js`'s `buildValueControl`/`createValueControl`). Don't
+reintroduce either — use `title=` directly, or thread a `tooltip`/`title`
+option through the existing helper (`createColorRow`, `createToggleSwitch`,
+`createUrlInputRow`, `buildValueControl`/`createValueControl`,
+`createFilePickerButton`, etc.) rather than hand-rolling markup. If you add
+a new settings control, give it a real tooltip in the same commit, not as a
+follow-up — that's exactly how ~245 controls ended up missing one.
 
 ## Layout gotcha: `.builder-main`'s 500px bottom padding
 
