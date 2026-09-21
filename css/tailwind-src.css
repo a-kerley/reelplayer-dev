@@ -12,7 +12,16 @@
 @layer theme, base, components, utilities;
 @import "tailwindcss/theme.css" layer(theme);
 @import "tailwindcss/utilities.css" layer(utilities);
-@plugin "daisyui";
+/* themes: restricted to just our own - without this, daisyUI still
+   compiles its own built-in "light"/"dark" themes alongside any custom
+   one, and critically its dark fallback applies via a real-specificity
+   `:root:not([data-theme])` selector that beats our custom theme's
+   deliberately zero-specificity `:where(:root)` one (see
+   @plugin "daisyui/theme" below) - the accent rendered as daisyUI's stock
+   indigo instead of our blue until this was scoped down. */
+@plugin "daisyui" {
+  themes: reelplayer-builder --default;
+}
 
 /* Only scan for class usage in the builder's own files - never
    player.html/page.html (Tailwind/daisyUI is builder-chrome-only, see
