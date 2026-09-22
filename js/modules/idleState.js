@@ -1,6 +1,29 @@
 // Idle-state timers for the player wrapper — enters/exits the "playback idle" and
 // "collapsed idle" CSS states that slow the background zoom animation after inactivity.
 // Mixed into playerApp via Object.assign, so methods rely on `this` referring to playerApp.
+
+// --playback-idle-delay is a static CSS custom property (set once in
+// variables.css; nothing in this codebase ever changes it at runtime), but
+// resetPlaybackIdleTimer() runs on every mousemove AND every playlist
+// 'scroll' event (playlistScroll.js) - both fire continuously during their
+// respective gestures, so re-reading it via getComputedStyle() each call
+// forces a style recalculation on every single mousemove/scroll tick. Same
+// fix as audioFades.js's cachedFadeInDuration/cachedFadeOutDuration: read
+// once, lazily, and reuse - this was the actual cause of scrolling going
+// "sticky" again after resetPlaybackIdleTimer() got added to the playlist's
+// scroll listener (see js/modules/playlistScroll.js), not new momentum
+// physics or anything scroll-specific.
+let cachedIdleDelay = null;
+
+function getIdleDelay() {
+  if (cachedIdleDelay === null) {
+    cachedIdleDelay = parseInt(
+      getComputedStyle(document.documentElement).getPropertyValue('--playback-idle-delay')
+    ) || 1000;
+  }
+  return cachedIdleDelay;
+}
+
 export const idleState = {
   clearAllIdleTimeouts() {
     // Clear expandable mode idle timeouts
@@ -37,13 +60,9 @@ export const idleState = {
     this.exitPlaybackIdle();
 
     // Set new timeout to enter idle state
-    const styles = getComputedStyle(document.documentElement);
-    const idleDelay = parseInt(styles.getPropertyValue('--playback-idle-delay')) || 1000;
-
-    // Store timeout in the appropriate mode state
     const timeoutRef = setTimeout(() => {
       this.enterPlaybackIdle();
-    }, idleDelay);
+    }, getIdleDelay());
 
     if (this.expandable.enabled) {
       this.expandable.playbackIdleTimeout = timeoutRef;
