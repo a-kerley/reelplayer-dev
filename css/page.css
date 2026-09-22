@@ -144,6 +144,13 @@ body.page-body {
   min-height: 2rem;
 }
 
+/* Overrides .page-block's own 2rem floor above - a spacer's whole purpose
+   is its configured height (js/modules/pageBlockRenderer.js's
+   renderSpacer()), including one set smaller than 2rem (32px). */
+.page-block-spacer {
+  min-height: 0;
+}
+
 /* Staged top-to-bottom reveal (js/modules/pageBlockReveal.js's
    applyBlockReveal()) - .page-block-reveal-ready is only ever added by
    that JS, so a block stays normally visible if the script hasn't run yet

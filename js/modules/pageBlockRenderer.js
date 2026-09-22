@@ -267,6 +267,21 @@ function renderImage(block) {
   return wrapper;
 }
 
+// Pure vertical space - no content, nothing to configure beyond its own
+// height. Deliberately no placeholder/dashed-outline visual for the empty
+// space even in the block editor's own row preview (unlike e.g. renderImage()'s
+// "Image not set" text) - this file is the ONE render path shared by that
+// preview and the public page (see this file's header comment), so adding
+// an editor-only decoration here would mean forking it, exactly the bug
+// class this file exists to avoid.
+function renderSpacer(block) {
+  const el = document.createElement("div");
+  el.className = "page-block page-block-spacer";
+  el.style.height = `${block.height ?? 40}px`;
+  el.setAttribute("aria-hidden", "true");
+  return el;
+}
+
 function renderPlayer(block, page) {
   const wrapper = document.createElement("div");
   wrapper.className = "page-block page-block-player";
@@ -1109,6 +1124,7 @@ const RENDERERS = {
   "banner-image": renderBannerImage,
   text: renderText,
   image: renderImage,
+  spacer: renderSpacer,
   player: renderPlayer,
   "embedded-video": renderEmbeddedVideo,
   button: renderButtonBlock,

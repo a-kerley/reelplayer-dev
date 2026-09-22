@@ -20,6 +20,7 @@ const BLOCK_TYPE_LABELS = {
   "banner-image": "Banner Image",
   text: "Text",
   image: "Image",
+  spacer: "Spacer",
   player: "Player",
   "embedded-video": "Embedded Video",
   button: "Button",
@@ -49,6 +50,7 @@ const ICONS = {
   "banner-image": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M3 16L10 13L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16 10C14.8954 10 14 9.10457 14 8C14 6.89543 14.8954 6 16 6C17.1046 6 18 6.89543 18 8C18 9.10457 17.1046 10 16 10Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   text: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 3.6V20.4C21 20.7314 20.7314 21 20.4 21H3.6C3.26863 21 3 20.7314 3 20.4V3.6C3 3.26863 3.26863 3 3.6 3H20.4C20.7314 3 21 3.26863 21 3.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 9V7L17 7V9" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V17M12 17H10M12 17H14" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   image: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 7.6V20.4C21 20.7314 20.7314 21 20.4 21H7.6C7.26863 21 7 20.7314 7 20.4V7.6C7 7.26863 7.26863 7 7.6 7H20.4C20.7314 7 21 7.26863 21 7.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M18 4H4.6C4.26863 4 4 4.26863 4 4.6V18" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 16.8L12.4444 15L21 18" stroke-linecap="round" stroke-linejoin="round"/><path d="M16.5 13C15.6716 13 15 12.3284 15 11.5C15 10.6716 15.6716 10 16.5 10C17.3284 10 18 10.6716 18 11.5C18 12.3284 17.3284 13 16.5 13Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
+  spacer: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M4 4H20" stroke-linecap="round" stroke-linejoin="round"/><path d="M4 20H20" stroke-linecap="round" stroke-linejoin="round"/><path d="M12 7V17" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 10L12 7L15 10" stroke-linecap="round" stroke-linejoin="round"/><path d="M9 14L12 17L15 14" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   player: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M6.90588 4.53682C6.50592 4.2998 6 4.58808 6 5.05299V18.947C6 19.4119 6.50592 19.7002 6.90588 19.4632L18.629 12.5162C19.0211 12.2838 19.0211 11.7162 18.629 11.4838L6.90588 4.53682Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   "embedded-video": `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M21 6.6V17.4C21 17.9523 20.5523 18.4 20 18.4H4C3.44772 18.4 3 17.9523 3 17.4V6.6C3 6.04772 3.44772 5.6 4 5.6H20C20.5523 5.6 21 6.04772 21 6.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M10 9.2L14.5 12L10 14.8V9.2Z" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
   button: `<svg xmlns="http://www.w3.org/2000/svg" width="24" height="24" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5"><path d="M3 8.6C3 7.71634 3.71634 7 4.6 7H19.4C20.2837 7 21 7.71634 21 8.6V15.4C21 16.2837 20.2837 17 19.4 17H4.6C3.71634 17 3 16.2837 3 15.4V8.6Z" stroke-linecap="round" stroke-linejoin="round"/><path d="M7 12H17" stroke-linecap="round" stroke-linejoin="round"/></svg>`,
@@ -73,6 +75,8 @@ function createEmptyBlock(type) {
       return { blockId, type, bodyHtml: "", alignment: "left" };
     case "image":
       return { blockId, type, imageUrl: "", altText: "", widthPreset: "full" };
+    case "spacer":
+      return { blockId, type, height: 40 };
     case "player":
       return { blockId, type, reelId: "", reelTitle: "", height: 500 };
     case "embedded-video":
@@ -378,6 +382,9 @@ function createConfigForm(block, page, onChange, refreshPreview) {
       break;
     case "image":
       form.appendChild(createImageConfig(block, onChange, refreshPreview));
+      break;
+    case "spacer":
+      form.appendChild(createSpacerConfig(block, onChange, refreshPreview));
       break;
     case "player":
       form.appendChild(createPlayerConfig(block, onChange, refreshPreview));
@@ -1837,6 +1844,32 @@ function createImageConfig(block, onChange, refreshPreview) {
   };
   widthRow.append(widthLabel, widthSelect);
   wrap.appendChild(widthRow);
+
+  return wrap;
+}
+
+function createSpacerConfig(block, onChange, refreshPreview) {
+  const wrap = document.createElement("div");
+
+  const { row, input } = createValueControl({
+    id: `${block.blockId}-height`,
+    label: "Height (px):",
+    value: block.height ?? 40,
+    min: 0,
+    max: 600,
+    step: 5,
+    unit: "px",
+    tooltip: "How much vertical space this block adds to the page.",
+  });
+  input.addEventListener("input", () => {
+    const val = parseInt(input.value, 10);
+    if (!isNaN(val)) block.height = val;
+  });
+  input.addEventListener("change", () => {
+    refreshPreview();
+    onChange();
+  });
+  wrap.appendChild(row);
 
   return wrap;
 }
