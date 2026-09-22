@@ -558,12 +558,16 @@ export async function renderMediaBrowser(container, options = {}) {
       newFolderBtn.textContent = "+ New Folder";
       newFolderBtn.className = "media-browser-new-folder-btn";
       newFolderBtn.title = "Create a new folder to organize files into";
+      // Same inline-rename-in-place flow as a folder row's own "New
+      // Folder" context-menu item (see showFolderMenu()), just anchored to
+      // whatever folder is currently being viewed instead of a
+      // right-clicked one - no popup prompt for the name.
       newFolderBtn.onclick = async () => {
-        const name = await promptForText("New folder name (e.g. backgrounds/nature)");
-        if (!name) return;
-        const path = name.replace(/^\/+|\/+$/g, '') + '/';
-        await createFolder(path);
-        navigateToFolder(path);
+        const parentPath = state.view.type === 'folder' ? state.view.path : '';
+        const childPath = `${parentPath}${uniqueChildFolderName(parentPath)}/`;
+        await createFolder(childPath);
+        state.editingFolderPath = childPath;
+        navigateToFolder(childPath);
       };
       sidebar.appendChild(newFolderBtn);
     }
