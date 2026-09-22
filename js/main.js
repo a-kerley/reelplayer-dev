@@ -99,7 +99,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     // A reel's embed id is a content hash (embedExporter.generateReelId) -
     // deterministic, so comparing a fresh hash of the current draft against
     // the id actually published last time (reel.publishedEmbedId, set in
-    // exportEmbedCode() below) tells us whether the live embed matches the
+    // publishReel() below) tells us whether the live embed matches the
     // draft, with no separate diffing mechanism needed. This is the Reels
     // equivalent of js/pagesController.js's updatePublishStatus() - Pages
     // already had this distinction (Live / Not yet published / stale);
@@ -545,24 +545,28 @@ document.addEventListener("DOMContentLoaded", async () => {
     }
 
     function setupExportEmbedButton() {
-      const btn = document.getElementById('exportEmbedBtn');
-      if (btn) {
-        btn.onclick = () => exportEmbedCode();
+      const publishBtn = document.getElementById('publishReelBtn');
+      if (publishBtn) {
+        publishBtn.onclick = () => publishReel();
+      }
+      const embedCodeBtn = document.getElementById('getEmbedCodeBtn');
+      if (embedCodeBtn) {
+        embedCodeBtn.onclick = () => showEmbedCodeDialog();
       }
     }
 
-    async function exportEmbedCode() {
+    async function publishReel() {
       const current = reels.find((r) => r.id === currentId);
       if (!current) {
-        dialog.alert("No reel selected for export.");
+        dialog.alert("No reel selected to publish.");
         return;
       }
       if (current.locked) {
-        dialog.alert("This reel is locked. Unlock it to export/publish.");
+        dialog.alert("This reel is locked. Unlock it to publish.");
         return;
       }
 
-      const btn = document.getElementById("exportEmbedBtn");
+      const btn = document.getElementById("publishReelBtn");
       const originalLabel = btn ? btn.textContent : "";
       if (btn) {
         btn.disabled = true;
@@ -573,13 +577,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       try {
         embedOptions = await embedExporter.generateEmbedOptions(current);
       } catch (error) {
-        dialog.alert(`Export Error: ${error.message}`);
-        return;
-      } finally {
+        dialog.alert(`Publish Error: ${error.message}`);
         if (btn) {
           btn.disabled = false;
           btn.textContent = originalLabel;
         }
+        return;
+      }
+
+      // The write itself already succeeded at this point - this step just
+      // confirms the exact public endpoint player.html reads from can see
+      // it. Worth doing: a 404 here means something's actually wrong (e.g.
+      // this reelId didn't persist), not merely "distant edge hasn't caught
+      // up yet" - KV writes are readable from here immediately, just not
+      // necessarily from every edge location worldwide within the same
+      // second.
+      if (btn) btn.textContent = "Verifying…";
+      const isLive = await embedExporter.verifyPublished(embedOptions.reelId).catch(() => false);
+      if (btn) {
+        btn.disabled = false;
+        btn.textContent = originalLabel;
       }
 
       // The click just made a real, live change - the reel is published
@@ -591,6 +608,30 @@ document.addEventListener("DOMContentLoaded", async () => {
       saveReels(reels);
       updateReelPublishStatus(current);
       setupAnalyticsControls(current);
+      showToast(isLive
+        ? "Published — confirmed live!"
+        : "Published, but couldn't confirm it's live yet - check the embed before sharing.");
+    }
+
+    async function showEmbedCodeDialog() {
+      const current = reels.find((r) => r.id === currentId);
+      if (!current) {
+        dialog.alert("No reel selected.");
+        return;
+      }
+      if (!current.publishedEmbedId) {
+        dialog.alert("Publish this reel first to get its embed code.");
+        return;
+      }
+
+      let iframe;
+      try {
+        iframe = embedExporter.buildIframeMarkup(current, current.publishedEmbedId);
+      } catch (error) {
+        dialog.alert(`Error: ${error.message}`);
+        return;
+      }
+      const embedOptions = { iframe };
 
       dialog.createDialog({
         type: 'custom',

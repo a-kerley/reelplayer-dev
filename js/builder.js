@@ -113,13 +113,13 @@ export function renderBuilder(reel, onChange) {
   // Tracks and color pickers don't fit the uniform shape above (they look up
   // their own DOM internally rather than operating on a passed element), so
   // they're created and inserted explicitly.
-  const exportBtn = document.getElementById("exportEmbedBtn");
+  const publishBtn = document.getElementById("publishReelBtn");
 
   const tracksSection = createTracksSection();
-  insertElement(tracksSection, exportBtn, reelForm, "before");
+  insertElement(tracksSection, publishBtn, reelForm, "before");
 
   const colorFieldset = createColorPickersSection();
-  insertElement(colorFieldset, exportBtn, reelForm, "before");
+  insertElement(colorFieldset, publishBtn, reelForm, "before");
 
   // Set up preset modal
   const colourPresetModal = createPresetModal();

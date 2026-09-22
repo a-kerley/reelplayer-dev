@@ -791,7 +791,8 @@ body {
    ============================================== */
 
 #addTrackBtn,
-#exportEmbedBtn,
+#publishReelBtn,
+#getEmbedCodeBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
 #previewPageBtn,
@@ -811,7 +812,8 @@ body {
 }
 
 #addTrackBtn,
-#exportEmbedBtn,
+#publishReelBtn,
+#getEmbedCodeBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
 #previewPageBtn,
@@ -824,7 +826,8 @@ body {
 }
 
 #addTrackBtn:hover,
-#exportEmbedBtn:hover,
+#publishReelBtn:hover,
+#getEmbedCodeBtn:hover,
 #manageEmbedsBtn:hover,
 #managePagesBtn:hover,
 #previewPageBtn:hover,

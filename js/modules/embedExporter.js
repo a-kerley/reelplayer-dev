@@ -31,7 +31,14 @@ export class EmbedExporter {
   async generateIframeEmbed(reel) {
     const reelId = this.generateReelId(reel);
     await this.storeReelData(reelId, reel);
+    return { iframe: this.buildIframeMarkup(reel, reelId), reelId };
+  }
 
+  // Builds the embed <iframe> markup for a reel id that's already published
+  // (no network call) - used by "Get Embed Code" to show the current live
+  // embed without re-publishing. generateIframeEmbed() above uses this too,
+  // right after actually publishing.
+  buildIframeMarkup(reel, reelId) {
     // Determine height based on mode
     let height;
     const isExpandable = reel.mode === 'expandable';
@@ -92,7 +99,16 @@ export class EmbedExporter {
            width="100%" height="${height}px" frameborder="0"
            style="display: block; border: none; min-height: ${height}px; transition: height 0.3s ease;">
           </iframe></div>${resizeScript}`;
-    return { iframe, reelId };
+    return iframe;
+  }
+
+  // Confirms the same public, unauthenticated endpoint player.html itself
+  // fetches (GET /reels/:id) can actually see what was just published -
+  // called right after storeReelData()'s POST resolves, so a publish click
+  // can report "confirmed live" rather than just "request accepted".
+  async verifyPublished(reelId) {
+    const response = await fetch(`${WORKER_BASE_URL}/reels/${reelId}`);
+    return response.ok;
   }
 
   generateReelId(reel) {
