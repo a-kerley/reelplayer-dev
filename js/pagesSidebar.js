@@ -23,7 +23,7 @@ export function renderPagesSidebar(pages, currentId, onSelect, onNew, onDelete, 
       getPublicUrl: (page) => page.publishedSlug ? publicPageUrl(page.publishedSlug) : null,
     },
     pages, currentId, onSelect, onNew, onDelete,
-    (page) => page.publishedSlug ? `/${page.publishedSlug}` : 'not yet published',
+    (page) => page.publishedSlug ? `/p/${page.publishedSlug}` : 'not yet published',
     onToggleLock
   );
 }

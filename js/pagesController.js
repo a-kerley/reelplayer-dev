@@ -745,7 +745,7 @@ export function initPagesController() {
     let slug = slugify(slugInput.value) || slugify(page.title);
 
     if (!isValidSlug(slug)) {
-      dialog.alert("Enter a title or a URL slug before publishing.");
+      dialog.alert("Enter a title or a URL before publishing.");
       return;
     }
 
@@ -805,9 +805,9 @@ export function initPagesController() {
           <input type="text" id="pageTitle" class="filename-display" title="The page's display title, shown on the page itself." />
         </label>
         <div class="color-row" style="margin-top:0.6rem;">
-          <span>URL slug:</span>
-          <input type="text" id="pageSlugInput" placeholder="auto-generated from title" title="The page's stable public URL identifier - unlike a reel embed id, it stays the same across edits and can be changed here." style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" />
-          <button type="button" id="publishPageBtn" class="page-block-add-btn" title="Publish this page live at its slug URL, or update it if already published.">Publish</button>
+          <span>URL:</span>
+          <input type="text" id="pageSlugInput" placeholder="auto-generated from title" title="The page's stable public URL - unlike a reel embed id, it stays the same across edits and can be changed here." style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;" />
+          <button type="button" id="publishPageBtn" class="page-block-add-btn" title="Publish this page live at its URL, or update it if already published.">Publish</button>
         </div>
         <p id="pagePublishStatus" class="builder-empty-state" style="text-align:left;padding:0.3rem 0;"></p>
         <button type="button" id="previewPageBtn" title="Open this page in a new tab as it currently looks, without publishing it.">Preview Page</button>

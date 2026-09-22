@@ -5,6 +5,18 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Page</title>
 
+  <!-- Every relative href/src/import below (the stylesheet, and every
+       module specifier in the inline <script> further down) resolves
+       against this, not against the document's own URL - needed now that
+       a published page's real URL is boxedape.com/p/<slug>, two path
+       segments deep, not one (src/index.js's PAGE_PATH_PATTERN rewrite
+       serves this file's content there without an HTTP redirect, so the
+       browser never actually navigates to /page.html itself - relative
+       URLs would otherwise resolve against /p/, not root, silently 404ing
+       every asset here without ever hitting a real page.html navigation
+       depth to catch it in earlier testing). -->
+  <base href="/">
+
   <!-- Warm the connection to R2 (media host) as early as possible, matching
        player.html's own preconnect - keep in sync with js/config.js's
        R2_PUBLIC_URL if it ever changes. -->
@@ -118,13 +130,15 @@
     async function init() {
       const params = new URLSearchParams(window.location.search);
       const isPreview = params.get('preview') === '1';
-      // A published page's real URL is boxedape.com/<slug> - src/index.js
+      // A published page's real URL is boxedape.com/p/<slug> - src/index.js
       // internally rewrites that request to this file without an HTTP
       // redirect, so the browser's address bar (and this pathname) stays at
-      // /<slug>, never /page.html. Stripped of leading/trailing slashes;
-      // "/page.html" itself (the "Preview Page" button's own
-      // page.html?preview=1) has no meaningful path slug, only the query.
-      const slug = window.location.pathname.replace(/^\/+|\/+$/g, '');
+      // /p/<slug>, never /page.html. "/page.html" itself (the "Preview
+      // Page" button's own page.html?preview=1) has no /p/ prefix to match,
+      // so slug stays empty there - fine, since isPreview short-circuits
+      // below before slug is ever used.
+      const pathMatch = window.location.pathname.match(/^\/p\/([a-zA-Z0-9_-]+)$/);
+      const slug = pathMatch ? pathMatch[1] : '';
 
       let pageData;
       if (isPreview) {

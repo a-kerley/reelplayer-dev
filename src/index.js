@@ -6,16 +6,25 @@
 // the builder must stay fully public, since they're loaded by anonymous
 // visitors' browsers wherever a reel is embedded or a page link is shared.
 // Everything not explicitly gated here falls straight through to static
-// asset serving - except a bare single-segment path with no matching asset
-// at all, which gets rewritten to page.html (see SLUG_PATH_PATTERN below)
-// so a published page's clean URL works.
+// asset serving - except /p/<slug> (see PAGE_PATH_PATTERN below), which
+// gets rewritten to page.html so a published page's clean URL works.
 const PROTECTED_PATHS = new Set(["/", "/index.html"]);
 
-// A published page's clean public URL - boxedape.com/<slug> instead of
+// A published page's clean public URL - boxedape.com/p/<slug> instead of
 // boxedape.com/page?slug=<slug>. Matches js/modules/pagePublish.js's own
-// SLUG_PATTERN exactly (single bare path segment, same character set) -
-// keep the two in sync if either ever changes.
-const SLUG_PATH_PATTERN = /^\/[a-zA-Z0-9_-]+$/;
+// SLUG_PATTERN exactly (same character set) - keep the two in sync if
+// either ever changes. A reserved, fixed prefix (rather than a bare
+// /<slug> at the root) deliberately, not just for clarity - it also means
+// this never needs to ask env.ASSETS.fetch() whether the ORIGINAL path
+// exists first (a bare-root scheme had to, to avoid shadowing every real
+// asset path, which meant a genuine 404 on that lookup had to be trusted
+// as "safe to treat as a slug" - except this zone's own Cloudflare-
+// dashboard-configured redirect rules got to that 404 response first and
+// silently rewrote it before this Worker ever saw it, confirmed by hand:
+// every unmatched path 307'd to /page regardless of what this code did).
+// An exact prefix match needs none of that - it rewrites unconditionally,
+// with nothing upstream able to intervene first.
+const PAGE_PATH_PATTERN = /^\/p\/([a-zA-Z0-9_-]+)$/;
 
 const COOKIE_NAME = "builder_auth";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -56,22 +65,17 @@ export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
-    if (!PROTECTED_PATHS.has(url.pathname)) {
-      const assetResponse = await env.ASSETS.fetch(request);
-      // Anything that's a real file, or an existing clean-URL route like
-      // /player or /page, already resolved above - only a genuine 404 on a
-      // bare single-segment path falls through to the page-slug rewrite
-      // below, so this never needs to hardcode/maintain a list of every
-      // real asset directory to avoid shadowing.
-      if (assetResponse.status !== 404 || request.method !== "GET" || !SLUG_PATH_PATTERN.test(url.pathname)) {
-        return assetResponse;
-      }
+    if (request.method === "GET" && PAGE_PATH_PATTERN.test(url.pathname)) {
       // Internal rewrite, not an HTTP redirect - the address bar stays at
-      // /<slug>, and page.html itself reads the slug back out of
+      // /p/<slug>, and page.html itself reads the slug back out of
       // location.pathname (see page.html's init()).
       const rewritten = new URL(request.url);
       rewritten.pathname = "/page.html";
       return env.ASSETS.fetch(new Request(rewritten, request));
+    }
+
+    if (!PROTECTED_PATHS.has(url.pathname)) {
+      return env.ASSETS.fetch(request);
     }
 
     const expectedToken = await hashPassword(env.BUILDER_ACCESS_PASSWORD);

@@ -68,7 +68,7 @@ function renderListHTML(entries, currentSlug) {
         const dateBadge = entry.published
           ? `<span style="${BADGE_STYLE}">Published ${new Date(entry.published).toLocaleString()}</span>`
           : "";
-        const slugBadge = `<span style="${BADGE_STYLE}font-family:monospace;">/${entry.slug}</span>`;
+        const slugBadge = `<span style="${BADGE_STYLE}font-family:monospace;">/p/${entry.slug}</span>`;
 
         return `
         <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid #444;gap:1rem;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
@@ -140,7 +140,7 @@ async function openPageManager(getCurrentPage) {
       btn.addEventListener("click", async () => {
         const slug = btn.dataset.slug;
         const confirmed = await dialog.confirm(
-          `Delete published page "/${slug}"? This cannot be undone.`,
+          `Delete published page "/p/${slug}"? This cannot be undone.`,
           "Delete",
           "Cancel"
         );
