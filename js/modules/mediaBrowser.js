@@ -932,9 +932,9 @@ export async function renderMediaBrowser(container, options = {}) {
     return zone;
   }
 
-  function sortHeader(label, field) {
+  function sortHeader(label, field, colClass = '') {
     const th = document.createElement("th");
-    th.className = "media-browser-sortable";
+    th.className = `media-browser-sortable${colClass ? ` ${colClass}` : ''}`;
     th.title = `Sort by ${label.toLowerCase()} (click again to reverse order)`;
 
     // Arrow lives before the label (not after) and always reserves its own
@@ -969,6 +969,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const headRow = document.createElement("tr");
     if (mode === 'manage') {
       const th = document.createElement("th");
+      th.className = "media-browser-col-check";
       const selectAll = document.createElement("input");
       selectAll.type = "checkbox";
       selectAll.checked = files.length > 0 && files.every(f => state.selected.has(f.key));
@@ -981,12 +982,18 @@ export async function renderMediaBrowser(container, options = {}) {
       th.appendChild(selectAll);
       headRow.appendChild(th);
     }
-    headRow.appendChild(document.createElement("th"));
+    const iconTh = document.createElement("th");
+    iconTh.className = "media-browser-col-icon";
+    headRow.appendChild(iconTh);
+    // table-layout: fixed derives every column's width from THIS row's
+    // cells (see js/modules/CLAUDE.md's note on this exact gotcha) - Name
+    // is the only column with no width class, so it gets whatever space
+    // the fixed-width columns leave over.
     headRow.appendChild(sortHeader("Name", "name"));
-    headRow.appendChild(sortHeader("Type", "type"));
-    headRow.appendChild(sortHeader("Track #", "trackNumber"));
-    headRow.appendChild(sortHeader("Size", "size"));
-    headRow.appendChild(sortHeader("Uploaded", "uploaded"));
+    headRow.appendChild(sortHeader("Type", "type", "media-browser-col-type"));
+    headRow.appendChild(sortHeader("Track #", "trackNumber", "media-browser-col-track"));
+    headRow.appendChild(sortHeader("Size", "size", "media-browser-col-size"));
+    headRow.appendChild(sortHeader("Uploaded", "uploaded", "media-browser-col-uploaded"));
     thead.appendChild(headRow);
     table.appendChild(thead);
 

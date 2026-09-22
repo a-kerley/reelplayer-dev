@@ -378,11 +378,35 @@
   font-size: var(--builder-text-sm);
 }
 
+/* table-layout: fixed so column widths actually hold (see
+   js/modules/CLAUDE.md's "a <td>'s width alone doesn't constrain a
+   column" gotcha) - widths are set on the header row's own cells below via
+   media-browser-col-* classes; Name gets none, so it takes whatever space
+   the fixed-width columns leave over. */
 .media-browser-table {
   width: 100%;
+  table-layout: fixed;
   border-collapse: collapse;
   color: #ddd;
   font-size: var(--builder-text-base);
+}
+
+.media-browser-col-check,
+.media-browser-col-icon {
+  width: 2rem;
+}
+
+.media-browser-col-type,
+.media-browser-col-track {
+  width: 4.5rem;
+}
+
+.media-browser-col-size {
+  width: 5rem;
+}
+
+.media-browser-col-uploaded {
+  width: 6.5rem;
 }
 
 .media-browser-table th {
@@ -391,6 +415,9 @@
   border-bottom: 1px solid #444;
   color: #999;
   font-weight: var(--builder-weight-semibold);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .media-browser-table th.media-browser-sortable {
@@ -414,10 +441,19 @@
   color: #4a90e2;
 }
 
+/* Fixed row height (was intrinsic to padding + content) so every row is
+   uniform regardless of content - height on a table row/cell acts as a
+   floor, not a cap, so this only actually holds together with the
+   nowrap/ellipsis truncation below (no wrapped second line to push it
+   taller). */
 .media-browser-table td {
-  padding: 0.5rem;
+  height: 2.75rem;
+  padding: 0 0.5rem;
   border-bottom: 1px solid #333;
   vertical-align: middle;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .media-browser-table a {
