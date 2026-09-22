@@ -23,8 +23,8 @@
 //   POST   /pages/:slug       - password-gated, body {id, slug, previousSlug?, title, blocks,
 //                               analyticsEnabled?, backgroundImageEnabled?, backgroundImage?,
 //                               backgroundOverlayEnabled?, backgroundOverlayColor?,
-//                               backgroundBlur?, backgroundParallaxMode?, contentOverlayColor?,
-//                               contentOverlayOpacity?, contentOverlayFullBleed?,
+//                               backgroundBlur?, backgroundParallaxMode?, contentOverlayEnabled?,
+//                               contentOverlayColor?, contentOverlayOpacity?, contentOverlayFullBleed?,
 //                               contentOverlayMarginVertical?, contentOverlayMarginHorizontal?,
 //                               contentMaxWidth?, contentPaddingTop?, contentPaddingBottom?,
 //                               textStyleDefs?}; 409
@@ -508,6 +508,7 @@ export default {
           backgroundOverlayColor: typeof body.backgroundOverlayColor === "string" ? body.backgroundOverlayColor : "#000000",
           backgroundBlur: typeof body.backgroundBlur === "number" ? body.backgroundBlur : 12,
           backgroundParallaxMode: body.backgroundParallaxMode === "scroll" ? "scroll" : "fixed",
+          contentOverlayEnabled: body.contentOverlayEnabled === true,
           contentOverlayColor: typeof body.contentOverlayColor === "string" ? body.contentOverlayColor : "#000000",
           contentOverlayOpacity: typeof body.contentOverlayOpacity === "number" ? body.contentOverlayOpacity : 0,
           contentOverlayFullBleed: body.contentOverlayFullBleed === true,
