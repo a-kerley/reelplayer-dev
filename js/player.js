@@ -680,6 +680,13 @@ const playerAppCore = {
   },
 
   setupVolumeControls() {
+    // Same reason as playlistScroll.js's initCustomScrollbar() cleanup:
+    // this runs on every render (not once per session), and the two
+    // document-level listeners bound below (mouseup, and touchstart on
+    // touch devices) are otherwise never torn down - every settings tweak
+    // in the builder would permanently leak one more of each.
+    this._volumeControlsCleanup?.();
+
     const volumeControl = this.elements.volumeControl;
     const volumeToggle = this.elements.volumeToggle;
     const volumeSlider = this.elements.volumeSlider;
@@ -695,6 +702,7 @@ const playerAppCore = {
       </svg>
     `;
     let hideSliderTimeout;
+    let handleDocumentTouchStart = null; // assigned below only on touch devices; referenced by the cleanup closure regardless
     volumeToggle.addEventListener("click", () => {
       const currentVolume = parseFloat(volumeSlider.value);
       if (currentVolume === 0) {
@@ -718,9 +726,15 @@ const playerAppCore = {
       volumeSlider.addEventListener("mousedown", () => {
         playerApp.isDraggingSlider = true;
       });
-      document.addEventListener("mouseup", () => {
+      const handleDocumentMouseUp = () => {
         playerApp.isDraggingSlider = false;
-      });
+      };
+      document.addEventListener("mouseup", handleDocumentMouseUp);
+      this._volumeControlsCleanup = () => {
+        document.removeEventListener("mouseup", handleDocumentMouseUp);
+        if (handleDocumentTouchStart) document.removeEventListener("touchstart", handleDocumentTouchStart);
+        clearTimeout(hideSliderTimeout);
+      };
 
       if (this.isTouchDevice()) {
         // KNOWN ISSUE - DO NOT STRIP THE [vol-debug] console.log/trace CALLS
@@ -785,7 +799,7 @@ const playerAppCore = {
           }
         });
 
-        document.addEventListener("touchstart", (e) => {
+        handleDocumentTouchStart = (e) => {
           const inside = volumeControl.contains(e.target);
           console.log('[vol-debug] document touchstart - target:', e.target?.id || e.target?.className, ', inside volumeControl:', inside);
           if (inside) {
@@ -801,7 +815,8 @@ const playerAppCore = {
             console.log('[vol-debug] 300ms outside-touch hide FIRED - removing show-slider');
             volumeControl.classList.remove("show-slider");
           }, 300);
-        }, { passive: true });
+        };
+        document.addEventListener("touchstart", handleDocumentTouchStart, { passive: true });
       } else {
         volumeControl.addEventListener("mouseenter", () => {
           clearTimeout(hideSliderTimeout);

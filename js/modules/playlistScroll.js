@@ -61,6 +61,19 @@ export const playlistScroll = {
   },
 
   initCustomScrollbar(playlistEl) {
+    // This runs on every renderPlaylist() call, which itself runs on every
+    // builder preview re-render, not once per session (same pattern
+    // js/player.js's setupMediaCoordination()/setupWaveformEvents() own
+    // comments document elsewhere in this codebase). Without tearing down
+    // the previous instance's ResizeObserver and document-level drag
+    // listeners first, every settings tweak during normal builder use
+    // would permanently leak one more of each - the document listeners in
+    // particular are bound to a target that's never destroyed, so they
+    // (and everything their closure references: old scrollbarContainer/
+    // scrollbarThumb elements, etc.) are kept alive forever, each one
+    // still running on every mousemove/touchmove anywhere on the page.
+    this._playlistScrollCleanup?.();
+
     // Remove any existing custom scrollbar
     const existingScrollbar = playlistEl.querySelector('.custom-scrollbar');
     if (existingScrollbar) {
@@ -93,15 +106,32 @@ export const playlistScroll = {
       scrollbarContainer.style.height = playlistRect.height + 'px';
     };
 
+    // scrollHeight/clientHeight only change on a real layout change
+    // (resize, expand/collapse, a fresh render, content reflow) - never
+    // from scrolling or dragging itself, same reasoning as
+    // updateScrollbarPosition() above. Cached here and refreshed at the
+    // same layout-changing moments (see refreshScrollMetricsCache()'s own
+    // call sites below) so the hot scroll/wheel/drag paths never force a
+    // live read - each one still forces a layout flush if anything's
+    // dirty regardless of how "cheap" the property looks, the same bug
+    // class already fixed once in js/player.js's waveform code.
+    let cachedScrollHeight = 0;
+    let cachedClientHeight = 0;
+    const refreshScrollMetricsCache = () => {
+      cachedScrollHeight = playlistEl.scrollHeight;
+      cachedClientHeight = playlistEl.clientHeight;
+    };
+
     // Thumb size/position + at-top/at-bottom masking classes - split out
     // from updateScrollbarPosition() (below) so the 'scroll' listener can
     // drive just this on every tick without also paying for a
-    // getBoundingClientRect() pair every time. Unlike position, these only
-    // need scrollTop/scrollHeight/clientHeight, which stay cheap as long
-    // as nothing upstream dirtied layout that same tick.
+    // getBoundingClientRect() pair every time. Reads the cached
+    // scrollHeight/clientHeight above rather than the live DOM properties -
+    // only scrollTop is read live, since that's the one value that
+    // actually changes on every tick.
     const updateScrollbarMetrics = () => {
-      const scrollHeight = playlistEl.scrollHeight;
-      const clientHeight = playlistEl.clientHeight;
+      const scrollHeight = cachedScrollHeight;
+      const clientHeight = cachedClientHeight;
 
       if (scrollHeight <= clientHeight) {
         scrollbarContainer.style.display = 'none';
@@ -147,6 +177,7 @@ export const playlistScroll = {
     // below) get both; the 'scroll' listener itself only needs metrics.
     const updateScrollbar = () => {
       updateScrollbarPosition();
+      refreshScrollMetricsCache();
       updateScrollbarMetrics();
     };
 
@@ -180,7 +211,8 @@ export const playlistScroll = {
       // keep counting right through active scrolling. 'scroll' fires for
       // every source (wheel, momentum coast, thumb drag, keyboard), so
       // this one call covers all of them; resetPlaybackIdleTimer() itself
-      // already no-ops when nothing's playing.
+      // already no-ops when nothing's playing, and its own CSS-var read is
+      // cached (idleState.js) rather than re-read on every tick.
       this.resetPlaybackIdleTimer();
       if (!isDragging) {
         updateScrollbarMetrics();
@@ -189,9 +221,9 @@ export const playlistScroll = {
 
     // Prevent page scroll when playlist reaches top/bottom + add smooth momentum
     playlistEl.addEventListener('wheel', (e) => {
-      const scrollHeight = playlistEl.scrollHeight;
+      const scrollHeight = cachedScrollHeight;
       const scrollTop = playlistEl.scrollTop;
-      const clientHeight = playlistEl.clientHeight;
+      const clientHeight = cachedClientHeight;
 
       const atTop = scrollTop === 0;
       const atBottom = scrollTop + clientHeight >= scrollHeight - 1; // -1 for rounding
@@ -232,8 +264,8 @@ export const playlistScroll = {
       if (!isDragging) return;
 
       const deltaY = clientY - startY;
-      const scrollHeight = playlistEl.scrollHeight;
-      const clientHeight = playlistEl.clientHeight;
+      const scrollHeight = cachedScrollHeight;
+      const clientHeight = cachedClientHeight;
       const thumbHeight = parseInt(scrollbarThumb.style.height);
       const maxThumbTop = clientHeight - thumbHeight;
       const scrollRange = scrollHeight - clientHeight;
@@ -279,19 +311,25 @@ export const playlistScroll = {
       }
     });
 
-    document.addEventListener('mousemove', (e) => {
+    // Named (not inline) so cleanup below can actually remove them -
+    // bound to `document`, not scrollbarThumb, since a drag can continue
+    // past the thumb's own bounds once the pointer is down (same reasoning
+    // as endDrag below).
+    const handleDragMouseMove = (e) => {
       if (!isDragging) return;
       moveDrag(e.clientY);
       e.preventDefault();
-    });
-    // Not passive - dragging the thumb must be able to suppress the page's
-    // own touch-scroll, otherwise the drag and a background scroll fight
-    // over the same gesture.
-    document.addEventListener('touchmove', (e) => {
+    };
+    const handleDragTouchMove = (e) => {
       if (!isDragging) return;
       moveDrag(e.touches[0].clientY);
       e.preventDefault();
-    }, { passive: false });
+    };
+    document.addEventListener('mousemove', handleDragMouseMove);
+    // Not passive - dragging the thumb must be able to suppress the page's
+    // own touch-scroll, otherwise the drag and a background scroll fight
+    // over the same gesture.
+    document.addEventListener('touchmove', handleDragTouchMove, { passive: false });
 
     document.addEventListener('mouseup', endDrag);
     document.addEventListener('touchend', endDrag);
@@ -300,11 +338,24 @@ export const playlistScroll = {
     updateScrollbar();
 
     // Additional delayed updates for both modes to handle layout transitions
-    setTimeout(updateScrollbar, 100);
-    setTimeout(updateScrollbar, 500);
+    const settleTimeout1 = setTimeout(updateScrollbar, 100);
+    const settleTimeout2 = setTimeout(updateScrollbar, 500);
 
     // Update on window resize
     const resizeObserver = new ResizeObserver(updateScrollbar);
     resizeObserver.observe(playlistEl);
+
+    // See the top of this method - torn down at the START of the next
+    // initCustomScrollbar() call (or never, if this is the last render of
+    // the player's lifetime, which is fine: page teardown reclaims it).
+    this._playlistScrollCleanup = () => {
+      resizeObserver.disconnect();
+      clearTimeout(settleTimeout1);
+      clearTimeout(settleTimeout2);
+      document.removeEventListener('mousemove', handleDragMouseMove);
+      document.removeEventListener('touchmove', handleDragTouchMove);
+      document.removeEventListener('mouseup', endDrag);
+      document.removeEventListener('touchend', endDrag);
+    };
   },
 };
