@@ -363,6 +363,8 @@ export async function renderMediaBrowser(container, options = {}) {
     const dir = state.sortDir === 'asc' ? 1 : -1;
     list = [...list].sort((a, b) => {
       if (state.sortField === 'name') return dir * a.name.localeCompare(b.name);
+      if (state.sortField === 'type') return dir * fileType(a.name).localeCompare(fileType(b.name));
+      if (state.sortField === 'trackNumber') return dir * ((parseInt(a.trackNumber, 10) || 0) - (parseInt(b.trackNumber, 10) || 0));
       if (state.sortField === 'size') return dir * ((a.size || 0) - (b.size || 0));
       return dir * (new Date(a.uploaded || 0) - new Date(b.uploaded || 0));
     });
@@ -932,10 +934,20 @@ export async function renderMediaBrowser(container, options = {}) {
 
   function sortHeader(label, field) {
     const th = document.createElement("th");
-    const arrow = state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : '';
-    th.textContent = label + arrow;
     th.className = "media-browser-sortable";
     th.title = `Sort by ${label.toLowerCase()} (click again to reverse order)`;
+
+    // Arrow lives before the label (not after) and always reserves its own
+    // space (empty when this isn't the active sort column) so clicking
+    // between columns doesn't shift the label text sideways.
+    const wrap = document.createElement("span");
+    wrap.className = "media-browser-sort-label";
+    const arrow = document.createElement("span");
+    arrow.className = "media-browser-sort-arrow";
+    arrow.textContent = state.sortField === field ? (state.sortDir === 'asc' ? '▲' : '▼') : '';
+    wrap.append(arrow, label);
+    th.appendChild(wrap);
+
     th.onclick = () => {
       if (state.sortField === field) {
         state.sortDir = state.sortDir === 'asc' ? 'desc' : 'asc';
@@ -971,12 +983,8 @@ export async function renderMediaBrowser(container, options = {}) {
     }
     headRow.appendChild(document.createElement("th"));
     headRow.appendChild(sortHeader("Name", "name"));
-    const typeTh = document.createElement("th");
-    typeTh.textContent = "Type";
-    headRow.appendChild(typeTh);
-    const trackTh = document.createElement("th");
-    trackTh.textContent = "Track #";
-    headRow.appendChild(trackTh);
+    headRow.appendChild(sortHeader("Type", "type"));
+    headRow.appendChild(sortHeader("Track #", "trackNumber"));
     headRow.appendChild(sortHeader("Size", "size"));
     headRow.appendChild(sortHeader("Uploaded", "uploaded"));
     thead.appendChild(headRow);

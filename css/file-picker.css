@@ -399,6 +399,21 @@
   user-select: none;
 }
 
+.media-browser-sort-label {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.3rem;
+}
+
+/* Reserves its own space even when empty (inactive column) so the label
+   doesn't shift sideways as the active sort column changes. */
+.media-browser-sort-arrow {
+  display: inline-block;
+  width: 0.65em;
+  font-size: 0.65em;
+  color: #4a90e2;
+}
+
 .media-browser-table td {
   padding: 0.5rem;
   border-bottom: 1px solid #333;
