@@ -12,3 +12,9 @@ node_modules
 # deployed site (see 1df28a9, where a misfired `wrangler deploy` from the
 # wrong directory swept a couple of these into a deploy).
 .DS_Store
+# Claude Code's own local session/tool state (e.g. scheduled_tasks.lock) -
+# same class of mistake as .DS_Store above, hit again the same way (a
+# `wrangler deploy` run from worker/ that still resolved the repo-root
+# config instead of worker/wrangler.toml - see that file's own README for
+# why `--config wrangler.toml` should be passed explicitly whenever unsure).
+.claude
