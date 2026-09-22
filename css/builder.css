@@ -697,6 +697,28 @@ body {
   white-space: nowrap;
 }
 
+.tracks-editor-header-label {
+  color: #999;
+  font-size: var(--builder-text-xs);
+  font-weight: var(--builder-weight-semibold);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
+/* Stand-ins for the icon-only button columns (copy/file-picker/remove) so
+   the labels above line up over the actual title/file fields below them,
+   not just float above the row as a whole. */
+.tracks-editor-header-spacer {
+  display: inline-block;
+  width: 32px;
+  flex-shrink: 0;
+}
+
+.tracks-editor-header-drag-spacer {
+  width: 22px;
+  margin-right: 0.5rem;
+}
+
 .track-drag-handle {
   display: flex;
   align-items: center;
@@ -1202,11 +1224,17 @@ input.filename-display {
   white-space: nowrap;
 }
 
+/* Color/italic only - deliberately NOT its own font-size/padding. This
+   class swaps in on the exact same element (or its instant swap-partner,
+   see tracksEditor.js's fileNameSpan/urlField and backgroundEffects.js's
+   equivalent) as the box gains real content, so a different font-size and
+   padding here than the base .filename-display rule made the box visibly
+   resize the moment you clicked into it/typed a value - it was never a
+   focus-style change, just this rule's own box happening to sit next to
+   the plain one. */
 .filename-display.placeholder {
   color: #888888;
-  font-size: var(--builder-text-xs);
   font-style: italic;
-  padding: 0.7em 0.7em;
 }
 
 /* ==============================================

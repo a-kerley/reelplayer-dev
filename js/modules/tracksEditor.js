@@ -11,7 +11,9 @@ export function updateTracksEditor(reel, onChange) {
   if (!tracksEditor) return;
   
   tracksEditor.innerHTML = "";
-  
+
+  tracksEditor.appendChild(createHeaderRow(reel));
+
   reel.playlist.forEach((track, i) => {
     const row = createTrackRow(track, i, reel, onChange);
     tracksEditor.appendChild(row);
@@ -20,6 +22,52 @@ export function updateTracksEditor(reel, onChange) {
   // Add the phantom "Add" row
   const addRow = createAddTrackRow(reel, onChange);
   tracksEditor.appendChild(addRow);
+}
+
+// Column labels above the track rows - mirrors createTrackRow()'s own
+// column order/widths (drag handle, title, copy button, file, file picker
+// button, remove button) with a plain spacer standing in for each
+// icon-only button column, so the labels actually line up over the real
+// fields below them instead of just floating above the row in general.
+function createHeaderRow(reel) {
+  const header = document.createElement("div");
+  header.className = "tracks-editor-header-row";
+  header.style.display = "flex";
+  header.style.gap = "0.5rem";
+  header.style.marginBottom = "0.35rem";
+
+  const dragSpacer = document.createElement("span");
+  dragSpacer.className = "tracks-editor-header-spacer tracks-editor-header-drag-spacer";
+  header.appendChild(dragSpacer);
+
+  const titleLabel = document.createElement("span");
+  titleLabel.className = "tracks-editor-header-label";
+  titleLabel.textContent = "Title";
+  titleLabel.style.flex = "0 1 18rem";
+  titleLabel.style.minWidth = "14rem";
+  header.appendChild(titleLabel);
+
+  header.appendChild(iconColumnSpacer());
+
+  const fileLabel = document.createElement("span");
+  fileLabel.className = "tracks-editor-header-label";
+  fileLabel.textContent = "File";
+  fileLabel.style.flex = "2";
+  header.appendChild(fileLabel);
+
+  header.appendChild(iconColumnSpacer());
+
+  if (reel.playlist.length > 1) {
+    header.appendChild(iconColumnSpacer());
+  }
+
+  return header;
+}
+
+function iconColumnSpacer() {
+  const spacer = document.createElement("span");
+  spacer.className = "tracks-editor-header-spacer";
+  return spacer;
 }
 
 function createTrackRow(track, index, reel, onChange) {
