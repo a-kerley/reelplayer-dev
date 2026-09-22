@@ -300,7 +300,8 @@ export async function renderMediaBrowser(container, options = {}) {
     selected: new Set(),
     files: [],
     password: null,
-    expandedFolders: new Set()
+    expandedFolders: new Set(),
+    editingFolderPath: null
   };
 
   // Make sure every ancestor of a folder is expanded, so a deep folder (e.g.
@@ -627,7 +628,37 @@ export async function renderMediaBrowser(container, options = {}) {
       labelDiv.appendChild(spacer);
     }
 
-    labelDiv.insertAdjacentHTML("beforeend", `${ICONS.FOLDER}<span>${label}</span>`);
+    labelDiv.insertAdjacentHTML("beforeend", ICONS.FOLDER);
+    // "New Folder" (see showFolderMenu()) leaves its freshly-created child
+    // in this state so its name is immediately editable in place, instead
+    // of a separate rename step after the fact.
+    if (path !== null && path === state.editingFolderPath) {
+      const input = document.createElement("input");
+      input.type = "text";
+      input.className = "media-browser-folder-rename-input";
+      input.value = label;
+      input.title = "Folder name";
+      const commit = async () => {
+        state.editingFolderPath = null;
+        const newName = input.value.trim();
+        if (!newName || newName === label) { renderSidebarOnly(); return; }
+        await renameFolder(path, newName);
+      };
+      input.onblur = commit;
+      input.onkeydown = (e) => {
+        if (e.key === "Enter") { e.preventDefault(); input.blur(); }
+        else if (e.key === "Escape") { e.preventDefault(); state.editingFolderPath = null; renderSidebarOnly(); }
+      };
+      input.onclick = (e) => e.stopPropagation(); // don't trigger the row's own onClick (navigate) while editing
+      labelDiv.appendChild(input);
+      // Deferred so the input exists in the DOM (and has real layout) before
+      // focus/select are attempted.
+      requestAnimationFrame(() => { input.focus(); input.select(); });
+    } else {
+      const labelSpan = document.createElement("span");
+      labelSpan.textContent = label;
+      labelDiv.appendChild(labelSpan);
+    }
     const protectedRoot = path ? protectedRootOf(path) : null;
     if (protectedRoot && !isActive) {
       // Skip the category color on the active row - it'd fight the active
@@ -654,7 +685,14 @@ export async function renderMediaBrowser(container, options = {}) {
       };
     }
 
-    row.onclick = onClick;
+    // Guard against a click landing anywhere else in the row (the icon, the
+    // counts column) while its name is being edited - only the input's own
+    // click is stopped above, so without this a click just outside it would
+    // still navigate away mid-edit.
+    row.onclick = (e) => {
+      if (path !== null && path === state.editingFolderPath) return;
+      onClick(e);
+    };
     if (path !== null) setupFolderDropTarget(row, path);
     return row;
   }
@@ -739,43 +777,74 @@ export async function renderMediaBrowser(container, options = {}) {
     });
   }
 
+  // Shared by the folder context menu's "Rename" item and the inline
+  // rename-in-place input shown right after "New Folder" creates a child
+  // (see folderNavItem's editingFolderPath handling) - both are just this
+  // same rename-every-file-under-the-prefix operation.
+  async function renameFolder(path, newName) {
+    const parentPath = folderOf(path.slice(0, -1));
+    const newPrefix = `${parentPath}${newName}/`;
+    const filesToMove = state.files.filter(f => f.key.startsWith(path));
+    if (!(await confirmIfInUse(filesToMove.map(f => f.key)))) return;
+    beginBusy();
+    try {
+      for (const f of filesToMove) {
+        const newKey = `${newPrefix}${f.key.slice(path.length)}`;
+        await renameFile(f.key, newKey, state.password);
+      }
+      if (state.view.type === 'folder' && state.view.path.startsWith(path)) {
+        state.view = { type: 'folder', path: newPrefix + state.view.path.slice(path.length) };
+        expandAncestors(state.view.path);
+        persistFolder();
+      }
+      await refresh();
+    } catch (error) {
+      dialog.alert(error.message);
+      await refresh();
+    } finally {
+      endBusy();
+    }
+  }
+
+  // Picks a default name that doesn't collide with an existing direct
+  // child of `parentPath` ("New Folder", "New Folder 2", ...) - the name
+  // is only ever a starting point anyway, since "New Folder" (below)
+  // immediately opens it for inline rename.
+  function uniqueChildFolderName(parentPath) {
+    const existing = new Set(subfoldersOf(parentPath).map(p => p.split('/').filter(Boolean).pop().toLowerCase()));
+    let name = "New Folder";
+    for (let n = 2; existing.has(name.toLowerCase()); n++) name = `New Folder ${n}`;
+    return name;
+  }
+
   function showFolderMenu(path, e) {
     // The protected audio/images/video roots still get a menu (consistent
     // right-click affordance on every folder row), but Rename/Delete are
     // greyed out rather than the row having no menu at all - these paths
     // are fixed targets every file-picker/upload flow depends on existing.
+    // Creating a CHILD folder inside one of them is still fine (e.g.
+    // audio/podcasts/), so "New Folder" itself is never disabled.
     const isProtected = !!PROTECTED_ROOT_FOLDERS[path];
     const currentName = path.split('/').filter(Boolean).pop();
-    const parentPath = folderOf(path.slice(0, -1));
 
     openContextMenuAtCursor(e, [
+      {
+        label: "New Folder",
+        onClick: async () => {
+          const childPath = `${path}${uniqueChildFolderName(path)}/`;
+          await createFolder(childPath);
+          state.expandedFolders.add(path);
+          state.editingFolderPath = childPath;
+          renderSidebarOnly();
+        }
+      },
       {
         label: "Rename",
         disabled: isProtected,
         onClick: async () => {
           const newName = await promptForText("Rename folder", currentName);
           if (!newName || newName === currentName) return;
-          const newPrefix = `${parentPath}${newName}/`;
-          const filesToMove = state.files.filter(f => f.key.startsWith(path));
-          if (!(await confirmIfInUse(filesToMove.map(f => f.key)))) return;
-          beginBusy();
-          try {
-            for (const f of filesToMove) {
-              const newKey = `${newPrefix}${f.key.slice(path.length)}`;
-              await renameFile(f.key, newKey, state.password);
-            }
-            if (state.view.type === 'folder' && state.view.path.startsWith(path)) {
-              state.view = { type: 'folder', path: newPrefix + state.view.path.slice(path.length) };
-              expandAncestors(state.view.path);
-              persistFolder();
-            }
-            await refresh();
-          } catch (error) {
-            dialog.alert(error.message);
-            await refresh();
-          } finally {
-            endBusy();
-          }
+          await renameFolder(path, newName);
         }
       },
       {

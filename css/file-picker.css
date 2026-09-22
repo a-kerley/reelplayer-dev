@@ -308,6 +308,24 @@
   color: #fff;
 }
 
+/* Inline rename-in-place input, shown right after "New Folder" creates a
+   child (see js/modules/mediaBrowser.js's editingFolderPath) - sized to
+   sit flush in the same spot the plain label <span> would occupy. */
+.media-browser-folder-rename-input {
+  flex: 1;
+  min-width: 0;
+  background: #1e1e1e;
+  border: 1px solid #4a90e2;
+  border-radius: 3px;
+  color: #fff;
+  font: inherit;
+  padding: 0.1rem 0.3rem;
+}
+
+.media-browser-folder-rename-input:focus {
+  outline: none;
+}
+
 .media-browser-folder-counts {
   font-size: var(--builder-text-sm);
   color: #999;
