@@ -382,10 +382,15 @@ export function initCardsController() {
   }
 
   function statRowHTML(stat, i) {
+    // The value field is "card-tag-value", not "stat-value" - daisyUI's own
+    // "stat" component (css/tailwind.css) claims .stat-value with
+    // font-size:2rem;font-weight:800, which silently applied to this plain
+    // text input since nothing in this codebase had defined that class
+    // first. Not a namespace this app should share with daisyUI's.
     return `
       <div class="color-row" data-index="${i}">
         <input type="text" class="stat-label" placeholder="Label (optional)" title="Optional label for this tag (e.g. 'Genre')." value="${(stat.label || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <input type="text" class="stat-value" placeholder="Value" title="Tag value shown on the card." value="${(stat.value || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
+        <input type="text" class="card-tag-value" placeholder="Value" title="Tag value shown on the card." value="${(stat.value || "").replace(/"/g, "&quot;")}" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
         <button type="button" class="track-remove-btn stat-remove" title="Remove tag" aria-label="Remove tag">
           <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" class="track-btn-svg">
             <path stroke-linecap="round" stroke-linejoin="round" d="M15 12H9m12 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z" />
@@ -394,12 +399,25 @@ export function initCardsController() {
       </div>`;
   }
 
+  // Column widths shared between this header and linkRowHTML()'s own
+  // fields below, so the labels actually line up over what they name -
+  // unlike Tags' "Label (optional)"/"Value" pair, none of these three
+  // fields are self-explanatory from an empty placeholder alone (a bare
+  // URL box and an icon dropdown with no visible caption).
+  const LINK_ROW_HEADER = `
+    <div class="color-row card-repeater-header">
+      <span style="flex:2;">URL</span>
+      <span style="flex:0 0 150px;">Icon</span>
+      <span style="flex:1;">Alt Text</span>
+      <span style="flex:0 0 32px;"></span>
+    </div>`;
+
   function linkRowHTML(link, i) {
     const options = LINK_ICONS.map((f) => `<option value="${f}" ${link.icon === f ? "selected" : ""}>${f.replace(/\.svg$/, "")}</option>`).join("");
     return `
       <div class="color-row" data-index="${i}">
         <input type="url" class="link-url" placeholder="https://…" title="Destination URL for this link." value="${(link.url || "").replace(/"/g, "&quot;")}" style="flex:2;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;" />
-        <select class="link-icon" title="Icon shown next to this link." style="padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;">
+        <select class="link-icon" title="Icon shown next to this link." style="flex:0 0 150px;padding:0.5rem;border:1px solid #444;border-radius:4px;background:#1e1e1e;color:#fff;">
           <option value="">(no icon)</option>
           ${options}
         </select>
@@ -412,7 +430,7 @@ export function initCardsController() {
       </div>`;
   }
 
-  function buildRepeaterHTML(legend, id, rowsHTML, addLabel) {
+  function buildRepeaterHTML(legend, id, rowsHTML, addLabel, headerHTML = "") {
     // collapsible: false - this fieldset's `.outerHTML` gets re-parsed into
     // cardEditorPane's innerHTML below, which would discard any listeners
     // wired to this throwaway in-memory node. renderEditor() re-wires the
@@ -422,6 +440,7 @@ export function initCardsController() {
       legend,
       collapsible: false,
       content: `
+        ${rowsHTML.length ? headerHTML : ""}
         <div class="${id}-rows">${rowsHTML.join("")}</div>
         <div class="phantom-track-row" style="display:flex;justify-content:flex-end;margin-top:0.25rem;">
           <button type="button" class="track-remove-btn add-btn ${id}-add" title="${addLabel}" aria-label="${addLabel}">
@@ -456,6 +475,19 @@ export function initCardsController() {
       step: 1,
       unit: "px",
       tooltip: "Override the player's outline width for this card (0 = use the reel's own).",
+    }).row.outerHTML;
+
+    // Same number-spinner control as every other numeric field in the
+    // builder (Outline Width above, Player Height on the Reels tab, ...)
+    // instead of a bare <input type="number">.
+    const orderControl = buildValueControl({
+      id: "cardOrderInput",
+      label: "Order (sidebar sort only, not layout):",
+      value: card.order ?? 0,
+      min: 0,
+      max: 999,
+      step: 1,
+      tooltip: "Controls this card's position in the sidebar list only, not its page layout.",
     }).row.outerHTML;
 
     // Split into the same shape as the Reels tab's own sections (a focused
@@ -497,10 +529,7 @@ export function initCardsController() {
     // same "one fieldset per concern" reasoning as the split above, instead
     // of five bare, individually-margined <label> rows.
     const cardInfoHTML = `
-      <label class="builder-field-row">
-        Order (sidebar sort only, not layout):
-        <input type="number" id="cardOrderInput" class="filename-display" title="Controls this card's position in the sidebar list only, not its page layout." style="width:6rem;" />
-      </label>
+      ${orderControl}
       <div id="cardLogoRowSlot"></div>
       <label class="builder-field-row">
         Logo Alt Text:
@@ -526,7 +555,7 @@ export function initCardsController() {
 
       ${createFieldset({ id: "cardInfoFieldset", legend: "Card Info", content: cardInfoHTML, collapsible: false }).outerHTML}
       ${buildRepeaterHTML("Tags", "cardStats", (card.stats || []).map(statRowHTML), "Add tag")}
-      ${buildRepeaterHTML("Links", "cardLinks", (card.links || []).map(linkRowHTML), "Add link")}
+      ${buildRepeaterHTML("Links", "cardLinks", (card.links || []).map(linkRowHTML), "Add link", LINK_ROW_HEADER)}
       ${buildRepeaterHTML("Partner Logos", "cardPartnerLogos", (card.partnerLogos || []).map(partnerLogoRowHTML), "Add partner logo")}
       ${createFieldset({ id: "cardPlayerOverridesFieldset", legend: "Player Overrides", content: playerOverridesHTML, collapsible: false }).outerHTML}
       ${createFieldset({ id: "cardChromeOverridesFieldset", legend: "Card Chrome Colours", content: chromeOverridesHTML, collapsible: false }).outerHTML}
@@ -556,11 +585,12 @@ export function initCardsController() {
     };
 
     const orderInput = document.getElementById("cardOrderInput");
+    wireValueControl(orderInput.closest(".value-control"));
     orderInput.value = card.order ?? 0;
-    orderInput.onblur = (e) => {
-      card.order = parseInt(e.target.value, 10) || 0;
+    orderInput.addEventListener("change", () => {
+      card.order = parseInt(orderInput.value, 10) || 0;
       updateCurrentCard();
-    };
+    });
 
     // --- Reel field - laid out identically to every other asset-picker row
     // (Logo Image, Banner Image/Video, ...) via the shared createUrlInputRow()
@@ -665,7 +695,7 @@ export function initCardsController() {
       rowHTML: statRowHTML,
       wireRow: (row, item) => {
         row.querySelector(".stat-label").onblur = (e) => { item.label = e.target.value; updateCurrentCard(); };
-        row.querySelector(".stat-value").onblur = (e) => { item.value = e.target.value; updateCurrentCard(); };
+        row.querySelector(".card-tag-value").onblur = (e) => { item.value = e.target.value; updateCurrentCard(); };
         row.querySelector(".stat-remove").onclick = () => removeItem(card.stats, item);
       },
     });

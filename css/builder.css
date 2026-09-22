@@ -910,6 +910,17 @@ body {
   font-size: var(--builder-text-base);
 }
 
+/* Column captions above a repeater's rows (buildRepeaterHTML()'s
+   headerHTML param, js/cardsController.js) - for a row whose fields
+   aren't self-explanatory from an empty placeholder alone. */
+.card-repeater-header {
+  margin-bottom: 0.4rem;
+  color: #888;
+  font-size: var(--builder-text-xs);
+  text-transform: uppercase;
+  letter-spacing: 0.03em;
+}
+
 /* Shared fieldset/section-heading style - consolidates three previously
    separate inline idioms (expandableMode.js's var(--builder-text-md)+bold,
    playerTextStyles.js/pagesController.js's hardcoded 1.05rem/600, and a
