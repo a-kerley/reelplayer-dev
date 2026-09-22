@@ -290,11 +290,17 @@ function renderPlayer(block, page) {
     wrapper.classList.add("page-block-empty");
     return wrapper;
   }
+  // Each override only actually applies while its own toggle is on - see
+  // pageBlocksEditor.js's createPlayerConfig() (buildOverrideRow).
+  const closedOverride = block.closedHeightOverrideEnabled ? block.closedHeightOverride : 0;
+  const openOverride = block.openHeightOverrideEnabled ? block.openHeightOverride : 0;
+  const playerOverride = block.playerHeightOverrideEnabled ? block.playerHeightOverride : 0;
+
   // The instant-before-first-postMessage guess - prefers whichever override
-  // is actually set (closed, since an expandable reel always starts
+  // is actually enabled (closed, since an expandable reel always starts
   // collapsed) so this doesn't flash at the wrong size before snapping to
   // the override player.html itself applies.
-  const height = block.closedHeightOverride || block.playerHeightOverride || 500;
+  const height = closedOverride || playerOverride || 500;
   const iframe = document.createElement("iframe");
   // Forwards this page's own customized text-style roles into the
   // embedded reel, so a title/track-name set to "inherit" a role
@@ -308,12 +314,12 @@ function renderPlayer(block, page) {
   if (page?.textStyleDefs && Object.keys(page.textStyleDefs).length) {
     iframeParams.set("pageTextStyles", JSON.stringify(page.textStyleDefs));
   }
-  // Real overrides (0 = off) applied on top of the reel's own configured
-  // heights by player.html's applyPageHeightOverrides() - not just a
-  // pre-load guess (see the `height` var above for that part).
-  if (block.closedHeightOverride) iframeParams.set("closedHeightOverride", String(block.closedHeightOverride));
-  if (block.openHeightOverride) iframeParams.set("openHeightOverride", String(block.openHeightOverride));
-  if (block.playerHeightOverride) iframeParams.set("playerHeightOverride", String(block.playerHeightOverride));
+  // Real overrides applied on top of the reel's own configured heights by
+  // player.html's applyPageHeightOverrides() - not just a pre-load guess
+  // (see the `height` var above for that part).
+  if (closedOverride) iframeParams.set("closedHeightOverride", String(closedOverride));
+  if (openOverride) iframeParams.set("openHeightOverride", String(openOverride));
+  if (playerOverride) iframeParams.set("playerHeightOverride", String(playerOverride));
   iframe.src = `player?${iframeParams}`;
   iframe.width = "100%";
   iframe.height = String(height);
