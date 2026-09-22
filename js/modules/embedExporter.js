@@ -141,6 +141,14 @@ export class EmbedExporter {
     
     const reelData = {
       id: reelId,
+      // The reel draft's own stable id (survives every republish, unlike
+      // `id` above which is a content hash that changes whenever the reel
+      // is edited). The Worker uses this to also update a `live-<sourceReelId>`
+      // alias pointing at this exact publish, so a Page's Player block or a
+      // Project Card that references the reel via that alias (see
+      // js/modules/reelPicker.js) always resolves to the latest publish
+      // instead of freezing on the hash id captured when it was picked.
+      sourceReelId: reel.id,
       title: reel.title,
       showTitle: reel.showTitle,
       analyticsEnabled: reel.analyticsEnabled === true,

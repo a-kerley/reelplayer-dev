@@ -1,9 +1,18 @@
-// reelPicker.js - "Select a Reel" modal for page player blocks: lists
-// published reels and lets you pick one by reference (js/pagesController.js
-// stores just the picked reel's id on the block, never a copy of its
-// config - see pageBlockRenderer.js's renderPlayer() for why). Read-only
-// single-select variant of js/modules/embedManager.js's fetch/render
-// pattern - same GET /reels call, no delete button.
+// reelPicker.js - "Select a Reel" modal for page player blocks and Project
+// Cards: lists published reels and lets you pick one by reference
+// (js/pagesController.js/js/cardsController.js store just the picked
+// reel's id, never a copy of its config - see pageBlockRenderer.js's
+// renderPlayer() for why). Read-only single-select variant of
+// js/modules/embedManager.js's fetch/render pattern - same GET /reels
+// call, no delete button.
+//
+// onSelect is handed a `live-<sourceReelId>` reference (not the raw
+// content-hash `entry.id`) whenever the picked entry has a sourceReelId -
+// the Worker's reelStorageKey() resolves that to whatever hash was most
+// recently published for that reel draft, so a Page/Card that references
+// it this way stays current across future republishes of the reel instead
+// of freezing on today's hash. Falls back to the raw hash for reels
+// published before this field existed.
 import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
@@ -31,7 +40,7 @@ function renderListHTML(entries) {
   return `
     <div style="max-height:300px;overflow-y:auto;">
       ${entries.map(entry => `
-        <div class="reel-picker-row" data-id="${entry.id}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+        <div class="reel-picker-row" data-id="${entry.id}" data-source-id="${entry.sourceReelId || ""}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
           title="Select this reel" role="button"
           style="display:flex;align-items:center;justify-content:space-between;padding:0.5rem 0;border-bottom:1px solid #444;cursor:pointer;">
           <div>
@@ -74,7 +83,8 @@ export async function openReelPicker({ onSelect }) {
       row.addEventListener("mouseenter", () => { row.style.background = "#333"; });
       row.addEventListener("mouseleave", () => { row.style.background = ""; });
       row.addEventListener("click", () => {
-        onSelect(row.dataset.id, row.dataset.title);
+        const liveId = row.dataset.sourceId ? `live-${row.dataset.sourceId}` : row.dataset.id;
+        onSelect(liveId, row.dataset.title);
         dialog.closeDialog();
       });
     });

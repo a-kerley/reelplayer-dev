@@ -9,10 +9,22 @@
 // not proxied through this Worker.
 //
 // Routes:
-//   GET    /reels/:id         - public, returns the stored reel JSON or 404
-//   POST   /reels/:id         - password-gated, stores the JSON body
-//   GET    /reels             - password-gated, lists {id, title, created} for every stored reel
-//   DELETE /reels/:id         - password-gated, removes the entry
+//   GET    /reels/:id         - public, returns the stored reel JSON or 404. `:id` may also be
+//                               `live-<sourceReelId>`, which resolves to whatever reel was most
+//                               recently published under that draft id (see reelStorageKey()) -
+//                               this is how a Page's Player block or a Project Card stays current
+//                               across reel republishes instead of freezing on one hash id.
+//   POST   /reels/:id         - password-gated, stores the JSON body under `reel_<id>`. If the
+//                               body has a `sourceReelId`, also updates that draft's
+//                               `live-<sourceReelId>` alias (see reelStorageKey()) to point at
+//                               this exact publish.
+//   GET    /reels             - password-gated, lists {id, title, created, sourceReelId} for
+//                               every stored reel (excludes the `live-*` alias entries)
+//   DELETE /reels/:id         - password-gated, removes the entry. Only ever removes the
+//                               `reel_<id>` hash entry, never a `live-*` alias, even if that
+//                               alias currently points at this same content - deliberately
+//                               independent, so cleaning up an old hash-keyed publish never
+//                               breaks a Page/Card still referencing the reel live.
 //   GET    /drafts/:id        - password-gated (NOT public, unlike /reels/:id - drafts have no
 //                               legitimate anonymous consumer), returns the stored draft JSON or 404
 //   POST   /drafts/:id        - password-gated, stores the JSON body (stamps updatedAt server-side)
@@ -126,6 +138,18 @@ function rawJsonResponse(value) {
     status: 200,
     headers: { "Content-Type": "application/json", ...CORS_HEADERS },
   });
+}
+
+// Resolves a reel id from a URL/reference into its actual KV key. A plain
+// id (a content hash, minted fresh on every publish) maps straight to its
+// own `reel_<id>` entry, same as always. A `live-<sourceReelId>` reference
+// instead maps to `reel_stable_<sourceReelId>` - an alias kept pointing at
+// whatever hash-keyed entry was most recently published for that reel
+// draft (see the POST /reels/:id handler). This is what lets a Page's
+// Player block or a Project Card reference "this reel, whatever it
+// currently is" instead of the one-shot hash captured when it was picked.
+function reelStorageKey(id) {
+  return id.startsWith("live-") ? `reel_stable_${id.slice(5)}` : `reel_${id}`;
 }
 
 async function parseJsonBody(request) {
@@ -253,17 +277,21 @@ export default {
       if (authError) return authError;
 
       // Explicit "reel_" prefix (not "") so this never picks up draft_/
-      // page_/draft_page_ keys sharing the same REELS namespace.
+      // page_/draft_page_ keys sharing the same REELS namespace. Excludes
+      // "reel_stable_" too - those are the live-alias entries the POST
+      // handler below maintains, not reels of their own to list/manage.
       const entries = await listEntries(env, "reel_", (r) => ({
         id: r.id, title: r.title, created: r.created, analyticsEnabled: r.analyticsEnabled === true,
-      }));
+        sourceReelId: r.sourceReelId || null,
+      }), ["reel_stable_"]);
       return jsonResponse(entries);
     }
 
-    // /reels/:id
+    // /reels/:id - :id may be a plain hash or a `live-<sourceReelId>`
+    // reference; reelStorageKey() resolves either to its real KV key.
     const match = pathname.match(/^\/reels\/([a-zA-Z0-9_-]+)$/);
     if (match) {
-      const key = `reel_${match[1]}`;
+      const key = reelStorageKey(match[1]);
 
       if (request.method === "GET") {
         const value = await env.REELS.get(key);
@@ -275,12 +303,19 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
         const body = await request.text();
+        let parsed;
         try {
-          JSON.parse(body);
+          parsed = JSON.parse(body);
         } catch {
           return jsonResponse({ error: "Invalid JSON body" }, 400);
         }
         await env.REELS.put(key, body);
+        // Keep this reel draft's live alias pointing at this exact publish,
+        // so anything referencing it via `live-<sourceReelId>` (a Page's
+        // Player block, a Project Card) picks up the change immediately.
+        if (parsed && parsed.sourceReelId) {
+          await env.REELS.put(`reel_stable_${parsed.sourceReelId}`, body);
+        }
         return jsonResponse({ ok: true });
       }
 
@@ -568,7 +603,7 @@ export default {
         }
         let reel = null;
         if (card.reelId) {
-          const reelValue = await env.REELS.get(`reel_${card.reelId}`);
+          const reelValue = await env.REELS.get(reelStorageKey(card.reelId));
           if (reelValue) {
             try {
               reel = JSON.parse(reelValue);
