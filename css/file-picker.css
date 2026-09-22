@@ -315,10 +315,6 @@
   min-width: 0;
 }
 
-.media-browser-main.has-bulk-bar {
-  padding-bottom: 4.5rem;
-}
-
 .media-browser-upload-zone {
   margin-bottom: 1rem;
   padding: 1rem;
@@ -360,40 +356,18 @@
   cursor: pointer;
 }
 
-/* Floats above the file list instead of pushing it down when items are
-   selected - taken out of normal document flow entirely (absolute,
-   anchored to the bottom of .media-browser-main) so the list never reflows
-   or shifts scroll position when a selection starts/changes. */
-.media-browser-bulk-bar {
-  position: absolute;
-  left: 50%;
-  bottom: 1rem;
-  transform: translateX(-50%);
-  z-index: 4;
-  display: flex;
-  align-items: center;
-  gap: 0.5rem;
-  width: max-content;
-  padding: 0.5rem 0.75rem;
-  background: #3a3a3a;
-  border-radius: 4px;
-  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
-  color: #fff;
-  font-size: var(--builder-text-base);
-}
-
-.media-browser-bulk-bar button {
-  background: #4a90e2;
+/* Generic red delete-button styling, also reused outside the media browser
+   (e.g. pageBlocksEditor.js's manage-presets dialog) - not scoped to any
+   bulk-bar container, since the media browser's own bulk bar was removed
+   in favor of right-click operations. */
+.media-browser-delete-btn {
+  background: #dc3545;
   color: #fff;
   border: none;
   border-radius: 4px;
   padding: 0.35rem 0.7rem;
   cursor: pointer;
   font-size: var(--builder-text-sm);
-}
-
-.media-browser-bulk-bar button.media-browser-delete-btn {
-  background: #dc3545;
 }
 
 .media-browser-table {

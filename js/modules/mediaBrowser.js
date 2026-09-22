@@ -622,9 +622,9 @@ export async function renderMediaBrowser(container, options = {}) {
     );
   }
 
-  // Shared by the bulk-bar "Move to folder..." button, a file row's "Move
-  // to..." context-menu entry, and drag-and-drop - all three are just this
-  // same rename-to-a-new-prefix operation, one call per file.
+  // Shared by a file row's "Move to..." context-menu entry (single file or
+  // whole checkbox selection) and drag-and-drop - both are just this same
+  // rename-to-a-new-prefix operation, one call per file.
   async function moveFiles(keys, destFolder) {
     const toMove = keys.filter((key) => {
       const file = state.files.find(f => f.key === key);
@@ -742,11 +742,6 @@ export async function renderMediaBrowser(container, options = {}) {
     main.appendChild(renderUploadZone());
 
     const files = visibleFiles();
-
-    if (mode === 'manage' && state.selected.size > 0) {
-      main.classList.add("has-bulk-bar");
-      main.appendChild(renderBulkBar());
-    }
 
     if (files.length === 0) {
       main.appendChild(renderEmptyState());
@@ -935,46 +930,6 @@ export async function renderMediaBrowser(container, options = {}) {
     return zone;
   }
 
-  function renderBulkBar() {
-    const bar = document.createElement("div");
-    bar.className = "media-browser-bulk-bar";
-    bar.textContent = `${state.selected.size} selected  `;
-
-    const moveBtn = document.createElement("button");
-    moveBtn.type = "button";
-    moveBtn.textContent = "Move to folder...";
-    moveBtn.title = "Move the selected files into a different folder";
-    moveBtn.onclick = async () => {
-      const dest = await promptForText("Move selected files to folder (e.g. backgrounds/nature):");
-      if (dest === null) return;
-      const folder = dest ? dest.replace(/^\/+|\/+$/g, '') + '/' : '';
-      await moveFiles(Array.from(state.selected), folder);
-    };
-
-    const deleteBtn = document.createElement("button");
-    deleteBtn.type = "button";
-    deleteBtn.textContent = "Delete Selected";
-    deleteBtn.className = "media-browser-delete-btn";
-    deleteBtn.title = "Permanently delete the selected files";
-    deleteBtn.onclick = async () => {
-      const confirmed = await dialog.confirm(`Delete ${state.selected.size} file(s)? This cannot be undone.`, "Delete", "Cancel");
-      if (!confirmed) return;
-      try {
-        for (const key of state.selected) {
-          const file = state.files.find(f => f.key === key);
-          if (!file || file.readOnly) continue;
-          await deleteFile(key, state.password);
-        }
-        await refresh();
-      } catch (error) {
-        dialog.alert(error.message);
-      }
-    };
-
-    bar.append(moveBtn, deleteBtn);
-    return bar;
-  }
-
   function sortHeader(label, field) {
     const th = document.createElement("th");
     const arrow = state.sortField === field ? (state.sortDir === 'asc' ? ' ▲' : ' ▼') : '';
@@ -1047,9 +1002,17 @@ export async function renderMediaBrowser(container, options = {}) {
       });
       // Right-click the row itself instead of a dedicated "..." button -
       // same convention as the folder rows above and
-      // js/modules/sidebarList.js's item rows.
+      // js/modules/sidebarList.js's item rows. Right-clicking a row that's
+      // already part of a multi-checkbox selection operates on the whole
+      // selection (see showRowMenu); right-clicking outside it collapses
+      // the selection down to just this row first, like Finder/Explorer.
       row.oncontextmenu = (e) => {
         e.preventDefault();
+        if (!state.selected.has(file.key)) {
+          state.selected.clear();
+          state.selected.add(file.key);
+          renderMainOnly();
+        }
         showRowMenu(file, e);
       };
     }
@@ -1115,15 +1078,52 @@ export async function renderMediaBrowser(container, options = {}) {
     return row;
   }
 
+  // Every folder path, indented by depth, as a flat flyout - lets "Move
+  // to..." jump straight to any folder anywhere in the tree in one click
+  // instead of typing a path, without needing nested submenus-of-submenus
+  // (contextMenu.js only supports one flyout level).
+  function moveToSubmenuItems(keys) {
+    const items = [{ label: "Unfiled (root)", onClick: () => moveFiles(keys, '') }];
+    computeFolders(state.files).forEach(path => {
+      const depth = path.split('/').filter(Boolean).length - 1;
+      const leaf = path.split('/').filter(Boolean).pop();
+      items.push({
+        label: `${'  '.repeat(depth)}${leaf}/`,
+        onClick: () => moveFiles(keys, path)
+      });
+    });
+    items.push({
+      label: "New folder...",
+      onClick: async () => {
+        const name = await promptForText("New folder name (e.g. backgrounds/nature)");
+        if (!name) return;
+        const path = name.replace(/^\/+|\/+$/g, '') + '/';
+        await moveFiles(keys, path);
+      }
+    });
+    return items;
+  }
+
+  // Operates on the whole checkbox selection when the right-clicked row is
+  // part of one (size > 1), otherwise just this row - see the oncontextmenu
+  // handler above, which collapses the selection to this row first
+  // otherwise. Rename/Copy URL don't have a sane multi-target meaning, so
+  // they're only offered for a single target.
   function showRowMenu(file, e) {
-    openContextMenuAtCursor(e, [
-      {
+    const keys = state.selected.has(file.key) && state.selected.size > 1
+      ? Array.from(state.selected)
+      : [file.key];
+    const multi = keys.length > 1;
+
+    const items = [];
+    if (!multi) {
+      items.push({
         label: "Copy URL",
         onClick: async () => {
           try { await navigator.clipboard.writeText(file.url); } catch { /* ignore */ }
         }
-      },
-      {
+      });
+      items.push({
         label: "Rename",
         onClick: async () => {
           const newName = await promptForText("Rename file", file.name);
@@ -1136,31 +1136,33 @@ export async function renderMediaBrowser(container, options = {}) {
             dialog.alert(error.message);
           }
         }
-      },
-      {
-        label: "Move to...",
-        onClick: async () => {
-          const dest = await promptForText("Move to folder (e.g. backgrounds/nature):", folderOf(file.key));
-          if (dest === null) return;
-          const folder = dest ? dest.replace(/^\/+|\/+$/g, '') + '/' : '';
-          await moveFiles([file.key], folder);
-        }
-      },
-      {
-        label: "Delete",
-        danger: true,
-        onClick: async () => {
-          const confirmed = await dialog.confirm(`Delete "${file.name}"? This cannot be undone.`, "Delete", "Cancel");
-          if (!confirmed) return;
-          try {
-            await deleteFile(file.key, state.password);
-            await refresh();
-          } catch (error) {
-            dialog.alert(error.message);
+      });
+    }
+
+    items.push({ label: "Move to...", submenu: moveToSubmenuItems(keys) });
+
+    items.push({
+      label: multi ? `Delete ${keys.length} Files` : "Delete",
+      danger: true,
+      onClick: async () => {
+        const label = multi ? `${keys.length} file(s)` : `"${file.name}"`;
+        const confirmed = await dialog.confirm(`Delete ${label}? This cannot be undone.`, "Delete", "Cancel");
+        if (!confirmed) return;
+        try {
+          for (const key of keys) {
+            const f = state.files.find(f => f.key === key);
+            if (!f || f.readOnly) continue;
+            await deleteFile(key, state.password);
           }
+          await refresh();
+        } catch (error) {
+          dialog.alert(error.message);
+          await refresh();
         }
       }
-    ]);
+    });
+
+    openContextMenuAtCursor(e, items);
   }
 
   function renderGrid(files) {
