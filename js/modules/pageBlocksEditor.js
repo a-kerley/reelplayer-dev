@@ -5,7 +5,7 @@
 // generic shared abstraction - the two lists differ enough per-row (type-
 // specific config forms here vs. fixed title/url fields there) that forcing
 // a shared component would add more indirection than it'd save.
-import { createUrlInputRow, createToggleSwitch } from "./domUtils.js";
+import { createUrlInputRow, createToggleSwitch, createClearButton, animateCollapseHeight } from "./domUtils.js";
 import { createValueControl, buildValueControl } from "./valueControl.js";
 import { renderBlock, parseVideoEmbedUrl, parseVideoProvider } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
@@ -132,28 +132,6 @@ function createBlockRow(block, index, page, onChange) {
   row.className = "page-block-row";
   row.draggable = false;
 
-  const header = document.createElement("div");
-  header.className = "page-block-row-header";
-
-  const dragHandle = createDragHandle(row);
-  header.appendChild(dragHandle);
-
-  const collapseBtn = createCollapseButton(block, row);
-  header.appendChild(collapseBtn);
-
-  const typeLabel = document.createElement("span");
-  typeLabel.className = "page-block-type-label";
-  typeLabel.innerHTML = `${ICONS[block.type] || ""}<span>${BLOCK_TYPE_LABELS[block.type] || block.type}</span>`;
-  header.appendChild(typeLabel);
-
-  const savePresetBtn = createSavePresetButton(block);
-  header.appendChild(savePresetBtn);
-
-  const removeBtn = createRemoveButton(index, page, onChange);
-  header.appendChild(removeBtn);
-
-  row.appendChild(header);
-
   // Text blocks skip this - their contenteditable editor (createTextConfig())
   // shows the styled result directly, so a second, separate rendered
   // preview underneath would just be a redundant duplicate view. Every
@@ -161,8 +139,7 @@ function createBlockRow(block, index, page, onChange) {
   // embedded video, button - none of those have an in-place styled
   // editing view). Created before configForm (rather than inline further
   // down) so refreshPreview below has something to close over regardless
-  // of block type - actually appended to `row` later, preserving the
-  // original header/config-form/preview visual order.
+  // of block type.
   const preview = block.type !== "text" ? document.createElement("div") : null;
   if (preview) preview.className = "page-block-row-preview";
 
@@ -183,20 +160,45 @@ function createBlockRow(block, index, page, onChange) {
   if (block.type === "player") playerBlockRefreshers.set(block.blockId, refreshPreview);
 
   const configForm = createConfigForm(block, page, onChange, refreshPreview);
-  row.appendChild(configForm);
 
-  if (preview) row.appendChild(preview);
+  // configForm + preview share one collapse/expand animation (see
+  // createCollapseButton()) - wrapped in a single body div rather than
+  // animated as two separate siblings, mirroring makeSectionCollapsible()'s
+  // (js/modules/domUtils.js) own single-wrapper-per-section approach.
+  const body = document.createElement("div");
+  body.className = "page-block-body";
+  body.appendChild(configForm);
+  if (preview) body.appendChild(preview);
 
-  if (collapsedBlockIds.has(block.blockId)) {
-    row.classList.add("page-block-row-collapsed");
-  }
+  const header = document.createElement("div");
+  header.className = "page-block-row-header";
+
+  const dragHandle = createDragHandle(row);
+  header.appendChild(dragHandle);
+
+  const collapseBtn = createCollapseButton(block, row, body);
+  header.appendChild(collapseBtn);
+
+  const typeLabel = document.createElement("span");
+  typeLabel.className = "page-block-type-label";
+  typeLabel.innerHTML = `${ICONS[block.type] || ""}<span>${BLOCK_TYPE_LABELS[block.type] || block.type}</span>`;
+  header.appendChild(typeLabel);
+
+  const savePresetBtn = createSavePresetButton(block);
+  header.appendChild(savePresetBtn);
+
+  const removeBtn = createRemoveButton(index, page, onChange);
+  header.appendChild(removeBtn);
+
+  row.appendChild(header);
+  row.appendChild(body);
 
   setupDragAndDrop(row, index, page, onChange);
 
   return row;
 }
 
-function createCollapseButton(block, row) {
+function createCollapseButton(block, row, body) {
   const collapseBtn = document.createElement("button");
   collapseBtn.type = "button";
   collapseBtn.className = "page-block-collapse-btn";
@@ -207,14 +209,39 @@ function createCollapseButton(block, row) {
       <path stroke-linecap="round" stroke-linejoin="round" d="M6 9l6 6 6-6" />
     </svg>
   `;
+
+  // Initial state is set directly, not via animateCollapseHeight() - `row`
+  // isn't attached to the document yet at creation time (updatePageBlocksEditor()
+  // appends it afterward), so body.scrollHeight would read 0 regardless of
+  // the real content height. Only a later, user-triggered toggle (below) is
+  // guaranteed to run while the row is actually on-screen and laid out.
+  const startOpen = !collapsedBlockIds.has(block.blockId);
+  collapseBtn.setAttribute("aria-expanded", String(startOpen));
+  row.classList.toggle("page-block-row-collapsed", !startOpen);
+  body.style.height = startOpen ? "auto" : "0px";
+
+  // Mirrors makeSectionCollapsible()'s own switch-to-auto-once-settled - a
+  // config field revealing another row (e.g. the embedded-video block's
+  // expandable-mode toggle) while open would otherwise get clipped by the
+  // last pixel height measured at the start of that open transition.
+  body.addEventListener("transitionend", (e) => {
+    if (e.propertyName === "height" && collapseBtn.getAttribute("aria-expanded") === "true") {
+      body.style.height = "auto";
+    }
+  });
+
   collapseBtn.onclick = () => {
-    const collapsed = row.classList.toggle("page-block-row-collapsed");
-    if (collapsed) {
-      collapsedBlockIds.add(block.blockId);
-    } else {
+    const opening = collapseBtn.getAttribute("aria-expanded") === "false";
+    collapseBtn.setAttribute("aria-expanded", String(opening));
+    row.classList.toggle("page-block-row-collapsed", !opening);
+    animateCollapseHeight(body, opening);
+    if (opening) {
       collapsedBlockIds.delete(block.blockId);
+    } else {
+      collapsedBlockIds.add(block.blockId);
     }
   };
+
   return collapseBtn;
 }
 
@@ -1817,41 +1844,61 @@ function createImageConfig(block, onChange, refreshPreview) {
 function createPlayerConfig(block, onChange, refreshPreview) {
   const wrap = document.createElement("div");
 
-  const pickRow = document.createElement("div");
-  pickRow.className = "color-row";
+  // Reel field - laid out identically to Project Cards' own reel field
+  // (cardsController.js's renderReelField()) via the same shared
+  // createUrlInputRow(), instead of this block's own previous hand-rolled
+  // ".color-row" + "Select Reel"/"Change" button markup. Same reasoning as
+  // that field's own comment: a single-line row with a folder-icon browse
+  // button wired to openReelPicker() via onPickerClick, read-only (a reel
+  // is picked, never typed), with a clear (x) button once one's picked
+  // since a read-only field can't be emptied by typing.
+  const reelFieldSlot = document.createElement("div");
 
-  const label = document.createElement("span");
-  label.textContent = "Reel:";
-  pickRow.appendChild(label);
-
-  const selectedLabel = document.createElement("span");
-  selectedLabel.className = "page-block-selected-reel";
-  selectedLabel.style.flex = "1";
-  selectedLabel.textContent = block.reelId
-    ? (block.reelTitle || block.reelId)
-    : "No reel selected";
-  pickRow.appendChild(selectedLabel);
-
-  const pickBtn = document.createElement("button");
-  pickBtn.type = "button";
-  pickBtn.className = "page-block-add-btn";
-  pickBtn.textContent = block.reelId ? "Change" : "Select Reel";
-  pickBtn.title = "Choose the reel this player block embeds.";
-  pickBtn.onclick = () => {
+  function openPicker() {
     openReelPicker({
       onSelect: (reelId, reelTitle) => {
         block.reelId = reelId;
         block.reelTitle = reelTitle;
-        selectedLabel.textContent = reelTitle || reelId;
-        pickBtn.textContent = "Change";
+        renderReelField(reelTitle);
         refreshPreview();
         onChange();
       },
     });
-  };
-  pickRow.appendChild(pickBtn);
+  }
 
-  wrap.appendChild(pickRow);
+  function renderReelField(title) {
+    reelFieldSlot.innerHTML = "";
+
+    const { row, input } = createUrlInputRow({
+      id: `${block.blockId}-reel`,
+      label: "Reel:",
+      value: block.reelId ? (title || block.reelId) : "",
+      placeholder: "Choose a reel…",
+      tooltip: "The reel this player block embeds.",
+      onPickerClick: openPicker,
+    });
+    input.readOnly = true;
+    input.style.cursor = "pointer";
+    input.onclick = openPicker;
+
+    if (block.reelId) {
+      const clearBtn = createClearButton({
+        onClick: () => {
+          block.reelId = "";
+          block.reelTitle = "";
+          renderReelField(null);
+          refreshPreview();
+          onChange();
+        },
+      });
+      row.appendChild(clearBtn);
+    }
+
+    reelFieldSlot.appendChild(row);
+  }
+
+  renderReelField(block.reelTitle);
+  wrap.appendChild(reelFieldSlot);
 
   // Just a starting guess, not a fixed size: player.html corrects it
   // automatically once the embedded reel loads (via the postMessage

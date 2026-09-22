@@ -50,19 +50,39 @@ export function createFieldset({ id, legend, content, styles = {}, collapsible =
  * @param {Object} [options]
  * @param {boolean} [options.defaultOpen=false]
  */
+// Animates `body`'s height between 0 (collapsed) and its natural content
+// height (open) via a JS-measured scrollHeight pixel value, not the CSS
+// Grid 0fr/1fr trick (css/card.css's .project-card-extra) - see this
+// function's original call site below for why that trick doesn't hold up
+// against settings-row content (color pickers, value-control sliders break
+// the grid intrinsic-sizing algorithm's height contribution). Shared by
+// makeSectionCollapsible() below and pageBlocksEditor.js's per-block
+// collapse toggle so both animate identically instead of each hand-rolling
+// its own copy - callers must switch `body.style.height` to `"auto"` once
+// the open-transition settles (see the `transitionend` listener at each
+// call site) so content that changes size while open isn't clipped by the
+// last measured pixel value. Only call this for a user-triggered toggle,
+// not to set a static initial state - `body` needs to already be laid out
+// (attached to the document) for `scrollHeight` to read correctly.
+export function animateCollapseHeight(body, open) {
+  if (open) {
+    body.style.height = body.scrollHeight + "px";
+  } else {
+    // Pin to a real pixel height first (in case it's currently 'auto') so
+    // there's a defined starting point to transition down from.
+    body.style.height = body.scrollHeight + "px";
+    void body.offsetHeight;
+    body.style.height = "0px";
+  }
+}
+
 export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
   const legend = fieldset.querySelector(":scope > legend");
   if (!legend || legend.dataset.collapsible === "true") return;
 
-  // .section-body's height is animated as a JS-measured pixel value, not
-  // via the CSS Grid 0fr/1fr trick (css/card.css's .project-card-extra) -
-  // tried that first here, but this codebase's real settings-group content
-  // (color pickers, value-control sliders, nested rows) collapses that
-  // trick to 0 regardless of 0fr/1fr/auto/max-content (confirmed: a plain
-  // block-display readout of the same content measures correctly, so some
-  // descendant's percentage-based sizing is breaking the grid intrinsic-
-  // sizing algorithm's height contribution). Measuring scrollHeight
-  // directly sidesteps that.
+  // .section-body's height is animated via animateCollapseHeight() above -
+  // see that function's comment for why (CSS Grid's 0fr/1fr trick doesn't
+  // hold up against this content).
   const body = document.createElement("div");
   body.className = "section-body";
   while (legend.nextSibling) body.appendChild(legend.nextSibling);
@@ -112,16 +132,7 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
     fieldset.style.borderColor = open ? "" : "transparent";
     fieldset.style.paddingTop = open ? openPadding : "0";
     fieldset.style.paddingBottom = open ? openPadding : "0";
-
-    if (open) {
-      body.style.height = body.scrollHeight + "px";
-    } else {
-      // Pin to a real pixel height first (in case it's currently 'auto')
-      // so there's a defined starting point to transition down from.
-      body.style.height = body.scrollHeight + "px";
-      void body.offsetHeight;
-      body.style.height = "0px";
-    }
+    animateCollapseHeight(body, open);
   };
   setOpen(defaultOpen);
 

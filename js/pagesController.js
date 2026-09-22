@@ -686,7 +686,7 @@ export function initPagesController() {
         max: 300,
         step: 5,
         unit: "px",
-        tooltip: "Empty space below the page's content column, after its last block.",
+        tooltip: "Empty space below the page's content column, after its last block. A 48px minimum always applies, regardless of this value, so a Player block's controls never end up flush against the page's bottom edge.",
       });
       input.addEventListener("input", () => {
         const val = parseInt(input.value, 10);

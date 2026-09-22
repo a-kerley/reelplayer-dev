@@ -1694,6 +1694,17 @@ input.filename-display:focus {
   padding: 0.8rem;
   margin-bottom: 0.8rem;
   background: #262626;
+  /* Collapsed state shrinks this to just the header - see
+     .page-block-row-collapsed below and .page-block-body's own height
+     transition (js/modules/pageBlocksEditor.js's createCollapseButton(),
+     animateCollapseHeight() in js/modules/domUtils.js). Same easing/timing
+     as .collapsible-section's own padding transition for settings groups,
+     so both collapse animations in the builder feel identical. */
+  transition: padding-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-block-row-collapsed {
+  padding-bottom: 0;
 }
 
 .page-block-row-header {
@@ -1701,6 +1712,11 @@ input.filename-display:focus {
   align-items: center;
   gap: 0.5rem;
   margin-bottom: 0.6rem;
+  transition: margin-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+.page-block-row-collapsed .page-block-row-header {
+  margin-bottom: 0;
 }
 
 .page-block-drag-handle {
@@ -1775,9 +1791,24 @@ input.filename-display:focus {
   transform: rotate(-90deg);
 }
 
-.page-block-row-collapsed .page-block-config,
-.page-block-row-collapsed .page-block-row-preview {
-  display: none;
+/* Height set to a real measured px value (or 'auto' once settled open) by
+   createCollapseButton()/animateCollapseHeight() (js/modules/
+   pageBlocksEditor.js, js/modules/domUtils.js) - same JS-measured-height
+   technique as .section-body above, for the same reason (see that class's
+   own comment: the CSS Grid 0fr/1fr trick doesn't hold up against this
+   content). Wraps .page-block-config and .page-block-row-preview together
+   so both animate as one, not two separately-timed collapses. */
+.page-block-body {
+  overflow: hidden;
+  transition: height 0.3s cubic-bezier(0.4, 0, 0.2, 1);
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .page-block-row,
+  .page-block-row-header,
+  .page-block-body {
+    transition: none;
+  }
 }
 
 .page-block-preset-btn {

@@ -55,6 +55,11 @@ const PARALLAX_FACTOR = 0.4;
 // (see getEdgeBuffer() below) - the minimum even at backgroundBlur:0, so
 // there's still a small margin for subpixel/rounding slack at the seam.
 const MIN_EDGE_BUFFER = 40;
+// px - floor under page.contentPaddingBottom (which defaults to 0 and is
+// otherwise fully author-set) so a Player block's own controls/expandable
+// panel growing at the very bottom of a page never end up flush against
+// the page's real bottom edge, regardless of what the author configured.
+const MIN_BOTTOM_PADDING = 48;
 
 // CSS blur(Npx) maps to a Gaussian stdDeviation of N/2 (the CSS Filter
 // Effects spec defines it that way), and a Gaussian's visible extent
@@ -136,7 +141,10 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
   // work whether or not a background image is on).
   scopeEl.style.setProperty("--page-content-max-width", `${page.contentMaxWidth ?? 900}px`);
   scopeEl.style.setProperty("--page-content-padding-top", `${page.contentPaddingTop ?? 0}px`);
-  scopeEl.style.setProperty("--page-content-padding-bottom", `${page.contentPaddingBottom ?? 0}px`);
+  scopeEl.style.setProperty(
+    "--page-content-padding-bottom",
+    `${Math.max(page.contentPaddingBottom ?? 0, MIN_BOTTOM_PADDING)}px`
+  );
 
   if (getComputedStyle(scopeEl).position === "static") {
     scopeEl.style.position = "relative";
