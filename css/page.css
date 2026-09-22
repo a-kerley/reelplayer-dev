@@ -454,6 +454,11 @@ body.page-body {
   --ev-transition: 0.35s;
   position: relative;
   overflow: hidden;
+  /* Scopes layout/paint invalidation to this box during the height
+     transition (same reasoning as the reel player's own expandable-mode
+     wrapper, css/expandable.css) - without it every frame of the resize
+     forces the browser to reconsider paint outside the wrapper too. */
+  contain: layout paint;
   border-radius: 8px;
   /* No vertical padding here (unlike the base rule) - the renderer drives
      an explicit pixel height (clientWidth x aspect-ratio) and vertical
