@@ -829,7 +829,6 @@ export async function renderMediaBrowser(container, options = {}) {
     // Creating a CHILD folder inside one of them is still fine (e.g.
     // audio/podcasts/), so "New Folder" itself is never disabled.
     const isProtected = !!PROTECTED_ROOT_FOLDERS[path];
-    const currentName = path.split('/').filter(Boolean).pop();
 
     openContextMenuAtCursor(e, [
       {
@@ -845,10 +844,9 @@ export async function renderMediaBrowser(container, options = {}) {
       {
         label: "Rename",
         disabled: isProtected,
-        onClick: async () => {
-          const newName = await promptForText("Rename folder", currentName);
-          if (!newName || newName === currentName) return;
-          await renameFolder(path, newName);
+        onClick: () => {
+          state.editingFolderPath = path;
+          renderSidebarOnly();
         }
       },
       {
