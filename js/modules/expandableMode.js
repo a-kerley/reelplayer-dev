@@ -3,11 +3,12 @@
 import { createUrlInputRow, createToggleSwitch, makeSectionCollapsible } from "./domUtils.js";
 import { createValueControl } from "./valueControl.js";
 import { eyedropButtonHTML } from "./colorPicker.js";
+import { attachSettingsGroupClipboard } from "./settingsGroupClipboard.js";
 
 /**
  * Creates the Player Mode section with Static/Expandable toggle
  */
-export function createPlayerModeSection(reel, onChange) {
+export function createPlayerModeSection(reel, onChange, onPasteApplied) {
   const section = document.createElement('fieldset');
   section.id = 'playerModeSection';
   section.style.marginBottom = '1.5rem';
@@ -87,6 +88,7 @@ export function createPlayerModeSection(reel, onChange) {
   section.appendChild(description);
 
   makeSectionCollapsible(section);
+  attachSettingsGroupClipboard(section, reel, onPasteApplied);
 
   return section;
 }
@@ -130,7 +132,7 @@ export function setupPlayerModeControls(section, reel, onChange) {
 /**
  * Creates the Static Mode Settings section
  */
-export function createStaticModeSettings(reel, onChange) {
+export function createStaticModeSettings(reel, onChange, onPasteApplied) {
   const section = document.createElement('fieldset');
   section.id = 'staticModeSettings';
   section.style.marginBottom = '1.5rem';
@@ -172,6 +174,7 @@ export function createStaticModeSettings(reel, onChange) {
   section.appendChild(settingsContainer);
 
   makeSectionCollapsible(section);
+  attachSettingsGroupClipboard(section, reel, onPasteApplied);
 
   return section;
 }
@@ -196,7 +199,7 @@ export function setupStaticModeSettings(section, reel, onChange) {
 /**
  * Creates the Expandable Mode Settings section
  */
-export function createExpandableModeSettings(reel, onChange) {
+export function createExpandableModeSettings(reel, onChange, onPasteApplied) {
   const section = document.createElement('fieldset');
   section.id = 'expandableModeSettings';
   section.style.marginBottom = '1.5rem';
@@ -333,6 +336,7 @@ export function createExpandableModeSettings(reel, onChange) {
   section.appendChild(settingsContainer);
 
   makeSectionCollapsible(section);
+  attachSettingsGroupClipboard(section, reel, onPasteApplied);
 
   return section;
 }

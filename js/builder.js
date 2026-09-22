@@ -18,6 +18,7 @@ import {
 } from "./modules/expandableMode.js";
 import { createFieldset, removeElementsByIds, insertElement } from "./modules/domUtils.js";
 import { renderPerTrackBackgrounds } from "./modules/backgroundEffects.js";
+import { attachSettingsGroupClipboard } from "./modules/settingsGroupClipboard.js";
 import { buildValueControl, wireValueControl } from "./modules/valueControl.js";
 
 /**
@@ -81,7 +82,7 @@ export function createEmptyReel() {
  * @param {Object} reel - Reel configuration object
  * @param {Function} onChange - Callback when reel changes
  */
-export function renderBuilder(reel, onChange) {
+export function renderBuilder(reel, onChange, onPasteApplied) {
   const titleInput = document.getElementById("reelTitle");
   const reelForm = document.getElementById("reelForm");
 
@@ -101,7 +102,7 @@ export function renderBuilder(reel, onChange) {
 
   const sectionElements = [];
   sectionDefs.forEach(({ create }, i) => {
-    const element = create(reel, onChange);
+    const element = create(reel, onChange, onPasteApplied);
     if (i === 0) {
       insertPlayerModeSection(element, titleInput, reelForm);
     } else {
@@ -120,6 +121,7 @@ export function renderBuilder(reel, onChange) {
 
   const colorFieldset = createColorPickersSection();
   insertElement(colorFieldset, publishBtn, reelForm, "before");
+  attachSettingsGroupClipboard(colorFieldset, reel, onPasteApplied);
 
   // Set up preset modal
   const colourPresetModal = createPresetModal();

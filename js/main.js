@@ -478,6 +478,18 @@ document.addEventListener("DOMContentLoaded", async () => {
       schedulePreviewRefresh();
     }
 
+    // Paste Settings (js/modules/settingsGroupClipboard.js) mutates `reel`
+    // directly rather than going through individual field onChange
+    // handlers, so a lightweight updateCurrentReel() wouldn't reflect the
+    // pasted values in the DOM (Pickr swatches, sliders, radios, etc. are
+    // all set once at section-creation time, not re-synced from `reel`).
+    // A full render() - the same rebuild a reel switch already does - is
+    // the reliable way to make every control show the pasted values.
+    function onSettingsPasted() {
+      saveReels(reels);
+      render();
+    }
+
     async function render() {
       renderSidebar(reels, currentId, setCurrent, createNew, handleDelete, toggleReelLock, moveReelToFolder, renameReelFolder, duplicateReel, reorderReels);
 
@@ -508,7 +520,7 @@ document.addEventListener("DOMContentLoaded", async () => {
         hideBuilderLoading();
       }
 
-      renderBuilder(current, updateCurrentReel);
+      renderBuilder(current, updateCurrentReel, onSettingsPasted);
       setupRefreshPreviewButton();
       setupExportEmbedButton();
       setupEmbedManagerButton(() => reels.find((r) => r.id === currentId));

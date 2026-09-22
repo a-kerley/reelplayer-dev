@@ -30,6 +30,7 @@ import { createValueControl } from "./valueControl.js";
 import { createToggleSwitch, makeSectionCollapsible } from "./domUtils.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 import { createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
+import { attachSettingsGroupClipboard } from "./settingsGroupClipboard.js";
 
 // Per-unit effective defaults shown in the toolbar when nothing's been
 // set - matches css/player.css's own hardcoded fallback values for
@@ -96,7 +97,7 @@ function ensurePlayerTextStyles(reel) {
   delete reel.titleAppearance;
 }
 
-export function createPlayerTextStylesSection(reel, onChange) {
+export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
   const old = document.getElementById("playerTextStylesSection");
   if (old) old.remove();
 
@@ -251,6 +252,7 @@ export function createPlayerTextStylesSection(reel, onChange) {
   section.querySelector("#playlistStyleToolbarSlot").appendChild(playlistToolbar);
 
   makeSectionCollapsible(section);
+  attachSettingsGroupClipboard(section, reel, onPasteApplied);
 
   return section;
 }
