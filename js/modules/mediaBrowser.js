@@ -60,6 +60,19 @@ function folderOf(key) {
   return parts.length ? parts.join('/') + '/' : '';
 }
 
+// R2 has no real concept of a folder - one only shows up in the sidebar
+// because some file's key happens to start with that prefix (see
+// computeFolders()). A brand-new folder with nothing in it yet has no key
+// to derive from, so it isn't actually persisted anywhere - it'd vanish
+// the instant you navigated away. Uploading this invisible zero-byte
+// marker object as the folder's first "file" (see createFolder()) is what
+// makes it stick; isFolderMarker() filters it back out of every visible
+// list/count so it never shows up as a real file to the user.
+const FOLDER_MARKER_NAME = ".folder";
+function isFolderMarker(f) {
+  return baseName(f.key) === FOLDER_MARKER_NAME;
+}
+
 // The three top-level R2 folders every file-picker context (see
 // R2_PREFIX_MAP in filePicker.js) targets by fixed path. Renaming or
 // deleting one of these would silently break every picker pointed at it, so
@@ -200,6 +213,7 @@ function countsFor(files, folder) {
   } else {
     scoped = files.filter(f => f.key.startsWith(folder)); // named folder - recursive rollup
   }
+  scoped = scoped.filter(f => !isFolderMarker(f));
   const counts = { audio: 0, video: 0, image: 0, other: 0 };
   scoped.forEach(f => { counts[fileType(f.name)]++; });
   return { total: scoped.length, ...counts };
@@ -360,6 +374,7 @@ export async function renderMediaBrowser(container, options = {}) {
     let list = state.view.type === 'folder'
       ? state.files.filter(f => folderOf(f.key) === state.view.path)
       : state.files;
+    list = list.filter(f => !isFolderMarker(f));
     if (state.search.trim()) {
       const q = state.search.trim().toLowerCase();
       list = list.filter(f => f.name.toLowerCase().includes(q));
@@ -423,6 +438,26 @@ export async function renderMediaBrowser(container, options = {}) {
     state.files = applyExtFilter(r2Files);
     state.selected.clear();
     render();
+  }
+
+  // Uploads FOLDER_MARKER_NAME as `path`'s first object, so the folder
+  // actually persists in R2 instead of just existing as transient client
+  // state that disappears the moment you navigate away (see the comment on
+  // isFolderMarker() above). Refetches into state.files but doesn't
+  // render() - callers immediately navigate/moveFiles afterward, which
+  // renders once with the final result rather than flickering through an
+  // intermediate one.
+  async function createFolder(path) {
+    beginBusy();
+    try {
+      await uploadFile(path, new File([], FOLDER_MARKER_NAME), state.password);
+      r2Files = await fetchAllR2Files(state.password);
+      state.files = applyExtFilter(r2Files);
+    } catch (error) {
+      dialog.alert(error.message);
+    } finally {
+      endBusy();
+    }
   }
 
   function render() {
@@ -526,6 +561,7 @@ export async function renderMediaBrowser(container, options = {}) {
         const name = await promptForText("New folder name (e.g. backgrounds/nature)");
         if (!name) return;
         const path = name.replace(/^\/+|\/+$/g, '') + '/';
+        await createFolder(path);
         navigateToFolder(path);
       };
       sidebar.appendChild(newFolderBtn);
