@@ -333,6 +333,10 @@ export async function renderMediaBrowser(container, options = {}) {
     return;
   }
   state.password = password;
+  // Containing block for the busy-overlay spinner (see beginBusy/endBusy
+  // below) - set once here rather than in CSS, since this same element is
+  // whatever the caller happened to hand in (a tab pane, a modal body).
+  container.style.position = "relative";
 
   container.innerHTML = '<p style="color:#888;">Loading...</p>';
 
@@ -384,6 +388,29 @@ export async function renderMediaBrowser(container, options = {}) {
     if (depth === 0) return true;
     const parent = folderOf(path.slice(0, -1));
     return state.expandedFolders.has(parent) && isFolderVisible(parent);
+  }
+
+  // Shows a spinner overlay for the duration of a mutating action (move,
+  // rename, delete) - counted rather than a plain boolean so an action that
+  // somehow overlaps another (e.g. a stray double-click) doesn't have the
+  // first one's completion hide the overlay out from under the second.
+  // render() wipes container's children (including the overlay) on its own
+  // whenever a mutating action's own refresh() call lands, which is exactly
+  // the "stays up until the action is confirmed complete" behavior wanted -
+  // endBusy()'s own removal call is then just a no-op cleanup for the
+  // error/no-op paths that don't call refresh().
+  let busyCount = 0;
+  function beginBusy() {
+    busyCount++;
+    if (busyCount > 1 || container.querySelector(".media-browser-busy-overlay")) return;
+    const overlay = document.createElement("div");
+    overlay.className = "media-browser-busy-overlay";
+    overlay.innerHTML = '<div class="media-browser-spinner"></div>';
+    container.appendChild(overlay);
+  }
+  function endBusy() {
+    busyCount = Math.max(0, busyCount - 1);
+    if (busyCount === 0) container.querySelector(".media-browser-busy-overlay")?.remove();
   }
 
   async function refresh() {
@@ -635,6 +662,7 @@ export async function renderMediaBrowser(container, options = {}) {
     if (toMove.length === 0) return;
     if (!(await confirmIfInUse(toMove))) return;
 
+    beginBusy();
     try {
       for (const key of toMove) {
         const file = state.files.find(f => f.key === key);
@@ -644,6 +672,8 @@ export async function renderMediaBrowser(container, options = {}) {
     } catch (error) {
       dialog.alert(error.message);
       await refresh();
+    } finally {
+      endBusy();
     }
   }
 
@@ -692,6 +722,7 @@ export async function renderMediaBrowser(container, options = {}) {
           const newPrefix = `${parentPath}${newName}/`;
           const filesToMove = state.files.filter(f => f.key.startsWith(path));
           if (!(await confirmIfInUse(filesToMove.map(f => f.key)))) return;
+          beginBusy();
           try {
             for (const f of filesToMove) {
               const newKey = `${newPrefix}${f.key.slice(path.length)}`;
@@ -706,6 +737,8 @@ export async function renderMediaBrowser(container, options = {}) {
           } catch (error) {
             dialog.alert(error.message);
             await refresh();
+          } finally {
+            endBusy();
           }
         }
       },
@@ -720,6 +753,7 @@ export async function renderMediaBrowser(container, options = {}) {
             "Delete", "Cancel"
           );
           if (!confirmed) return;
+          beginBusy();
           try {
             for (const f of filesToDelete) {
               await deleteFile(f.key, state.password);
@@ -732,6 +766,8 @@ export async function renderMediaBrowser(container, options = {}) {
           } catch (error) {
             dialog.alert(error.message);
             await refresh();
+          } finally {
+            endBusy();
           }
         }
       }
@@ -1161,11 +1197,14 @@ export async function renderMediaBrowser(container, options = {}) {
           const newName = await promptForText("Rename file", file.name);
           if (!newName || newName === file.name) return;
           if (!(await confirmIfInUse([file.key]))) return;
+          beginBusy();
           try {
             await renameFile(file.key, `${folderOf(file.key)}${newName}`, state.password);
             await refresh();
           } catch (error) {
             dialog.alert(error.message);
+          } finally {
+            endBusy();
           }
         }
       });
@@ -1180,6 +1219,7 @@ export async function renderMediaBrowser(container, options = {}) {
         const label = multi ? `${keys.length} file(s)` : `"${file.name}"`;
         const confirmed = await dialog.confirm(`Delete ${label}? This cannot be undone.`, "Delete", "Cancel");
         if (!confirmed) return;
+        beginBusy();
         try {
           for (const key of keys) {
             const f = state.files.find(f => f.key === key);
@@ -1190,6 +1230,8 @@ export async function renderMediaBrowser(container, options = {}) {
         } catch (error) {
           dialog.alert(error.message);
           await refresh();
+        } finally {
+          endBusy();
         }
       }
     });

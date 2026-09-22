@@ -170,6 +170,34 @@
   min-height: 0;
 }
 
+/* Shown for the duration of a mutating action (move/rename/delete) - see
+   js/modules/mediaBrowser.js's beginBusy()/endBusy(). Covers the whole
+   browser (container is given position:relative for this) rather than
+   just the file list, since a folder rename/delete can also touch the
+   sidebar. */
+.media-browser-busy-overlay {
+  position: absolute;
+  inset: 0;
+  z-index: 10;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(26, 26, 26, 0.55);
+}
+
+.media-browser-spinner {
+  width: 28px;
+  height: 28px;
+  border: 3px solid rgba(255, 255, 255, 0.15);
+  border-top-color: #4a90e2;
+  border-radius: 50%;
+  animation: media-browser-spin 0.8s linear infinite;
+}
+
+@keyframes media-browser-spin {
+  to { transform: rotate(360deg); }
+}
+
 .media-browser-sidebar {
   width: 220px;
   flex-shrink: 0;
