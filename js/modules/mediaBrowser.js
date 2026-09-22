@@ -237,6 +237,11 @@ function promptForText(message, defaultValue = "") {
  * @param {string} options.contextKey - identifies *which* select-mode picker this is (e.g. 'assets/audio') so each
  *   one remembers its own last-visited folder independently. Ignored in 'manage' mode, which has a single shared memory.
  * @param {Function} options.onSelect - (url) => void, called in 'select' mode when a row is clicked
+ * @param {boolean} options.multiple - 'select' mode only: shows checkboxes and a "Add N" bar instead of
+ *   picking-and-closing on a single row click - see onSelectMultiple.
+ * @param {Function} options.onSelectMultiple - (urls[]) => void, called in 'select' mode with `multiple`
+ *   when the "Add N" bar is confirmed - urls are in the picker's own current display order (whatever
+ *   sort is active), not checkbox-click order, so a caller inserting them can rely on that order.
  */
 export async function renderMediaBrowser(container, options = {}) {
   const {
@@ -244,8 +249,14 @@ export async function renderMediaBrowser(container, options = {}) {
     extensions = null,
     startFolder = '',
     contextKey = null,
-    onSelect = null
+    onSelect = null,
+    multiple = false,
+    onSelectMultiple = null
   } = options;
+
+  // Checkboxes show in 'manage' mode (bulk move/delete via right-click) and
+  // in 'select' mode when the caller opted into multi-pick.
+  const showCheckboxes = mode === 'manage' || (mode === 'select' && multiple);
 
   // Remembered state: which folder was last open (per manage-tab / per select
   // context, so e.g. the background-image picker and the audio-track picker
@@ -371,6 +382,19 @@ export async function renderMediaBrowser(container, options = {}) {
 
   render();
 
+  // Shared by visibleFiles() (current folder) and selectedFilesInOrder()
+  // (a multi-pick's checked files, which may span folders the user
+  // navigated through while checking boxes) - same active sort/direction
+  // either way.
+  function sortComparator(a, b) {
+    const dir = state.sortDir === 'asc' ? 1 : -1;
+    if (state.sortField === 'name') return dir * a.name.localeCompare(b.name);
+    if (state.sortField === 'type') return dir * fileType(a.name).localeCompare(fileType(b.name));
+    if (state.sortField === 'trackNumber') return dir * ((parseInt(a.trackNumber, 10) || 0) - (parseInt(b.trackNumber, 10) || 0));
+    if (state.sortField === 'size') return dir * ((a.size || 0) - (b.size || 0));
+    return dir * (new Date(a.uploaded || 0) - new Date(b.uploaded || 0));
+  }
+
   function visibleFiles() {
     let list = state.view.type === 'folder'
       ? state.files.filter(f => folderOf(f.key) === state.view.path)
@@ -380,15 +404,15 @@ export async function renderMediaBrowser(container, options = {}) {
       const q = state.search.trim().toLowerCase();
       list = list.filter(f => f.name.toLowerCase().includes(q));
     }
-    const dir = state.sortDir === 'asc' ? 1 : -1;
-    list = [...list].sort((a, b) => {
-      if (state.sortField === 'name') return dir * a.name.localeCompare(b.name);
-      if (state.sortField === 'type') return dir * fileType(a.name).localeCompare(fileType(b.name));
-      if (state.sortField === 'trackNumber') return dir * ((parseInt(a.trackNumber, 10) || 0) - (parseInt(b.trackNumber, 10) || 0));
-      if (state.sortField === 'size') return dir * ((a.size || 0) - (b.size || 0));
-      return dir * (new Date(a.uploaded || 0) - new Date(b.uploaded || 0));
-    });
-    return list;
+    return [...list].sort(sortComparator);
+  }
+
+  // The multi-pick's checked files, in the picker's own current sort order
+  // (not checkbox-click order) - see renderSelectBar()'s "Add N" button.
+  function selectedFilesInOrder() {
+    return state.files
+      .filter(f => state.selected.has(f.key) && !isFolderMarker(f))
+      .sort(sortComparator);
   }
 
   function subfoldersOf(path) {
@@ -886,6 +910,11 @@ export async function renderMediaBrowser(container, options = {}) {
     main.className = "media-browser-main";
     main.appendChild(renderUploadZone());
 
+    if (mode === 'select' && multiple && state.selected.size > 0) {
+      main.classList.add("has-select-bar");
+      main.appendChild(renderSelectBar());
+    }
+
     const files = visibleFiles();
 
     if (files.length === 0) {
@@ -1075,6 +1104,26 @@ export async function renderMediaBrowser(container, options = {}) {
     return zone;
   }
 
+  // 'select' mode's multi-pick confirmation - the checkbox-driven
+  // counterpart to a single row's click-to-pick-and-close (see renderRow()'s
+  // link.onclick). Files are handed to the caller in selectedFilesInOrder()'s
+  // order (the picker's own current sort), not checkbox-click order.
+  function renderSelectBar() {
+    const bar = document.createElement("div");
+    bar.className = "media-browser-select-bar";
+    const count = state.selected.size;
+    bar.textContent = `${count} selected  `;
+
+    const addBtn = document.createElement("button");
+    addBtn.type = "button";
+    addBtn.textContent = `Add ${count} Selected`;
+    addBtn.onclick = () => {
+      onSelectMultiple(selectedFilesInOrder().map(f => f.url));
+    };
+    bar.appendChild(addBtn);
+    return bar;
+  }
+
   function sortHeader(label, field, colClass = '') {
     const th = document.createElement("th");
     th.className = `media-browser-sortable${colClass ? ` ${colClass}` : ''}`;
@@ -1110,7 +1159,7 @@ export async function renderMediaBrowser(container, options = {}) {
 
     const thead = document.createElement("thead");
     const headRow = document.createElement("tr");
-    if (mode === 'manage') {
+    if (showCheckboxes) {
       const th = document.createElement("th");
       th.className = "media-browser-col-check";
       const selectAll = document.createElement("input");
@@ -1178,7 +1227,7 @@ export async function renderMediaBrowser(container, options = {}) {
       };
     }
 
-    if (mode === 'manage') {
+    if (showCheckboxes) {
       const cb = document.createElement("td");
       const checkbox = document.createElement("input");
       checkbox.type = "checkbox";
@@ -1206,7 +1255,14 @@ export async function renderMediaBrowser(container, options = {}) {
     link.rel = "noopener";
     link.textContent = file.name;
     link.onclick = (e) => {
-      if (mode === 'select' && onSelect) {
+      if (mode === 'select' && multiple) {
+        // Checkbox-driven batch pick instead of pick-and-close - see the
+        // "Add N" bar (renderSelectBar()) that confirms the actual add.
+        e.preventDefault();
+        if (state.selected.has(file.key)) state.selected.delete(file.key);
+        else state.selected.add(file.key);
+        renderMainOnly();
+      } else if (mode === 'select' && onSelect) {
         e.preventDefault();
         onSelect(file.url);
       }

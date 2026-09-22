@@ -87,7 +87,7 @@ function createTrackRow(track, index, reel, onChange) {
   const copyBtn = createCopyFilenameButton(track, titleField, onChange);
   
   // File picker button
-  const filePickerBtn = createFilePickerButton(track, onChange, index);
+  const filePickerBtn = createFilePickerButton(track, onChange, index, reel);
   
   // URL field with filename display
   const { fileNameSpan, urlField } = createUrlField(track, onChange);
@@ -260,10 +260,12 @@ function createCopyFilenameButton(track, titleField, onChange) {
         .split("?")[0]; // Get filename without query params
       
       if (rawFilename && rawFilename !== "Dropbox link") {
-        // Clean up the filename: remove extension, replace underscores/hyphens with spaces
+        // Clean up the filename: remove extension, replace underscores with
+        // spaces. Hyphens are left alone - often an intentional part of a
+        // name ("afro-cuban", "up-tempo"), not just a space substitute.
         const cleanTitle = rawFilename
           .replace(/\.[^/.]+$/, "") // Remove file extension
-          .replace(/[_-]/g, " ") // Replace underscores and hyphens with spaces
+          .replace(/_/g, " ") // Replace underscores with spaces
           .trim();
         
         titleField.value = cleanTitle;
@@ -349,7 +351,7 @@ function setupDragAndDrop(row, index, reel, onChange) {
   });
 }
 
-function createFilePickerButton(track, onChange, index) {
+function createFilePickerButton(track, onChange, index, reel) {
   const btn = createFilePickerButtonEl({
     id: `track-${index}-audio-picker`,
     ariaLabel: "Browse local files",
@@ -362,26 +364,44 @@ function createFilePickerButton(track, onChange, index) {
       directory: 'assets/audio',
       extensions: ['.mp3', '.wav', '.ogg', '.opus', '.flac', '.aac', '.m4a', '.alac'],
       title: 'Select Audio File',
+      multiple: true,
+      // Single-file pick (still reachable via grid view, which has no
+      // checkbox UI - see mediaBrowser.js's renderGrid()) - fills just
+      // this row, same as before multi-select existed.
       onSelect: (selectedFilePath) => {
         track.url = selectedFilePath;
         onChange();
-        
+
         // Update the filename display
         const fileNameSpan = btn.parentElement.querySelector('.filename-display');
         if (fileNameSpan) {
           const newFilenameText = extractFileName(selectedFilePath) || "Paste Link or Select File";
           fileNameSpan.textContent = newFilenameText;
-          
+
           if (newFilenameText === "Paste Link or Select File") {
             fileNameSpan.classList.add("placeholder");
           } else {
             fileNameSpan.classList.remove("placeholder");
           }
         }
+      },
+      // Checkbox multi-pick, confirmed via the picker's "Add N Selected"
+      // bar - urls arrive in the picker's own display order. The first
+      // fills this row (same as a single pick), the rest become new
+      // tracks inserted right after it in that same order.
+      onSelectMultiple: (urls) => {
+        if (urls.length === 0) return;
+        track.url = urls[0];
+        const newTracks = urls.slice(1).map(url => ({ title: "", url }));
+        if (newTracks.length > 0) {
+          reel.playlist.splice(index + 1, 0, ...newTracks);
+        }
+        updateTracksEditor(reel, onChange);
+        onChange();
       }
     });
   };
-  
+
   return btn;
 }
 

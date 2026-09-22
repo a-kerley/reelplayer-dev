@@ -60,10 +60,15 @@ function createModalFooter(onClose) {
  * @param {string} options.directory - one of the known categories (see R2_PREFIX_MAP above), e.g. 'assets/audio'
  * @param {string[]} options.extensions - allowed file extensions, e.g. ['.jpg', '.png']
  * @param {string} options.title - modal title
- * @param {Function} options.onSelect - called with the selected file's URL
+ * @param {Function} options.onSelect - called with the selected file's URL (single-pick, or the
+ *   fallback path used by createFilePickerButtonEl's own single-file callers)
+ * @param {boolean} options.multiple - shows checkboxes + an "Add N Selected" bar instead of
+ *   picking-and-closing on a single row click - see options.onSelectMultiple
+ * @param {Function} options.onSelectMultiple - required when options.multiple is true; called with
+ *   the checked files' URLs (string[]) in the picker's own display order, once confirmed
  */
 export function openFilePicker(options) {
-  const { directory, extensions, title = "Select File", onSelect } = options;
+  const { directory, extensions, title = "Select File", onSelect, multiple = false, onSelectMultiple } = options;
 
   const modal = createModalOverlay();
   const modalContent = createModalContent();
@@ -87,9 +92,14 @@ export function openFilePicker(options) {
     extensions,
     startFolder: R2_PREFIX_MAP[directory] || "",
     contextKey: directory,
+    multiple,
     onSelect: (url) => {
       onSelect(url);
       closeModal();
-    }
+    },
+    onSelectMultiple: multiple ? (urls) => {
+      onSelectMultiple(urls);
+      closeModal();
+    } : null
   });
 }

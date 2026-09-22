@@ -13,13 +13,16 @@ export const playlistScroll = {
 
       const titleEl = document.createElement("span");
       titleEl.className = "playlist-item-title";
+      // Same fallback-name cleanup as urlUtils.js's extractFileName() -
+      // underscores become spaces, hyphens are left alone (often an
+      // intentional part of a name, not just a space substitute).
       titleEl.textContent =
         track.title ||
         track.url
           .split("/")
           .pop()
           .split("?")[0]
-          .replace(/[_-]/g, " ")
+          .replace(/_/g, " ")
           .replace(/\.[^/.]+$/, "");
 
       const durationEl = document.createElement("span");

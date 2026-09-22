@@ -369,6 +369,43 @@
   min-width: 0;
 }
 
+.media-browser-main.has-select-bar {
+  padding-bottom: 4.5rem;
+}
+
+/* 'select' mode's multi-pick confirmation bar (js/modules/mediaBrowser.js's
+   renderSelectBar()) - floats above the file list rather than pushing it
+   down, same reasoning the old manage-mode bulk bar used before it was
+   retired in favor of right-click ops there; this one has no right-click
+   equivalent since it's confirming an add, not acting on existing files. */
+.media-browser-select-bar {
+  position: absolute;
+  left: 50%;
+  bottom: 1rem;
+  transform: translateX(-50%);
+  z-index: 4;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  width: max-content;
+  padding: 0.5rem 0.75rem;
+  background: #3a3a3a;
+  border-radius: 4px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  color: #fff;
+  font-size: var(--builder-text-base);
+}
+
+.media-browser-select-bar button {
+  background: #4a90e2;
+  color: #fff;
+  border: none;
+  border-radius: 4px;
+  padding: 0.35rem 0.7rem;
+  cursor: pointer;
+  font-size: var(--builder-text-sm);
+}
+
 .media-browser-upload-zone {
   margin-bottom: 1rem;
   padding: 1rem;
