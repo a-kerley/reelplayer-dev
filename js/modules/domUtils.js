@@ -1,6 +1,29 @@
 // domUtils.js - DOM manipulation and element creation utilities
 
 /**
+ * Disables `btn` and sets its label to `busyLabel` while `fn` runs, then
+ * always restores its original disabled/label state - on success, on
+ * thrown error, and on every early return in between. `fn` receives a
+ * `setLabel(text)` callback for updating the label mid-flight (e.g.
+ * "Publishing…" -> "Verifying…") without another disable/restore dance.
+ * `btn` may be null/missing (falls through to just running `fn`).
+ */
+export async function withBusyButton(btn, busyLabel, fn) {
+  if (!btn) return fn(() => {});
+
+  const originalLabel = btn.textContent;
+  const originalDisabled = btn.disabled;
+  btn.disabled = true;
+  btn.textContent = busyLabel;
+  try {
+    return await fn((text) => { btn.textContent = text; });
+  } finally {
+    btn.disabled = originalDisabled;
+    btn.textContent = originalLabel;
+  }
+}
+
+/**
  * Creates a fieldset element with legend and content
  * @param {Object} options - Configuration options
  * @param {string} options.id - Element ID

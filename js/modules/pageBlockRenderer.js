@@ -319,8 +319,8 @@ function renderPlayer(block, page) {
   // player.html posts these regardless of reel mode - an expandable reel
   // resizes itself (collapsed banner <-> full controls on hover) and
   // reports its new height every time, exactly like it does for a
-  // third-party <iframe> embed (see embedExporter.js's generateIframeEmbed()
-  // for the same handshake). Without this listener, an expandable reel in
+  // third-party <iframe> embed (see embedExporter.js's publishReel() for
+  // the same handshake). Without this listener, an expandable reel in
   // a page would be stuck at whatever height was configured here - either
   // clipped once expanded, or wasting space while collapsed. Even a static
   // reel benefits: player.html always posts one `initial: true` message on

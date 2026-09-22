@@ -1,6 +1,6 @@
 // pagePublish.js - Publishes a page draft to its public GET /pages/:slug
 // entry, the Pages counterpart of js/modules/embedExporter.js's
-// storeReelData(). Unlike a reel's embed id (a content hash, regenerated
+// postReelToWorker(). Unlike a reel's embed id (a content hash, regenerated
 // silently on every publish), a page's slug is a stable, user-editable
 // public identifier - the Worker route needs both the new slug and the
 // previously-published one (if renaming) to clean up the old entry and

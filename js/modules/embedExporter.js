@@ -9,35 +9,30 @@ export class EmbedExporter {
     this.baseURL = window.location.origin + window.location.pathname;
   }
 
-  // Generate iframe embed code
-  async generateEmbedOptions(reel) {
-    // Filter valid tracks
+  // Validates the reel, then POSTs it to the Worker and returns
+  // { iframe, reelId } - the one method that actually publishes. Callers
+  // that want to track publish state (e.g. js/main.js's "is this reel's
+  // live embed up to date with the current draft" indicator) compare a
+  // fresh generateReelId(reel) call against the reelId returned here the
+  // last time this actually succeeded, rather than this module tracking
+  // that itself.
+  async publishReel(reel) {
     const playlist = (reel.playlist || []).filter(
       track => track.url && track.url.trim() !== ""
     );
-
     if (playlist.length === 0) {
       throw new Error("No valid tracks found in the reel. Please add some tracks before exporting.");
     }
 
-    return this.generateIframeEmbed(reel);
-  }
-
-  // Returns { iframe, reelId } - callers that want to track publish state
-  // (e.g. js/main.js's "is this reel's live embed up to date with the
-  // current draft" indicator) compare a fresh generateReelId(reel) call
-  // against the reelId returned here the last time this actually
-  // succeeded, rather than this module tracking that itself.
-  async generateIframeEmbed(reel) {
     const reelId = this.generateReelId(reel);
-    await this.storeReelData(reelId, reel);
+    await this.postReelToWorker(reelId, reel);
     return { iframe: this.buildIframeMarkup(reel, reelId), reelId };
   }
 
   // Builds the embed <iframe> markup for a reel id that's already published
   // (no network call) - used by "Get Embed Code" to show the current live
-  // embed without re-publishing. generateIframeEmbed() above uses this too,
-  // right after actually publishing.
+  // embed without re-publishing. publishReel() above uses this too, right
+  // after actually publishing.
   buildIframeMarkup(reel, reelId) {
     // Determine height based on mode
     let height;
@@ -104,8 +99,8 @@ export class EmbedExporter {
 
   // Confirms the same public, unauthenticated endpoint player.html itself
   // fetches (GET /reels/:id) can actually see what was just published -
-  // called right after storeReelData()'s POST resolves, so a publish click
-  // can report "confirmed live" rather than just "request accepted".
+  // called right after postReelToWorker()'s POST resolves, so a publish
+  // click can report "confirmed live" rather than just "request accepted".
   async verifyPublished(reelId) {
     const response = await fetch(`${WORKER_BASE_URL}/reels/${reelId}`);
     return response.ok;
@@ -131,7 +126,7 @@ export class EmbedExporter {
     });
   }
 
-  async storeReelData(reelId, reel) {
+  async postReelToWorker(reelId, reel) {
     // Store complete reel configuration for iframe player
     // Ensure playlist tracks include all properties (background images, videos, zoom, etc.)
     const playlist = (reel.playlist || [])

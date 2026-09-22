@@ -12,7 +12,7 @@ import { dialog } from "./modules/dialogSystem.js";
 import { showToast } from "./modules/toast.js";
 import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
-import { createToggleSwitch } from "./modules/domUtils.js";
+import { createToggleSwitch, withBusyButton } from "./modules/domUtils.js";
 import { markAsOperatorBrowser } from "./modules/statsBeacon.js";
 import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
 import { createTabController } from "./modules/tabController.js";
@@ -579,36 +579,26 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
 
       const btn = document.getElementById("publishReelBtn");
-      const originalLabel = btn ? btn.textContent : "";
-      if (btn) {
-        btn.disabled = true;
-        btn.textContent = "Publishing…";
-      }
 
-      let embedOptions;
+      let embedOptions, isLive;
       try {
-        embedOptions = await embedExporter.generateEmbedOptions(current);
+        ({ embedOptions, isLive } = await withBusyButton(btn, "Publishing…", async (setLabel) => {
+          const options = await embedExporter.publishReel(current);
+
+          // The write itself already succeeded at this point - this step
+          // just confirms the exact public endpoint player.html reads from
+          // can see it. Worth doing: a 404 here means something's actually
+          // wrong (e.g. this reelId didn't persist), not merely "distant
+          // edge hasn't caught up yet" - KV writes are readable from here
+          // immediately, just not necessarily from every edge location
+          // worldwide within the same second.
+          setLabel("Verifying…");
+          const live = await embedExporter.verifyPublished(options.reelId).catch(() => false);
+          return { embedOptions: options, isLive: live };
+        }));
       } catch (error) {
         dialog.alert(`Publish Error: ${error.message}`);
-        if (btn) {
-          btn.disabled = false;
-          btn.textContent = originalLabel;
-        }
         return;
-      }
-
-      // The write itself already succeeded at this point - this step just
-      // confirms the exact public endpoint player.html reads from can see
-      // it. Worth doing: a 404 here means something's actually wrong (e.g.
-      // this reelId didn't persist), not merely "distant edge hasn't caught
-      // up yet" - KV writes are readable from here immediately, just not
-      // necessarily from every edge location worldwide within the same
-      // second.
-      if (btn) btn.textContent = "Verifying…";
-      const isLive = await embedExporter.verifyPublished(embedOptions.reelId).catch(() => false);
-      if (btn) {
-        btn.disabled = false;
-        btn.textContent = originalLabel;
       }
 
       // The click just made a real, live change - the reel is published

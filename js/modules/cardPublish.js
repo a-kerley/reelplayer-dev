@@ -1,6 +1,6 @@
 // cardPublish.js - generateCardId()/publishCard(), the Project Cards
 // counterpart of js/modules/embedExporter.js's generateReelId()/
-// storeReelData(). Modeled on the reel side (content-hash id, no slug/
+// postReelToWorker(). Modeled on the reel side (content-hash id, no slug/
 // rename machinery), not js/modules/pagePublish.js - see
 // docs/project-cards/PLAN.md §1/§4.
 import { WORKER_BASE_URL } from "../config.js";
