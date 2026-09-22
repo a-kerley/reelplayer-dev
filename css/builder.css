@@ -1694,17 +1694,6 @@ input.filename-display:focus {
   padding: 0.8rem;
   margin-bottom: 0.8rem;
   background: #262626;
-  /* Collapsed state shrinks this to just the header - see
-     .page-block-row-collapsed below and .page-block-body's own height
-     transition (js/modules/pageBlocksEditor.js's createCollapseButton(),
-     animateCollapseHeight() in js/modules/domUtils.js). Same easing/timing
-     as .collapsible-section's own padding transition for settings groups,
-     so both collapse animations in the builder feel identical. */
-  transition: padding-bottom 0.3s cubic-bezier(0.4, 0, 0.2, 1);
-}
-
-.page-block-row-collapsed {
-  padding-bottom: 0;
 }
 
 .page-block-row-header {
@@ -1804,7 +1793,6 @@ input.filename-display:focus {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .page-block-row,
   .page-block-row-header,
   .page-block-body {
     transition: none;
