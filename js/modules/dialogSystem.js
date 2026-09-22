@@ -76,7 +76,7 @@ export class DialogSystem {
         type: "custom",
         message,
         content: `<input type="text" id="dialogPromptInput" value="${String(defaultValue).replace(/"/g, "&quot;")}"
-          style="width:100%;padding:0.6em;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />`,
+          style="width:100%;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />`,
         buttons: [
           { text: "Cancel", type: "secondary", onClick: () => { this.closeDialog(); resolve(null); } },
           {

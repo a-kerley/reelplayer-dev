@@ -20,7 +20,7 @@ function promptForBuilderPassword() {
       message: "Enter the builder password to publish or manage embeds.",
       content: `
         <input type="password" id="builderPasswordInput" placeholder="Password"
-          style="width:100%;padding:0.6em;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />
+          style="width:100%;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:0.95rem;box-sizing:border-box;background:#1e1e1e;color:#fff;" />
       `,
       buttons: [
         {

@@ -227,7 +227,10 @@ function handlePresetRename(row, preset, currentPickrValues, reel, colourPresetM
   input.style.color = "#fff";
   input.style.border = "1px solid #444";
   input.style.borderRadius = "3px";
-  input.style.padding = "0.2em 0.4em";
+  // Matches css/builder.css's `.preset-name-col input` rule - set inline
+  // (not just relying on that class matching this dynamically-inserted
+  // input) since every other property on this input is already inline too.
+  input.style.padding = "0.2em 0.4em 0.2em 0.5rem";
   
   nameSpan.replaceWith(input);
   input.focus();

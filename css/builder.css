@@ -1147,7 +1147,11 @@ input.filename-display {
   font-size: var(--builder-text-sm);
   font-weight: var(--builder-weight-regular);
   color: #fff;
-  padding: 0.35em 0.7em;
+  /* Left padding standardized to 0.5rem, matching every other settings
+     text field (createUrlInputRow() in domUtils.js, .builder-select,
+     .preset-name-col input) - top/right/bottom stay as they were, this is
+     purely about the left edge each text field's own value starts at. */
+  padding: 0.35em 0.7em 0.35em 0.5rem;
   background: #1e1e1e;
   border: 1px solid #444;
   border-radius: 3px;
@@ -1308,7 +1312,10 @@ input.filename-display:focus {
   white-space: nowrap;
   border: none;
   background: none;
-  padding: 0.2em 0.4em;
+  /* Left padding standardized to 0.5rem, matching every other settings
+     text field - top/right/bottom stay as they were (a compact rename row,
+     not a full settings field). */
+  padding: 0.2em 0.4em 0.2em 0.5rem;
   font-size: 1em;
   font-family: inherit;
   color: #fff;
@@ -2276,7 +2283,9 @@ input.filename-display:focus {
   background-color: #1e1e1e;
   color: #fff;
   font-size: var(--builder-text-base);
-  padding: 0.35rem 2.1rem 0.35rem 0.6rem;
+  /* Left padding standardized to 0.5rem, matching every other settings
+     text field - right stays inflated for the custom arrow graphic. */
+  padding: 0.35rem 2.1rem 0.35rem 0.5rem;
   cursor: pointer;
   transition: border-color 0.15s;
   background-image:
