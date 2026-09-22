@@ -579,6 +579,21 @@ function decorateExpandableVideo(wrapper, iframe, block, page) {
   // renderer set an inline aspect-ratio; clear it so only pixel heights are
   // ever in play here.
   wrapper.style.aspectRatio = "";
+
+  // Pin the iframe's OWN box to the final expanded pixel height up front,
+  // instead of the base renderer's height:100% (which tracks the wrapper's
+  // own animating height). A cross-origin embed (YouTube/Vimeo/Stream)
+  // reflows its entire internal document every time its host iframe
+  // resizes - with height:100%, that fired on every single frame of the
+  // open/close transition, which is real jank the reel player never pays
+  // (it resizes native <video>/<audio> elements, not a foreign document).
+  // With the iframe's box fixed, the wrapper's own height transition
+  // (already clipped by overflow:hidden + contain:layout paint) is the
+  // only thing animating - the iframe's layout never changes mid-transition.
+  // While collapsed this also just shows a static top slice of the video,
+  // matching the existing closedBgMode:"none" behaviour below.
+  iframe.style.height = `${expandableVideoExpandedHeight(wrapper, block)}px`;
+
   const collapsedHeight = Number(block.collapsedHeight) || EXPANDABLE_VIDEO_DEFAULTS.collapsedHeight;
   const blur = Number(block.closedBgBlur ?? EXPANDABLE_VIDEO_DEFAULTS.closedBgBlur);
   wrapper.style.setProperty("--ev-collapsed-height", `${collapsedHeight}px`);
@@ -876,7 +891,9 @@ function createEvExpandCollapse(wrapper, iframe, block) {
   // so re-derive it on resize while expanded.
   function onResize() {
     if (expanded && !reduceMotion) {
-      wrapper.style.height = `${expandableVideoExpandedHeight(wrapper, block)}px`;
+      const target = expandableVideoExpandedHeight(wrapper, block);
+      wrapper.style.height = `${target}px`;
+      iframe.style.height = `${target}px`;
     }
   }
 
