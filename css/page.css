@@ -497,8 +497,16 @@ body.page-body {
 }
 
 .page-block-embedded-video[data-expandable] .ev-overlay {
+  /* Fixed to the collapsed height (matches the reel player's own
+     .project-title-overlay in css/expandable.css) rather than inset:0 -
+     inset:0 stretches this layer's box along with the wrapper's own
+     height transition while it expands, which visually "grows" the
+     overlay image/text instead of the intended plain fade-out. */
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: var(--ev-collapsed-height, 120px);
   display: flex;
   align-items: center;
   justify-content: center;
