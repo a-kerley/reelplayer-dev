@@ -314,21 +314,49 @@ function findMp4Box(buf, type, start, end) {
   while (offset + 8 <= end) {
     let size = u32be(buf, offset);
     const boxType = String.fromCharCode(buf[offset + 4], buf[offset + 5], buf[offset + 6], buf[offset + 7]);
-    if (size === 1) return null; // 64-bit extended size - not needed for a tag lookup, bail rather than misparse
-    if (size === 0) size = end - offset;
-    if (boxType === type) return { start: offset + 8, end: offset + size };
-    if (size < 8) return null;
+    let headerSize = 8;
+    if (size === 1) {
+      // 64-bit extended size - audio files are always well under 4GB, so
+      // the high 32 bits are always 0 in practice; just read the low 32.
+      if (offset + 16 > end) return null;
+      size = u32be(buf, offset + 12);
+      headerSize = 16;
+    } else if (size === 0) {
+      size = end - offset; // extends to the end of its container
+    }
+    if (boxType === type) return { start: offset + headerSize, end: offset + size };
+    if (size < headerSize) return null; // malformed - bail rather than loop forever
     offset += size;
   }
   return null;
 }
 
+// Finds a box by scanning for its literal 4-byte type tag rather than
+// walking every box between `start` and it - specifically for "ilst",
+// whose parent "meta" is nominally a FullBox (4-byte version/flags before
+// its children) but which some encoders - notably older Apple/QuickTime
+// ones, seen in the wild on real uploaded files - write as the pre-ISO
+// "meta" atom with NO version/flags header at all. Walking meta's
+// children with a hardcoded +4 skip silently misaligned every box after
+// it on exactly those files, so ilst (and therefore trkn) was never
+// found. The 4 bytes immediately before any box's type tag are always its
+// size field regardless of what came before it, so this sidesteps the
+// ambiguity entirely instead of trying to detect which meta variant it is.
+function findBoxByTag(buf, tag, start, end) {
+  const needle = [...tag].map(c => c.charCodeAt(0));
+  const idx = findBytes(buf, needle, start, end);
+  if (idx === -1 || idx < 4) return null;
+  const size = u32be(buf, idx - 4);
+  if (size < 8) return null;
+  return { start: idx + 4, end: Math.min(idx - 4 + size, end) };
+}
+
 function extractMp4TrackNumber(buf) {
   const moov = findMp4Box(buf, "moov", 0, buf.length);
-  const udta = moov && findMp4Box(buf, "udta", moov.start, moov.end);
-  const meta = udta && findMp4Box(buf, "meta", udta.start, udta.end);
-  const ilst = meta && findMp4Box(buf, "ilst", meta.start + 4, meta.end); // skip meta's own version/flags
-  const trkn = ilst && findMp4Box(buf, "trkn", ilst.start, ilst.end);
+  if (!moov) return null;
+  const ilst = findBoxByTag(buf, "ilst", moov.start, moov.end);
+  if (!ilst) return null;
+  const trkn = findMp4Box(buf, "trkn", ilst.start, ilst.end);
   const data = trkn && findMp4Box(buf, "data", trkn.start, trkn.end);
   if (!data || data.start + 12 > data.end) return null;
   const trackNumber = u16be(buf, data.start + 8 + 2); // +8 skips data's own type/locale flags, +2 skips the reserved uint16
