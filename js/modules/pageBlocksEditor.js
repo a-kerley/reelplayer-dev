@@ -9,6 +9,7 @@ import { createUrlInputRow, createToggleSwitch, createClearButton, animateCollap
 import { createValueControl, buildValueControl } from "./valueControl.js";
 import { renderBlock, parseVideoEmbedUrl, parseVideoProvider } from "./pageBlockRenderer.js";
 import { openReelPicker } from "./reelPicker.js";
+import { WORKER_BASE_URL } from "../config.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
@@ -78,7 +79,12 @@ function createEmptyBlock(type) {
     case "spacer":
       return { blockId, type, height: 40 };
     case "player":
-      return { blockId, type, reelId: "", reelTitle: "", height: 500 };
+      // Height overrides default to 0 (off - use the reel's own configured
+      // heights), matching the Project Cards convention (cardsController.js's
+      // "Outline Width Override (0 = use the reel's own)"). Which of the
+      // three actually applies depends on the picked reel's mode - see
+      // createPlayerConfig().
+      return { blockId, type, reelId: "", reelTitle: "", closedHeightOverride: 0, openHeightOverride: 0, playerHeightOverride: 0 };
     case "embedded-video":
       // Expandable-mode fields are intentionally absent here - a block
       // without them renders exactly as it always has (see
@@ -1915,6 +1921,7 @@ function createPlayerConfig(block, onChange, refreshPreview) {
         block.reelId = reelId;
         block.reelTitle = reelTitle;
         renderReelField(reelTitle);
+        refreshHeightOverridesForReel();
         refreshPreview();
         onChange();
       },
@@ -1942,6 +1949,7 @@ function createPlayerConfig(block, onChange, refreshPreview) {
           block.reelId = "";
           block.reelTitle = "";
           renderReelField(null);
+          refreshHeightOverridesForReel();
           refreshPreview();
           onChange();
         },
@@ -1955,32 +1963,102 @@ function createPlayerConfig(block, onChange, refreshPreview) {
   renderReelField(block.reelTitle);
   wrap.appendChild(reelFieldSlot);
 
-  // Just a starting guess, not a fixed size: player.html corrects it
-  // automatically once the embedded reel loads (via the postMessage
-  // handshake in pageBlockRenderer.js's renderPlayer()) - a static reel
-  // reports its real configured height on load, an expandable one keeps
-  // reporting a new height every time it expands/collapses. This only
-  // matters for how the block looks for an instant before that first
-  // message arrives.
-  const { row: heightRow, input: heightInput } = createValueControl({
-    id: `${block.blockId}-height`,
-    label: "Starting Height (px):",
-    value: block.height || 500,
-    min: 100,
-    max: 2000,
-    step: 10,
-    unit: "px",
-    tooltip: "Corrected automatically once the player loads - this only affects the instant before that.",
-  });
-  heightInput.addEventListener("input", () => {
-    const val = parseInt(heightInput.value, 10);
-    if (!isNaN(val)) block.height = val;
-  });
-  heightInput.addEventListener("change", () => {
-    refreshPreview();
-    onChange();
-  });
-  wrap.appendChild(heightRow);
+  // Which height override(s) make sense depends on the picked reel's own
+  // mode (static: one height; expandable: separate closed/open heights) -
+  // the block itself doesn't know this (it only stores a reelId reference,
+  // never a copy of the reel's config - see reelPicker.js's header comment),
+  // so it's fetched via the same public GET /reels/:id player.html itself
+  // uses, whenever the picked reel changes. These are real overrides
+  // (0 = use the reel's own), forwarded into the embed and applied on top
+  // of the reel's actual configured heights - see player.html's
+  // applyPageHeightOverrides() - not just a pre-load size guess.
+  const heightOverrideSlot = document.createElement("div");
+  wrap.appendChild(heightOverrideSlot);
+
+  function renderHeightOverrides(mode) {
+    heightOverrideSlot.innerHTML = "";
+    if (!block.reelId) return;
+
+    if (mode === "expandable") {
+      const { row: closedRow, input: closedInput } = createValueControl({
+        id: `${block.blockId}-closed-height`,
+        label: "Closed Height Override (px):",
+        value: block.closedHeightOverride || 0,
+        min: 0,
+        max: 2000,
+        step: 10,
+        unit: "px",
+        tooltip: "Override this reel's own collapsed height for this embed only (0 = use the reel's own).",
+      });
+      closedInput.addEventListener("input", () => {
+        const val = parseInt(closedInput.value, 10);
+        if (!isNaN(val)) block.closedHeightOverride = val;
+      });
+      closedInput.addEventListener("change", () => {
+        refreshPreview();
+        onChange();
+      });
+      heightOverrideSlot.appendChild(closedRow);
+
+      const { row: openRow, input: openInput } = createValueControl({
+        id: `${block.blockId}-open-height`,
+        label: "Open Height Override (px):",
+        value: block.openHeightOverride || 0,
+        min: 0,
+        max: 2000,
+        step: 10,
+        unit: "px",
+        tooltip: "Override this reel's own expanded height for this embed only (0 = use the reel's own).",
+      });
+      openInput.addEventListener("input", () => {
+        const val = parseInt(openInput.value, 10);
+        if (!isNaN(val)) block.openHeightOverride = val;
+      });
+      openInput.addEventListener("change", () => {
+        refreshPreview();
+        onChange();
+      });
+      heightOverrideSlot.appendChild(openRow);
+    } else {
+      const { row: heightRow, input: heightInput } = createValueControl({
+        id: `${block.blockId}-player-height`,
+        label: "Player Height Override (px):",
+        value: block.playerHeightOverride || 0,
+        min: 0,
+        max: 2000,
+        step: 10,
+        unit: "px",
+        tooltip: "Override this reel's own player height for this embed only (0 = use the reel's own).",
+      });
+      heightInput.addEventListener("input", () => {
+        const val = parseInt(heightInput.value, 10);
+        if (!isNaN(val)) block.playerHeightOverride = val;
+      });
+      heightInput.addEventListener("change", () => {
+        refreshPreview();
+        onChange();
+      });
+      heightOverrideSlot.appendChild(heightRow);
+    }
+  }
+
+  async function refreshHeightOverridesForReel() {
+    if (!block.reelId) {
+      renderHeightOverrides(null);
+      return;
+    }
+    let mode = "static";
+    try {
+      const res = await fetch(`${WORKER_BASE_URL}/reels/${block.reelId}`);
+      if (res.ok) mode = (await res.json()).mode || "static";
+    } catch {
+      // Network hiccup or reel since unpublished - fall back to the static
+      // (single height) field rather than leaving the form stuck empty.
+    }
+    renderHeightOverrides(mode);
+  }
+
+  refreshHeightOverridesForReel();
 
   return wrap;
 }

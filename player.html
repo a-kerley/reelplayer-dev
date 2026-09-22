@@ -141,6 +141,30 @@
       }
     }
 
+    // Same "only present from a page's Player block" reasoning as
+    // pageTextStylesParam above (js/modules/pageBlockRenderer.js's
+    // renderPlayer()) - real overrides applied on top of this reel's own
+    // configured heights (see applyPageHeightOverrides() below), not just
+    // a pre-load size guess. 0/absent = no override for that field.
+    const closedHeightOverride = parseInt(urlParams.get('closedHeightOverride'), 10) || 0;
+    const openHeightOverride = parseInt(urlParams.get('openHeightOverride'), 10) || 0;
+    const playerHeightOverride = parseInt(urlParams.get('playerHeightOverride'), 10) || 0;
+
+    // Applies a page Player block's height overrides on top of a reel's own
+    // configured heights, the same "merge before applying" shape as
+    // js/modules/cardChrome.js's mergeCardOverrides() for cards - just
+    // inline here since it's only 3 fields, not a reusable whitelist. A
+    // no-op (returns reelData unchanged) when no override param was sent.
+    function applyPageHeightOverrides(reelData) {
+      if (!reelData || (!closedHeightOverride && !openHeightOverride && !playerHeightOverride)) return reelData;
+      const settings = { ...(reelData.settings || {}) };
+      if (closedHeightOverride) settings.expandableCollapsedHeight = closedHeightOverride;
+      if (openHeightOverride) settings.expandableExpandedHeight = openHeightOverride;
+      const merged = { ...reelData, settings };
+      if (playerHeightOverride) merged.playerHeight = playerHeightOverride;
+      return merged;
+    }
+
     if (!reelId) {
       showError('No reel ID provided');
     } else if (embedType === 'card') {
@@ -155,8 +179,8 @@
     async function loadAndRenderReel(reelId) {
       try {
         // Fetch reel data from the Worker (see loadReelData below)
-        const reelData = await loadReelData(reelId);
-        
+        const reelData = applyPageHeightOverrides(await loadReelData(reelId));
+
         if (!reelData) {
           showError('Reel not found');
           return;
