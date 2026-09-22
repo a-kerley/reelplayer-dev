@@ -871,6 +871,16 @@ function createEvExpandCollapse(wrapper, iframe, block) {
     }
   }
 
+  // Same reasoning as the reel player's own expandPlayer()/collapsePlayer()
+  // (js/player.js) - hint the compositor to keep a dedicated layer ready
+  // right before the height transition starts, and drop the hint once it
+  // settles. will-change left on permanently costs memory for no benefit
+  // outside an actual transition.
+  function clearWillChangeSoon() {
+    const ms = (parseFloat(getComputedStyle(wrapper).getPropertyValue("--ev-transition")) || 0.35) * 1000;
+    setTimeout(() => { wrapper.style.willChange = ""; }, ms + 50);
+  }
+
   // The expanded box is an explicit pixel height (width x aspect-ratio) -
   // no aspect-ratio fallback keeps it right as the viewport width changes,
   // so re-derive it on resize while expanded.
@@ -898,9 +908,11 @@ function createEvExpandCollapse(wrapper, iframe, block) {
       wrapper.style.height = `${target}px`;
       return;
     }
+    wrapper.style.willChange = "height";
     wrapper.style.height = `${collapsedPx()}px`;
     void wrapper.offsetHeight;
     wrapper.style.height = `${target}px`;
+    clearWillChangeSoon();
   }
 
   function collapse({ animate = true } = {}) {
@@ -917,10 +929,12 @@ function createEvExpandCollapse(wrapper, iframe, block) {
     }
     // Pin the current expanded height as an explicit start, flush, then drop
     // to the collapsed height. Hand back to the CSS rule once it settles.
+    wrapper.style.willChange = "height";
     wrapper.style.height = `${wrapper.getBoundingClientRect().height}px`;
     void wrapper.offsetHeight;
     wrapper.classList.remove("ev-expanded");
     wrapper.style.height = `${collapsedPx()}px`;
+    clearWillChangeSoon();
     endHandler = (e) => {
       if (e.target !== wrapper || e.propertyName !== "height") return;
       clearEndHandler();
