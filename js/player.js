@@ -998,34 +998,25 @@ const playerAppCore = {
       setTimeout(updateTotalTime, 100);
       setTimeout(updateTotalTime, 500);
       
-      // Auto-resume with fade-in if track was switched during playback
+      // Auto-resume playback if the track was switched (manual pick, or
+      // auto-advance to the next track) - deliberately NEVER with a
+      // fade-in here. A freshly switched track always starts from position
+      // 0, and fading in only makes sense when RESUMING a paused mid-track
+      // position - see togglePlayback()'s isResuming branch, which already
+      // draws exactly this distinction ("Starting from beginning: no
+      // fade"). This branch used to fade in unconditionally, audible as a
+      // soft attack at the start of every track-switch/auto-advance
+      // destination even though it's always starting from zero.
       if (this.wasPlayingBeforeTrackSwitch) {
         this.wasPlayingBeforeTrackSwitch = false; // Reset flag
 
-        // Set volume to 0, start playback, then fade in. Read the nominal
-        // volume (not wavesurfer.getVolume(), which reflects whatever a
-        // fade currently has gain at, not necessarily the real volume).
-        const targetVolume = this.lastKnownVolume;
-        // Cancel any still-active fade automation first - wavesurfer's own
-        // setVolume() does a direct gainNode.gain.value= write, which throws
-        // if it lands inside an active setValueCurveAtTime's time range.
+        // Cancel any fade automation still in flight from fading the
+        // previous track out (applyAudioFadeOut() above, for a mid-track
+        // switch) and restore the real nominal volume - wherever that fade
+        // left gain isn't necessarily this track's actual volume.
         this.cancelActiveFades();
-        this.wavesurfer.setVolume(0);
+        this.wavesurfer.setVolume(this.lastKnownVolume);
         this.wavesurfer.play();
-
-        // A short delay, not requestAnimationFrame, before scheduling the
-        // fade-in curve: verified directly (50+ run stress test) that
-        // scheduling new GainNode automation via rAF (or with no delay at
-        // all) shortly after play() starts a fresh AudioBufferSourceNode
-        // hits a real, intermittent Chromium bug where gain briefly reads
-        // back as the node's construction-time default (1) - an audible
-        // full-volume blip before the ramp takes over. A plain setTimeout of
-        // 16ms+ reliably avoided it every time (rAF did not, despite being a
-        // similar delay) in the same test; 20ms is inaudible here since gain
-        // is already at 0 throughout the wait.
-        setTimeout(() => {
-          this.applyAudioFadeInFromZero(targetVolume);
-        }, 20);
       }
     });
     this.wavesurfer.on("play", () => {
