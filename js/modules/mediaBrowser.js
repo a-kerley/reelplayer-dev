@@ -237,11 +237,15 @@ function promptForText(message, defaultValue = "") {
  * @param {string} options.contextKey - identifies *which* select-mode picker this is (e.g. 'assets/audio') so each
  *   one remembers its own last-visited folder independently. Ignored in 'manage' mode, which has a single shared memory.
  * @param {Function} options.onSelect - (url) => void, called in 'select' mode when a row is clicked
- * @param {boolean} options.multiple - 'select' mode only: shows checkboxes and a "Add N" bar instead of
- *   picking-and-closing on a single row click - see onSelectMultiple.
+ * @param {boolean} options.multiple - 'select' mode only: shows checkboxes instead of picking-and-
+ *   closing on a single row click - see onSelectMultiple/onSelectionChange.
  * @param {Function} options.onSelectMultiple - (urls[]) => void, called in 'select' mode with `multiple`
- *   when the "Add N" bar is confirmed - urls are in the picker's own current display order (whatever
- *   sort is active), not checkbox-click order, so a caller inserting them can rely on that order.
+ *   when the caller's own confirm action (from onSelectionChange) fires - urls are in the picker's own
+ *   current display order (whatever sort is active), not checkbox-click order.
+ * @param {Function} options.onSelectionChange - 'select' mode with `multiple` only: (count, confirmFn) => void,
+ *   called every time the checked count changes, so the caller can drive its own UI (e.g. a modal's
+ *   footer button switching from "Cancel" to "Add N Selected") instead of this component showing its
+ *   own confirm bar. confirmFn is null when count is 0, otherwise call it to fire onSelectMultiple.
  */
 export async function renderMediaBrowser(container, options = {}) {
   const {
@@ -251,7 +255,8 @@ export async function renderMediaBrowser(container, options = {}) {
     contextKey = null,
     onSelect = null,
     multiple = false,
-    onSelectMultiple = null
+    onSelectMultiple = null,
+    onSelectionChange = null
   } = options;
 
   // Checkboxes show in 'manage' mode (bulk move/delete via right-click) and
@@ -408,7 +413,7 @@ export async function renderMediaBrowser(container, options = {}) {
   }
 
   // The multi-pick's checked files, in the picker's own current sort order
-  // (not checkbox-click order) - see renderSelectBar()'s "Add N" button.
+  // (not checkbox-click order) - see notifySelectionChange()'s confirmFn.
   function selectedFilesInOrder() {
     return state.files
       .filter(f => state.selected.has(f.key) && !isFolderMarker(f))
@@ -494,6 +499,18 @@ export async function renderMediaBrowser(container, options = {}) {
     body.appendChild(renderResizeHandle());
     body.appendChild(renderMain());
     container.appendChild(body);
+    notifySelectionChange();
+  }
+
+  // Tells the caller (via onSelectionChange) how many files are checked
+  // right now, plus a confirmFn to actually commit that selection - see
+  // that option's own doc comment above. Called on every render so the
+  // caller's own UI (e.g. a modal footer button) always reflects the
+  // current count, without this component needing its own confirm bar.
+  function notifySelectionChange() {
+    if (!(mode === 'select' && multiple && onSelectionChange)) return;
+    const count = state.selected.size;
+    onSelectionChange(count, count > 0 ? () => onSelectMultiple(selectedFilesInOrder().map(f => f.url)) : null);
   }
 
   // Drag-resizes the sidebar by writing directly to its inline width during
@@ -910,11 +927,6 @@ export async function renderMediaBrowser(container, options = {}) {
     main.className = "media-browser-main";
     main.appendChild(renderUploadZone());
 
-    if (mode === 'select' && multiple && state.selected.size > 0) {
-      main.classList.add("has-select-bar");
-      main.appendChild(renderSelectBar());
-    }
-
     const files = visibleFiles();
 
     if (files.length === 0) {
@@ -973,6 +985,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const oldMain = body.querySelector(".media-browser-main");
     const newMain = renderMain();
     body.replaceChild(newMain, oldMain);
+    notifySelectionChange();
   }
 
   function renderSidebarOnly() {
@@ -1102,26 +1115,6 @@ export async function renderMediaBrowser(container, options = {}) {
 
     zone.appendChild(input);
     return zone;
-  }
-
-  // 'select' mode's multi-pick confirmation - the checkbox-driven
-  // counterpart to a single row's click-to-pick-and-close (see renderRow()'s
-  // link.onclick). Files are handed to the caller in selectedFilesInOrder()'s
-  // order (the picker's own current sort), not checkbox-click order.
-  function renderSelectBar() {
-    const bar = document.createElement("div");
-    bar.className = "media-browser-select-bar";
-    const count = state.selected.size;
-    bar.textContent = `${count} selected  `;
-
-    const addBtn = document.createElement("button");
-    addBtn.type = "button";
-    addBtn.textContent = `Add ${count} Selected`;
-    addBtn.onclick = () => {
-      onSelectMultiple(selectedFilesInOrder().map(f => f.url));
-    };
-    bar.appendChild(addBtn);
-    return bar;
   }
 
   function sortHeader(label, field, colClass = '') {
@@ -1256,8 +1249,8 @@ export async function renderMediaBrowser(container, options = {}) {
     link.textContent = file.name;
     link.onclick = (e) => {
       if (mode === 'select' && multiple) {
-        // Checkbox-driven batch pick instead of pick-and-close - see the
-        // "Add N" bar (renderSelectBar()) that confirms the actual add.
+        // Checkbox-driven batch pick instead of pick-and-close - the
+        // caller's own UI (see onSelectionChange) confirms the actual add.
         e.preventDefault();
         if (state.selected.has(file.key)) state.selected.delete(file.key);
         else state.selected.add(file.key);

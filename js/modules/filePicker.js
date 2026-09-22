@@ -42,16 +42,20 @@ function createModalHeader(title) {
   return header;
 }
 
+// Single footer button that reads "Cancel" (closes the modal) until
+// something's checked in multi-pick mode, at which point it becomes "Add N
+// Selected" (confirms the pick) instead - see openFilePicker()'s own
+// onSelectionChange handler below, which drives the swap - rather than a
+// second button or an in-browser confirm bar.
 function createModalFooter(onClose) {
   const footer = document.createElement("div");
   footer.className = "file-picker-footer";
-  const closeButton = document.createElement("button");
-  closeButton.className = "file-picker-cancel-btn";
-  closeButton.textContent = "Cancel";
-  closeButton.title = "Close without selecting a file";
-  closeButton.addEventListener("click", onClose);
-  footer.appendChild(closeButton);
-  return footer;
+  const actionButton = document.createElement("button");
+  actionButton.className = "file-picker-cancel-btn";
+  actionButton.textContent = "Cancel";
+  actionButton.title = "Close without selecting a file";
+  footer.appendChild(actionButton);
+  return { footer, actionButton };
 }
 
 /**
@@ -62,8 +66,9 @@ function createModalFooter(onClose) {
  * @param {string} options.title - modal title
  * @param {Function} options.onSelect - called with the selected file's URL (single-pick, or the
  *   fallback path used by createFilePickerButtonEl's own single-file callers)
- * @param {boolean} options.multiple - shows checkboxes + an "Add N Selected" bar instead of
- *   picking-and-closing on a single row click - see options.onSelectMultiple
+ * @param {boolean} options.multiple - shows checkboxes instead of picking-and-closing on a single row
+ *   click, and turns the footer's Cancel button into "Add N Selected" once something's checked -
+ *   see options.onSelectMultiple
  * @param {Function} options.onSelectMultiple - required when options.multiple is true; called with
  *   the checked files' URLs (string[]) in the picker's own display order, once confirmed
  */
@@ -77,7 +82,17 @@ export function openFilePicker(options) {
   body.className = "file-picker-body";
 
   const closeModal = () => document.body.removeChild(modal);
-  const footer = createModalFooter(closeModal);
+  const { footer, actionButton } = createModalFooter(closeModal);
+
+  // The footer button's one click handler does whichever action is
+  // currently active - closes the modal, or confirms the checked
+  // selection - rather than re-binding a new listener every time the
+  // count changes.
+  let confirmSelection = null;
+  actionButton.onclick = () => {
+    if (confirmSelection) confirmSelection();
+    else closeModal();
+  };
 
   modalContent.append(header, body, footer);
   modal.appendChild(modalContent);
@@ -100,6 +115,17 @@ export function openFilePicker(options) {
     onSelectMultiple: multiple ? (urls) => {
       onSelectMultiple(urls);
       closeModal();
+    } : null,
+    onSelectionChange: multiple ? (count, confirmFn) => {
+      confirmSelection = confirmFn;
+      actionButton.classList.toggle("file-picker-confirm-btn", count > 0);
+      if (count > 0) {
+        actionButton.textContent = `Add ${count} Selected`;
+        actionButton.title = "Add the selected files";
+      } else {
+        actionButton.textContent = "Cancel";
+        actionButton.title = "Close without selecting a file";
+      }
     } : null
   });
 }
