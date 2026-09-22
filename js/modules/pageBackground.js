@@ -90,6 +90,18 @@ function getContentExtent(scopeEl) {
   return contentEl ? contentEl.offsetTop + contentEl.offsetHeight : 0;
 }
 
+// contentEl.offsetTop alone - scopeEl's own top padding (e.g. page.html's
+// preview-mode watermark bar) pushes real in-flow content down without
+// shifting an absolutely-positioned child's default static-position top by
+// the same amount in every case (see .page-background-clip's use below),
+// so anything sized/positioned off getContentExtent() needs this same
+// baseline subtracted to turn that absolute distance into a height
+// relative to its own top, not scopeEl's.
+function getContentTop(scopeEl) {
+  const contentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
+  return contentEl ? contentEl.offsetTop : 0;
+}
+
 function getContentHeight(scopeEl, scrollSource) {
   return scrollSource === window
     ? document.documentElement.scrollHeight
@@ -230,6 +242,11 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
     clip = document.createElement("div");
     clip.className = "page-background-clip";
     clip.style.backgroundColor = overlayColor;
+    // Explicit, not left to default to its static position (which used to
+    // happen to equal getContentTop() only because that's usually 0) -
+    // sizeClip() below needs a top it can actually subtract its own
+    // Math.max(...) height math from, not an implicit browser-computed one.
+    clip.style.top = `${getContentTop(scopeEl)}px`;
     scopeEl.insertBefore(clip, scopeEl.firstChild);
   }
 
@@ -274,7 +291,7 @@ export function applyPageBackground(scopeEl, page, scrollSource) {
 
   function sizeClip() {
     if (!clip) return;
-    clip.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
+    clip.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource)) - getContentTop(scopeEl)}px`;
   }
 
   function sizeLayer() {
@@ -384,10 +401,24 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
   );
 
   if (fullBleed) {
-    // Not "top:0; bottom:0; height:auto" - scopeEl (body for page.html,
-    // #pagePreviewPane for the builder preview) is only as tall as its own
-    // in-flow content, since absolutely positioned descendants (this layer
-    // included) don't contribute to that auto-height. When the page's
+    // top is contentEl.offsetTop, not 0 - scopeEl (body for page.html,
+    // #pagePreviewPane for the builder preview) can carry its own top
+    // padding (e.g. page.html's preview-mode watermark bar, css/page.css's
+    // body.page-preview-mode), which pushes the real in-flow content down
+    // but a hardcoded "top:0" here didn't move with it - this layer started
+    // above the real content (behind the watermark) while
+    // .page-background-clip (which used to rely on its own default static
+    // position, already correctly pushed down by the same padding - see
+    // getContentTop()) stayed aligned, producing a seam at the top and a
+    // same-sized untinted gap at the bottom. Height is measured from that
+    // same top, not from scopeEl's own origin - Math.max(getContentExtent(),
+    // viewport height) is an absolute distance from scopeEl's top, so it's
+    // reduced by contentEl.offsetTop to become a height relative to this
+    // layer's own (now non-zero) top.
+    //
+    // Not "top:0; bottom:0; height:auto" - scopeEl is only as tall as its
+    // own in-flow content, since absolutely positioned descendants (this
+    // layer included) don't contribute to that auto-height. When the page's
     // actual content is shorter than the viewport, that leaves scopeEl's
     // box shorter than the visible page too, so "bottom:0" resolves against
     // that shorter box and the tint stops short of the real bottom of the
@@ -409,9 +440,9 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
     // scroll) compounded the two layers' heights off each other with no
     // ceiling. contentEl's own box is unaffected by either layer, so it
     // can't feed a loop.
-    overlay.style.top = "0";
+    overlay.style.top = `${contentEl.offsetTop}px`;
     overlay.style.bottom = "";
-    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource))}px`;
+    overlay.style.height = `${Math.max(getContentExtent(scopeEl), getViewportHeight(scrollSource)) - contentEl.offsetTop}px`;
     overlay.style.borderRadius = "0";
     // A native rubber-band/elastic overscroll bounce reveals area beyond
     // scopeEl's own real bottom - the browser paints THAT sliver from
