@@ -173,6 +173,15 @@ export const playlistScroll = {
 
     // Handle scroll events
     playlistEl.addEventListener('scroll', () => {
+      // The playback-idle timer (idleState.js) only resets on
+      // mousemove/mouseenter/touchstart on the player wrapper - a wheel or
+      // trackpad scroll fires neither of those if the cursor itself never
+      // moves, so scrolling the playlist alone used to let the idle timer
+      // keep counting right through active scrolling. 'scroll' fires for
+      // every source (wheel, momentum coast, thumb drag, keyboard), so
+      // this one call covers all of them; resetPlaybackIdleTimer() itself
+      // already no-ops when nothing's playing.
+      this.resetPlaybackIdleTimer();
       if (!isDragging) {
         updateScrollbarMetrics();
       }
