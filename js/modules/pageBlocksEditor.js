@@ -1987,21 +1987,22 @@ function createPlayerConfig(block, onChange, refreshPreview) {
   // reelDefaultValue - the reel's own actual current height for that
   // field - so switching the toggle on starts from a real, working value
   // instead of an arbitrary/zeroed one.
-  function buildOverrideRow({ key, enabledKey, label, tooltip, reelDefaultValue }) {
+  function buildOverrideRow({ key, enabledKey, label, tooltip, reelDefaultValue, step, sliderMin, sliderMax }) {
     const { row, control, input, slider } = createValueControl({
       id: `${block.blockId}-${key}`,
       label,
       value: block[key] || reelDefaultValue,
+      // Typed range stays wide (0-2000) regardless of field - the slider is
+      // what's field-specific, matching whatever range the reel builder's
+      // own equivalent control (expandableMode.js) uses, since that's the
+      // actual value being overridden.
       min: 0,
       max: 2000,
-      step: 5,
+      step,
       unit: "px",
       tooltip,
-      // Same drag range as the Embedded Video block's own Collapsed Height
-      // slider (createEmbeddedVideoConfig() below) - min/max above still
-      // let you type a value outside this if you actually need one.
-      sliderMin: 60,
-      sliderMax: 400,
+      sliderMin,
+      sliderMax,
     });
 
     function setEnabled(enabled) {
@@ -2047,12 +2048,19 @@ function createPlayerConfig(block, onChange, refreshPreview) {
     if (!block.reelId) return;
 
     if (mode === "expandable") {
+      // Ranges mirror the reel builder's own Collapsed/Expanded Height
+      // controls exactly (expandableMode.js) - these overrides replace
+      // those same values for this embed, so the slider should feel like
+      // the same field, not an arbitrary new range.
       heightOverrideSlot.appendChild(buildOverrideRow({
         key: "closedHeightOverride",
         enabledKey: "closedHeightOverrideEnabled",
         label: "Closed Height Override (px):",
         tooltip: "This reel's own collapsed height for this embed only.",
         reelDefaultValue: reelDefaults.closedHeight,
+        step: 5,
+        sliderMin: 50,
+        sliderMax: 300,
       }));
       heightOverrideSlot.appendChild(buildOverrideRow({
         key: "openHeightOverride",
@@ -2060,14 +2068,21 @@ function createPlayerConfig(block, onChange, refreshPreview) {
         label: "Open Height Override (px):",
         tooltip: "This reel's own expanded height for this embed only.",
         reelDefaultValue: reelDefaults.openHeight,
+        step: 10,
+        sliderMin: 200,
+        sliderMax: 1000,
       }));
     } else {
+      // Matches the reel builder's own Player Height control's range.
       heightOverrideSlot.appendChild(buildOverrideRow({
         key: "playerHeightOverride",
         enabledKey: "playerHeightOverrideEnabled",
         label: "Player Height Override (px):",
         tooltip: "This reel's own player height for this embed only.",
         reelDefaultValue: reelDefaults.playerHeight,
+        step: 10,
+        sliderMin: 200,
+        sliderMax: 1000,
       }));
     }
   }
