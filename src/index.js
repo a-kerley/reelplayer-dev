@@ -68,9 +68,17 @@ export default {
     if (request.method === "GET" && PAGE_PATH_PATTERN.test(url.pathname)) {
       // Internal rewrite, not an HTTP redirect - the address bar stays at
       // /p/<slug>, and page.html itself reads the slug back out of
-      // location.pathname (see page.html's init()).
+      // location.pathname (see page.html's init()). Rewritten to "/page"
+      // (extensionless), NOT "/page.html" - env.ASSETS.fetch() applies
+      // Cloudflare's own html_handling canonicalization even to this
+      // internal fetch, and a literal ".html" path gets its OWN 307 back
+      // to the extensionless form ("/page") rather than that file's actual
+      // content - confirmed by hand: a direct request for /page.html
+      // itself 307s to /page for the exact same reason, nothing to do with
+      // any dashboard-configured rule. "/page" resolves straight to
+      // page.html's content via that same clean-URL matching, no redirect.
       const rewritten = new URL(request.url);
-      rewritten.pathname = "/page.html";
+      rewritten.pathname = "/page";
       return env.ASSETS.fetch(new Request(rewritten, request));
     }
 
