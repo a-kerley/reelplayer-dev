@@ -206,13 +206,140 @@ function isAudioKey(key) {
   return AUDIO_EXTS.includes(ext);
 }
 
-// Pulls the track number out of an ID3v2 tag at the front of an audio
-// file's bytes, if present. Only handles the common ID3v2.3/2.4 case
-// (ID3v1, which lives in a trailer at the *end* of the file, would need a
+// Reads the track-number tag out of whichever of AUDIO_EXTS's formats the
+// bytes actually are, dispatching on magic number rather than the file
+// extension (cheap and self-verifying - an extension lie just falls
+// through to the generic MP4 box-walk, which harmlessly finds nothing).
+// Every format-specific parser below has the same never-throws, "null if
+// not found or not understood" contract as the original ID3 parser did.
+export function extractTrackNumber(buf) {
+  try {
+    if (buf.length < 8) return null;
+    if (buf[0] === 0x49 && buf[1] === 0x44 && buf[2] === 0x33) return extractId3TrackNumber(buf); // "ID3" - mp3
+    if (buf[0] === 0x66 && buf[1] === 0x4c && buf[2] === 0x61 && buf[3] === 0x43) return extractFlacTrackNumber(buf); // "fLaC"
+    if (buf[0] === 0x4f && buf[1] === 0x67 && buf[2] === 0x67 && buf[3] === 0x53) return extractOggTrackNumber(buf); // "OggS" - ogg vorbis/opus
+    return extractMp4TrackNumber(buf); // m4a/alac (and anything else falls through to "no moov box found")
+  } catch {
+    return null;
+  }
+}
+
+// Big-endian unsigned reads (ID3 sizes, MP4 box sizes/fields) - `>>> 0`
+// converts the 32-bit result to unsigned, since JS bitwise ops are signed.
+function u16be(buf, o) { return (buf[o] << 8) | buf[o + 1]; }
+function u32be(buf, o) { return ((buf[o] << 24) | (buf[o + 1] << 16) | (buf[o + 2] << 8) | buf[o + 3]) >>> 0; }
+// Little-endian unsigned reads - Vorbis-comment field lengths (FLAC, Ogg
+// Vorbis/Opus) are LE, unlike ID3/MP4 which are BE.
+function u32le(buf, o) { return ((buf[o + 3] << 24) | (buf[o + 2] << 16) | (buf[o + 1] << 8) | buf[o]) >>> 0; }
+
+function findBytes(buf, needle, from, limit) {
+  const end = Math.min(limit, buf.length - needle.length);
+  outer:
+  for (let i = from; i <= end; i++) {
+    for (let j = 0; j < needle.length; j++) {
+      if (buf[i + j] !== needle[j]) continue outer;
+    }
+    return i;
+  }
+  return -1;
+}
+
+// Shared by FLAC's VORBIS_COMMENT metadata block and Ogg Vorbis/Opus's
+// comment header packet - both use the identical Vorbis Comment structure:
+// a length-prefixed vendor string, then a count-prefixed list of
+// "KEY=value" fields. `offset` points at the vendor-string length field
+// (i.e. right after whatever magic/header precedes it).
+function parseVorbisComment(buf, offset, end) {
+  if (offset + 4 > end) return null;
+  let pos = offset + 4 + u32le(buf, offset);
+  if (pos + 4 > end) return null;
+  const commentCount = u32le(buf, pos);
+  pos += 4;
+  for (let i = 0; i < commentCount && pos + 4 <= end; i++) {
+    const len = u32le(buf, pos);
+    pos += 4;
+    if (pos + len > end) break;
+    const field = new TextDecoder("utf-8").decode(buf.slice(pos, pos + len));
+    pos += len;
+    const eq = field.indexOf("=");
+    if (eq > -1 && field.slice(0, eq).toUpperCase() === "TRACKNUMBER") {
+      const trackNumber = field.slice(eq + 1).trim().split("/")[0].trim();
+      return trackNumber || null;
+    }
+  }
+  return null;
+}
+
+// FLAC: "fLaC" magic, then a sequence of metadata blocks (1-byte
+// last-block-flag + type, 3-byte big-endian length). Type 4 is
+// VORBIS_COMMENT.
+function extractFlacTrackNumber(buf) {
+  let offset = 4;
+  while (offset + 4 <= buf.length) {
+    const isLast = (buf[offset] & 0x80) !== 0;
+    const blockType = buf[offset] & 0x7f;
+    const blockLen = (buf[offset + 1] << 16) | (buf[offset + 2] << 8) | buf[offset + 3];
+    const blockStart = offset + 4;
+    if (blockType === 4) return parseVorbisComment(buf, blockStart, Math.min(blockStart + blockLen, buf.length));
+    offset = blockStart + blockLen;
+    if (isLast || offset > buf.length) break;
+  }
+  return null;
+}
+
+// Ogg Vorbis/Opus: the comment packet (second logical packet, "OpusTags"
+// for Opus or 0x03+"vorbis" for Vorbis) almost always fits inside a single
+// Ogg page for ordinary track tags, so rather than a full page/segment
+// demuxer this just scans for the magic and parses the Vorbis Comment
+// structure that immediately follows it - a page boundary ("OggS") would
+// only interrupt that for unusually large tag data (e.g. embedded cover
+// art), which just falls through to null like any other unrecognized case.
+function extractOggTrackNumber(buf) {
+  const searchLimit = Math.min(buf.length, 65536);
+  const OPUS_TAGS = [0x4f, 0x70, 0x75, 0x73, 0x54, 0x61, 0x67, 0x73]; // "OpusTags"
+  const VORBIS_COMMENT = [0x03, 0x76, 0x6f, 0x72, 0x62, 0x69, 0x73]; // 0x03 + "vorbis"
+  let idx = findBytes(buf, OPUS_TAGS, 0, searchLimit);
+  if (idx !== -1) return parseVorbisComment(buf, idx + OPUS_TAGS.length, buf.length);
+  idx = findBytes(buf, VORBIS_COMMENT, 0, searchLimit);
+  if (idx !== -1) return parseVorbisComment(buf, idx + VORBIS_COMMENT.length, buf.length);
+  return null;
+}
+
+// MP4 box walk (m4a/alac): moov > udta > meta (4-byte version/flags, then
+// children) > ilst > trkn > data. The "data" atom's payload is 8 bytes -
+// 4-byte type/locale flags, then [reserved, track, total, reserved] as
+// four big-endian uint16s.
+function findMp4Box(buf, type, start, end) {
+  let offset = start;
+  while (offset + 8 <= end) {
+    let size = u32be(buf, offset);
+    const boxType = String.fromCharCode(buf[offset + 4], buf[offset + 5], buf[offset + 6], buf[offset + 7]);
+    if (size === 1) return null; // 64-bit extended size - not needed for a tag lookup, bail rather than misparse
+    if (size === 0) size = end - offset;
+    if (boxType === type) return { start: offset + 8, end: offset + size };
+    if (size < 8) return null;
+    offset += size;
+  }
+  return null;
+}
+
+function extractMp4TrackNumber(buf) {
+  const moov = findMp4Box(buf, "moov", 0, buf.length);
+  const udta = moov && findMp4Box(buf, "udta", moov.start, moov.end);
+  const meta = udta && findMp4Box(buf, "meta", udta.start, udta.end);
+  const ilst = meta && findMp4Box(buf, "ilst", meta.start + 4, meta.end); // skip meta's own version/flags
+  const trkn = ilst && findMp4Box(buf, "trkn", ilst.start, ilst.end);
+  const data = trkn && findMp4Box(buf, "data", trkn.start, trkn.end);
+  if (!data || data.start + 12 > data.end) return null;
+  const trackNumber = u16be(buf, data.start + 8 + 2); // +8 skips data's own type/locale flags, +2 skips the reserved uint16
+  return trackNumber ? String(trackNumber) : null;
+}
+
+// Pulls the track number out of an ID3v2 tag at the front of an mp3's
+// bytes, if present. Only handles the common ID3v2.3/2.4 case (ID3v1,
+// which lives in a trailer at the *end* of the file, would need a
 // separate read - skipped, since most modern encoders write ID3v2 anyway).
-// Never throws - worst case, returns null and the upload proceeds with no
-// track-number metadata.
-function extractTrackNumber(buf) {
+function extractId3TrackNumber(buf) {
   try {
     if (buf.length < 10) return null;
     // "ID3" magic, then major version byte (3 or 4 supported), revision,
