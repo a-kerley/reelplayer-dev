@@ -25,6 +25,17 @@ import { applyPageBackground } from "./modules/pageBackground.js";
 import { applyTextStyles } from "./modules/pageTextStyles.js";
 import { applyBlockReveal } from "./modules/pageBlockReveal.js";
 import { attachMediaCoordinator } from "./modules/pageMediaCoordinator.js";
+import { createColorPickrButton } from "./modules/styleToolbarWidgets.js";
+
+// Same Pickr-instance-tracking pattern as playerTextStyles.js/
+// pageBlocksEditor.js - destroyed and rebuilt each time the page form
+// re-renders, since renderPageBuilderForm() replaces pageEditorPane's
+// innerHTML wholesale.
+let pageFormPickrInstances = [];
+function destroyPageFormPickrInstances() {
+  pageFormPickrInstances.forEach((p) => p.destroy());
+  pageFormPickrInstances = [];
+}
 
 function createEmptyPage() {
   return {
@@ -455,9 +466,10 @@ export function initPagesController() {
     // like Content Background below - useful for filling a transparent PNG's
     // gaps or the blurred image's own edge softening with a chosen color
     // instead of the page's plain background. No opacity slider, unlike
-    // Content Background - <input type="color"> is always opaque, and a
-    // partly-transparent base color behind an opaque cover-sized image
-    // would rarely be visible anyway.
+    // Content Background - the Pickr instance below is created with
+    // opacity left at its default (off), and a partly-transparent base
+    // color behind an opaque cover-sized image would rarely be visible
+    // anyway.
     const overlayToggleSlot = document.getElementById("pageBackgroundOverlayToggleSlot");
     if (overlayToggleSlot) {
       overlayToggleSlot.innerHTML = "";
@@ -472,15 +484,15 @@ export function initPagesController() {
       }));
     }
 
-    const overlayBgColorInput = document.getElementById("pageBackgroundOverlayColor");
-    if (overlayBgColorInput) {
-      overlayBgColorInput.value = page.backgroundOverlayColor || "#000000";
-      overlayBgColorInput.addEventListener("input", () => {
-        page.backgroundOverlayColor = overlayBgColorInput.value;
-      });
-      overlayBgColorInput.addEventListener("change", () => {
+    const overlayBgColorSlot = document.getElementById("pageBackgroundOverlayColorSlot");
+    if (overlayBgColorSlot) {
+      overlayBgColorSlot.innerHTML = "";
+      const overlayBgColorPickr = createColorPickrButton(page.backgroundOverlayColor || "#000000", (hex) => {
+        page.backgroundOverlayColor = hex;
         updateCurrentPage();
-      });
+      }, pageFormPickrInstances);
+      overlayBgColorPickr.btn.title = "Solid color shown behind the background image - fills transparent gaps or blurred edges.";
+      overlayBgColorSlot.appendChild(overlayBgColorPickr.btn);
     }
 
     const modeSelect = document.getElementById("pageBackgroundParallaxMode");
@@ -533,15 +545,15 @@ export function initPagesController() {
       }));
     }
 
-    const overlayColorInput = document.getElementById("pageContentOverlayColor");
-    if (overlayColorInput) {
-      overlayColorInput.value = page.contentOverlayColor || "#000000";
-      overlayColorInput.addEventListener("input", () => {
-        page.contentOverlayColor = overlayColorInput.value;
-      });
-      overlayColorInput.addEventListener("change", () => {
+    const overlayColorSlot = document.getElementById("pageContentOverlayColorSlot");
+    if (overlayColorSlot) {
+      overlayColorSlot.innerHTML = "";
+      const overlayColorPickr = createColorPickrButton(page.contentOverlayColor || "#000000", (hex) => {
+        page.contentOverlayColor = hex;
         updateCurrentPage();
-      });
+      }, pageFormPickrInstances);
+      overlayColorPickr.btn.title = "Tint color shown behind the page content, on top of the background image.";
+      overlayColorSlot.appendChild(overlayColorPickr.btn);
     }
 
     const overlayOpacitySlot = document.getElementById("pageContentOverlayOpacitySlot");
@@ -798,6 +810,7 @@ export function initPagesController() {
 
   function renderPageBuilderForm(page) {
     if (!pageEditorPane) return;
+    destroyPageFormPickrInstances();
     pageEditorPane.innerHTML = `
       <form id="pageForm" autocomplete="off">
         <label>
@@ -827,7 +840,7 @@ export function initPagesController() {
           <div class="color-row" style="margin-top:0.6rem;">
             <label for="pageBackgroundOverlayEnabled" style="cursor:pointer;" title="Show the solid color swatch behind the background image (fills transparent/blurred edges).">Overlay behind image</label>
             <span id="pageBackgroundOverlayToggleSlot"></span>
-            <input type="color" id="pageBackgroundOverlayColor" title="Solid color shown behind the background image - fills transparent gaps or blurred edges." style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+            <span id="pageBackgroundOverlayColorSlot"></span>
           </div>
           <div class="color-row" style="margin-top:0.6rem;">
             <span>Scroll behavior:</span>
@@ -845,7 +858,7 @@ export function initPagesController() {
             </div>
             <div class="color-row" style="margin-top:0.6rem;">
               <span>Color:</span>
-              <input type="color" id="pageContentOverlayColor" title="Tint color shown behind the page content, on top of the background image." style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
+              <span id="pageContentOverlayColorSlot"></span>
             </div>
             <div id="pageContentOverlayOpacitySlot"></div>
             <div class="color-row" style="margin-top:0.6rem;">

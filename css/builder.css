@@ -1117,6 +1117,39 @@ button:disabled {
    PICKR COLOR PICKER CUSTOMIZATION
    ============================================== */
 
+/* Pickr ships no dark theme (only classic/monolith/nano, all light) - the
+   nano theme this app uses renders its popup with a white background by
+   default, which otherwise floats as a bright rectangle over the dark
+   builder chrome. Matches this file's own dark palette (panels #2a2a2a,
+   inputs #1e1e1e, borders #444/#3a3a3a, text #fff/#ccc/#999). Selectors
+   mirror nano.min.css's own exactly, just re-pointed at dark colors -
+   .pcr-save/.pcr-clear/.pcr-cancel keep their colored (blue/red)
+   backgrounds unchanged since those already read fine on dark.  */
+.pcr-app {
+  background: #2a2a2a !important;
+  box-shadow: 0 0.15em 1.5em 0 rgba(0, 0, 0, 0.4), 0 0 1em 0 rgba(0, 0, 0, 0.15) !important;
+}
+
+.pcr-app .pcr-interaction input {
+  color: #fff !important;
+  background: #1e1e1e !important;
+}
+
+.pcr-app .pcr-interaction .pcr-result {
+  color: #fff !important;
+  background: #1e1e1e !important;
+}
+
+.pcr-app .pcr-interaction .pcr-type {
+  color: #ccc !important;
+  background: #3a3a3a !important;
+}
+
+.pcr-app .pcr-interaction .pcr-type.active {
+  color: #fff !important;
+  background: #4285f4 !important;
+}
+
 .pcr-app .pcr-swatches {
   display: flex !important;
   flex-wrap: wrap !important;
