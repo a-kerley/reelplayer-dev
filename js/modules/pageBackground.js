@@ -391,6 +391,22 @@ function positionContentOverlay(scopeEl, page, scrollSource) {
   const existing = scopeEl.querySelector(".page-content-overlay-layer");
   if (existing) existing.remove();
 
+  // ?? not a plain falsy check - contentOverlayEnabled didn't exist before
+  // this toggle was added, so an already-published page with a nonzero
+  // contentOverlayOpacity (the only control that used to exist) but no
+  // explicit contentOverlayEnabled would otherwise have its tint silently
+  // vanish on next render. Only a genuinely unconfigured page (opacity 0,
+  // field absent) defaults to off; an explicit true/false always wins.
+  const enabled = page.contentOverlayEnabled ?? (page.contentOverlayOpacity ?? 0) > 0;
+  if (!enabled) {
+    // Also clears any fullBleed-mode overscroll-bounce tint the element
+    // below might have left behind (see the fullBleed branch further down) -
+    // otherwise turning Content Background off after having it on in
+    // fullBleed mode would leave scopeEl's own background-color stuck.
+    scopeEl.style.backgroundColor = "";
+    return;
+  }
+
   const contentEl = scopeEl.querySelector(".page-blocks-list, .page-status-message");
   if (!contentEl) return;
 

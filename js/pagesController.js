@@ -40,6 +40,7 @@ function createEmptyPage() {
     backgroundOverlayColor: "#000000",
     backgroundBlur: 12,
     backgroundParallaxMode: "fixed",
+    contentOverlayEnabled: false,
     contentOverlayColor: "#000000",
     contentOverlayOpacity: 0,
     contentOverlayFullBleed: false,
@@ -514,6 +515,24 @@ export function initPagesController() {
       blurSlot.appendChild(row);
     }
 
+    const contentOverlayToggleSlot = document.getElementById("pageContentOverlayEnabledToggleSlot");
+    if (contentOverlayToggleSlot) {
+      contentOverlayToggleSlot.innerHTML = "";
+      // Matches pageBackground.js's own fallback: a page saved before this
+      // toggle existed, with a nonzero opacity already set, should open
+      // showing "on" here too - not silently disagree with what's actually
+      // rendering on the live page.
+      contentOverlayToggleSlot.appendChild(createToggleSwitch({
+        id: "pageContentOverlayEnabled",
+        checked: page.contentOverlayEnabled ?? (page.contentOverlayOpacity ?? 0) > 0,
+        tooltip: "Show a color tint behind the page's content column, on top of the background image.",
+        onChange: (e) => {
+          page.contentOverlayEnabled = e.target.checked;
+          updateCurrentPage();
+        },
+      }));
+    }
+
     const overlayColorInput = document.getElementById("pageContentOverlayColor");
     if (overlayColorInput) {
       overlayColorInput.value = page.contentOverlayColor || "#000000";
@@ -821,6 +840,10 @@ export function initPagesController() {
           <div style="margin-top:1.2rem;padding-top:1rem;border-top:1px solid #444;">
             <div class="builder-section-legend">Content Background</div>
             <div class="color-row">
+              <label for="pageContentOverlayEnabled" style="cursor:pointer;" title="Show a color tint behind the page's content column, on top of the background image.">Enable</label>
+              <span id="pageContentOverlayEnabledToggleSlot"></span>
+            </div>
+            <div class="color-row" style="margin-top:0.6rem;">
               <span>Color:</span>
               <input type="color" id="pageContentOverlayColor" title="Tint color shown behind the page content, on top of the background image." style="width:3rem;height:2rem;padding:0;border:1px solid #444;border-radius:4px;background:#1e1e1e;cursor:pointer;" />
             </div>
