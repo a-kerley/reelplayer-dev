@@ -134,7 +134,16 @@ const playerAppCore = {
     if (!measuredWidth) return;
 
     waveformEl.style.flex = '0 0 auto';
-    waveformEl.style.width = `${Math.round(measuredWidth)}px`;
+    // Cached alongside the frozen inline style itself - the "seek" and
+    // "audioprocess" handlers below read this instead of #waveform's own
+    // .clientWidth, which (despite the width itself being frozen and thus
+    // unchanging) still forces a synchronous layout flush on every read if
+    // anything upstream in that same tick dirtied layout - exactly what a
+    // hot per-frame handler can't afford. See updateWaveformWidth()'s own
+    // top comment for the layout-thrashing history this class of bug has
+    // already caused once.
+    this.waveformWidthPx = Math.round(measuredWidth);
+    waveformEl.style.width = `${this.waveformWidthPx}px`;
 
     // #total-time's position is anchored to #waveform's own right edge
     // (right: 0.1rem), so a width change here shifts where it actually
@@ -1114,14 +1123,18 @@ const playerAppCore = {
       // Update playhead time immediately when seeking
       const currentTime = this.wavesurfer.getCurrentTime();
       this.elements.playheadTime.textContent = this.formatTime(currentTime);
-      
-      // Position playhead at seek location
+
+      // Position playhead at seek location. Uses the frozen width cached by
+      // updateWaveformWidth() rather than a live .clientWidth read - see
+      // that method's own comment on why a read here would force a
+      // synchronous layout flush on every call.
       const duration = this.wavesurfer.getDuration();
       const percent = currentTime / duration;
-      const pixelX = percent * this.elements.waveform.clientWidth;
+      const waveformWidth = this.waveformWidthPx || this.elements.waveform.clientWidth;
+      const pixelX = percent * waveformWidth;
       const clampedX = Math.min(
         Math.max(pixelX, 20),
-        this.elements.waveform.clientWidth - 40
+        waveformWidth - 40
       );
       this.elements.playheadTime.style.left = `${clampedX}px`;
       // Show playhead briefly when seeking
@@ -1135,20 +1148,26 @@ const playerAppCore = {
         }, 1000);
       }
     });
+    // Fires continuously (near enough every frame) for the whole duration
+    // of playback, so any layout-forcing read in here directly competes
+    // with the browser's own scroll/paint work on the main thread every
+    // tick - see updateWaveformWidth()'s cached this.waveformWidthPx,
+    // which is what makes the position math below read-free.
     this.wavesurfer.on("audioprocess", () => {
       const currentTime = this.wavesurfer.getCurrentTime();
       const duration = this.wavesurfer.getDuration();
-      
+
       this.elements.playheadTime.textContent = this.formatTime(currentTime);
-      
+
       // Show playhead only when playing
       this.elements.playheadTime.style.opacity = this.wavesurfer.isPlaying() ? "1" : "0";
-      
+
       const percent = currentTime / duration;
-      const pixelX = percent * this.elements.waveform.clientWidth;
+      const waveformWidth = this.waveformWidthPx || this.elements.waveform.clientWidth;
+      const pixelX = percent * waveformWidth;
       const clampedX = Math.min(
         Math.max(pixelX, 20),
-        this.elements.waveform.clientWidth - 40
+        waveformWidth - 40
       );
       this.elements.playheadTime.style.left = `${clampedX}px`;
     });

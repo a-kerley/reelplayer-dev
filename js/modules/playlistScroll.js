@@ -93,10 +93,13 @@ export const playlistScroll = {
       scrollbarContainer.style.height = playlistRect.height + 'px';
     };
 
-    // Update scrollbar position and size
-    const updateScrollbar = () => {
-      updateScrollbarPosition();
-
+    // Thumb size/position + at-top/at-bottom masking classes - split out
+    // from updateScrollbarPosition() (below) so the 'scroll' listener can
+    // drive just this on every tick without also paying for a
+    // getBoundingClientRect() pair every time. Unlike position, these only
+    // need scrollTop/scrollHeight/clientHeight, which stay cheap as long
+    // as nothing upstream dirtied layout that same tick.
+    const updateScrollbarMetrics = () => {
       const scrollHeight = playlistEl.scrollHeight;
       const clientHeight = playlistEl.clientHeight;
 
@@ -136,6 +139,17 @@ export const playlistScroll = {
       }
     };
 
+    // Position (top offset + height relative to the parent) only actually
+    // changes when layout does - resize, expand/collapse settling, a fresh
+    // playlist render - never just from scrolling, since scrolling never
+    // moves playlistEl relative to its own parent. Call sites that are
+    // layout-changing moments (init, ResizeObserver, the settle timeouts
+    // below) get both; the 'scroll' listener itself only needs metrics.
+    const updateScrollbar = () => {
+      updateScrollbarPosition();
+      updateScrollbarMetrics();
+    };
+
     // Initial position
     updateScrollbarPosition();
 
@@ -160,7 +174,7 @@ export const playlistScroll = {
     // Handle scroll events
     playlistEl.addEventListener('scroll', () => {
       if (!isDragging) {
-        updateScrollbar();
+        updateScrollbarMetrics();
       }
     });
 
