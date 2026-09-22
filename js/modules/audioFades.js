@@ -42,6 +42,17 @@ const CURVE_POINTS = 20;
 // time unambiguously in the future.
 const SCHEDULE_EPSILON = 0.01; // seconds
 
+// A seek mid-playback jumps the underlying buffer position to a sample that
+// (almost always) isn't at a zero crossing, which is audible as a click -
+// the classic "splice" artifact. Rather than hunting for an actual zero
+// crossing in the decoded PCM data, duckForSeek()/restoreAfterSeek() below
+// bracket the seek with a duck-to-silence-and-back this short - short
+// enough to read as "the click is gone," not as an audible dip. Much
+// shorter than SCHEDULE_EPSILON itself, so duckForSeek() deliberately does
+// NOT use that forward-scheduling buffer (see its own comment) - the two
+// serve different, near-opposite goals.
+const MICRO_FADE_DURATION = 0.002; // seconds (2ms)
+
 // --audio-fade-in/out-duration are static CSS custom properties (set once in
 // variables.css; nothing in this codebase ever changes them at runtime), but
 // applyAudioFadeInFromZero/applyAudioFadeOut run on every single play/pause -
@@ -186,6 +197,55 @@ export const audioFades = {
     });
     if (!media?.gainNode?.gain || !media?.audioContext) return null;
     return { gain: media.gainNode.gain, ctx: media.audioContext };
+  },
+
+  // Called from a CAPTURE-phase pointerdown/touchstart on the waveform
+  // (see js/player.js's setupWaveformEvents()) - BEFORE WaveSurfer's own
+  // interact:true click/drag-to-seek runs, not in reaction to its "seek"
+  // event. By the time "seek" fires, the sample discontinuity has already
+  // been rendered, so reacting to it can't mask the click - only ducking
+  // ahead of it can. Deliberately schedules at `now`, not `now +
+  // SCHEDULE_EPSILON` like every other fade in this file: the whole point
+  // is to land before a seek that's about to happen essentially
+  // synchronously, and a dropped/delayed event here just means this
+  // particular click goes unmasked (silently falls back to today's
+  // behavior) rather than the worse failure modes the epsilon buffer
+  // elsewhere is guarding against (a full-volume blip on a fade-IN from a
+  // fresh node - see applyAudioFadeInFromZero's own comment - which
+  // doesn't apply to this already-playing node either way).
+  duckForSeek() {
+    if (!this.wavesurfer) return;
+    const g = this._getGainParam();
+    if (!g) return;
+    const { gain, ctx } = g;
+    try {
+      const now = ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(0, now + MICRO_FADE_DURATION);
+    } catch (error) {
+      console.warn('[audioFades] duckForSeek failed:', error);
+    }
+  },
+
+  // Restores gain back to the real nominal volume (not wavesurfer.getVolume(),
+  // same reasoning as every other fade method here) - called once the seek
+  // gesture actually ends (pointerup/touchend), so a drag that seeks
+  // repeatedly while held stays ducked for its whole duration instead of
+  // fluttering up/down between intermediate positions.
+  restoreAfterSeek() {
+    if (!this.wavesurfer) return;
+    const g = this._getGainParam();
+    if (!g) return;
+    const { gain, ctx } = g;
+    try {
+      const now = ctx.currentTime;
+      gain.cancelScheduledValues(now);
+      gain.setValueAtTime(gain.value, now);
+      gain.linearRampToValueAtTime(this.lastKnownVolume, now + MICRO_FADE_DURATION);
+    } catch (error) {
+      console.warn('[audioFades] restoreAfterSeek failed:', error);
+    }
   },
 
   async applyAudioFadeInFromZero(targetVolume) {

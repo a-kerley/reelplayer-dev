@@ -913,6 +913,50 @@ const playerAppCore = {
     waveformEl.addEventListener("touchmove", (e) => updateScrubPreview(e.touches[0].clientX), { passive: true });
     waveformEl.addEventListener("touchend", hideScrubPreview);
 
+    // Duck audio around a mid-playback seek (click or drag on the
+    // waveform) to mask the click a non-zero-crossing buffer jump causes -
+    // see audioFades.js's duckForSeek()/restoreAfterSeek(). The pointerdown
+    // listener MUST be capture-phase: WaveSurfer's own interact:true
+    // click/drag-to-seek handler runs on the same native event, and
+    // capture-phase always fires first regardless of listener registration
+    // order, which is what lets this land before the seek's discontinuity
+    // instead of reacting after it.
+    //
+    // this._seekDucked (not a closure-local variable) tracks whether THIS
+    // gesture actually ducked, so an unrelated mouseup/touchend elsewhere
+    // on the page never fires a stray restore - stored on `this` because
+    // it has to be shared between the pointerdown handler below (rebound
+    // fresh on every call to this method, same as updateScrubPreview's
+    // sibling listeners just above, since waveformEl itself is a fresh
+    // element each render) and the pointerup handler (bound to `document`,
+    // which is never recreated - guarded below the same way
+    // setupMediaCoordination() guards its own window-level listener, or it
+    // would accumulate across every re-render instead of just once).
+    waveformEl.addEventListener("mousedown", () => {
+      if (!this.wavesurfer?.isPlaying()) return;
+      this._seekDucked = true;
+      this.duckForSeek();
+    }, { capture: true });
+    waveformEl.addEventListener("touchstart", () => {
+      if (!this.wavesurfer?.isPlaying()) return;
+      this._seekDucked = true;
+      this.duckForSeek();
+    }, { capture: true, passive: true });
+
+    if (!this._seekDuckReleaseBound) {
+      this._seekDuckReleaseBound = true;
+      const handleSeekPointerUp = () => {
+        if (!this._seekDucked) return;
+        this._seekDucked = false;
+        this.restoreAfterSeek();
+      };
+      // Global, not on waveformEl - a drag-to-seek can release with the
+      // pointer no longer over the waveform (same reasoning as
+      // playlistScroll.js's own thumb-drag release handling).
+      document.addEventListener("mouseup", handleSeekPointerUp);
+      document.addEventListener("touchend", handleSeekPointerUp);
+    }
+
     this.wavesurfer.on("ready", () => {
       this.isWaveformReady = true;
       // Freeze #waveform's width as an explicit pixel value now that the DOM
