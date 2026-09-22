@@ -7,14 +7,26 @@
 // a second hand-copy of it.
 let openMenuCleanup = null;
 let openMenuAnchor = null;
-let openSubmenuCleanup = null; // closed whenever the parent menu closes, or another item's submenu opens
+// One entry per open flyout LEVEL (not per item) - entry 0 is the first
+// flyout off the root menu, entry 1 a flyout off one of entry 0's own
+// items, etc. Submenus can nest arbitrarily deep (see mediaBrowser.js's
+// folder-tree "Move to..." menu) - closeSubmenusFrom(n) truncates the
+// chain back to n levels, which is what both "hovered a sibling at this
+// depth" and "closed the whole menu" need.
+let submenuStack = [];
 
 export function closeContextMenu() {
-  closeSubmenu();
+  closeSubmenusFrom(0);
   if (openMenuCleanup) {
     openMenuCleanup();
     openMenuCleanup = null;
     openMenuAnchor = null;
+  }
+}
+
+function closeSubmenusFrom(depth) {
+  while (submenuStack.length > depth) {
+    submenuStack.pop().cleanup();
   }
 }
 
@@ -34,13 +46,6 @@ export function openContextMenuAtCursor(e, items, opts) {
   point.remove();
 }
 
-function closeSubmenu() {
-  if (openSubmenuCleanup) {
-    openSubmenuCleanup();
-    openSubmenuCleanup = null;
-  }
-}
-
 /**
  * @param {HTMLElement} anchorEl - element the menu is positioned relative to
  * @param {Array<{label: string, icon?: string, danger?: boolean, disabled?: boolean, style?: string,
@@ -52,7 +57,9 @@ function closeSubmenu() {
  *   `submenu`, if given (and `onClick` omitted), makes this a flyout item -
  *   hovering or clicking it opens a second anchored menu of its own items
  *   instead of firing an action directly (see js/modules/sidebarList.js's
- *   "Move to..." item).
+ *   "Move to..." item). Submenu items can themselves carry a `submenu`,
+ *   nesting to any depth (see js/modules/mediaBrowser.js's folder-tree
+ *   "Move to..." menu).
  *   `style`, if given, is a CSS text string applied to the item's own
  *   button (e.g. `font-family: 'Merriweather', serif` for a font picker
  *   menu, so each entry previews in its own typeface) - see
@@ -84,46 +91,7 @@ export function openContextMenu(anchorEl, items, opts = {}) {
 
   const menu = document.createElement("div");
   menu.className = "app-context-menu";
-  items.forEach(item => {
-    const btn = document.createElement("button");
-    btn.type = "button";
-    btn.className = item.danger ? "danger" : "";
-    if (currentLabel && typeof item.label === "string" && item.label.trim() === currentLabel) {
-      btn.classList.add("selected");
-      btn.setAttribute("aria-current", "true");
-    }
-    if (item.style) btn.style.cssText = item.style;
-    btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
-
-    if (item.disabled) {
-      btn.disabled = true;
-      menu.appendChild(btn);
-      return;
-    }
-
-    if (opts.preventFocusSteal) {
-      btn.addEventListener("mousedown", (e) => e.preventDefault());
-    }
-
-    if (item.submenu) {
-      btn.classList.add("has-submenu");
-      const chevron = document.createElement("span");
-      chevron.className = "submenu-chevron";
-      chevron.setAttribute("aria-hidden", "true");
-      chevron.textContent = "▸"; // ▸
-      btn.appendChild(chevron);
-      const openThisSubmenu = () => openSubmenu(btn, item.submenu, opts);
-      btn.addEventListener("mouseenter", openThisSubmenu);
-      btn.onclick = openThisSubmenu;
-    } else {
-      btn.addEventListener("mouseenter", closeSubmenu); // hovering away from the flyout item closes it
-      btn.onclick = () => {
-        closeContextMenu();
-        item.onClick();
-      };
-    }
-    menu.appendChild(btn);
-  });
+  renderMenuItems(menu, items, opts, 0, currentLabel);
   document.body.appendChild(menu);
 
   const anchorRect = anchorEl.getBoundingClientRect();
@@ -141,10 +109,11 @@ export function openContextMenu(anchorEl, items, opts = {}) {
     // A click on the anchor (or anything inside it, e.g. the label span / caret
     // svg) is left for the anchor's own handler to toggle - closing here first
     // would make that handler always see "not open" and reopen instead. A
-    // click inside an open submenu is *not* outside this parent menu either -
-    // the submenu is a separate DOM node, appended straight to <body>.
+    // click inside any open submenu (at any nesting depth) is *not* outside
+    // this parent menu either - each flyout is a separate DOM node, appended
+    // straight to <body>.
     if (menu.contains(e.target) || anchorEl.contains(e.target)) return;
-    if (openSubmenuEl && openSubmenuEl.contains(e.target)) return;
+    if (submenuStack.some(entry => entry.el.contains(e.target))) return;
     closeContextMenu();
   };
   const onKeydown = (e) => { if (e.key === "Escape") closeContextMenu(); };
@@ -167,37 +136,70 @@ export function openContextMenu(anchorEl, items, opts = {}) {
   };
 }
 
-let openSubmenuEl = null;
-
-// One flyout level only (no submenu-of-a-submenu) - anchored to the item
-// button that opened it, to its right, flipping left/up if that would
-// overflow the viewport. Positioned/closed independently of the parent
-// menu's own lifecycle, except closeContextMenu() always closes both.
-function openSubmenu(anchorEl, items, parentOpts) {
-  closeSubmenu();
-
-  const submenu = document.createElement("div");
-  submenu.className = "app-context-menu";
+// Shared by the root menu and every flyout level - builds each item's
+// button and wires its hover/click behavior. `depth` is the flyout-stack
+// index that a submenu opened FROM this item would occupy (0 for items in
+// the root menu, 1 for items inside the first flyout, etc.) - it's what
+// closeSubmenusFrom() needs to collapse only the levels deeper than
+// whichever item was just hovered/clicked.
+function renderMenuItems(container, items, opts, depth, currentLabel) {
   items.forEach(item => {
     const btn = document.createElement("button");
     btn.type = "button";
     btn.className = item.danger ? "danger" : "";
+    if (currentLabel && typeof item.label === "string" && item.label.trim() === currentLabel) {
+      btn.classList.add("selected");
+      btn.setAttribute("aria-current", "true");
+    }
     if (item.style) btn.style.cssText = item.style;
     btn.innerHTML = item.icon ? `${item.icon}<span>${item.label}</span>` : item.label;
+
     if (item.disabled) {
       btn.disabled = true;
-      submenu.appendChild(btn);
+      container.appendChild(btn);
       return;
     }
-    if (parentOpts.preventFocusSteal) {
+
+    if (opts.preventFocusSteal) {
       btn.addEventListener("mousedown", (e) => e.preventDefault());
     }
-    btn.onclick = () => {
-      closeContextMenu();
-      item.onClick();
-    };
-    submenu.appendChild(btn);
+
+    if (item.submenu) {
+      btn.classList.add("has-submenu");
+      const chevron = document.createElement("span");
+      chevron.className = "submenu-chevron";
+      chevron.setAttribute("aria-hidden", "true");
+      chevron.textContent = "▸";
+      btn.appendChild(chevron);
+      const openThisSubmenu = () => openSubmenuLevel(depth, btn, item.submenu, opts);
+      btn.addEventListener("mouseenter", openThisSubmenu);
+      btn.onclick = openThisSubmenu;
+    } else {
+      // Hovering a plain item collapses any flyouts opened from a sibling
+      // at this same depth, but leaves this item's own ancestor flyouts
+      // (depth - 1, depth - 2, ...) open.
+      btn.addEventListener("mouseenter", () => closeSubmenusFrom(depth));
+      btn.onclick = () => {
+        closeContextMenu();
+        item.onClick();
+      };
+    }
+    container.appendChild(btn);
   });
+}
+
+// Opens (or replaces) the flyout at stack position `level`, anchored to the
+// item button that triggered it - positioned to its right, flipping
+// left/up if that would overflow the viewport. Any deeper flyout (level+1
+// and beyond) is closed first, and any flyout already at this exact level
+// (e.g. the user moved from one submenu-having item to a sibling one) is
+// replaced.
+function openSubmenuLevel(level, anchorEl, items, opts) {
+  closeSubmenusFrom(level);
+
+  const submenu = document.createElement("div");
+  submenu.className = "app-context-menu";
+  renderMenuItems(submenu, items, opts, level + 1);
   document.body.appendChild(submenu);
 
   const anchorRect = anchorEl.getBoundingClientRect();
@@ -209,9 +211,8 @@ function openSubmenu(anchorEl, items, parentOpts) {
   submenu.style.left = `${left}px`;
   submenu.style.top = `${top}px`;
 
-  openSubmenuEl = submenu;
-  openSubmenuCleanup = () => {
-    submenu.remove();
-    openSubmenuEl = null;
-  };
+  submenuStack.push({
+    el: submenu,
+    cleanup: () => submenu.remove()
+  });
 }

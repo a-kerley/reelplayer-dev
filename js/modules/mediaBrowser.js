@@ -1078,20 +1078,34 @@ export async function renderMediaBrowser(container, options = {}) {
     return row;
   }
 
-  // Every folder path, indented by depth, as a flat flyout - lets "Move
-  // to..." jump straight to any folder anywhere in the tree in one click
-  // instead of typing a path, without needing nested submenus-of-submenus
-  // (contextMenu.js only supports one flyout level).
+  // A folder that has subfolders becomes a flyout itself (its own "Move
+  // here" entry plus one item per child, each recursing the same way) -
+  // contextMenu.js supports arbitrarily deep nested submenus, so this
+  // mirrors the real folder tree instead of a flattened path list. A
+  // childless folder is just a plain clickable item.
+  function folderMoveItem(path, keys) {
+    const leaf = path.split('/').filter(Boolean).pop();
+    const children = subfoldersOf(path);
+    if (children.length === 0) {
+      return { label: `${leaf}/`, icon: ICONS.FOLDER, onClick: () => moveFiles(keys, path) };
+    }
+    return {
+      label: `${leaf}/`,
+      icon: ICONS.FOLDER,
+      submenu: [
+        { label: "Move here", onClick: () => moveFiles(keys, path) },
+        ...children.map(child => folderMoveItem(child, keys))
+      ]
+    };
+  }
+
   function moveToSubmenuItems(keys) {
-    const items = [{ label: "Unfiled (root)", onClick: () => moveFiles(keys, '') }];
-    computeFolders(state.files).forEach(path => {
-      const depth = path.split('/').filter(Boolean).length - 1;
-      const leaf = path.split('/').filter(Boolean).pop();
-      items.push({
-        label: `${'  '.repeat(depth)}${leaf}/`,
-        onClick: () => moveFiles(keys, path)
-      });
-    });
+    const allFolders = computeFolders(state.files);
+    const topLevel = allFolders.filter(path => folderOf(path.slice(0, -1)) === '');
+    const items = [
+      { label: "Unfiled (root)", icon: ICONS.FOLDER, onClick: () => moveFiles(keys, '') },
+      ...topLevel.map(path => folderMoveItem(path, keys))
+    ];
     items.push({
       label: "New folder...",
       onClick: async () => {
