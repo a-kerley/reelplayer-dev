@@ -364,6 +364,20 @@ instead:
   to set `scopeEl`'s own `background-color` to the tint instead - browsers
   paint the overscroll-bounce gap from the container's `background-color`,
   which never affects scrollable layout at all.
+- A fourth, related trap (not `scrollHeight` this time, but the same family
+  - absolute-position math that silently assumes `scopeEl`'s own top edge
+  is position 0): `.page-background-clip` and the full-bleed overlay both
+  sized/positioned themselves as an absolute distance from `scopeEl`'s
+  origin - fine until `scopeEl` carries its own top padding (`page.html`'s
+  preview-mode watermark bar, `css/page.css`'s `body.page-preview-mode`),
+  which pushed the real in-flow content down without shifting either
+  layer's own top the same amount. Produced a seam at the top and a
+  same-sized untinted/uncropped gap at the bottom, visible only in
+  "Preview Page" mode (no watermark on the real published page, so it
+  never showed up there). Fixed by a shared `getContentTop()` helper (mirrors
+  `getContentExtent()`) that both the clip and the overlay now subtract
+  before treating their own `Math.max(...)` height math as relative to
+  their own top, not `scopeEl`'s.
 
 If you touch parallax, full-bleed sizing, or anything that reads
 `document.body`/`#pagePreviewPane`'s height in this file, verify by
