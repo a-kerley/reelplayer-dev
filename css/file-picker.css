@@ -461,16 +461,24 @@
 }
 
 /* Reserves its own space even when empty (inactive column) so the label
-   doesn't shift sideways as the active sort column changes. Width is a
-   fixed rem value (not em) specifically so it doesn't change size along
-   with its own font-size - an em width here would reserve a narrower box
-   than the glyph actually renders at, letting the label creep sideways
-   the moment an arrow appears. */
+   doesn't shift as the active sort column changes. Width is a fixed rem
+   value (not em) specifically so it doesn't change size along with its
+   own font-size - an em width here would reserve a narrower box than the
+   glyph actually renders at, letting the label creep sideways the moment
+   an arrow appears. Height is fixed the same way, with the glyph flex-
+   centered inside and clipped by overflow:hidden - the ▲/▼ characters'
+   own font metrics render taller than the box's line-height would
+   otherwise allow, which was nudging the whole header row down a couple
+   pixels whenever an arrow appeared. */
 .media-browser-sort-arrow {
-  display: inline-block;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
   flex-shrink: 0;
   width: 0.75rem;
-  text-align: center;
+  height: 0.75rem;
+  overflow: hidden;
+  line-height: 1;
   font-size: 0.65em;
   color: inherit;
 }
