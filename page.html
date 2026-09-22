@@ -118,7 +118,13 @@
     async function init() {
       const params = new URLSearchParams(window.location.search);
       const isPreview = params.get('preview') === '1';
-      const slug = params.get('slug');
+      // A published page's real URL is boxedape.com/<slug> - src/index.js
+      // internally rewrites that request to this file without an HTTP
+      // redirect, so the browser's address bar (and this pathname) stays at
+      // /<slug>, never /page.html. Stripped of leading/trailing slashes;
+      // "/page.html" itself (the "Preview Page" button's own
+      // page.html?preview=1) has no meaningful path slug, only the query.
+      const slug = window.location.pathname.replace(/^\/+|\/+$/g, '');
 
       let pageData;
       if (isPreview) {

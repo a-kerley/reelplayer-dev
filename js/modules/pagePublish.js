@@ -55,11 +55,12 @@ export function isValidSlug(slug) {
   return typeof slug === "string" && slug.length > 0 && SLUG_PATTERN.test(slug);
 }
 
-/** The canonical, shareable public URL for a published slug (extensionless
- * "page", matching player?id=<id>'s clean-URL form - see embedExporter.js). */
+/** The canonical, shareable public URL for a published slug - a bare
+ * boxedape.com/<slug>, not boxedape.com/page?slug=<slug> - see
+ * src/index.js's SLUG_PATH_PATTERN rewrite for the other half of this. */
 export function publicPageUrl(slug) {
   const baseURL = (window.location.origin + window.location.pathname).replace(/index\.html$/, "");
-  return `${baseURL}page?slug=${slug}`;
+  return `${baseURL}${slug}`;
 }
 
 /**
@@ -111,7 +112,7 @@ export async function publishPage(page, slug) {
     throw new Error("Incorrect password. Please try publishing again.");
   }
   if (response.status === 409) {
-    throw new Error(`The URL "/page?slug=${slug}" is already taken by another page - choose a different slug.`);
+    throw new Error(`The URL "/${slug}" is already taken by another page - choose a different slug.`);
   }
   if (!response.ok) {
     throw new Error(`Failed to publish page (server responded with status ${response.status}).`);

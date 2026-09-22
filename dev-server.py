@@ -2,11 +2,14 @@
 """Local static server for ReelPlayer dev/testing.
 
 `python3 -m http.server` serves files by exact path, so the extensionless
-routes the app relies on in production - `player?id=X`, `page?slug=Y` (see
-js/modules/pageBlockRenderer.js's renderPlayer(), page.html) - 404 locally.
-Cloudflare Pages resolves those to `player.html` / `page.html` automatically
-("clean URLs"); this reproduces just that one behaviour so the Pages tab's
-reel-player blocks and Preview Page work when serving the repo locally.
+routes the app relies on in production - `player?id=X` (see
+js/modules/pageBlockRenderer.js's renderPlayer()), and a published page's
+own bare `/<slug>` URL (see js/modules/pagePublish.js's publicPageUrl(),
+src/index.js's SLUG_PATH_PATTERN rewrite) - 404 locally. This reproduces
+both: a `.html` sibling always wins first (`player` -> `player.html`,
+`page` -> `page.html`), and a bare single-segment path with no matching
+file/sibling at all falls back to `page.html`, mirroring src/index.js's
+own production fallback for a page slug.
 
 Reel and page *data* is unaffected - it's fetched from the live Worker at
 config.js's WORKER_BASE_URL, which is CORS-open, so no local API is needed.
@@ -34,6 +37,14 @@ class Handler(http.server.SimpleHTTPRequestHandler):
         # (the Cloudflare Pages clean-URL behaviour this app depends on).
         if not os.path.splitext(local)[1] and os.path.exists(local + ".html"):
             return local + ".html"
+        # A bare single-path-segment request that matched neither a real
+        # file nor an existing `.html` sibling above (so it's not `/player`
+        # or `/page` themselves, both already handled by the sibling check)
+        # - treat it as a published page's slug and serve page.html,
+        # mirroring src/index.js's SLUG_PATH_PATTERN fallback in production.
+        segment = os.path.relpath(local, ROOT)
+        if "." not in segment and os.sep not in segment:
+            return os.path.join(ROOT, "page.html")
         return local
 
     def end_headers(self):

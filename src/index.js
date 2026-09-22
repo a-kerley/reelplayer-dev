@@ -6,8 +6,16 @@
 // the builder must stay fully public, since they're loaded by anonymous
 // visitors' browsers wherever a reel is embedded or a page link is shared.
 // Everything not explicitly gated here falls straight through to static
-// asset serving.
+// asset serving - except a bare single-segment path with no matching asset
+// at all, which gets rewritten to page.html (see SLUG_PATH_PATTERN below)
+// so a published page's clean URL works.
 const PROTECTED_PATHS = new Set(["/", "/index.html"]);
+
+// A published page's clean public URL - boxedape.com/<slug> instead of
+// boxedape.com/page?slug=<slug>. Matches js/modules/pagePublish.js's own
+// SLUG_PATTERN exactly (single bare path segment, same character set) -
+// keep the two in sync if either ever changes.
+const SLUG_PATH_PATTERN = /^\/[a-zA-Z0-9_-]+$/;
 
 const COOKIE_NAME = "builder_auth";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
@@ -49,7 +57,21 @@ export default {
     const url = new URL(request.url);
 
     if (!PROTECTED_PATHS.has(url.pathname)) {
-      return env.ASSETS.fetch(request);
+      const assetResponse = await env.ASSETS.fetch(request);
+      // Anything that's a real file, or an existing clean-URL route like
+      // /player or /page, already resolved above - only a genuine 404 on a
+      // bare single-segment path falls through to the page-slug rewrite
+      // below, so this never needs to hardcode/maintain a list of every
+      // real asset directory to avoid shadowing.
+      if (assetResponse.status !== 404 || request.method !== "GET" || !SLUG_PATH_PATTERN.test(url.pathname)) {
+        return assetResponse;
+      }
+      // Internal rewrite, not an HTTP redirect - the address bar stays at
+      // /<slug>, and page.html itself reads the slug back out of
+      // location.pathname (see page.html's init()).
+      const rewritten = new URL(request.url);
+      rewritten.pathname = "/page.html";
+      return env.ASSETS.fetch(new Request(rewritten, request));
     }
 
     const expectedToken = await hashPassword(env.BUILDER_ACCESS_PASSWORD);
