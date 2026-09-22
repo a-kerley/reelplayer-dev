@@ -214,11 +214,28 @@ function createCollapseButton(block, row, body) {
     </svg>
   `;
 
-  // Initial state is set directly, not via animateCollapseHeight() - `row`
-  // isn't attached to the document yet at creation time (updatePageBlocksEditor()
-  // appends it afterward), so body.scrollHeight would read 0 regardless of
-  // the real content height. Only a later, user-triggered toggle (below) is
-  // guaranteed to run while the row is actually on-screen and laid out.
+  const setOpen = (open) => {
+    collapseBtn.setAttribute("aria-expanded", String(open));
+    row.classList.toggle("page-block-row-collapsed", !open);
+    animateCollapseHeight(body, open);
+    if (open) {
+      collapsedBlockIds.delete(block.blockId);
+    } else {
+      collapsedBlockIds.add(block.blockId);
+    }
+  };
+  // Stashed on the element itself so an alt-click on a DIFFERENT block row
+  // (below) can drive this one's open state too - mirrors
+  // makeSectionCollapsible()'s identical _setCollapsibleOpen pattern
+  // (js/modules/domUtils.js) for settings-group fieldsets.
+  row._setBlockCollapseOpen = setOpen;
+
+  // Initial state is set directly, not via setOpen()/animateCollapseHeight() -
+  // `row` isn't attached to the document yet at creation time
+  // (updatePageBlocksEditor() appends it afterward), so body.scrollHeight
+  // would read 0 regardless of the real content height. Only a later,
+  // user-triggered toggle (below) is guaranteed to run while the row is
+  // actually on-screen and laid out.
   const startOpen = !collapsedBlockIds.has(block.blockId);
   collapseBtn.setAttribute("aria-expanded", String(startOpen));
   row.classList.toggle("page-block-row-collapsed", !startOpen);
@@ -234,15 +251,17 @@ function createCollapseButton(block, row, body) {
     }
   });
 
-  collapseBtn.onclick = () => {
+  collapseBtn.onclick = (e) => {
     const opening = collapseBtn.getAttribute("aria-expanded") === "false";
-    collapseBtn.setAttribute("aria-expanded", String(opening));
-    row.classList.toggle("page-block-row-collapsed", !opening);
-    animateCollapseHeight(body, opening);
-    if (opening) {
-      collapsedBlockIds.delete(block.blockId);
+    // Alt/Option-click applies this same open/closed state to every OTHER
+    // block row on this page (expand-all/collapse-all), using whichever
+    // direction this particular click would have applied to just this row.
+    if (e.altKey && row.parentElement) {
+      [...row.parentElement.children]
+        .filter((el) => el.classList?.contains("page-block-row"))
+        .forEach((el) => el._setBlockCollapseOpen?.(opening));
     } else {
-      collapsedBlockIds.add(block.blockId);
+      setOpen(opening);
     }
   };
 

@@ -134,6 +134,10 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
     fieldset.style.paddingBottom = open ? openPadding : "0";
     animateCollapseHeight(body, open);
   };
+  // Stashed on the element itself so an alt-click on a DIFFERENT section
+  // (below) can drive this one's open state too, without either section
+  // needing to know about the other beyond being siblings.
+  fieldset._setCollapsibleOpen = setOpen;
   setOpen(defaultOpen);
 
   // Once fully open, switch to 'auto' so content that changes size while
@@ -147,7 +151,21 @@ export function makeSectionCollapsible(fieldset, { defaultOpen = false } = {}) {
 
   const toggle = (e) => {
     if (e.target.closest("button, a, input, select, textarea")) return;
-    setOpen(legend.getAttribute("aria-expanded") === "false");
+    const open = legend.getAttribute("aria-expanded") === "false";
+    // Alt/Option-click applies this same open/closed state to every OTHER
+    // collapsible section sharing this one's parent (e.g. every settings
+    // group in the current tab's form) - expand-all/collapse-all, using
+    // whichever direction this particular click would have applied to just
+    // this section. Siblings, not a global query, so this only ever
+    // affects sections actually alongside the one clicked - never a
+    // different, currently-hidden tab's own sections.
+    if (e.altKey && fieldset.parentElement) {
+      [...fieldset.parentElement.children]
+        .filter((el) => el.matches?.(".collapsible-section"))
+        .forEach((el) => el._setCollapsibleOpen?.(open));
+    } else {
+      setOpen(open);
+    }
   };
   legend.addEventListener("click", toggle);
   legend.addEventListener("keydown", (e) => {
