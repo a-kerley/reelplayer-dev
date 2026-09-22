@@ -490,7 +490,12 @@ body.page-body {
   height: calc(100% + 4 * var(--ev-blur, 8px));
   object-fit: cover;
   filter: blur(var(--ev-blur, 8px));
-  transition: opacity var(--ev-transition) ease, filter var(--ev-transition) ease;
+  /* Only opacity animates here - this layer already fades to opacity:0 at
+     the same time as the wrapper's height transition, so nobody sees the
+     de-blur happen. Animating `filter` too was pure waste: recomputing a
+     blur on a resizing layer every frame is expensive and was a real
+     contributor to choppy open/close on this block. */
+  transition: opacity var(--ev-transition) ease;
   pointer-events: none;
 }
 
@@ -580,15 +585,14 @@ body.page-body {
   text-shadow: 0 1px 8px rgba(0, 0, 0, 0.55);
 }
 
-/* De-blur + fade the collapsed layers out as the block expands. */
+/* Fade the collapsed layers out as the block expands. ev-closed-bg's own
+   blur radius stays fixed (see its transition comment above) - opacity:0
+   already hides it, so there's nothing to gain from also animating the
+   blur back to 0. */
 .page-block-embedded-video[data-expandable].ev-expanded .ev-closed-bg,
 .page-block-embedded-video[data-expandable].ev-expanded .ev-overlay-tint,
 .page-block-embedded-video[data-expandable].ev-expanded .ev-overlay {
   opacity: 0;
-}
-
-.page-block-embedded-video[data-expandable].ev-expanded .ev-closed-bg {
-  filter: blur(0);
 }
 
 /* Overlay-image intro scale-in, ported from the reel player's
