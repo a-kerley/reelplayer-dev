@@ -138,13 +138,16 @@ function createBlockRow(block, index, page, onChange) {
 
   // Text blocks skip this - their contenteditable editor (createTextConfig())
   // shows the styled result directly, so a second, separate rendered
-  // preview underneath would just be a redundant duplicate view. Every
-  // other block type still gets one (banner image, image, player,
-  // embedded video, button - none of those have an in-place styled
-  // editing view). Created before configForm (rather than inline further
-  // down) so refreshPreview below has something to close over regardless
-  // of block type.
-  const preview = block.type !== "text" ? document.createElement("div") : null;
+  // preview underneath would just be a redundant duplicate view. Spacer
+  // blocks skip it too - renderSpacer() is just an empty div at a given
+  // height, so a rendered preview beneath the height control shows nothing
+  // the control itself doesn't already say. Every other block type still
+  // gets one (banner image, image, player, embedded video, button - none
+  // of those have an in-place styled editing view or an inherently empty
+  // render). Created before configForm (rather than inline further down)
+  // so refreshPreview below has something to close over regardless of
+  // block type.
+  const preview = block.type !== "text" && block.type !== "spacer" ? document.createElement("div") : null;
   if (preview) preview.className = "page-block-row-preview";
 
   // Re-renders just THIS row's own preview - not a save trigger itself
@@ -152,9 +155,9 @@ function createBlockRow(block, index, page, onChange) {
   // separately for that), and not a full block-list rebuild either: only
   // `preview`'s own contents are replaced, so every other row's DOM (and
   // its live Pickr instances, focus state, etc.) is left completely
-  // alone. A no-op for text blocks, which have no `preview` element to
-  // refresh in the first place (see above) - mirrors createTextConfig()'s
-  // own comment on why it never calls this at all.
+  // alone. A no-op for text and spacer blocks, which have no `preview`
+  // element to refresh in the first place (see above) - mirrors
+  // createTextConfig()'s own comment on why it never calls this at all.
   function refreshPreview() {
     if (!preview) return;
     preview.innerHTML = "";
