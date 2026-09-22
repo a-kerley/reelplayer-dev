@@ -57,7 +57,7 @@ function measureWidth() {
  * call wireValueControl() on the mounted result.
  * @returns {{row: HTMLDivElement, control: HTMLDivElement, input: HTMLInputElement, slider: HTMLInputElement, labelEl: HTMLSpanElement}}
  */
-export function buildValueControl({ id, label, value, min, max, step = 1, unit = '', tooltip = '' }) {
+export function buildValueControl({ id, label, value, min, max, step = 1, unit = '', tooltip = '', sliderMin = min, sliderMax = max }) {
   const row = document.createElement('div');
   row.className = 'color-row value-control-row';
 
@@ -118,10 +118,18 @@ export function buildValueControl({ id, label, value, min, max, step = 1, unit =
   // the track's own overflow:hidden), so it needs no JS-tracked percentage
   // unlike the hand-rolled --range-fill version this replaced.
   slider.className = 'range range-primary range-xs';
-  slider.min = String(min);
-  slider.max = String(max);
+  // Defaults to the same range as the number field (every existing caller),
+  // but a caller can pass a tighter sliderMin/sliderMax when the field's
+  // typeable range is wider than what's actually comfortable to drag to -
+  // the number input still accepts the full min/max either way; assigning
+  // a range input's .value outside ITS OWN min/max just clamps visually to
+  // the nearest end, which is exactly the "type past the slider" effect
+  // wanted (see wireValueControl(), which drives slider.value off the
+  // number field's real min/max, not the slider's own).
+  slider.min = String(sliderMin);
+  slider.max = String(sliderMax);
   slider.step = String(step);
-  slider.setAttribute('value', String(isNaN(value) ? min : clamp(value, min, max)));
+  slider.setAttribute('value', String(isNaN(value) ? sliderMin : clamp(value, sliderMin, sliderMax)));
   slider.tabIndex = -1;
 
   sliderWrap.appendChild(slider);
@@ -251,6 +259,8 @@ export function wireValueControl(control) {
  * @param {number} [options.step=1] - Base increment; Shift = x10, Ctrl = /10
  * @param {string} [options.unit] - Suffix shown next to the input (px, pt, %...)
  * @param {string} [options.tooltip]
+ * @param {number} [options.sliderMin=min] - Narrower drag range than min/max, if the field's typeable range is wider than what's comfortable to drag to
+ * @param {number} [options.sliderMax=max]
  * @returns {{row: HTMLDivElement, control: HTMLDivElement, input: HTMLInputElement, slider: HTMLInputElement}}
  *   `row` is a ready-to-use .color-row (label + control). `control` is just
  *   the input+slider, for embedding in a custom layout instead.

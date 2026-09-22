@@ -1994,9 +1994,14 @@ function createPlayerConfig(block, onChange, refreshPreview) {
       value: block[key] || reelDefaultValue,
       min: 0,
       max: 2000,
-      step: 10,
+      step: 5,
       unit: "px",
       tooltip,
+      // Same drag range as the Embedded Video block's own Collapsed Height
+      // slider (createEmbeddedVideoConfig() below) - min/max above still
+      // let you type a value outside this if you actually need one.
+      sliderMin: 60,
+      sliderMax: 400,
     });
 
     function setEnabled(enabled) {
