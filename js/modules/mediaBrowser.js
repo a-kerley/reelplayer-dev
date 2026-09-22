@@ -992,7 +992,10 @@ export async function renderMediaBrowser(container, options = {}) {
   function renderRow(file) {
     const type = fileType(file.name);
     const row = document.createElement("tr");
-    row.className = "media-browser-row";
+    // Checked rows are exactly the set a right-click's context-menu actions
+    // will apply to (see the oncontextmenu handler below), so highlighting
+    // them here doubles as "these are what you're about to act on."
+    row.className = `media-browser-row${state.selected.has(file.key) ? ' selected' : ''}`;
 
     if (mode === 'manage' && !file.readOnly) {
       row.draggable = true;

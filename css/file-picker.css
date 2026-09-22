@@ -222,6 +222,14 @@
   cursor: grab;
 }
 
+.media-browser-row.selected {
+  background: rgba(74, 144, 226, 0.16);
+}
+
+.media-browser-row.selected:hover {
+  background: rgba(74, 144, 226, 0.24);
+}
+
 .media-browser-card[draggable="true"] {
   cursor: grab;
 }
