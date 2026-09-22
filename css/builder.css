@@ -1224,17 +1224,18 @@ input.filename-display {
   white-space: nowrap;
 }
 
-/* Color/italic only - deliberately NOT its own font-size/padding. This
+/* Color only - deliberately NOT its own font-size/padding/font-style. This
    class swaps in on the exact same element (or its instant swap-partner,
    see tracksEditor.js's fileNameSpan/urlField and backgroundEffects.js's
-   equivalent) as the box gains real content, so a different font-size and
-   padding here than the base .filename-display rule made the box visibly
-   resize the moment you clicked into it/typed a value - it was never a
+   equivalent) as the box gains real content, so any property that differs
+   here from the base .filename-display rule reads as the box visibly
+   changing the moment you click into it/type a value - it was never a
    focus-style change, just this rule's own box happening to sit next to
-   the plain one. */
+   the plain one. Italic used to be one of those differences too (dropped
+   for the same reason: real content is never italic, so toggling it on
+   the empty state and back off just added another visible style flip). */
 .filename-display.placeholder {
   color: #888888;
-  font-style: italic;
 }
 
 /* ==============================================
