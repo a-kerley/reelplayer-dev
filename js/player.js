@@ -1595,8 +1595,15 @@ const playerAppCore = {
     };
 
     const handleMouseLeave = () => {
-      // Clear idle timeout when mouse leaves
-      this.clearPlaybackIdleTimeout();
+      // Arm (not just clear) the idle countdown when the mouse leaves -
+      // clearPlaybackIdleTimeout() alone cancelled the pending timer with
+      // nothing to replace it, so once the cursor actually left the
+      // wrapper there was no countdown left running at all and idle could
+      // only ever be reached by moving the mouse and then holding it still
+      // *inside* the wrapper, never by leaving entirely. The mouse leaving
+      // is itself the moment inactivity starts, so it should start the same
+      // countdown mousemove does, not cancel it.
+      this.resetPlaybackIdleTimer();
     };
 
     const handleMouseMove = () => {

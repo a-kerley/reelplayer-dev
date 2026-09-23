@@ -189,16 +189,27 @@ export const playlistScroll = {
     let isScrolling = false;
     let scrollAnimationFrame = null;
 
+    // The stop-check (Math.abs(scrollVelocity) > 0.1) only ever runs INSIDE
+    // this rAF loop, never synchronously from the wheel handler that kicks
+    // it off (see the 'wheel' listener below) - a slow/gentle trackpad
+    // scroll sends many small deltaY events, and evaluating the threshold
+    // against a single such event before any other has had a chance to add
+    // to scrollVelocity killed the gesture on the spot: velocity landed at
+    // or under 0.1, the loop never started, and the next event repeated the
+    // same losing evaluation from zero. Deferring the first check to the
+    // next frame gives same-frame wheel events (trackpads commonly fire
+    // faster than 60Hz) a chance to accumulate first, so a real, sustained
+    // slow scroll now actually starts and keeps running instead of being
+    // silently discarded event by event. Confirmed via investigation - this
+    // was the actual cause of "scrolling barely responds unless it's fast."
     const smoothScroll = () => {
       if (Math.abs(scrollVelocity) > 0.1) {
         playlistEl.scrollTop += scrollVelocity;
         scrollVelocity *= 0.92; // Friction/deceleration factor
         scrollAnimationFrame = requestAnimationFrame(smoothScroll);
-        isScrolling = true;
       } else {
         scrollVelocity = 0;
         isScrolling = false;
-        cancelAnimationFrame(scrollAnimationFrame);
       }
     };
 
@@ -242,9 +253,12 @@ export const playlistScroll = {
       // Add to velocity (scaled down for smooth control)
       scrollVelocity += e.deltaY * 0.5;
 
-      // Start smooth scroll animation if not already running
+      // Start the momentum loop if not already running - always via rAF,
+      // never by calling smoothScroll() synchronously here (see its own
+      // comment above for why that was the actual bug).
       if (!isScrolling) {
-        smoothScroll();
+        isScrolling = true;
+        scrollAnimationFrame = requestAnimationFrame(smoothScroll);
       }
     }, { passive: false });
 
@@ -352,6 +366,7 @@ export const playlistScroll = {
       resizeObserver.disconnect();
       clearTimeout(settleTimeout1);
       clearTimeout(settleTimeout2);
+      cancelAnimationFrame(scrollAnimationFrame); // in case momentum is still coasting when a re-render replaces this instance
       document.removeEventListener('mousemove', handleDragMouseMove);
       document.removeEventListener('touchmove', handleDragTouchMove);
       document.removeEventListener('mouseup', endDrag);
