@@ -24,6 +24,25 @@ function getIdleDelay() {
   return cachedIdleDelay;
 }
 
+// resetPlaybackIdleTimer() still does real work on every call even with
+// the CSS-var read cached above: clearTimeout() x3, a classList check (plus
+// classList.remove()/pauseBackgroundAnimations() on an actual idle-exit),
+// and a fresh setTimeout() allocation. Fine at mousemove frequency, but the
+// playlist's 'scroll' listener (playlistScroll.js) also calls this on every
+// tick, and scrollTop-driven momentum fires 'scroll' close to once per
+// animation frame for as long as it decays - during active PLAYBACK
+// specifically, since this function no-ops immediately otherwise (see its
+// own isPlaying guard below), which is exactly why this only ever read as
+// "laggy scrolling during playback." Idle detection only needs coarse
+// resolution - nothing downstream cares if the timer resets 100ms later
+// than the very first tick of a scroll burst - so this coalesces a whole
+// burst of calls into one real reset every RESET_THROTTLE_MS, the same
+// leading-edge-throttle shape already used for resize debouncing
+// (js/player.js's setupWaveformWidthTracking()), just throttled instead of
+// debounced since this needs to fire promptly at the START of activity,
+// not only once it stops.
+const RESET_THROTTLE_MS = 150;
+
 export const idleState = {
   clearAllIdleTimeouts() {
     // Clear expandable mode idle timeouts
@@ -54,6 +73,16 @@ export const idleState = {
 
     const isPlaying = this.wavesurfer?.isPlaying();
     if (!isPlaying) return;
+
+    // See RESET_THROTTLE_MS's own comment above - coalesces a burst of
+    // calls (mousemove, or 'scroll' during momentum) into one real reset
+    // per window instead of redoing the clear/exit/reschedule work on
+    // every single tick.
+    const now = performance.now();
+    if (this._lastIdleResetAt !== undefined && now - this._lastIdleResetAt < RESET_THROTTLE_MS) {
+      return;
+    }
+    this._lastIdleResetAt = now;
 
     // Clear existing timeout and exit current idle state
     this.clearPlaybackIdleTimeout();
