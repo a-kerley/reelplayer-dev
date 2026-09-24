@@ -82,12 +82,11 @@
   display: none !important;
 }
 
-/* Custom scrollbar container */
+/* Custom scrollbar container - `right`/`top`/`height` are set inline by
+   js/modules/playlistScroll.js (position tracks the playlist's own layout,
+   which can change independent of any value fixed here), not by this rule. */
 .custom-scrollbar {
   position: absolute;
-  right: 8px; /* Position away from the edge */
-  top: 0;
-  bottom: 0;
   width: 6px;
   background: transparent;
   pointer-events: none;
@@ -95,17 +94,37 @@
   border-radius: 3px;
 }
 
-/* Custom scrollbar thumb */
+/* Custom scrollbar thumb - hidden by default, fades in on playlist activity
+   (hover/scroll/drag) and fades back out after a short idle window; see
+   playlistScroll.js's showScrollbar()/scheduleScrollbarHide(). Independent
+   of playback state entirely - .playback-idle only ever activates while
+   actually playing, which would leave this permanently visible while
+   paused if it were hooked into that instead.
+
+   Deliberately asymmetric timing, same convention as macOS's own overlay
+   scrollbars: appearing is quick (the transition on .visible below governs
+   this direction, since that's the rule matching the target state once the
+   class is added) so it doesn't feel laggy to reach for, disappearing is
+   slower (the transition here on the base rule governs that direction,
+   matching once .visible is removed) so the fade actually reads as a fade
+   instead of a snap - a plain symmetric 0.3s both ways was barely visible
+   on a translucent 6px-wide element and felt like a hard cut. */
 .custom-scrollbar-thumb {
   position: absolute;
   right: 0;
   width: 6px;
   background: rgba(0, 0, 0, 0.3);
   border-radius: 3px;
-  transition: background 0.2s ease;
+  opacity: 0;
+  transition: background 0.2s ease, opacity 0.5s ease;
   pointer-events: auto;
   cursor: pointer;
   min-height: 30px;
+}
+
+.custom-scrollbar-thumb.visible {
+  opacity: 1;
+  transition: background 0.2s ease, opacity 0.15s ease;
 }
 
 @media (hover: hover) and (pointer: fine) {

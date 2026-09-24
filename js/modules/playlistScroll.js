@@ -86,13 +86,23 @@ export const playlistScroll = {
 
     // Create custom scrollbar elements - position relative to playlist's parent
     const playlistParent = playlistEl.parentElement;
+    // Desktop nudged a touch further left (more inset from the edge) than
+    // touch - kept device-specific rather than moving both, since mobile's
+    // own spacing is a separate, not-yet-addressed refinement.
+    const scrollbarRightOffset = this.isTouchDevice() ? 15 : 21;
     const scrollbarContainer = document.createElement('div');
     scrollbarContainer.className = 'custom-scrollbar';
-    scrollbarContainer.style.cssText = 'position: absolute; right: 15px; width: 6px; background: transparent; z-index: 1000; pointer-events: none;';
+    scrollbarContainer.style.cssText = `position: absolute; right: ${scrollbarRightOffset}px; width: 6px; background: transparent; z-index: 1000; pointer-events: none;`;
 
     const scrollbarThumb = document.createElement('div');
     scrollbarThumb.className = 'custom-scrollbar-thumb';
-    scrollbarThumb.style.cssText = `position: absolute; right: 0; width: 6px; background: ${thumbColor}; border-radius: 3px; pointer-events: auto; cursor: pointer; transition: background 0.2s ease;`;
+    // No inline `transition` here - the CSS class (css/playlist.css) owns it
+    // now (asymmetric fade-in/fade-out timing on .custom-scrollbar-thumb vs
+    // .visible), and an inline transition would silently win over both,
+    // same as it was silently winning over the plain opacity transition
+    // that used to live in that CSS rule before this - the fade genuinely
+    // never ran, confirmed via computed style.
+    scrollbarThumb.style.cssText = `position: absolute; right: 0; width: 6px; background: ${thumbColor}; border-radius: 3px; pointer-events: auto; cursor: pointer;`;
 
     scrollbarContainer.appendChild(scrollbarThumb);
     playlistParent.appendChild(scrollbarContainer);
@@ -181,6 +191,24 @@ export const playlistScroll = {
       updateScrollbarMetrics();
     };
 
+    // Auto-hide/show, independent of playback state entirely (see this
+    // rule's own comment in css/playlist.css for why not .playback-idle).
+    // Shown on any playlist activity (hover, scroll, drag) and faded back
+    // out a short while after the last one.
+    const SCROLLBAR_HIDE_DELAY_MS = 1200;
+    let scrollbarHideTimeout = null;
+    const showScrollbar = () => {
+      scrollbarThumb.classList.add('visible');
+      clearTimeout(scrollbarHideTimeout);
+      // Never auto-hides mid-drag - only once the drag actually ends (see
+      // endDrag() below, which calls scheduleScrollbarHide() itself).
+      if (!isDragging) {
+        scrollbarHideTimeout = setTimeout(() => {
+          scrollbarThumb.classList.remove('visible');
+        }, SCROLLBAR_HIDE_DELAY_MS);
+      }
+    };
+
     // Initial position
     updateScrollbarPosition();
 
@@ -225,10 +253,18 @@ export const playlistScroll = {
       // already no-ops when nothing's playing, and its own CSS-var read is
       // cached (idleState.js) rather than re-read on every tick.
       this.resetPlaybackIdleTimer();
+      showScrollbar();
       if (!isDragging) {
         updateScrollbarMetrics();
       }
     });
+
+    // Hovering the scrollable area itself also reveals the scrollbar, not
+    // just an active scroll - matches the OS overlay-scrollbar convention
+    // this is modeled on (show while the user could plausibly reach for it,
+    // not only once they're already mid-scroll).
+    playlistEl.addEventListener('mouseenter', showScrollbar);
+    playlistEl.addEventListener('mousemove', showScrollbar);
 
     // Prevent page scroll when playlist reaches top/bottom + add smooth momentum
     playlistEl.addEventListener('wheel', (e) => {
@@ -272,6 +308,7 @@ export const playlistScroll = {
       startY = clientY;
       startThumbTop = parseInt(scrollbarThumb.style.top) || 0;
       scrollbarThumb.style.background = colorToRgba(accentColor, 0.5);
+      showScrollbar(); // isDragging is already true, so this skips scheduling a hide
     };
 
     const moveDrag = (clientY) => {
@@ -300,6 +337,7 @@ export const playlistScroll = {
       if (isDragging) {
         isDragging = false;
         scrollbarThumb.style.background = colorToRgba(accentColor, 0.3);
+        showScrollbar(); // now that isDragging is false, this schedules the hide countdown
       }
     };
 
@@ -314,6 +352,10 @@ export const playlistScroll = {
     }, { passive: true });
 
     scrollbarThumb.addEventListener('mouseenter', () => {
+      // Lives outside playlistEl (appended to its parent, see above), so it
+      // needs its own reveal trigger - playlistEl's own mouseenter/mousemove
+      // never fire for a hover that lands directly on the thumb.
+      showScrollbar();
       if (!isDragging) {
         scrollbarThumb.style.background = colorToRgba(accentColor, 0.4);
       }
@@ -366,6 +408,7 @@ export const playlistScroll = {
       resizeObserver.disconnect();
       clearTimeout(settleTimeout1);
       clearTimeout(settleTimeout2);
+      clearTimeout(scrollbarHideTimeout);
       cancelAnimationFrame(scrollAnimationFrame); // in case momentum is still coasting when a re-render replaces this instance
       document.removeEventListener('mousemove', handleDragMouseMove);
       document.removeEventListener('touchmove', handleDragTouchMove);
