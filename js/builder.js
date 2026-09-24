@@ -51,6 +51,7 @@ export function createEmptyReel() {
     overlayColorEnabled: false,
     hoverDarkenEnabled: false,
     hoverDarkenAmount: 15,
+    hoverDarkenUndarkenOnIdle: false,
     idleUnblurEnabled: false,
     idleUnblurAmount: 50,
     // Player configuration
@@ -236,6 +237,16 @@ function createColorPickersSection() {
   // input+slider, not the row) - set title directly on the pieces that
   // actually get serialized instead.
   hoverDarkenAmountBuilt.control.title = 'How much darker the background gets while hovering the player.';
+  // .value-control's shared CSS is flex: 1 1 0% (fine when it's the last
+  // thing in its row, which is true everywhere else this control is used) -
+  // but this row now has the "Un-darken on Idle" toggle after it. flex-grow
+  // alone was ballooning the control out to ~600px and shoving the toggle
+  // off to the far right; flex-basis 0% with grow zeroed out then collapsed
+  // it to 0 width instead, since it has no intrinsic size of its own to
+  // fall back on. `0 0 auto` sizes it to its natural content width and
+  // stops it claiming leftover row space either way. Scoped to just this
+  // instance, not the shared class.
+  hoverDarkenAmountBuilt.control.style.flex = '0 0 auto';
   const hoverDarkenAmountRow = hoverDarkenAmountBuilt.control.outerHTML;
 
   const idleUnblurAmountBuilt = buildValueControl({
@@ -284,10 +295,7 @@ function createColorPickersSection() {
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Player Outline</h4>
       <div class="color-row">
         <span>Outline:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;" title="Draw a border around the player.">
-          <input type="checkbox" id="playerOutlineEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
+        <input type="checkbox" id="playerOutlineEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Draw a border around the player." />
         <button id="pickr-outline-color" class="pickr-button" type="button" disabled style="opacity:0.5;" aria-label="Outline Colour" title="Colour of the player's border."></button>
         ${eyedropButtonHTML('pickr-outline-color')}
         ${outlineWidthControl}
@@ -297,20 +305,14 @@ function createColorPickersSection() {
       <h4 style="margin:0 0 0.75rem 0;font-size:1rem;font-weight:600;color:var(--builder-accent);">Background Image & Effects</h4>
       <div class="color-row">
         <span>Static Background Colour:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;" title="Fill the player background with a solid colour.">
-          <input type="checkbox" id="backgroundColorEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
+        <input type="checkbox" id="backgroundColorEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Fill the player background with a solid colour." />
         <button id="pickr-background-color" class="pickr-button" type="button" aria-label="Static Background Colour" title="Solid background colour shown behind the player."></button>
         ${eyedropButtonHTML('pickr-background-color')}
       </div>
       <div id="backgroundImageRowWrapper">
         <div class="color-row" id="backgroundImageRow">
           <span>Background Image:</span>
-          <label class="toggle-switch" style="margin-right:0.5rem;" title="Show an image behind the player instead of/under the solid background colour.">
-            <input type="checkbox" id="backgroundImageEnabled" />
-            <span class="toggle-slider"></span>
-          </label>
+          <input type="checkbox" id="backgroundImageEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Show an image behind the player instead of/under the solid background colour." />
           <input id="backgroundImageUrl" type="url" placeholder="https://example.com/image.jpg" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;opacity:0.5;" disabled />
           <button id="backgroundImageFilePicker" type="button" class="file-picker-btn" aria-label="Browse background images" title="Browse background images" disabled style="opacity:0.5;">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
@@ -328,10 +330,7 @@ function createColorPickersSection() {
       <div id="backgroundVideoRowWrapper">
         <div class="color-row" id="backgroundVideoRow">
           <span>Background Video:</span>
-          <label class="toggle-switch" style="margin-right:0.5rem;" title="Play a looping video behind the player instead of/under the static background.">
-            <input type="checkbox" id="backgroundVideoEnabled" />
-            <span class="toggle-slider"></span>
-          </label>
+          <input type="checkbox" id="backgroundVideoEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Play a looping video behind the player instead of/under the static background." />
           <input id="backgroundVideoUrl" type="url" placeholder="https://example.com/video.mp4" style="flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;opacity:0.5;" disabled />
           <button id="backgroundVideoFilePicker" type="button" class="file-picker-btn" aria-label="Browse background videos" title="Browse background videos" disabled style="opacity:0.5;">
             <svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width: 20px; height: 20px; color: #ccc;">
@@ -354,27 +353,21 @@ function createColorPickersSection() {
       ${backgroundBlurRow}
       <div class="color-row">
         <span>Overlay Colour:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;" title="Tint the background with a semi-transparent colour.">
-          <input type="checkbox" id="overlayColorEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
+        <input type="checkbox" id="overlayColorEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Tint the background with a semi-transparent colour." />
         <button id="pickr-overlay-color" class="pickr-button" type="button" disabled style="opacity:0.5;" aria-label="Overlay Colour" title="Tint colour (with opacity) applied over the background."></button>
         ${eyedropButtonHTML('pickr-overlay-color')}
       </div>
       <div class="color-row">
         <span>Darken on Hover:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;" title="Darken the background while the player is hovered.">
-          <input type="checkbox" id="hoverDarkenEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
+        <input type="checkbox" id="hoverDarkenEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Darken the background while the player is hovered." />
         ${hoverDarkenAmountRow}
+        <span style="color:#444;">|</span>
+        <input type="checkbox" id="hoverDarkenUndarkenOnIdle" class="toggle toggle-primary toggle-sm" style="margin-left:0.5rem;margin-right:0.3rem;" title="Also un-darken automatically once the player has sat idle for a while, even if the mouse never left it (static mode only)." />
+        <span style="font-size:0.8rem;color:#999;white-space:nowrap;">Un-darken on Idle</span>
       </div>
       <div class="color-row">
         <span>Unblur on Idle:</span>
-        <label class="toggle-switch" style="margin-right:0.5rem;" title="Gradually reduce the background blur while the player sits idle.">
-          <input type="checkbox" id="idleUnblurEnabled" />
-          <span class="toggle-slider"></span>
-        </label>
+        <input type="checkbox" id="idleUnblurEnabled" class="toggle toggle-primary toggle-sm" style="margin-right:0.5rem;" title="Gradually reduce the background blur while the player sits idle." />
         ${idleUnblurAmountRow}
       </div>
     </div>

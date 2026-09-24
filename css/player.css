@@ -861,14 +861,25 @@ button {
    cleanly with per-layer blur without adding another stacked element/z-index to
    manage. --hover-darken-brightness only differs from its 1 (no-op) default
    while both .hover-darken-enabled is present (reel setting) and the wrapper is
-   actually hovered - so disabling the feature, or not hovering, always no-ops. */
+   actually hovered - so disabling the feature, or not hovering, always no-ops.
+
+   Optional second reel setting, hoverDarkenUndarkenOnIdle (adds
+   .hover-darken-undarken-on-idle): also un-darkens once .playback-idle
+   kicks in (idleState.js) while still hovering - same idea and same shared
+   timer as idle-unblur's own .playback-idle carve-out above, just inverted
+   polarity. Off by default (undarken only on :not(:hover), as before) so
+   existing reels keep their current look unless this is turned on. Static
+   mode only - in expandable mode hovering is what keeps the player
+   expanded, so it's already "actively engaged" for the whole duration,
+   matching idle-unblur's own established reasoning for not carving out an
+   idle state there either. */
 /* Scoped to real hover/pointer devices only - on touch this rule would still
    match via the browser's own simulated/sticky :hover-on-tap, fighting the
    .touch-darkened class below (JS clears that on its own idle timer, but the
    native sticky :hover can stay latched on regardless, keeping the darken
    stuck permanently instead of just poor timing). */
 @media (hover: hover) and (pointer: fine) {
-  .player-wrapper.hover-darken-enabled:hover {
+  .player-wrapper.hover-darken-enabled:hover:not(.hover-darken-undarken-on-idle.playback-idle) {
     --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
   }
 }
@@ -892,24 +903,25 @@ button {
    filter rule (see .player-wrapper::after/.track-background-layer/
    .background-video), with a fraction of --background-blur.
 
-   NOT keyed to .playback-idle/.collapsed-idle (js/modules/idleState.js) -
-   those are driven by a "no mouse movement for N ms while still hovering"
-   timer whose mouseleave handler only clears the pending timer rather than
-   entering idle, so it never actually fires on "the mouse left the player",
-   which is what this feature wants. Five separate rules below instead cover
-   static vs expandable mode, desktop-hover vs mobile-touch input, and (for
+   Desktop static and desktop expandable-while-expanded both also settle via
+   .playback-idle (js/modules/idleState.js) - the same "no mouse movement
+   for --playback-idle-delay while still hovering" state that already dims
+   the playlist/controls, reused here rather than a second
+   independently-tuned timer. Five separate rules below still cover static
+   vs expandable mode, desktop-hover vs mobile-touch input, and (for
    expandable-mobile specifically) expanded vs collapsed, since "settled"
    means something different in each combination. */
 
-/* Static, desktop: settled the instant the mouse actually leaves the player -
-   no separate cooldown, mirrors hover-darken's immediate :hover reaction
-   above, just inverted (blur reduces OFF hover instead of ON it). Scoped to
-   real hover/pointer devices only, same reasoning as hover-darken's :hover
-   rule - :not(:hover) on a touch device would otherwise depend on the
-   browser's own simulated/sticky hover-on-tap rather than the dedicated
-   .touch-settled handling below. */
+/* Static, desktop: settled the instant the mouse actually leaves the player
+   (mirrors hover-darken's immediate :hover reaction above, just inverted -
+   blur reduces OFF hover instead of ON it), or once .playback-idle kicks in
+   while still hovering. Scoped to real hover/pointer devices only, same
+   reasoning as hover-darken's :hover rule - :not(:hover) on a touch device
+   would otherwise depend on the browser's own simulated/sticky hover-on-tap
+   rather than the dedicated .touch-settled handling below. */
 @media (hover: hover) and (pointer: fine) {
-  .player-wrapper.idle-unblur-enabled:not(.expandable-mode).is-playing:not(:hover) {
+  .player-wrapper.idle-unblur-enabled:not(.expandable-mode).is-playing:not(:hover),
+  .player-wrapper.idle-unblur-enabled:not(.expandable-mode).is-playing.playback-idle {
     --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
   }
 }
@@ -925,9 +937,17 @@ button {
    - by the time .expanded is removed, the existing hover-driven collapse
    delay/fade (expandable.css) has already played out, so no extra cooldown
    is needed on top of that. Also naturally true before the very first hover
-   (nothing has been touched yet), which is the correct starting state. */
+   (nothing has been touched yet), which is the correct starting state.
+
+   Also settles while still EXPANDED, once .playback-idle kicks in - same
+   mechanism and same MOVE_THRESHOLD_PX-filtered timer as static mode's own
+   carve-out above (setupExpandableModeInteractions() in js/player.js).
+   Hovering keeps the player expanded, but "expanded" alone no longer
+   implies "actively engaged" for as long as the hover holds - genuine
+   inactivity should still settle it. */
 @media (hover: hover) and (pointer: fine) {
-  .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing:not(.expanded) {
+  .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing:not(.expanded),
+  .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing.expanded.playback-idle {
     --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
   }
 }

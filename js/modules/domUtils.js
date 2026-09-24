@@ -239,27 +239,25 @@ export function createColorRow({ label, buttonId, tooltip = "", additionalElemen
  * @returns {HTMLLabelElement}
  */
 export function createToggleSwitch({ id, checked = false, onChange = null, tooltip = "" }) {
-  const label = document.createElement("label");
-  label.className = "toggle-switch";
-  label.style.marginRight = "0.5rem";
-  if (tooltip) label.title = tooltip;
-
+  // daisyUI's real toggle component (see "Tailwind / daisyUI (builder only)"
+  // in CLAUDE.md) - a single self-styled checkbox, no wrapping label/span
+  // needed like the old hand-rolled .toggle-switch/.toggle-slider markup
+  // this replaced. Its CSS also bakes in flex-shrink:0, which the old
+  // fixed-width-but-shrinkable markup didn't have - that's what was
+  // squashing toggles into ovals in narrow flex rows.
   const input = document.createElement("input");
   input.type = "checkbox";
   input.id = id;
+  input.className = "toggle toggle-primary toggle-sm";
+  input.style.marginRight = "0.5rem";
   input.checked = checked;
-  
+  if (tooltip) input.title = tooltip;
+
   if (onChange) {
     input.addEventListener("change", onChange);
   }
-  
-  const slider = document.createElement("span");
-  slider.className = "toggle-slider";
-  
-  label.appendChild(input);
-  label.appendChild(slider);
-  
-  return label;
+
+  return input;
 }
 
 /**
@@ -471,7 +469,10 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   // toggle-gated row in the builder (js/builder.js's Background Image/Video,
   // js/modules/blendModeControls.js's setupBackgroundColorControls()).
   if (toggleEl) {
-    const toggleInput = toggleEl.querySelector("input");
+    // createToggleSwitch() now returns the checkbox itself (daisyUI's real
+    // toggle needs no wrapping label/span - see its own comment), not a
+    // wrapper to query into.
+    const toggleInput = toggleEl;
     const applyDimState = () => {
       const isEnabled = toggleInput.checked;
       input.style.opacity = isEnabled ? "1" : "0.5";

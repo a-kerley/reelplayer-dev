@@ -1374,8 +1374,17 @@ const playerAppCore = {
       return;
     }
 
+    // Same real-hand jitter problem as setupStaticModeInteractions() - a
+    // resting mouse/trackpad still emits sub-pixel mousemove events, which
+    // would otherwise keep resetting playback-idle's timer forever. Needed
+    // here too now that idle-unblur also settles while EXPANDED via
+    // .playback-idle (css/player.css), not just once contracted.
+    const MOVE_THRESHOLD_PX = 4;
+    let lastMoveX = null;
+    let lastMoveY = null;
+
     // Create new listener functions and store references for cleanup
-    const handleMouseEnter = () => {
+    const handleMouseEnter = (e) => {
       if (!this.expandable.isExpanded) {
         this.expandPlayer();
       }
@@ -1383,6 +1392,8 @@ const playerAppCore = {
       // (player-closed-idle should only exit when audio starts or player expands)
       this.exitPlaybackIdle();
       this.exitCollapsedIdle();
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
     };
 
     const handleMouseLeave = () => {
@@ -1393,7 +1404,17 @@ const playerAppCore = {
       this.clearPlaybackIdleTimeout();
     };
 
-    const handleMouseMove = () => {
+    const handleMouseMove = (e) => {
+      // See MOVE_THRESHOLD_PX's comment above - ignore sub-threshold jitter
+      // so the idle countdown can actually complete.
+      const dx = e.clientX - lastMoveX;
+      const dy = e.clientY - lastMoveY;
+      if (lastMoveX !== null && (dx * dx + dy * dy) < MOVE_THRESHOLD_PX * MOVE_THRESHOLD_PX) {
+        return;
+      }
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
+
       // Reset idle timer on mouse movement
       this.resetPlaybackIdleTimer();
     };
@@ -1587,11 +1608,31 @@ const playerAppCore = {
     // Clean up old listeners if they exist
     this.cleanupStaticModeListeners();
 
+    // idle-unblur's desktop CSS rule (css/player.css) now doubles up on
+    // .playback-idle (idleState.js) rather than a second dedicated timer -
+    // playback-idle already exists to dim the playlist/controls after
+    // --playback-idle-delay of no mouse movement, so unblurring on the same
+    // class means "no movement for a while" only has one timer/state behind
+    // it, not two independently-tuned ones.
+    //
+    // A real mouse/trackpad emits a steady trickle of sub-pixel mousemove
+    // events even while a hand is deliberately holding still (sensor/driver
+    // noise) - without filtering those out, every one of them would reset
+    // playback-idle's timer, so it could never actually complete for a real
+    // user (confirmed by hand; scripted testing moves the cursor once and
+    // doesn't hit this). Only movement past a small threshold counts as
+    // "real" activity and reaches resetPlaybackIdleTimer().
+    const MOVE_THRESHOLD_PX = 4;
+    let lastMoveX = null;
+    let lastMoveY = null;
+
     // Create new listener functions and store references for cleanup
-    const handleMouseEnter = () => {
+    const handleMouseEnter = (e) => {
       // Exit playback-related idle states on mouse enter, but not player-closed-idle
       // (player-closed-idle should only exit when audio starts or player expands)
       this.exitPlaybackIdle();
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
     };
 
     const handleMouseLeave = () => {
@@ -1602,12 +1643,23 @@ const playerAppCore = {
       // only ever be reached by moving the mouse and then holding it still
       // *inside* the wrapper, never by leaving entirely. The mouse leaving
       // is itself the moment inactivity starts, so it should start the same
-      // countdown mousemove does, not cancel it.
+      // countdown mousemove does, not cancel it. resetPlaybackIdleTimer()
+      // calls exitPlaybackIdle() first, so :not(:hover)'s own instant unblur
+      // and this stay in agreement rather than racing.
       this.resetPlaybackIdleTimer();
     };
 
-    const handleMouseMove = () => {
-      // Reset idle timer on mouse movement
+    const handleMouseMove = (e) => {
+      // See MOVE_THRESHOLD_PX's comment above - ignore sub-threshold jitter
+      // so the idle countdown can actually complete.
+      const dx = e.clientX - lastMoveX;
+      const dy = e.clientY - lastMoveY;
+      if (lastMoveX !== null && (dx * dx + dy * dy) < MOVE_THRESHOLD_PX * MOVE_THRESHOLD_PX) {
+        return;
+      }
+      lastMoveX = e.clientX;
+      lastMoveY = e.clientY;
+
       this.resetPlaybackIdleTimer();
     };
 
@@ -1648,7 +1700,7 @@ const playerAppCore = {
       }
       this.static.listeners = null;
     }
-    
+
     // Clear static mode idle timeout
     if (this.static.playbackIdleTimeout) {
       clearTimeout(this.static.playbackIdleTimeout);
@@ -2128,6 +2180,7 @@ const playerAppCore = {
     if (shouldHideTitle) wrapperClasses += ' no-title';
     if (this.expandable.enabled) wrapperClasses += ' expandable-mode';
     if (reel?.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
+    if (reel?.hoverDarkenUndarkenOnIdle) wrapperClasses += ' hover-darken-undarken-on-idle';
     if (reel?.idleUnblurEnabled) wrapperClasses += ' idle-unblur-enabled';
 
     // Build project title overlay HTML for expandable mode

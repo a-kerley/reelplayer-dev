@@ -123,7 +123,7 @@ function buildToggleRow(spec, options, setOrDelete) {
     checked,
     tooltip: spec.tooltip,
     onChange: () => {
-      const on = toggle.querySelector("input").checked;
+      const on = toggle.checked;
       setOrDelete(spec.key, on, on === spec.defaultOn);
     },
   });
@@ -200,7 +200,7 @@ function buildColorRow(spec, options, setOrDelete, pickrInstances) {
     checked: enabled,
     tooltip: spec.tooltip,
     onChange: () => {
-      const on = toggle.querySelector("input").checked;
+      const on = toggle.checked;
       applyEnabled(on);
       if (on) setOrDelete(spec.key, pickr.btn.style.background || "#00adef", false);
       else setOrDelete(spec.key, null, true);

@@ -558,9 +558,9 @@ function createColorPickerRow(label, buttonId, tooltip, toggle = null) {
 }
 
 /**
- * Helper: Create a toggle-switch row, matching the Background Image/Video
+ * Helper: Create a toggle row, matching the Background Image/Video
  * enable toggles in the Colours & Effects section (.color-row, label on the
- * left, toggle-switch on the right). Pass { heading: true } for a toggle
+ * left, daisyUI toggle on the right). Pass { heading: true } for a toggle
  * that gates a group of rows below it, so it reads as a mini section
  * heading (bold, accent-coloured) rather than a plain option.
  */

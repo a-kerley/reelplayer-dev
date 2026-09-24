@@ -48,6 +48,7 @@ const GROUP_KEYS = {
     "playerOutlineWidth",
     "hoverDarkenEnabled",
     "hoverDarkenAmount",
+    "hoverDarkenUndarkenOnIdle",
     "idleUnblurEnabled",
     "idleUnblurAmount",
   ],

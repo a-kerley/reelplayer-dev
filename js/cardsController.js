@@ -762,14 +762,19 @@ export function initCardsController() {
     }
 
     // --- Analytics toggle ---------------------------------------------
+    // Slot stays in the DOM permanently (its id is what the external
+    // <label for="cardAnalyticsEnabled"> below needs to find, on the
+    // toggle itself - not this wrapper) - replaceChildren() swaps the
+    // toggle out on each render instead of replacing/re-id'ing the slot
+    // itself, which broke once createToggleSwitch() started returning a
+    // bare checkbox with no wrapper to carry a second id.
     const analyticsToggle = createToggleSwitch({
       id: "cardAnalyticsEnabled",
       checked: card.analyticsEnabled === true,
       tooltip: "Track plays/engagement analytics for this card.",
       onChange: (e) => { card.analyticsEnabled = e.target.checked; updateCurrentCard(); },
     });
-    document.getElementById("cardAnalyticsSlot").replaceWith(analyticsToggle);
-    analyticsToggle.id = "cardAnalyticsSlot";
+    document.getElementById("cardAnalyticsSlot").replaceChildren(analyticsToggle);
 
     // --- Card Style Overrides -------------------------------------------
     const showReelTitleToggle = createToggleSwitch({
@@ -778,8 +783,7 @@ export function initCardsController() {
       tooltip: "Show the reel's own title inside this card's Listen tab.",
       onChange: (e) => { overrides.showReelTitle = e.target.checked; updateCurrentCard(); },
     });
-    document.getElementById("cardShowReelTitleSlot").replaceWith(showReelTitleToggle);
-    showReelTitleToggle.id = "cardShowReelTitleSlot";
+    document.getElementById("cardShowReelTitleSlot").replaceChildren(showReelTitleToggle);
 
     const { row: bannerImageRow } = createUrlInputRow({
       id: "cardBannerImageInput",

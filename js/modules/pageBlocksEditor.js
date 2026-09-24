@@ -2251,7 +2251,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     checked: block.expandable === true,
     tooltip: "Collapse this video to a smaller preview that expands on hover/tap instead of playing inline at full size.",
     onChange: () => {
-      block.expandable = expToggle.querySelector("input").checked;
+      block.expandable = expToggle.checked;
       if (block.expandable) ensureExpandableVideoDefaults(block);
       syncExpandableVisibility();
       refreshPreview();
@@ -2378,7 +2378,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     checked: block.closedOverlayColorEnabled === true,
     tooltip: "Show the colour tint over the collapsed background.",
     onChange: () => {
-      block.closedOverlayColorEnabled = overlayTintToggle.querySelector("input").checked;
+      block.closedOverlayColorEnabled = overlayTintToggle.checked;
       applyOverlayTintEnabled();
       refreshPreview();
       onChange();
