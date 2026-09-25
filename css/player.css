@@ -211,10 +211,59 @@
   top: 0;
   left: 0;
   height: 100%;
-  background-color: var(--waveform-hover);
   pointer-events: none;
   width: 0;
+  opacity: 0; /* JS toggles this (not just width) - see updateScrubPreview()/
+                 hideScrubPreview() in player.js. Width alone can't hide the
+                 ::after line below: at width 0 its own right:0 anchor still
+                 sits at the waveform's left edge, not off-screen. */
+  transition: opacity 0.15s ease;
   z-index: 8;
+}
+.hover-overlay::before {
+  /* The masked flat fill, clipped to the waveform's own drawn pixels via a
+     live canvas-snapshot mask (see updateHoverWaveformMask() in player.js)
+     instead of tinting the whole rectangular box. Kept on its own layer,
+     separate from ::after's line below - mask-image applies to everything
+     painted inside the element it's set on, so putting it on .hover-overlay
+     itself would also clip the line to the waveform's shape (invisible over
+     any quiet/silent stretch). --hover-mask-image/-size are set from JS as
+     custom properties on .hover-overlay (inherited down to this pseudo)
+     rather than as inline styles directly, since JS can't target a
+     pseudo-element's own style. mask-size is fixed CSS px (the waveform's
+     actual width), not a percentage - a percentage would be relative to
+     this box's own shrinking/growing width and stretch the snapshot to fit
+     it, instead of letting that width act as a reveal window over an image
+     anchored at a fixed position/size. */
+  content: '';
+  position: absolute;
+  inset: 0;
+  background-color: var(--waveform-hover);
+  mask-image: var(--hover-mask-image, none);
+  mask-repeat: no-repeat;
+  mask-position: left top;
+  mask-size: var(--hover-mask-size, 100% 100%);
+  mask-mode: alpha; /* use the canvas's alpha channel, not pixel luminance -
+                        the waveform is drawn mid-grey, which luminance
+                        masking would only partially reveal */
+  -webkit-mask-image: var(--hover-mask-image, none);
+  -webkit-mask-repeat: no-repeat;
+  -webkit-mask-position: left top;
+  -webkit-mask-size: var(--hover-mask-size, 100% 100%);
+}
+.hover-overlay::after {
+  /* The "hover playhead" itself - a thin line at the fill's leading edge,
+     echoing the real progress cursor's look (also 1px, also --ui-accent)
+     so hovering previews where a click would seek to. Deliberately NOT
+     inside the masked ::before layer above - always full box height,
+     regardless of whether the waveform has any signal at this x position. */
+  content: '';
+  position: absolute;
+  top: 0;
+  right: 0;
+  bottom: 0;
+  width: 2px;
+  background-color: var(--ui-accent);
 }
 .hover-time {
   position: absolute;

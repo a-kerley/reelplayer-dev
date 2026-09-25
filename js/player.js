@@ -995,6 +995,45 @@ const playerAppCore = {
     }
   },
 
+  // EXPERIMENT: locate WaveSurfer's own rendering canvas so the hover fill
+  // can be masked to it. WaveSurfer v7 renders into a shadow root on its own
+  // generated wrapper (the "#waveform > div:last-child" that css/player.css
+  // already targets elsewhere) - a plain querySelector from the document (or
+  // even from this.elements.waveform) can't see through that boundary, so
+  // this walks it explicitly rather than reusing the (silently no-op-ing)
+  // this.elements.waveform.querySelectorAll("canvas") pattern used above.
+  getWaveformCanvas() {
+    const waveformEl = this.elements.waveform;
+    const wrapper = waveformEl?.lastElementChild;
+    return wrapper?.shadowRoot?.querySelector(".canvases canvas") || null;
+  },
+
+  // EXPERIMENT: snapshot that canvas into .hover-overlay::before's mask-image
+  // (via CSS custom properties, not inline styles - a pseudo-element has no
+  // DOM node of its own for JS to style directly) so its flat fill only
+  // shows through the waveform's actual drawn pixels, not the full
+  // rectangular box. Deliberately not applied to .hover-overlay itself: that
+  // would also mask ::after's hover-playhead line down to the waveform's
+  // shape, hiding it over any quiet/silent stretch - see the CSS comment.
+  updateHoverWaveformMask() {
+    const fillEl = this.elements.hoverOverlay;
+    const waveformEl = this.elements.waveform;
+    const canvas = this.getWaveformCanvas();
+    if (!fillEl || !waveformEl || !canvas || !canvas.width) return;
+
+    let dataUrl;
+    try {
+      dataUrl = canvas.toDataURL();
+    } catch (e) {
+      return; // Leave the previous mask in place rather than blanking it.
+    }
+    fillEl.style.setProperty("--hover-mask-image", `url(${dataUrl})`);
+    fillEl.style.setProperty(
+      "--hover-mask-size",
+      `${waveformEl.clientWidth}px 100%`
+    );
+  },
+
   setupWaveformEvents() {
     const waveformEl = this.elements.waveform;
     const hoverOverlay = this.elements.hoverOverlay;
@@ -1030,6 +1069,7 @@ const playerAppCore = {
       const duration = this.wavesurfer.getDuration();
       const time = duration * percent;
       hoverOverlay.style.width = `${percent * 100}%`;
+      hoverOverlay.style.opacity = "1";
       hoverTime.textContent = this.formatTime(time);
       hoverTime.style.opacity = "1";
       const pixelX = clientX - rect.left;
@@ -1039,7 +1079,7 @@ const playerAppCore = {
       )}px`;
     };
     const hideScrubPreview = () => {
-      hoverOverlay.style.width = `0%`;
+      hoverOverlay.style.opacity = "0";
       hoverTime.style.opacity = "0";
     };
 
@@ -1482,6 +1522,12 @@ const playerAppCore = {
       pixelRatio: Math.ceil(window.devicePixelRatio || 1), // Ensure whole number for Safari
     });
     
+    // EXPERIMENT: re-snapshot the waveform canvas into .hover-overlay's mask
+    // every time WaveSurfer actually finishes drawing it - covers the
+    // initial render, every track switch, and every resize-driven redraw
+    // (fillParent/responsive) in one hook, unlike "ready" alone.
+    this.wavesurfer.on("redrawcomplete", () => this.updateHoverWaveformMask());
+
     // Fix Safari-specific sub-pixel rendering gap at origin line
     this.wavesurfer.on("ready", () => {
       const canvases = this.elements.waveform.querySelectorAll("canvas");
