@@ -1016,6 +1016,14 @@ const playerAppCore = {
   // would also mask ::after's hover-playhead line down to the waveform's
   // shape, hiding it over any quiet/silent stretch - see the CSS comment.
   updateHoverWaveformMask() {
+    // Touch has no hover - it's a discrete tap/drag-to-seek, never a fill
+    // that previews where you'd land, so there's nothing to keep this in
+    // sync for. Skipping it here avoids the cost of re-encoding a PNG
+    // snapshot (canvas.toDataURL()) on every redraw for devices that will
+    // never actually display it - see updateScrubPreview() below, which
+    // skips showing the fill itself for the same reason.
+    if (this.isTouchDevice()) return;
+
     const fillEl = this.elements.hoverOverlay;
     const waveformEl = this.elements.waveform;
     const canvas = this.getWaveformCanvas();
@@ -1072,8 +1080,14 @@ const playerAppCore = {
       );
       const duration = this.wavesurfer.getDuration();
       const time = duration * percent;
-      hoverOverlay.style.width = `${percent * 100}%`;
-      hoverOverlay.style.opacity = "1";
+      // The fill is a hover preview - touch has no hover, just a tap/drag
+      // that seeks directly, so skip showing it there (see
+      // updateHoverWaveformMask()'s matching skip above). The time label
+      // below stays for both: useful feedback while a finger is still down.
+      if (!this.isTouchDevice()) {
+        hoverOverlay.style.width = `${percent * 100}%`;
+        hoverOverlay.style.opacity = "1";
+      }
       hoverTime.textContent = this.formatTime(time);
       hoverTime.style.opacity = "1";
       const pixelX = clientX - rect.left;
