@@ -845,7 +845,7 @@
     
     /* ============================================
        KEYBOARD CONTROLS
-       Spacebar play/pause for embed
+       Space play/pause, left/right seek 5s, up/down playlist nav
        ============================================ */
     function setupKeyboardControls() {
       document.addEventListener("keydown", (e) => {
@@ -855,8 +855,9 @@
           active.tagName === "TEXTAREA" ||
           active.isContentEditable
         );
-        
-        if (!isTyping && (e.code === "Space" || e.key === " ")) {
+        if (isTyping) return;
+
+        if (e.code === "Space" || e.key === " ") {
           e.preventDefault();
           if (playerApp.wavesurfer && playerApp.isWaveformReady) {
             // Same fade-aware toggle the play/pause button uses - NOT a raw
@@ -864,6 +865,12 @@
             // playerApp.togglePlayback() in js/player.js).
             playerApp.togglePlayback();
           }
+        } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+          e.preventDefault();
+          playerApp.seekRelative(e.code === "ArrowLeft" ? -5 : 5);
+        } else if (e.code === "ArrowUp" || e.code === "ArrowDown") {
+          e.preventDefault();
+          playerApp.selectRelativeTrack(e.code === "ArrowUp" ? -1 : 1);
         }
       });
     }

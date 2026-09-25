@@ -850,7 +850,7 @@ document.addEventListener("DOMContentLoaded", async () => {
     if (playheadTime) playheadTime.style.opacity = "0";
   });
 
-// Keyboard shortcut for play/pause (space), except when in input/textarea
+// Keyboard shortcuts (space/arrows), except when in input/textarea
 document.addEventListener("keydown", (e) => {
   const active = document.activeElement;
   const isTyping =
@@ -859,7 +859,9 @@ document.addEventListener("keydown", (e) => {
       active.tagName === "TEXTAREA" ||
       active.isContentEditable
     );
-  if (!isTyping && (e.code === "Space" || e.key === " ")) {
+  if (isTyping) return;
+
+  if (e.code === "Space" || e.key === " ") {
     e.preventDefault();
     // Route through the play/pause button's own click handler rather than
     // calling wavesurfer.playPause() directly - the button handler is the
@@ -869,6 +871,12 @@ document.addEventListener("keydown", (e) => {
     if (playerApp.wavesurfer && playerApp.isWaveformReady) {
       playerApp.elements.playPauseBtn?.click();
     }
+  } else if (e.code === "ArrowLeft" || e.code === "ArrowRight") {
+    e.preventDefault();
+    playerApp.seekRelative(e.code === "ArrowLeft" ? -5 : 5);
+  } else if (e.code === "ArrowUp" || e.code === "ArrowDown") {
+    e.preventDefault();
+    playerApp.selectRelativeTrack(e.code === "ArrowUp" ? -1 : 1);
   }
 });
 });

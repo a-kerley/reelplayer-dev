@@ -566,6 +566,24 @@ const playerAppCore = {
     this.initializePlayer(url, nextTrack.title, nextIndex);
   },
 
+  // Up/down-arrow playlist navigation. Wraps at either end (index -1 or
+  // playlist.length both wrap via the modulo below) and always starts the
+  // new track playing - the same userSelected:true path a playlist-item
+  // click uses (see playlistScroll.js), not playNextTrack()'s own
+  // wasPlayingBeforeTrackSwitch flag (that one preserves whatever the
+  // paused/playing state already was, which is right for an automatic
+  // end-of-track advance but not for a deliberate track pick).
+  selectRelativeTrack(delta) {
+    const playlist = this.currentReelSettings?.playlist;
+    if (!playlist || playlist.length === 0) return;
+
+    const nextIndex =
+      (this.currentTrackIndex + delta + playlist.length) % playlist.length;
+    const track = playlist[nextIndex];
+    const url = this.convertDropboxLinkToDirect(track.url);
+    this.initializePlayer(url, track.title, nextIndex, true);
+  },
+
   updateTrackBackground(trackIndex) {
     // Get both track background layer elements
     const layerA = this.playerContainer?.querySelector('.track-bg-layer-a');
@@ -1044,6 +1062,30 @@ const playerAppCore = {
       "--hover-mask-full-width",
       `${waveformEl.clientWidth}px`
     );
+  },
+
+  // Left/right-arrow relative seek. Clamped (not wrapped) to the track's own
+  // bounds - unlike selectRelativeTrack()'s playlist wraparound, running off
+  // either end of a single track has no natural "next" position to land on.
+  // Ducks/restores around the jump exactly like a waveform click-seek (see
+  // the mousedown/touchstart pair below) - setTime() is the same kind of
+  // non-zero-crossing buffer jump a click causes, so it needs the same
+  // click-masking treatment, just without a pointerup to time the restore
+  // off - there's no drag here, so duck and restore both happen immediately
+  // around the single setTime() call instead.
+  seekRelative(deltaSeconds) {
+    if (!this.wavesurfer || !this.isWaveformReady) return;
+    const duration = this.wavesurfer.getDuration();
+    if (!duration) return;
+
+    const target = Math.min(
+      Math.max(this.wavesurfer.getCurrentTime() + deltaSeconds, 0),
+      duration
+    );
+    const wasPlaying = this.wavesurfer.isPlaying();
+    if (wasPlaying) this.duckForSeek();
+    this.wavesurfer.setTime(target);
+    if (wasPlaying) this.restoreAfterSeek();
   },
 
   setupWaveformEvents() {
