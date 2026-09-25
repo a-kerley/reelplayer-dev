@@ -211,6 +211,11 @@
   top: 0;
   left: 0;
   height: 100%;
+  /* Clips ::before below (a FIXED-size layer, never resized) down to
+     however much of it this box's own JS-driven width currently reveals -
+     see ::before's own comment for why the clip lives here instead of just
+     resizing the masked layer directly. */
+  overflow: hidden;
   pointer-events: none;
   width: 0;
   opacity: 0; /* JS toggles this (not just width) - see updateScrubPreview()/
@@ -227,29 +232,37 @@
      separate from ::after's line below - mask-image applies to everything
      painted inside the element it's set on, so putting it on .hover-overlay
      itself would also clip the line to the waveform's shape (invisible over
-     any quiet/silent stretch). --hover-mask-image/-size are set from JS as
-     custom properties on .hover-overlay (inherited down to this pseudo)
-     rather than as inline styles directly, since JS can't target a
-     pseudo-element's own style. mask-size is fixed CSS px (the waveform's
-     actual width), not a percentage - a percentage would be relative to
-     this box's own shrinking/growing width and stretch the snapshot to fit
-     it, instead of letting that width act as a reveal window over an image
-     anchored at a fixed position/size. */
+     any quiet/silent stretch).
+
+     Deliberately a FIXED width (--hover-mask-full-width, the waveform's
+     actual width, set from JS only on redraw) rather than inset:0/100% of
+     the parent. inset:0 would resize THIS box - and therefore force the
+     browser to re-run mask compositing - on every mousemove tick, since
+     .hover-overlay's own width changes continuously while scrubbing. That
+     showed up as visible jitter while hovering during playback, when the
+     frame budget's already contended by audio processing. Keeping this
+     layer's own box constant means mask compositing only redoes work when
+     the mask image itself actually changes (a real redraw), and the
+     parent's overflow:hidden crops it down to the revealed portion instead
+     - a plain clip, not a re-mask, and far cheaper per frame. */
   content: '';
   position: absolute;
-  inset: 0;
+  top: 0;
+  left: 0;
+  height: 100%;
+  width: var(--hover-mask-full-width, 100%);
   background-color: var(--waveform-hover);
   mask-image: var(--hover-mask-image, none);
   mask-repeat: no-repeat;
   mask-position: left top;
-  mask-size: var(--hover-mask-size, 100% 100%);
+  mask-size: 100% 100%; /* relative to this box's own now-fixed size */
   mask-mode: alpha; /* use the canvas's alpha channel, not pixel luminance -
                         the waveform is drawn mid-grey, which luminance
                         masking would only partially reveal */
   -webkit-mask-image: var(--hover-mask-image, none);
   -webkit-mask-repeat: no-repeat;
   -webkit-mask-position: left top;
-  -webkit-mask-size: var(--hover-mask-size, 100% 100%);
+  -webkit-mask-size: 100% 100%;
 }
 .hover-overlay::after {
   /* The "hover playhead" itself - a thin line at the fill's leading edge,

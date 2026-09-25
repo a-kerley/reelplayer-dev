@@ -1028,9 +1028,13 @@ const playerAppCore = {
       return; // Leave the previous mask in place rather than blanking it.
     }
     fillEl.style.setProperty("--hover-mask-image", `url(${dataUrl})`);
+    // Fixed width, not a size - ::before's own box is this width always
+    // (see its CSS comment); .hover-overlay's overflow:hidden crops it down
+    // to whatever the current hover x reveals, so this only needs updating
+    // when the waveform itself actually redraws, never on mousemove.
     fillEl.style.setProperty(
-      "--hover-mask-size",
-      `${waveformEl.clientWidth}px 100%`
+      "--hover-mask-full-width",
+      `${waveformEl.clientWidth}px`
     );
   },
 
