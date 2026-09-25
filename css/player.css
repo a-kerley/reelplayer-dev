@@ -309,8 +309,25 @@ button {
   margin-bottom: var(--expandable-track-info-bottom);
   margin-left: var(--expandable-track-info-left);
   padding-left: var(--expandable-track-info-padding);
+  /* track-info is a sibling of .player-container (play button + waveform +
+     volume), not a child of it, so it isn't naturally width-constrained by
+     the volume control the way the waveform is - a long title could
+     otherwise extend under .volume-control's reserved 46px column and the
+     volume slider that pops up from it (#volumeSlider, position:absolute;
+     bottom:100%). Reserving the same width here keeps the title's right
+     edge aligned with the waveform's own right edge instead of running the
+     full width of .player-content. Deliberately --expandable-icon-width,
+     NOT --expandable-track-info-left - the left var gets zeroed on narrow
+     viewports (see variables.css) so the title can start under the play
+     button instead, but the right edge still has to clear the volume
+     control regardless of what the left offset is doing. */
+  margin-right: calc(var(--expandable-icon-width) + var(--expandable-player-gap));
   font-family: var(--reel-track-font-family, inherit);
-  font-size: var(--reel-track-size, 0.9rem);
+  /* --track-info-mobile-scale narrows this a little on narrow viewports
+     (variables.css) - multiplies whatever size is already in effect,
+     custom per-reel or the plain default, rather than needing its own
+     separate narrow-viewport default. */
+  font-size: calc(var(--reel-track-size, 0.9rem) * var(--track-info-mobile-scale, 1));
   font-weight: var(--reel-track-weight, 600);
   /* --reel-track-color, when set, is either a Custom color picked in
      js/modules/playerTextStyles.js or a resolved page-role color.
@@ -322,14 +339,80 @@ button {
      above. */
   color: var(--reel-track-color, #ffffff);
   font-style: normal;
-  white-space: nowrap;
+  /* Clips .track-info-text while it's marqueeing (see below) - its own
+     overflow/white-space/text-overflow own the static ellipsis-truncated
+     look, this only matters once that inner element is deliberately
+     rendering wider than this box during the scroll animation. */
   overflow: hidden;
-  text-overflow: ellipsis;
 }
 .track-info.visible {
   opacity: 1;
   visibility: visible;
 }
+
+/* Currently-playing track title: static ellipsis truncation by default
+   (this element owns overflow/white-space/text-overflow itself, a
+   standalone single-box ellipsis rather than relying on .track-info's -
+   deliberately, since the marquee state below needs to render this
+   element WIDER than its box and translate it, which an ellipsis-owning
+   parent can't do through a nested block/inline-block child). display is
+   always inline-block, even outside the marquee state, so the transform
+   transition below has something to actually animate against - avoids a
+   jump-cut on the .scrolling class itself flipping off. js/player.js's
+   updateTrackInfo() drives the opacity crossfade on track change;
+   refreshTrackInfoScroll() measures overflow, and while actually playing,
+   rebuilds this element's content as two copies of the title (only while
+   .scrolling - plain single-copy text otherwise, so ellipsis keeps working)
+   and hands it the --track-info-scroll-distance/-marquee-duration vars the
+   loop below reads. */
+.track-info-text {
+  display: inline-block;
+  max-width: 100%;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  vertical-align: top;
+  transition: opacity 0.25s ease, transform 0.4s ease;
+}
+
+/* Continuous carousel, not a ping-pong bounce: refreshTrackInfoScroll()
+   duplicates the title with a fixed gap (second copy lands exactly where
+   the first started) and sets --track-info-scroll-distance to that one
+   copy-width-plus-gap, so translating by exactly that distance on an
+   infinite linear loop resets invisibly - the second copy is already
+   sitting where the first began. .scrolling is JS-driven (not a pure CSS
+   .is-playing selector like before) since building the duplicate content
+   needs JS regardless; pausing/stopping removes the class, dropping back to
+   the plain single copy, and .track-info-text's own transition (above)
+   eases the transform back to translateX(0) rather than snapping. */
+.track-info-text.scrolling {
+  max-width: none;
+  overflow: visible;
+  text-overflow: clip;
+  /* animation-delay only holds the first iteration at 0% - the loop itself
+     still runs back-to-back with no gap after that, just a pause before it
+     first starts. */
+  animation: track-info-marquee var(--track-info-marquee-duration, 8s) linear 2s infinite;
+}
+
+@keyframes track-info-marquee {
+  from {
+    transform: translateX(0);
+  }
+  to {
+    transform: translateX(var(--track-info-scroll-distance, 0px));
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .track-info-text.scrolling {
+    animation: none;
+    max-width: 100%;
+    overflow: hidden;
+    text-overflow: ellipsis;
+  }
+}
+
 .player-wrapper {
   position: relative;
   width: 100%;

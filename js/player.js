@@ -104,8 +104,14 @@ const playerAppCore = {
   // "should this use tap/scroll-driven interactions instead of hover", as
   // opposed to merely checking for touch support (which would also flag
   // touchscreen laptops that are still mouse-primary).
+  //
+  // forceTouchPreview lets the builder's "Mobile Preview" toggle
+  // (js/main.js) simulate touch-mode on a real mouse/trackpad dev machine -
+  // it only flips JS-computed branches like this one, not actual CSS
+  // `@media (hover: hover)` rules (those need Chrome DevTools' own device
+  // toolbar, which genuinely changes matchMedia for the whole page).
   isTouchDevice() {
-    return window.matchMedia('(hover: none) and (pointer: coarse)').matches;
+    return this.forceTouchPreview || window.matchMedia('(hover: none) and (pointer: coarse)').matches;
   },
 
   // #waveform is flex:1 in the stylesheet (see the CSS comments on that rule
@@ -659,11 +665,120 @@ const playerAppCore = {
 
   updateTrackInfo(audioURL, title) {
     const trackInfo = this.elements.trackInfo;
-    if (trackInfo) {
-      const fileName = title || extractFileName(audioURL);
+    if (!trackInfo) return;
+    const fileName = title || extractFileName(audioURL);
+    trackInfo.classList.add('visible');
+
+    const textEl = trackInfo.querySelector('.track-info-text');
+    if (!textEl) {
+      // No wrapper span (shouldn't happen via renderPlayer()'s own markup,
+      // but keeps this safe against any other caller) - no crossfade/marquee
+      // possible without it, just show the name.
       trackInfo.textContent = fileName;
-      trackInfo.classList.add('visible');
+      return;
     }
+    if (trackInfo.dataset.title === fileName) {
+      // Same track re-selected (e.g. re-clicking the active playlist item) -
+      // nothing to crossfade, but the box may have been resized since the
+      // last measurement.
+      this.refreshTrackInfoScroll();
+      return;
+    }
+
+    // Crossfade to the new title - same idea as the track background's own
+    // cross-dissolve on track switch (updateTrackBackground() below): fade
+    // out, swap the text once it's invisible, remeasure for the marquee,
+    // fade back in. Timeout duration matches .track-info-text's own opacity
+    // transition (css/player.css).
+    clearTimeout(this._trackInfoFadeTimeout);
+    textEl.style.opacity = '0';
+    this._trackInfoFadeTimeout = setTimeout(() => {
+      trackInfo.dataset.title = fileName;
+      this.refreshTrackInfoScroll();
+      textEl.style.opacity = '1';
+    }, 250);
+  },
+
+  // Measures whether the current track title overflows its box and, if so,
+  // builds a continuously-looping carousel rather than a ping-pong bounce:
+  // the title is duplicated with a fixed gap so the second copy picks up
+  // exactly where the first left off, then translated by exactly one
+  // copy-width-plus-gap on a plain infinite loop - the reset at 100% is
+  // invisible since that's exactly where the (identical) second copy
+  // already is. Only ever runs while actually playing - called both from
+  // updateTrackInfo() (text changed) and updatePlayingState() (play/pause
+  // toggled with the same title), since unlike a pure CSS ping-pong this
+  // needs to physically rebuild the duplicated markup, not just toggle a
+  // class.
+  refreshTrackInfoScroll() {
+    const trackInfo = this.elements.trackInfo;
+    const textEl = trackInfo?.querySelector('.track-info-text');
+    if (!trackInfo || !textEl) return;
+    const isPlaying = !!this.elements.playerWrapper?.classList.contains('is-playing');
+
+    if (textEl.classList.contains('scrolling') && !isPlaying) {
+      // Was actively carouselling and playback just stopped - a very quick
+      // fade out/in around the reset (rather than relying only on the
+      // transform transition to slide it back) masks the abrupt swap from
+      // two duplicated marquee copies back to a single static one. Uses its
+      // own faster inline transition rather than .track-info-text's shared
+      // 0.25s opacity transition (that one's timed to match the track-change
+      // crossfade elsewhere) - cleared again once the fade-in lands so it
+      // doesn't linger and slow down a later crossfade.
+      const FAST_MS = 120;
+      clearTimeout(this._trackInfoResetFadeTimeout);
+      textEl.style.transition = `opacity ${FAST_MS}ms ease`;
+      textEl.style.opacity = '0';
+      this._trackInfoResetFadeTimeout = setTimeout(() => {
+        this.applyTrackInfoContent();
+        textEl.style.opacity = '1';
+        setTimeout(() => { textEl.style.transition = ''; }, FAST_MS);
+      }, FAST_MS);
+      return;
+    }
+
+    this.applyTrackInfoContent();
+  },
+
+  // The actual measure-and-rebuild step behind refreshTrackInfoScroll() -
+  // split out so the playback-stopped reset above can wrap it in a fade
+  // without duplicating this logic.
+  applyTrackInfoContent() {
+    const trackInfo = this.elements.trackInfo;
+    const textEl = trackInfo?.querySelector('.track-info-text');
+    if (!trackInfo || !textEl) return;
+    const title = trackInfo.dataset.title || '';
+    const isPlaying = !!this.elements.playerWrapper?.classList.contains('is-playing');
+
+    // Always measure against a single plain copy first - a duplicated
+    // marquee copy would inflate scrollWidth and give a wrong reading.
+    textEl.classList.remove('scrolling');
+    textEl.textContent = title;
+    const overflow = textEl.scrollWidth - trackInfo.clientWidth;
+    trackInfo.classList.toggle('overflowing', overflow > 2);
+
+    const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
+    if (!isPlaying || overflow <= 2 || reduceMotion) {
+      // Plain single copy stays - .track-info-text's own ellipsis handles
+      // the static truncated look.
+      return;
+    }
+
+    const GAP_PX = 40;
+    const first = document.createElement('span');
+    first.textContent = title;
+    first.style.marginRight = `${GAP_PX}px`;
+    const second = first.cloneNode(true);
+    second.style.marginRight = '0';
+    textEl.replaceChildren(first, second);
+    const copyDistance = first.getBoundingClientRect().width + GAP_PX;
+
+    trackInfo.style.setProperty('--track-info-scroll-distance', `-${copyDistance}px`);
+    // Constant px/sec regardless of title length, so a longer title takes
+    // proportionally longer rather than always taking the same duration.
+    const PX_PER_SECOND = 20; // ~40% slower than the original 34
+    trackInfo.style.setProperty('--track-info-marquee-duration', `${Math.max(4, copyDistance / PX_PER_SECOND)}s`);
+    textEl.classList.add('scrolling');
   },
 
   updateActivePlaylistItem(index) {
@@ -917,8 +1032,19 @@ const playerAppCore = {
       hoverTime.style.opacity = "0";
     };
 
-    waveformEl.addEventListener("mousemove", (e) => updateScrubPreview(e.clientX));
-    waveformEl.addEventListener("mouseleave", hideScrubPreview);
+    // Guarded by isTouchDevice() (unlike a real touch device, which simply
+    // never fires mousemove) so the builder's Mobile Preview toggle
+    // (forceTouchPreview) can suppress this - otherwise the real desktop
+    // mouse hovering over the waveform to click/scrub during that preview
+    // would still show the hover scrub-preview/time label.
+    waveformEl.addEventListener("mousemove", (e) => {
+      if (this.isTouchDevice()) return;
+      updateScrubPreview(e.clientX);
+    });
+    waveformEl.addEventListener("mouseleave", () => {
+      if (this.isTouchDevice()) return;
+      hideScrubPreview();
+    });
 
     // Touch equivalent of the hover preview above - WaveSurfer's own tap-to-seek
     // (interact: true) already handles the actual seek natively via touch, this
@@ -2105,6 +2231,11 @@ const playerAppCore = {
     if (wrapper) {
       wrapper.classList.toggle('is-playing', playing);
     }
+    // Start/stop the track title carousel - refreshTrackInfoScroll() reads
+    // this same .is-playing class, so this covers a bare play/pause toggle
+    // with no track change (updateTrackInfo() already covers the reverse:
+    // a track change while already playing).
+    this.refreshTrackInfoScroll();
 
     if (wrapper && this.expandable.enabled) {
       // Update collapsed state based on playing status (only when not expanded)
@@ -2210,7 +2341,7 @@ const playerAppCore = {
             ? `<div class="reel-title">${title}</div>`
             : ""
         }
-        <div class="track-info"></div>
+        <div class="track-info"><span class="track-info-text"></span></div>
         <div class="player-container">
           <button id="playPause" class="icon-button">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
@@ -2300,14 +2431,10 @@ const playerAppCore = {
       
       // Pre-buffer video for first track
       this.preloadVideos();
-      
-      // Set track info for preview
-      const trackInfo = this.elements.trackInfo;
-      const fileName = firstTrack.title || extractFileName(firstTrack.url);
-      if (trackInfo) {
-        trackInfo.textContent = fileName;
-        trackInfo.classList.add("visible");
-      }
+      // initializePlayer() above already set the track info (updateTrackInfo())
+      // - this used to duplicate that here with a raw textContent write,
+      // which would silently wipe out .track-info-text's wrapper span
+      // (needed for the crossfade/marquee) on every fresh render.
     }
   },
 };

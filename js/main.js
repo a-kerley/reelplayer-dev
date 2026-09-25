@@ -30,7 +30,6 @@ import {
 } from "./modules/draftStore.js";
 import { maybeRunMigration } from "./modules/draftMigration.js";
 import { getBuilderPassword } from "./modules/builderAuth.js";
-import { extractFileName } from "./modules/urlUtils.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -522,6 +521,7 @@ document.addEventListener("DOMContentLoaded", async () => {
 
       renderBuilder(current, updateCurrentReel, onSettingsPasted);
       setupRefreshPreviewButton();
+      setupMobilePreviewToggle();
       setupExportEmbedButton();
       setupEmbedManagerButton(() => reels.find((r) => r.id === currentId));
       setupAnalyticsControls(current);
@@ -554,6 +554,46 @@ document.addEventListener("DOMContentLoaded", async () => {
       if (btn) {
         btn.onclick = () => showPreview();
       }
+    }
+
+    // Simulates touch-mode (playerApp.forceTouchPreview, read by
+    // isTouchDevice() in player.js) plus a phone-width column, so
+    // touch-only JS branches (scrollbar offset, hover-darken/idle-unblur
+    // touch handling) can be checked from a desktop dev machine. Doesn't
+    // persist across reloads - always starts off.
+    // Mirrors css/variables.css's own `@media (max-width: 480px)` block -
+    // that's a real browser-viewport-width query, which narrowing just this
+    // preview pane's own CSS width can never trigger (confirmed: the
+    // player's mobile-only track-info alignment silently didn't show up
+    // through this toggle until these were added here too). Keep these
+    // values in sync with that media query block by hand; there's no way to
+    // read "what would this resolve to under that media query" from JS.
+    const MOBILE_PREVIEW_VARS = {
+      '--player-padding': '1rem',
+      '--expandable-playlist-inset': '1rem',
+      '--expandable-track-info-left': '0.9375rem',
+      '--expandable-track-info-padding': '0rem',
+      '--track-info-mobile-scale': '0.88',
+    };
+
+    function setupMobilePreviewToggle() {
+      const btn = document.getElementById('mobilePreviewToggleBtn');
+      const preview = document.getElementById('reelPlayerPreview');
+      if (!btn || !preview) return;
+      btn.onclick = () => {
+        playerApp.forceTouchPreview = !playerApp.forceTouchPreview;
+        btn.classList.toggle('active', playerApp.forceTouchPreview);
+        btn.setAttribute('aria-pressed', String(playerApp.forceTouchPreview));
+        preview.classList.toggle('mobile-preview-mode', playerApp.forceTouchPreview);
+        Object.entries(MOBILE_PREVIEW_VARS).forEach(([prop, value]) => {
+          if (playerApp.forceTouchPreview) {
+            document.documentElement.style.setProperty(prop, value);
+          } else {
+            document.documentElement.style.removeProperty(prop);
+          }
+        });
+        showPreview();
+      };
     }
 
     function setupExportEmbedButton() {
@@ -733,25 +773,22 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     const firstTrack = playlist[0];
     const convertedURL = convertDropboxLinkToDirect(firstTrack.url);
+    // initializePlayer() already sets the track info itself (playerApp.
+    // updateTrackInfo()) - a duplicate raw textContent write here used to
+    // silently wipe out .track-info-text's wrapper span (needed for the
+    // crossfade/marquee) right after it was set.
     playerApp.initializePlayer(convertedURL, firstTrack.title, 0);
-
-    // Show track info for the first track on load
-    const trackInfo = playerApp.elements.trackInfo;
-    const fileName = firstTrack.title || extractFileName(firstTrack.url);
-    if (trackInfo) {
-      trackInfo.textContent = fileName;
-      trackInfo.classList.add("visible");
-    }
   }
 
   // --- Custom events ---
   document.addEventListener("track:change", (e) => {
     const { audioURL, title, index } = e.detail;
-    const trackInfo = playerApp.elements.trackInfo;
-    const fileName = title || extractFileName(audioURL);
-    if (trackInfo) {
-      trackInfo.textContent = fileName;
-    }
+    // Routes through the same crossfade/marquee-aware path initializePlayer()
+    // itself uses, rather than a raw textContent write - this listener fires
+    // on every track load (including the builder's own preview, since
+    // js/player.js dispatches "track:change" unconditionally), and a plain
+    // write here was destroying .track-info-text's wrapper span.
+    playerApp.updateTrackInfo(audioURL, title);
     const items = document.querySelectorAll(".playlist-item");
     items.forEach((el) => el.classList.remove("active"));
     if (typeof index === "number") {

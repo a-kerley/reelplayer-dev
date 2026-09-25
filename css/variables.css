@@ -72,11 +72,21 @@
      SHARED TRACK INFO POSITIONING
      Used by both static and expandable modes
      ======================================== */
-  --expandable-track-info-left: 2.875rem;         /* Left offset for track info (matches play button's actual 46px rendered width) */
+  /* One flanking icon's rendered width (play button on the left, volume
+     control on the right - both are 46px, see css/player.css's own
+     .heroicon/.volume-control). Named separately from
+     --expandable-track-info-left below because that one gets overridden
+     per-viewport (see the narrow-viewport block further down) while this
+     is a real, unchanging physical size - css/player.css's .track-info
+     margin-right still needs the true icon width even on a narrow player,
+     regardless of what the left offset is doing. */
+  --expandable-icon-width: 2.875rem;
+  --expandable-track-info-left: var(--expandable-icon-width); /* Left offset for track info (matches play button's rendered width by default) */
   --expandable-track-info-padding: 0.5rem;        /* Additional left padding for track info text (matches --expandable-player-gap, so text lines up with the waveform's left edge) */
   --expandable-track-info-top: 1rem;              /* Top margin above track info */
   --expandable-track-info-bottom: 0.5rem;         /* Bottom margin below track info */
-  
+  --track-info-mobile-scale: 1;                   /* Font-size multiplier for the track title, narrowed below */
+
   /* ========================================
      SHARED PLAYLIST SPACING
      Used by both static and expandable modes
@@ -171,14 +181,37 @@
    content (waveform, controls, playlist rows) even starts. Overriding the
    variables here, rather than touching every rule that reads them, is why
    this is a one-block change instead of a scattered one - the shared-var
-   architecture in the rest of this file exists for exactly this. Deliberately
-   NOT touching icon/button sizes (.heroicon is already 46px, close to the
-   ~44px minimum touch-target recommendation) or --expandable-track-info-left
-   (tied to the play button's width, not wasted space).
+   architecture in the rest of this file exists for exactly this.
+   Deliberately NOT touching icon/button sizes (.heroicon is already 46px,
+   close to the ~44px minimum touch-target recommendation).
    ======================================== */
 @media (max-width: 480px) {
   :root {
     --player-padding: 1rem;
     --expandable-playlist-inset: 1rem;
+    /* Track info's left offset normally mirrors the play button's real
+       width (--expandable-icon-width) plus its gap, purely so the title
+       text lines up with the waveform's left edge - see the shared vars
+       above. That fixed ~54px reservation barely registers on a wide
+       desktop player, but on a ~375-390px phone-width player it eats close
+       to a third of the total width before any title text starts,
+       truncating a longer title far more aggressively than it needs to.
+       Shrinking both here instead brings the title's own left edge close
+       to the play button's left edge (flush - 0/0 - read as too tight
+       against the button) - trades exact waveform alignment on the LEFT
+       for most of the width narrow players can give the title, with a
+       small breathing-room gap left in front of the button. The RIGHT edge
+       still needs to clear the volume control regardless (css/player.css's
+       .track-info margin-right), which is exactly why that one reads
+       --expandable-icon-width directly rather than this variable - shrinking
+       this here must not also shrink that reservation. */
+    --expandable-track-info-left: 0.9375rem;
+    --expandable-track-info-padding: 0rem;
+    /* A little smaller on narrow players - the title has noticeably less
+       width to work with than desktop even after the left-offset saving
+       above, so proportionally reducing whatever size is already in effect
+       (custom per-reel or the CSS default) buys a bit more of the title
+       before it truncates/needs to scroll. */
+    --track-info-mobile-scale: 0.88;
   }
 }

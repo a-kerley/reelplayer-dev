@@ -671,6 +671,54 @@ body {
   margin-bottom: 4rem;
 }
 
+/* "Mobile Preview" toggle (js/main.js's setupMobilePreviewToggle()) - same
+   pressed-state look as .sidebar-tab.active. Narrowing to a phone-width
+   column is enough on its own since .player-wrapper is width:100% with no
+   viewport-width media queries anywhere in this app - see player.js's
+   forceTouchPreview for the touch-mode half of this feature. */
+#mobilePreviewToggleBtn.active {
+  background: var(--builder-accent);
+  color: white;
+  border-color: var(--builder-accent);
+}
+
+#reelPlayerPreview.mobile-preview-mode {
+  max-width: 390px;
+  margin-left: auto;
+  margin-right: auto;
+}
+
+/* Real desktop :hover still fires in this mode - moving the mouse over the
+   preview to click play/scrub/drag is unavoidable while testing. These
+   override every :hover-driven rule in player.css/playlist.css back to its
+   non-hovered look (higher specificity via the #reelPlayerPreview.
+   mobile-preview-mode ancestor wins regardless of source order or the
+   @media (hover:hover) block those rules live in), so only the JS
+   touch-equivalents (.touch-darkened/.touch-settled, driven by player.js's
+   forceTouchPreview) drive hover-darken/idle-unblur here - matching a real
+   touch device, where none of this :hover CSS would ever match at all. */
+#reelPlayerPreview.mobile-preview-mode #playPause:hover {
+  transform: none;
+}
+
+#reelPlayerPreview.mobile-preview-mode .player-wrapper.hover-darken-enabled:hover {
+  --hover-darken-brightness: 1;
+}
+
+#reelPlayerPreview.mobile-preview-mode .player-wrapper.idle-unblur-enabled:hover {
+  --idle-unblur-blur: var(--background-blur);
+}
+
+#reelPlayerPreview.mobile-preview-mode .custom-scrollbar-thumb:hover {
+  background: rgba(0, 0, 0, 0.3);
+}
+
+#reelPlayerPreview.mobile-preview-mode .playlist-item:hover:not(.active) {
+  transform: scale(0.95);
+  opacity: 0.7;
+  background-color: transparent;
+}
+
 /* Project Cards tab's own live preview - stacked below the form, same
    pattern as #reelPlayerPreview above (not the Pages tab's side-by-side
    resizable #pagePreviewPane - the user asked for Reels-tab parity). Capped
@@ -858,6 +906,28 @@ body {
 #refreshCardPreviewBtn:hover,
 #cardPublishBtn:hover {
   background: var(--builder-hover);
+}
+
+/* "Mobile Preview" toggle - outline-off/filled-on, same convention as
+   .sidebar-tab.active/.sidebar-media-btn.active (not lumped into the
+   solid-accent action-button group above, which has no "off" look to
+   contrast a pressed state against). */
+#mobilePreviewToggleBtn {
+  background: transparent;
+  color: var(--builder-accent);
+  border: 1px solid var(--builder-accent);
+  border-radius: 5px;
+  font-size: var(--builder-text-md);
+  padding: 0.4rem 0.8rem;
+  margin-top: 1rem;
+  margin-left: 0.5rem;
+  font-weight: var(--builder-weight-bold);
+  cursor: pointer;
+  transition: background 0.18s, color 0.18s;
+}
+
+#mobilePreviewToggleBtn:hover {
+  background: rgba(74, 144, 226, 0.15);
 }
 
 /* The in-editor lock/unlock control (#reelLockBtn/#pageLockBtn) - amber
