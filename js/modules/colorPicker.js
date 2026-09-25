@@ -111,6 +111,19 @@ function initPickrs(pickrConfigs, onChange) {
 
         pickrInstances.push(pickr);
 
+        // Work around a real bug in the currently-resolved @simonwep/pickr
+        // build (unpinned CDN, currently 1.10.2): the `default` option above
+        // is silently ignored - EVERY swatch initializes to black regardless
+        // of what `default` is set to, verified with a minimal repro outside
+        // this codebase's own code (Pickr.create({default: '#ff0000'}) alone
+        // still yields getColor() = black; calling setColor() right after
+        // does not). The reel's actual saved color was never the problem -
+        // only the picker's own swatch was wrong, which is why the real
+        // player always looked correct while every picker looked black after
+        // a reload. Forcing it via setColor() here is a genuine fix for a
+        // library defect, not a workaround for anything in this file.
+        pickr.setColor(cfg.default);
+
         // Event handlers
         // "change" fires continuously while dragging inside the popup -
         // unlike every other field in the builder, a color's actual reel
