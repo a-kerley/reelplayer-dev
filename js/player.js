@@ -31,6 +31,17 @@ const playerAppCore = {
   activeFadeIn: null, // Track active fade-in to allow cancellation
   wasPlayingBeforeTrackSwitch: false, // Track if we need to auto-resume with fade-in
   isTrackSwitching: false, // Flag to prevent pause event from interfering during track switch
+  // What the user last asked for (via the play/pause button or spacebar),
+  // not what wavesurfer is actually doing right now - the two can differ
+  // for up to a fade's duration. togglePlayback() branches on this (not
+  // wavesurfer.isPlaying()) so a rapid second click during a fade toggles
+  // the right direction instead of re-running the same branch, and the
+  // icon/playhead-time flip immediately off this instead of waiting for
+  // the real "play"/"pause" wavesurfer events. Those real events still
+  // write this flag too (see setupWaveSurfer()'s "play"/"pause" handlers),
+  // so anything that changes actual playback outside a button click
+  // (pauseForOtherPlayer(), track finish) reconciles it back to reality.
+  desiredPlaying: false,
   isFirstLoad: true, // Flag to track if this is the initial player load for intro animation
   lastProjectTitleImageUrl: null, // Track the last project title image URL for new reel detection
   
@@ -1219,6 +1230,11 @@ const playerAppCore = {
       // genuinely new, unmanaged play() call ever needs a fade cancelled,
       // that call site should cancel explicitly, not rely on this event.
 
+      // Reconcile intent to reality - covers every path that ends up
+      // actually playing without going through togglePlayback() (e.g. the
+      // wasPlayingBeforeTrackSwitch auto-resume above).
+      this.desiredPlaying = true;
+
       // Show cursor when playing using UI accent color
       const accentColor = getComputedStyle(document.documentElement)
         .getPropertyValue("--ui-accent")
@@ -1248,7 +1264,14 @@ const playerAppCore = {
       document.dispatchEvent(new CustomEvent("playback:play"));
     });
     this.wavesurfer.on("pause", () => {
-      
+      // Reconcile intent to reality - covers pauses this player's own
+      // button didn't request: pauseForOtherPlayer() (another embed on the
+      // page started), and natural end-of-track (the underlying media
+      // element pauses itself, which wavesurfer surfaces as this same
+      // event, before the "finish" handler below decides whether to
+      // auto-advance).
+      this.desiredPlaying = false;
+
       // Hide cursor when paused by making it transparent
       this.wavesurfer.setOptions({ cursorColor: 'transparent' });
       this.elements.waveform.classList.remove('playing');
@@ -1369,7 +1392,19 @@ const playerAppCore = {
   // GainNode-bug workaround below, which is exactly the drift that let
   // spacebar-on-a-page bypass the fades while the button kept them.
   togglePlayback() {
-    if (this.wavesurfer.isPlaying()) {
+    // Branch on what the user last asked for, not wavesurfer.isPlaying() -
+    // during a fade those disagree for up to the fade's duration, and
+    // reading real state here would make a second click mid-fade re-run
+    // the same branch instead of reversing it. Flip and broadcast the new
+    // intent immediately so the button/playhead respond to this click, not
+    // to whichever wavesurfer event eventually fires once the fade lands.
+    const wasDesiredPlaying = this.desiredPlaying;
+    this.desiredPlaying = !wasDesiredPlaying;
+    document.dispatchEvent(
+      new CustomEvent(this.desiredPlaying ? "playback:play" : "playback:pause")
+    );
+
+    if (wasDesiredPlaying) {
       // pauseAfterFade: true so the actual pause() (and the 'pause' event
       // that triggers video fade-out) happens *inside* the fade-out, right
       // after gain reaches silence - not in a separate .then() here, which
