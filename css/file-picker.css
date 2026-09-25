@@ -161,6 +161,39 @@
   font-size: var(--builder-text-md);
 }
 
+.media-browser-storage {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  flex-shrink: 0;
+}
+
+.media-browser-storage-label {
+  color: #999;
+  font-size: var(--builder-text-base);
+  white-space: nowrap;
+}
+
+.media-browser-storage-track {
+  width: 80px;
+  height: 6px;
+  border-radius: 3px;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  overflow: hidden;
+}
+
+.media-browser-storage-fill {
+  height: 100%;
+  background: #4a90e2;
+  border-radius: 3px;
+  transition: width 0.2s ease;
+}
+
+.media-browser-storage-fill.near-limit {
+  background: #dc3545;
+}
+
 .media-browser-view-btn {
   background: #3a3a3a;
   color: #ccc;

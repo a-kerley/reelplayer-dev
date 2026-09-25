@@ -90,6 +90,15 @@ function protectedRootOf(path) {
   return Object.keys(PROTECTED_ROOT_FOLDERS).find(root => path === root || path.startsWith(root)) || null;
 }
 
+// Cloudflare R2's free tier: 10GB of storage before paid usage kicks in.
+// Purely informational - the Worker enforces nothing client-side, this is
+// just so the Media Library tab can show how close the account is to it.
+const FREE_TIER_STORAGE_LIMIT_BYTES = 10 * 1024 * 1024 * 1024;
+
+function formatGB(bytes) {
+  return `${(bytes / (1024 * 1024 * 1024)).toFixed(2)} GB`;
+}
+
 function formatBytes(bytes) {
   if (bytes == null) return '—';
   if (bytes < 1024) return `${bytes} B`;
@@ -552,6 +561,33 @@ export async function renderMediaBrowser(container, options = {}) {
     return handle;
   }
 
+  function renderStorageUsage() {
+    const totalBytes = r2Files
+      .filter(f => !isFolderMarker(f))
+      .reduce((sum, f) => sum + (f.size || 0), 0);
+    const fraction = Math.min(totalBytes / FREE_TIER_STORAGE_LIMIT_BYTES, 1);
+
+    const wrap = document.createElement("div");
+    wrap.className = "media-browser-storage";
+    wrap.title = `${formatGB(totalBytes)} of ${formatGB(FREE_TIER_STORAGE_LIMIT_BYTES)} used (Cloudflare R2 free tier)`;
+
+    const label = document.createElement("span");
+    label.className = "media-browser-storage-label";
+    label.textContent = `${formatGB(totalBytes)} / 10 GB`;
+    wrap.appendChild(label);
+
+    const track = document.createElement("div");
+    track.className = "media-browser-storage-track";
+    const fill = document.createElement("div");
+    fill.className = "media-browser-storage-fill";
+    if (fraction >= 0.9) fill.classList.add("near-limit");
+    fill.style.width = `${fraction * 100}%`;
+    track.appendChild(fill);
+    wrap.appendChild(track);
+
+    return wrap;
+  }
+
   function renderToolbar() {
     const bar = document.createElement("div");
     bar.className = "media-browser-toolbar";
@@ -565,6 +601,18 @@ export async function renderMediaBrowser(container, options = {}) {
     search.value = state.search;
     search.oninput = () => { state.search = search.value; renderMainOnly(); };
     bar.appendChild(search);
+
+    // Manage mode only (the real Media Library tab) - a file-picker modal is
+    // about finding one file, not auditing total account usage, and r2Files
+    // there can be extension-filtered to begin with (see applyExtFilter),
+    // which would misreport it anyway. Reads the live r2Files closure
+    // variable fresh on every render() call, so it stays correct after an
+    // upload/delete/rename/move without any separate "recompute the total"
+    // bookkeeping - render() already re-runs renderToolbar() after each of
+    // those (see refresh()/createFolder() above).
+    if (mode === 'manage') {
+      bar.appendChild(renderStorageUsage());
+    }
 
     const listBtn = document.createElement("button");
     listBtn.type = "button";
