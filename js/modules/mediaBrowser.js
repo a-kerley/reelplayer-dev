@@ -435,13 +435,19 @@ export async function renderMediaBrowser(container, options = {}) {
   // endBusy()'s own removal call is then just a no-op cleanup for the
   // error/no-op paths that don't call refresh().
   let busyCount = 0;
-  function beginBusy() {
+  function beginBusy(text = "") {
     busyCount++;
-    if (busyCount > 1 || container.querySelector(".media-browser-busy-overlay")) return;
-    const overlay = document.createElement("div");
-    overlay.className = "media-browser-busy-overlay";
-    overlay.innerHTML = '<div class="media-browser-spinner"></div>';
-    container.appendChild(overlay);
+    if (!container.querySelector(".media-browser-busy-overlay")) {
+      const overlay = document.createElement("div");
+      overlay.className = "media-browser-busy-overlay";
+      overlay.innerHTML = '<div class="media-browser-spinner"></div><div class="media-browser-busy-text"></div>';
+      container.appendChild(overlay);
+    }
+    setBusyText(text);
+  }
+  function setBusyText(text) {
+    const el = container.querySelector(".media-browser-busy-text");
+    if (el) el.textContent = text;
   }
   function endBusy() {
     busyCount = Math.max(0, busyCount - 1);
@@ -1132,7 +1138,9 @@ export async function renderMediaBrowser(container, options = {}) {
     for (const [folder, names] of byFolder) {
       const label = names.length === 1 ? names[0] : `${names.length} files`;
       const confirmed = await dialog.confirm(
-        `${label} look like they belong in "${folder}" - move them there now?`,
+        names.length === 1
+          ? `${label} looks like it belongs in "${folder}" - move it there now?`
+          : `${label} look like they belong in "${folder}" - move them there now?`,
         "Move", "Leave in Unfiled"
       );
       if (!confirmed) continue;
@@ -1188,13 +1196,14 @@ export async function renderMediaBrowser(container, options = {}) {
 
       const failures = [];
       const succeeded = [];
+      beginBusy();
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const clashes = takenKeys.has(`${targetFolder}${file.name}`);
-        const name = clashes && clashMode === "keep" ? uniqueFileName(targetFolder, file.name, takenKeys) : file.name;
-        zone.textContent = `Uploading ${i + 1} of ${files.length}: ${name}...`;
+        const exists = takenKeys.has(`${targetFolder}${file.name}`);
+        const name = exists && clashMode === "keep" ? uniqueFileName(targetFolder, file.name, takenKeys) : file.name;
+        setBusyText(`Uploading ${i + 1} of ${files.length}: ${name}`);
         try {
-          await uploadFile(targetFolder, file, name, clashes && clashMode === "replace");
+          await uploadFile(targetFolder, file, name, exists && clashMode === "replace");
           takenKeys.add(`${targetFolder}${name}`);
           succeeded.push(name);
         } catch (error) {
@@ -1203,6 +1212,7 @@ export async function renderMediaBrowser(container, options = {}) {
       }
 
       await refresh();
+      endBusy();
 
       if (failures.length) {
         dialog.alert(`${failures.length} of ${files.length} file(s) failed to upload:\n\n${failures.join('\n')}`);

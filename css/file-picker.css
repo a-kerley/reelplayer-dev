@@ -225,9 +225,24 @@
   inset: 0;
   z-index: 10;
   display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
   align-items: center;
   justify-content: center;
   background: rgba(26, 26, 26, 0.55);
+}
+
+.media-browser-busy-text {
+  max-width: 80%;
+  color: #ccc;
+  font-size: var(--builder-text-base);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.media-browser-busy-text:empty {
+  display: none;
 }
 
 .media-browser-spinner {
