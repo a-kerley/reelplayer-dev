@@ -88,6 +88,7 @@
   --expandable-track-info-top: 1rem;              /* Top margin above track info */
   --expandable-track-info-bottom: 0.5rem;         /* Bottom margin below track info */
   --track-info-mobile-scale: 1;                   /* Font-size multiplier for the track title, narrowed below */
+  --track-info-marquee-delay: 2s;                 /* Pause before a long track title starts scrolling, longer on narrow players below */
 
   /* ========================================
      SHARED PLAYLIST SPACING
@@ -215,5 +216,6 @@
        (custom per-reel or the CSS default) buys a bit more of the title
        before it truncates/needs to scroll. */
     --track-info-mobile-scale: 0.88;
+    --track-info-marquee-delay: 5s;
   }
 }

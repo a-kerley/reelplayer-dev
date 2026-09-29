@@ -470,7 +470,7 @@ button {
   /* animation-delay only holds the first iteration at 0% - the loop itself
      still runs back-to-back with no gap after that, just a pause before it
      first starts. */
-  animation: track-info-marquee var(--track-info-marquee-duration, 8s) linear 2s infinite;
+  animation: track-info-marquee var(--track-info-marquee-duration, 8s) linear var(--track-info-marquee-delay, 2s) infinite;
 }
 
 @keyframes track-info-marquee {
