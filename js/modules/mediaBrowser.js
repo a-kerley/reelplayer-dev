@@ -443,12 +443,18 @@ export async function renderMediaBrowser(container, options = {}) {
     return dir * (new Date(a.uploaded || 0) - new Date(b.uploaded || 0));
   }
 
+  // Search spans every folder, not just the open one - a file you're
+  // looking for is rarely in whichever folder you happen to be in.
+  function isSearching() {
+    return state.search.trim() !== '';
+  }
+
   function visibleFiles() {
-    let list = state.view.type === 'folder'
+    let list = state.view.type === 'folder' && !isSearching()
       ? state.files.filter(f => folderOf(f.key) === state.view.path)
       : state.files;
     list = list.filter(f => !isFolderMarker(f));
-    if (state.search.trim()) {
+    if (isSearching()) {
       const q = state.search.trim().toLowerCase();
       list = list.filter(f => f.name.toLowerCase().includes(q));
     }
@@ -635,10 +641,10 @@ export async function renderMediaBrowser(container, options = {}) {
 
     const search = document.createElement("input");
     search.type = "text";
-    search.placeholder = "Search...";
+    search.placeholder = "Search all folders...";
     search.className = "media-browser-search";
-    search.title = "Search files by name";
-    search.setAttribute("aria-label", "Search files by name");
+    search.title = "Search file names across every folder";
+    search.setAttribute("aria-label", "Search file names across every folder");
     search.value = state.search;
     search.oninput = () => { state.search = search.value; renderMainOnly(); };
     bar.appendChild(search);
@@ -1132,6 +1138,12 @@ export async function renderMediaBrowser(container, options = {}) {
       ? subfoldersOf(state.view.path)
       : [];
 
+    if (isSearching()) {
+      message.textContent = `No files match "${state.search.trim()}".`;
+      wrap.appendChild(message);
+      return wrap;
+    }
+
     if (subfolders.length === 0) {
       message.textContent = "No files here.";
       wrap.appendChild(message);
@@ -1511,6 +1523,13 @@ export async function renderMediaBrowser(container, options = {}) {
       }
     };
     nameTd.appendChild(link);
+    // Results can come from anywhere, so say where.
+    if (state.view.type === 'all' || isSearching()) {
+      const folder = document.createElement("span");
+      folder.className = "media-browser-file-folder";
+      folder.textContent = folderOf(file.key) || "Unfiled";
+      nameTd.appendChild(folder);
+    }
     if (file.readOnly) {
       const badge = document.createElement("span");
       badge.textContent = " (test asset)";
@@ -1670,7 +1689,7 @@ export async function renderMediaBrowser(container, options = {}) {
       const type = fileType(file.name);
       const card = document.createElement("div");
       card.className = `media-browser-card${state.selected.has(file.key) ? ' selected' : ''}`;
-      card.title = file.name;
+      card.title = `${folderOf(file.key)}${file.name}`;
       wireManageActions(card, file);
 
       if (showCheckboxes) {
