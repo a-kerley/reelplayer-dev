@@ -7,32 +7,36 @@ import { trackBackgroundType } from "./trackBackground.js";
 let zoomControlIdCounter = 0;
 
 /**
- * Generates expandable mode preview HTML with zoom control
+ * Background image preview HTML with zoom control - one frame per player
+ * height (collapsed + expanded in expandable mode), each showing the push-in peak
  * @param {string} imageUrl - Image URL
  * @param {Object} reel - Reel configuration object
  * @param {number} zoom - Zoom level (1-3)
  * @returns {string} HTML string
  */
 export function createExpandablePreview(imageUrl, reel, zoom = 1) {
-  if (!reel || reel.mode !== "expandable") {
-    return `<img src="${imageUrl}" style="width:100%;height:auto;max-height:200px;object-fit:contain;border-radius:3px;transform:scale(${zoom});" />`;
-  }
-  
   const previewIframe = document.querySelector("#player-preview");
   let playerWidth = 800;
   if (previewIframe) {
     const iframeRect = previewIframe.getBoundingClientRect();
-    playerWidth = Math.min(iframeRect.width, 800);
+    playerWidth = Math.min(iframeRect.width, 800) || 800;
   }
-  
-  const collapsedHeight = parseInt(reel.expandableSettings?.collapsedHeight) || 120;
-  const expandedHeight = parseInt(reel.expandableSettings?.expandedHeight) || 500;
-  
-  const maxPreviewWidth = Math.min(playerWidth, 400);
-  const scaleFactor = maxPreviewWidth / playerWidth;
+  const scaleFactor = Math.min(playerWidth, 400) / playerWidth;
   const previewWidth = playerWidth * scaleFactor;
-  const collapsedPreviewHeight = collapsedHeight * scaleFactor;
-  const expandedPreviewHeight = expandedHeight * scaleFactor;
+
+  const isExpandable = reel?.mode === "expandable";
+  const frames = isExpandable
+    ? [
+        ["Collapsed", parseInt(reel.expandableSettings?.collapsedHeight) || 120],
+        ["Expanded", parseInt(reel.expandableSettings?.expandedHeight) || 500]
+      ]
+    : [["Player", parseInt(reel?.playerHeight) || 500]];
+
+  // WHY: playback pushes the image in to zoom × multiplier around its centre,
+  // so relative to this base-zoom preview the area still visible at the peak is
+  // always the middle 1/multiplier of the frame, whatever the zoom.
+  const multiplier = parseFloat(getComputedStyle(document.documentElement).getPropertyValue("--playback-idle-zoom-multiplier")) || 1.2;
+  const inset = ((1 - 1 / multiplier) / 2 * 100).toFixed(2);
 
   // Built (not wired) here since this is assembled into an HTML string and
   // re-parsed via innerHTML - attachZoomListener() wires it after mounting.
@@ -48,31 +52,30 @@ export function createExpandablePreview(imageUrl, reel, zoom = 1) {
   // `tooltip` above only lands on the (here, empty) label element - this
   // markup only ever embeds `.control.outerHTML` (see below), so set title
   // directly on the piece that's actually serialized.
-  zoomControl.control.title = 'Zoom level applied to this background image in the preview.';
+  zoomControl.control.title = 'Base zoom for this background image. During playback it slowly pushes in further from here.';
+
+  const frameHtml = frames.map(([label, height]) => `
+        <div style="display:flex;flex-direction:column;gap:0.5rem;">
+          <div style="font-size:0.75rem;color:#ccc;text-align:center;">${label} (${height}px)</div>
+          <div style="width:${previewWidth}px;height:${height * scaleFactor}px;border:1px solid #444;border-radius:4px;overflow:hidden;position:relative;">
+            <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
+            <div style="position:absolute;inset:${inset}%;border:1px dashed rgba(255,255,255,0.85);box-shadow:0 0 0 1px rgba(0,0,0,0.5);pointer-events:none;"></div>
+          </div>
+        </div>`).join("");
 
   return `
     <div style="display:flex;flex-direction:column;gap:1rem;">
-      <div style="text-align:center;font-size:var(--builder-text-base);color:#ccc;font-weight:var(--builder-weight-medium);">Expandable Mode Preview</div>
+      <div style="text-align:center;font-size:var(--builder-text-base);color:#ccc;font-weight:var(--builder-weight-medium);">${isExpandable ? "Expandable Mode Preview" : "Background Preview"}</div>
 
       <div style="display:flex;align-items:center;gap:0.75rem;padding:0 1rem;">
         <label style="font-size:var(--builder-text-sm);color:#ccc;white-space:nowrap;">Zoom:</label>
         ${zoomControl.control.outerHTML}
       </div>
 
-      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">
-        <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:0.75rem;color:#ccc;text-align:center;">Collapsed (${collapsedHeight}px)</div>
-          <div style="width:${previewWidth}px;height:${collapsedPreviewHeight}px;border:1px solid #444;border-radius:4px;overflow:hidden;position:relative;">
-            <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
-          </div>
-        </div>
-        <div style="display:flex;flex-direction:column;gap:0.5rem;">
-          <div style="font-size:0.75rem;color:#ccc;text-align:center;">Expanded (${expandedHeight}px)</div>
-          <div style="width:${previewWidth}px;height:${expandedPreviewHeight}px;border:1px solid #444;border-radius:4px;overflow:hidden;position:relative;">
-            <img class="preview-img" src="${imageUrl}" style="width:100%;height:100%;object-fit:cover;object-position:center;transform:scale(${zoom});" />
-          </div>
-        </div>
+      <div style="display:flex;gap:1rem;justify-content:center;flex-wrap:wrap;">${frameHtml}
       </div>
+
+      <div style="text-align:center;font-size:0.75rem;color:#999;">Dashed outline: what's still visible at the peak of the playback push-in (×${multiplier}).</div>
     </div>
   `;
 }
