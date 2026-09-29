@@ -59,7 +59,7 @@ to take a `containerId` param instead of hardcoding the builder's own
 preview pane. See `js/modules/cardChrome.js`. Don't add a fourth
 hand-written copy here if you touch the card path.)
 
-This has already caused three real, hard-to-spot bugs (all worked in the
+This has already caused four real, hard-to-spot bugs (all worked in the
 builder preview, all silently wrong only in a real embed):
 
 - `initializeEmbedPlayer()` never created `playerApp.closedIdleManager` -
@@ -85,6 +85,12 @@ builder preview, all silently wrong only in a real embed):
   `playerApp.togglePlayback()`; every "toggle playback" entry point
   (`onclick`, spacebar, and any future one) MUST call that, never a raw
   `wavesurfer.playPause()/play()/pause()`.
+- `renderPlayerHTML()`'s `.track-info` was missing the inner
+  `.track-info-text` span, and the bootstrap then overwrote it with plain
+  `textContent` anyway - the one-line/ellipsis/marquee styling all lives on
+  that span, so embedded track titles wrapped onto several lines on phones
+  and never carouselled. The title is set by `initializePlayer()` ->
+  `updateTrackInfo()`; `player.html` must not write it itself.
 
 None of these threw an error or logged a warning - all were just quiet
 no-ops / silent divergences. When adding or changing anything in
