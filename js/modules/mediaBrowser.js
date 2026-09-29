@@ -1402,7 +1402,10 @@ export async function renderMediaBrowser(container, options = {}) {
     // the fixed-width columns leave over.
     headRow.appendChild(sortHeader("Name", "name"));
     headRow.appendChild(sortHeader("Type", "type", "media-browser-col-type"));
-    headRow.appendChild(sortHeader("Track #", "trackNumber", "media-browser-col-track"));
+    // Only audio carries a track number (from its ID3 tag) - no point
+    // spending a column on a list of dashes.
+    const showTrack = files.some(f => f.trackNumber);
+    if (showTrack) headRow.appendChild(sortHeader("Track #", "trackNumber", "media-browser-col-track"));
     headRow.appendChild(sortHeader("Size", "size", "media-browser-col-size"));
     headRow.appendChild(sortHeader("Uploaded", "uploaded", "media-browser-col-uploaded"));
     if (mode === 'manage') {
@@ -1414,7 +1417,7 @@ export async function renderMediaBrowser(container, options = {}) {
     table.appendChild(thead);
 
     const tbody = document.createElement("tbody");
-    files.forEach(file => tbody.appendChild(renderRow(file)));
+    files.forEach(file => tbody.appendChild(renderRow(file, showTrack)));
     table.appendChild(tbody);
 
     return table;
@@ -1496,7 +1499,7 @@ export async function renderMediaBrowser(container, options = {}) {
     }
   }
 
-  function renderRow(file) {
+  function renderRow(file, showTrack) {
     const type = fileType(file.name);
     const row = document.createElement("tr");
     // Checked rows are exactly the set a right-click's context-menu actions
@@ -1551,9 +1554,11 @@ export async function renderMediaBrowser(container, options = {}) {
     typeTd.textContent = type;
     row.appendChild(typeTd);
 
-    const trackTd = document.createElement("td");
-    trackTd.textContent = file.trackNumber || "—";
-    row.appendChild(trackTd);
+    if (showTrack) {
+      const trackTd = document.createElement("td");
+      trackTd.textContent = file.trackNumber || "—";
+      row.appendChild(trackTd);
+    }
 
     const sizeTd = document.createElement("td");
     sizeTd.textContent = formatBytes(file.size);
