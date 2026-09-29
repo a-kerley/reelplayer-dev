@@ -34,7 +34,7 @@ export const videoLayerState = {
     // taking effect on a reel with no global video set.
     const trackVideo = trackBackgroundVideo(track).trim();
     if (trackVideo) {
-      return { url: trackVideo, type: 'track' };
+      return { url: trackVideo, type: 'track', start: Number(track.backgroundVideoStart) || 0 };
     }
 
     // Fall back to the reel's own global background video.

@@ -138,6 +138,7 @@ export class EmbedExporter {
         backgroundImage: track.backgroundImage || "",
         backgroundVideo: track.backgroundVideo || "",
         backgroundType: trackBackgroundType(track),
+        backgroundVideoStart: track.backgroundVideoStart || 0,
         backgroundZoom: track.backgroundZoom || 1
       }));
     

@@ -96,7 +96,7 @@ export const videoPlayback = {
       const fadeInDuration = this.getVideoTransitionDuration('fadeIn');
 
       // Start fade-in on next layer
-      const fadeInPromise = this.fadeInVideo(nextLayer, fadeInDuration);
+      const fadeInPromise = this.fadeInVideo(nextLayer, fadeInDuration, activeVideo.start);
 
       // If current layer is active, fade it out simultaneously (crossfade)
       if (currentLayer?.classList.contains('active')) {
@@ -318,9 +318,10 @@ export const videoPlayback = {
    *
    * @param {HTMLVideoElement} videoElement - The video element to fade in
    * @param {number} duration - Fade duration in milliseconds
+   * @param {number} startAt - Seconds to start a fresh (never-played) video from
    * @returns {Promise} - Resolves when fade completes
    */
-  async fadeInVideo(videoElement, duration = 800) {
+  async fadeInVideo(videoElement, duration = 800, startAt = 0) {
     if (!videoElement) {
       console.warn('[Fade In Video] ⚠️ Called with null/undefined videoElement');
       return Promise.resolve();
@@ -371,9 +372,11 @@ export const videoPlayback = {
       const getTimestamp = () => `+${(performance.now() - startTime).toFixed(0)}ms`;
 
 
-      // Seek past first frame to avoid black/frozen frame (common with Cloudinary/streaming)
+      // Seek past first frame to avoid black/frozen frame (common with Cloudinary/streaming),
+      // or to the track's chosen start point. Only a fresh video sits at 0 - a resumed one
+      // keeps its position.
       if (videoElement.currentTime === 0) {
-        videoElement.currentTime = 0.1;
+        videoElement.currentTime = Math.max(0.1, startAt);
 
         // Wait for seek to complete before playing
         await new Promise(seekResolve => {
@@ -386,7 +389,7 @@ export const videoPlayback = {
           setTimeout(() => {
             videoElement.removeEventListener('seeked', seekHandler);
             seekResolve();
-          }, 500);
+          }, startAt > 0.1 ? 3000 : 500);
         });
       }
 

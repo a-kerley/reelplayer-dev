@@ -376,6 +376,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
       filenameDisplay: videoFilenameDisplay,
       onUpdate: () => {
         track.backgroundVideo = videoUrlInput.value;
+        videoChanged();
         onChange();
       },
       extractFileName
@@ -405,6 +406,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
           const newFilename = extractFileName(filePath) || "Video URL";
           videoFilenameDisplay.textContent = newFilename;
           videoFilenameDisplay.classList.toggle("placeholder", newFilename === "Video URL");
+          videoChanged();
           onChange();
         }
       });
@@ -416,10 +418,51 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
         track.backgroundVideo = "";
         videoFilenameDisplay.textContent = "Video URL";
         videoFilenameDisplay.classList.add("placeholder");
+        videoChanged();
         onChange();
       }
     });
-    
+
+    // Start point: a scrub pane (same open/close button pattern as the image's
+    // crop pane) that picks where this track's video begins playing.
+    const startBtn = createCropPreviewButton({ id: `track-${index}-video-start` });
+    startBtn.setAttribute("aria-label", "Choose video start point");
+    startBtn.title = "Choose where this track's video starts playing";
+    startBtn.querySelector("path").setAttribute("d", "M12 6v6h4.5m4.5 0a9 9 0 1 1-18 0 9 9 0 0 1 18 0Z");
+
+    const startHint = document.createElement("span");
+    startHint.style.cssText = "font-size:0.7rem;color:#4a90e2;white-space:nowrap;flex-shrink:0;";
+    startHint.title = "This track's video starts from here";
+    const updateStartHint = () => {
+      const start = track.backgroundVideoStart || 0;
+      startHint.textContent = start ? `@${formatVideoTime(start)}` : "";
+      startHint.style.display = start ? "" : "none";
+    };
+    updateStartHint();
+
+    const startPane = document.createElement("div");
+    startPane.className = "bg-preview-pane";
+    startPane.style.cssText = "display:none;margin-top:0.5rem;padding:0.75rem;background:#1e1e1e;border:1px solid #444;border-radius:4px;";
+    const renderStartPane = () => {
+      startPane.innerHTML = "";
+      if (!track.backgroundVideo) {
+        startPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No video selected</p>';
+        return;
+      }
+      startPane.appendChild(createVideoStartEditor(track, () => {
+        updateStartHint();
+        onChange();
+      }));
+    };
+    const startPreview = setupCropPreviewToggle(startBtn, startPane, renderStartPane);
+
+    // A start point belongs to one specific file - drop it when the video changes.
+    function videoChanged() {
+      track.backgroundVideoStart = 0;
+      updateStartHint();
+      if (startPreview.isOpen) renderStartPane();
+    }
+
     // Assemble row
     const groupCss = "display:flex;gap:0.4rem;align-items:center;flex:1;min-width:0;transition:opacity 0.2s;";
     const imageGroup = document.createElement("div");
@@ -427,7 +470,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     imageGroup.append(imageFilenameDisplay, imageUrlInput, imageFilePickerBtn, cropBtn, imageClearBtn);
     const videoGroup = document.createElement("div");
     videoGroup.style.cssText = groupCss;
-    videoGroup.append(videoFilenameDisplay, videoUrlInput, videoFilePickerBtn, videoClearBtn);
+    videoGroup.append(videoFilenameDisplay, videoUrlInput, startHint, videoFilePickerBtn, startBtn, videoClearBtn);
 
     const applyType = () => {
       const isVideo = typeCheckbox.checked;
@@ -436,6 +479,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
       videoGroup.inert = !isVideo;
       videoGroup.style.opacity = isVideo ? "1" : "0.5";
       if (isVideo && cropPreview.isOpen) cropPreview.toggle();
+      if (!isVideo && startPreview.isOpen) startPreview.toggle();
     };
     applyType();
     typeCheckbox.addEventListener("change", () => {
@@ -448,7 +492,109 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     
     trackWrapper.appendChild(trackRow);
     trackWrapper.appendChild(previewPane);
+    trackWrapper.appendChild(startPane);
     
     container.appendChild(trackWrapper);
   });
+}
+
+function formatVideoTime(seconds) {
+  const m = Math.floor(seconds / 60);
+  const sec = (seconds % 60).toFixed(1).padStart(4, "0");
+  return `${m}:${sec}`;
+}
+
+/**
+ * Scrub-to-pick editor for a track's video start point: a muted preview that
+ * follows the slider, plus "Set start here". Writes track.backgroundVideoStart.
+ * @param {Object} track - Playlist track with backgroundVideo
+ * @param {Function} onCommit - Called after the start point changes
+ * @returns {HTMLDivElement}
+ */
+function createVideoStartEditor(track, onCommit) {
+  const wrap = document.createElement("div");
+  wrap.style.cssText = "display:flex;flex-direction:column;gap:0.6rem;align-items:center;";
+
+  const video = document.createElement("video");
+  video.src = track.backgroundVideo;
+  video.muted = true;
+  video.playsInline = true;
+  video.preload = "auto";
+  video.style.cssText = "width:100%;max-width:400px;max-height:225px;background:#000;border-radius:3px;";
+
+  // Slider + a marker for the saved start point, positioned over the track.
+  const sliderWrap = document.createElement("div");
+  sliderWrap.style.cssText = "position:relative;width:100%;max-width:400px;";
+  const slider = document.createElement("input");
+  slider.type = "range";
+  slider.className = "range range-primary range-xs";
+  slider.style.width = "100%";
+  slider.min = "0";
+  slider.step = "0.04";
+  slider.disabled = true;
+  slider.title = "Scrub through the video to find the start point (arrow keys step about one frame).";
+  slider.setAttribute("aria-label", "Video position");
+  const marker = document.createElement("div");
+  marker.style.cssText = "position:absolute;top:-3px;bottom:-3px;width:2px;background:#dc3545;pointer-events:none;display:none;";
+  marker.title = "Current start point";
+  sliderWrap.append(slider, marker);
+
+  const controls = document.createElement("div");
+  controls.style.cssText = "display:flex;gap:0.6rem;align-items:center;font-size:0.75rem;color:#ccc;";
+  const readout = document.createElement("span");
+  readout.style.cssText = "font-variant-numeric:tabular-nums;min-width:9em;";
+  const setBtn = document.createElement("button");
+  setBtn.type = "button";
+  setBtn.className = "btn btn-primary btn-xs";
+  setBtn.textContent = "Set start here";
+  setBtn.title = "Start this track's video from the frame shown.";
+  setBtn.disabled = true;
+  const resetBtn = document.createElement("button");
+  resetBtn.type = "button";
+  resetBtn.className = "btn btn-ghost btn-xs";
+  resetBtn.textContent = "Reset";
+  resetBtn.title = "Start this track's video from the beginning.";
+  const startLabel = document.createElement("span");
+  startLabel.style.color = "#999";
+  controls.append(readout, setBtn, resetBtn, startLabel);
+
+  const render = () => {
+    const duration = video.duration || 0;
+    const start = track.backgroundVideoStart || 0;
+    readout.textContent = `${formatVideoTime(video.currentTime)} / ${formatVideoTime(duration)}`;
+    startLabel.textContent = `Start: ${formatVideoTime(start)}`;
+    marker.style.display = duration ? "" : "none";
+    if (duration) marker.style.left = `calc(${(start / duration) * 100}% - 1px)`;
+  };
+
+  video.addEventListener("loadedmetadata", () => {
+    slider.max = String(video.duration);
+    slider.disabled = false;
+    setBtn.disabled = false;
+    const start = track.backgroundVideoStart || 0;
+    video.currentTime = start;
+    slider.value = String(start);
+    render();
+  });
+  video.addEventListener("seeked", render);
+  slider.addEventListener("input", () => {
+    video.currentTime = parseFloat(slider.value);
+    render();
+  });
+  setBtn.addEventListener("click", () => {
+    track.backgroundVideoStart = Math.round(video.currentTime * 100) / 100;
+    render();
+    onCommit();
+  });
+  resetBtn.addEventListener("click", () => {
+    track.backgroundVideoStart = 0;
+    video.currentTime = 0;
+    slider.value = "0";
+    render();
+    onCommit();
+  });
+
+  wrap.append(video, sliderWrap, controls);
+  render();
+  return wrap;
 }
