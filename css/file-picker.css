@@ -399,6 +399,13 @@
 
 /* File-type icon colouring - folders use amber above; these differentiate
    audio/image/video/other files in both the table and grid views. */
+/* Type icons carry no inline size, so list cells and grid cards
+   (.media-browser-card-preview svg) can each size them. */
+.media-browser-icon svg {
+  width: 16px;
+  height: 16px;
+}
+
 .media-browser-icon-audio svg { color: #34d399; }
 
 .media-browser-preview-btn {
