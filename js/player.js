@@ -2596,3 +2596,16 @@ export const playerApp = Object.assign(
   videoLayerState,
   videoPlayback
 );
+
+// WHY: wavesurfer's WebAudio backend creates its AudioContext at render time
+// (before any gesture, so mobile browsers start it suspended) and its play()
+// never calls resume(). Desktop Chrome auto-resumes on start() after a click;
+// iOS Safari and Android Chrome don't - playback "runs" (playhead moves) but
+// is silent. resume() only unlocks audio when called inside a real gesture,
+// so do it here on every one, covering every play path at once.
+for (const type of ["pointerup", "touchend", "click", "keydown"]) {
+  document.addEventListener(type, () => {
+    const ctx = playerApp.wavesurfer?.getMediaElement?.()?.audioContext;
+    if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
+  }, { capture: true, passive: true });
+}
