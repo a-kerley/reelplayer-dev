@@ -1,4 +1,5 @@
 // embedExporter.js - Handles exporting embed code for Squarespace and other platforms
+import { trackBackgroundType } from "./trackBackground.js";
 import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
 import { apiFetch } from "./builderAuth.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
@@ -136,6 +137,7 @@ export class EmbedExporter {
         title: track.title,
         backgroundImage: track.backgroundImage || "",
         backgroundVideo: track.backgroundVideo || "",
+        backgroundType: trackBackgroundType(track),
         backgroundZoom: track.backgroundZoom || 1
       }));
     

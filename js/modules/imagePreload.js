@@ -1,5 +1,7 @@
 // Background image preloading — keeps upcoming track/background images warm in the browser cache.
 // Mixed into playerApp via Object.assign, so methods rely on `this` referring to playerApp.
+import { trackBackgroundImage } from './trackBackground.js';
+
 export const imagePreload = {
   /**
    * Preload background images for current and upcoming tracks
@@ -13,22 +15,22 @@ export const imagePreload = {
 
     // Get current track image
     const currentTrack = playlist[currentIndex];
-    if (currentTrack?.backgroundImage) {
-      imagesToPreload.push(currentTrack.backgroundImage);
+    if (trackBackgroundImage(currentTrack)) {
+      imagesToPreload.push(trackBackgroundImage(currentTrack));
     }
 
     // Get next track image (loop to start if at end)
     const nextIndex = (currentIndex + 1) % playlist.length;
     const nextTrack = playlist[nextIndex];
-    if (nextTrack?.backgroundImage) {
-      imagesToPreload.push(nextTrack.backgroundImage);
+    if (trackBackgroundImage(nextTrack)) {
+      imagesToPreload.push(trackBackgroundImage(nextTrack));
     }
 
     // Get previous track image (loop to end if at start)
     const prevIndex = currentIndex === 0 ? playlist.length - 1 : currentIndex - 1;
     const prevTrack = playlist[prevIndex];
-    if (prevTrack?.backgroundImage) {
-      imagesToPreload.push(prevTrack.backgroundImage);
+    if (trackBackgroundImage(prevTrack)) {
+      imagesToPreload.push(trackBackgroundImage(prevTrack));
     }
 
     // Get project title image from reel settings

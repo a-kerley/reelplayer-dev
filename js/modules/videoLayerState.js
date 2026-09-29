@@ -1,3 +1,5 @@
+import { trackBackgroundVideo } from './trackBackground.js';
+
 // Dual-layer (A/B) video bookkeeping — which layer is current/next per video type ('main'
 // or 'track'), what URL each layer holds, and which track/reel video should be active.
 // Mixed into playerApp via Object.assign, so methods rely on `this` referring to playerApp.
@@ -30,8 +32,9 @@ export const videoLayerState = {
     // which meant a track override was silently ignored for every track
     // whenever the reel had its own global video enabled at all - only ever
     // taking effect on a reel with no global video set.
-    if (track?.backgroundVideo && track.backgroundVideo.trim()) {
-      return { url: track.backgroundVideo.trim(), type: 'track' };
+    const trackVideo = trackBackgroundVideo(track).trim();
+    if (trackVideo) {
+      return { url: trackVideo, type: 'track' };
     }
 
     // Fall back to the reel's own global background video.

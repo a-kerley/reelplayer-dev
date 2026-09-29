@@ -2,6 +2,7 @@
 
 import { createFilePickerButton, createCropPreviewButton, createClearButton, setupDebouncedInput } from "./domUtils.js";
 import { buildValueControl, wireValueControl } from "./valueControl.js";
+import { trackBackgroundType } from "./trackBackground.js";
 
 let zoomControlIdCounter = 0;
 
@@ -252,6 +253,19 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     trackRow.style.cssText = "display:flex;gap:0.4rem;align-items:center;margin-bottom:0.4rem;padding:0.35rem 0.5rem;background:#262626;border-radius:3px;border:1px solid #444;";
     
     // Track label
+    // Image-or-video switch (daisyUI toggle with icons: 2nd child shows when
+    // off, 3rd when on). The inactive side keeps its value, just dimmed + inert.
+    const typeToggle = document.createElement("label");
+    typeToggle.className = "toggle toggle-sm";
+    typeToggle.style.flexShrink = "0";
+    typeToggle.title = "Use a background image or a background video for this track.";
+    typeToggle.innerHTML = `
+      <input type="checkbox" aria-label="Background video instead of image" />
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.5"><rect x="3" y="3" width="18" height="18" rx="2"/><circle cx="9" cy="9" r="2"/><path d="m21 15-5-5L5 21"/></svg>
+      <svg aria-hidden="true" viewBox="0 0 24 24" fill="currentColor"><path d="M8 5v14l11-7z"/></svg>`;
+    const typeCheckbox = typeToggle.querySelector("input");
+    typeCheckbox.checked = trackBackgroundType(track) === "video";
+
     const trackLabel = document.createElement("span");
     trackLabel.style.cssText = "width:180px;font-size:0.75rem;font-weight:500;color:#ccc;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;flex-shrink:0;";
     const trackTitle = track.title || `Track ${index + 1}`;
@@ -320,7 +334,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
       }
     };
     
-    setupCropPreviewToggle(cropBtn, previewPane, updatePreview);
+    const cropPreview = setupCropPreviewToggle(cropBtn, previewPane, updatePreview);
     
     // Update preview when URL changes
     imageUrlInput.addEventListener("input", () => {
@@ -404,17 +418,30 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     });
     
     // Assemble row
-    trackRow.appendChild(trackLabel);
-    trackRow.appendChild(imageFilenameDisplay);
-    trackRow.appendChild(imageUrlInput);
-    trackRow.appendChild(imageFilePickerBtn);
-    trackRow.appendChild(cropBtn);
-    trackRow.appendChild(imageClearBtn);
-    trackRow.appendChild(separator);
-    trackRow.appendChild(videoFilenameDisplay);
-    trackRow.appendChild(videoUrlInput);
-    trackRow.appendChild(videoFilePickerBtn);
-    trackRow.appendChild(videoClearBtn);
+    const groupCss = "display:flex;gap:0.4rem;align-items:center;flex:1;min-width:0;transition:opacity 0.2s;";
+    const imageGroup = document.createElement("div");
+    imageGroup.style.cssText = groupCss;
+    imageGroup.append(imageFilenameDisplay, imageUrlInput, imageFilePickerBtn, cropBtn, imageClearBtn);
+    const videoGroup = document.createElement("div");
+    videoGroup.style.cssText = groupCss;
+    videoGroup.append(videoFilenameDisplay, videoUrlInput, videoFilePickerBtn, videoClearBtn);
+
+    const applyType = () => {
+      const isVideo = typeCheckbox.checked;
+      imageGroup.inert = isVideo;
+      imageGroup.style.opacity = isVideo ? "0.5" : "1";
+      videoGroup.inert = !isVideo;
+      videoGroup.style.opacity = isVideo ? "1" : "0.5";
+      if (isVideo && cropPreview.isOpen) cropPreview.toggle();
+    };
+    applyType();
+    typeCheckbox.addEventListener("change", () => {
+      track.backgroundType = typeCheckbox.checked ? "video" : "image";
+      applyType();
+      onChange();
+    });
+
+    trackRow.append(typeToggle, trackLabel, imageGroup, separator, videoGroup);
     
     trackWrapper.appendChild(trackRow);
     trackWrapper.appendChild(previewPane);

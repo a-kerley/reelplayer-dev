@@ -30,6 +30,7 @@
 //   whitelist - player.html wires it directly into the existing
 //   pageRoleStyles slot in its resolveTextUnit()/applyReelStyleVars()
 //   pair (PLAN.md §5's "second drift pair"), not through this function.
+import { trackBackgroundImage } from "./trackBackground.js";
 import { escapeHtml } from "./domUtils.js";
 const OVERRIDE_SETTINGS_FIELD = {
   accent: "varUiAccent",
@@ -126,7 +127,7 @@ function resolveBannerImage(cardData) {
   if (overrides.bannerImage) return overrides.bannerImage;
   const settings = cardData.reel?.settings || {};
   if (settings.backgroundImageEnabled && settings.backgroundImage) return settings.backgroundImage;
-  return cardData.reel?.playlist?.[0]?.backgroundImage || "";
+  return trackBackgroundImage(cardData.reel?.playlist?.[0]);
 }
 
 // Same fallback shape as resolveBannerImage() above, for the reel's own

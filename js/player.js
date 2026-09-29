@@ -1,4 +1,5 @@
 // player.js
+import { trackBackgroundImage as activeTrackImage } from './modules/trackBackground.js';
 import { createPlayerClosedIdleManager } from './modules/playerClosedIdle.js';
 import { imagePreload } from './modules/imagePreload.js';
 import { audioFades } from './modules/audioFades.js';
@@ -602,7 +603,7 @@ const playerAppCore = {
     // Get the track's background image and zoom
     const playlist = reelSettings.playlist || [];
     const track = playlist[trackIndex];
-    const trackBackgroundImage = track?.backgroundImage;
+    const trackBackgroundImage = activeTrackImage(track);
     const trackBackgroundZoom = track?.backgroundZoom || 1;
     
 
