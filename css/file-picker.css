@@ -801,6 +801,12 @@
   border-color: #4a90e2;
 }
 
+.media-browser-folder-row:focus-visible,
+.media-browser-card:focus-visible {
+  outline: 2px solid #4a90e2;
+  outline-offset: -2px;
+}
+
 .media-browser-card.selected {
   border-color: #4a90e2;
   background: rgba(74, 144, 226, 0.16);

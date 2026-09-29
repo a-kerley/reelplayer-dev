@@ -865,6 +865,30 @@ export async function renderMediaBrowser(container, options = {}) {
       if (path !== null && path === state.editingFolderPath) return;
       onClick(e);
     };
+    // Keyboard: Enter/Space opens, Left/Right collapse/expand, and the
+    // context-menu key or Shift+F10 opens the folder menu. e.target check
+    // keeps the inline rename input's own keys from reaching this.
+    // Both actions re-render the sidebar, so focus is put back on this
+    // folder's replacement row afterwards.
+    row.tabIndex = 0;
+    row.dataset.navId = path ?? "*all*";
+    const refocus = () => container.querySelector(`[data-nav-id="${CSS.escape(row.dataset.navId)}"]`)?.focus();
+    row.onkeydown = (e) => {
+      if (e.target !== row) return;
+      if (e.key === "Enter" || e.key === " ") {
+        e.preventDefault();
+        onClick(e);
+        refocus();
+      } else if (onToggleExpand && ((e.key === "ArrowRight" && !isExpanded) || (e.key === "ArrowLeft" && isExpanded))) {
+        e.preventDefault();
+        onToggleExpand();
+        refocus();
+      } else if (row.oncontextmenu && (e.key === "ContextMenu" || (e.shiftKey && e.key === "F10"))) {
+        e.preventDefault();
+        const rect = row.getBoundingClientRect();
+        row.oncontextmenu({ preventDefault() {}, clientX: rect.left + 24, clientY: rect.bottom });
+      }
+    };
     if (path !== null) setupFolderDropTarget(row, path);
     return row;
   }
@@ -1739,6 +1763,12 @@ export async function renderMediaBrowser(container, options = {}) {
       }
 
       card.onclick = () => activateFile(file);
+      card.tabIndex = 0;
+      card.onkeydown = (e) => {
+        if (e.target !== card || (e.key !== "Enter" && e.key !== " ")) return;
+        e.preventDefault();
+        activateFile(file);
+      };
 
       grid.appendChild(card);
     });
