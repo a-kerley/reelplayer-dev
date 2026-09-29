@@ -417,7 +417,7 @@ export function initPagesController() {
     }
     const statsBtn = document.getElementById("viewPageStatsBtn");
     if (statsBtn) {
-      statsBtn.onclick = () => openStatsModal("page", page.id, page.title, [page.publishedSlug]);
+      statsBtn.onclick = () => openStatsModal("page", page.id, page.title, [page.publishedSlug], { analyticsEnabled: !!page.analyticsEnabled });
     }
   }
 

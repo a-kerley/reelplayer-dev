@@ -79,7 +79,7 @@ function renderListHTML(entries, currentSlug) {
             </div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-            <button type="button" class="page-manager-stats-btn" data-slug="${entry.slug}" data-id="${entry.id || ""}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+            <button type="button" class="page-manager-stats-btn" data-slug="${entry.slug}" data-id="${entry.id || ""}" data-analytics="${entry.analyticsEnabled ? "on" : "off"}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
               title="View how many times this page has been opened"
               style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
             <button type="button" class="page-manager-copy-btn" data-slug="${entry.slug}"
@@ -123,7 +123,7 @@ async function openPageManager(getCurrentPage) {
   setTimeout(() => {
     document.querySelectorAll(".page-manager-stats-btn").forEach(btn => {
       btn.addEventListener("click", () => {
-        openStatsModal("page", btn.dataset.id || btn.dataset.slug, btn.dataset.title, [btn.dataset.slug]);
+        openStatsModal("page", btn.dataset.id || btn.dataset.slug, btn.dataset.title, [btn.dataset.slug], { analyticsEnabled: btn.dataset.analytics === "on" });
       });
     });
 

@@ -76,7 +76,7 @@ function renderListHTML(entries, currentEmbedId) {
             </div>
           </div>
           <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-            <button type="button" class="embed-manager-stats-btn" data-id="${entry.id}" data-source-id="${entry.sourceReelId || ""}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
+            <button type="button" class="embed-manager-stats-btn" data-id="${entry.id}" data-source-id="${entry.sourceReelId || ""}" data-analytics="${entry.analyticsEnabled ? "on" : "off"}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
               title="View opens/plays/listen-time analytics for this reel (all its published versions combined)"
               style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
             <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
@@ -121,7 +121,7 @@ async function openEmbedManager(getCurrentReel) {
       btn.addEventListener("click", () => {
         // Stats are filed per reel (its draft id), not per publish - a
         // legacy publish with no sourceReelId falls back to its own id.
-        openStatsModal("reel", btn.dataset.sourceId || btn.dataset.id, btn.dataset.title, [btn.dataset.id]);
+        openStatsModal("reel", btn.dataset.sourceId || btn.dataset.id, btn.dataset.title, [btn.dataset.id], { analyticsEnabled: btn.dataset.analytics === "on" });
       });
     });
 

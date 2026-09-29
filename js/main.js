@@ -148,7 +148,7 @@ document.addEventListener("DOMContentLoaded", async () => {
       }
       const statsBtn = document.getElementById("viewReelStatsBtn");
       if (statsBtn) {
-        statsBtn.onclick = () => openStatsModal("reel", reel.id, reel.title, [reel.publishedEmbedId]);
+        statsBtn.onclick = () => openStatsModal("reel", reel.id, reel.title, [reel.publishedEmbedId], { analyticsEnabled: !!reel.analyticsEnabled });
       }
     }
 

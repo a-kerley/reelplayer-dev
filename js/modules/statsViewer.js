@@ -76,7 +76,17 @@ export function summarizeStats(events) {
     .sort((a, b) => (a.ts < b.ts ? 1 : -1))
     .slice(0, 100);
 
-  return { totalViews: views.length, totalPlays: plays.length, totalListenSeconds, perTrack, sessions };
+  const locationCounts = new Map();
+  [...sessionMap.values()].forEach((sess) => {
+    const place = [sess.city, sess.country].filter(Boolean).join(", ") || "Unknown";
+    locationCounts.set(place, (locationCounts.get(place) || 0) + 1);
+  });
+  const topLocations = [...locationCounts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 5)
+    .map(([place, count]) => ({ place, count }));
+
+  return { totalViews: views.length, totalPlays: plays.length, totalListenSeconds, perTrack, sessions, topLocations };
 }
 
 function formatLocation(entry) {
@@ -84,58 +94,80 @@ function formatLocation(entry) {
   return escapeHtml([entry.city, entry.country].filter(Boolean).join(", "));
 }
 
-function renderStatsHTML(summary) {
+function plural(n, word) {
+  return `${n} ${word}${n === 1 ? "" : "s"}`;
+}
+
+function statTile(value, label) {
+  return `<div class="stats-tile"><div class="stats-tile-value">${value}</div><div class="stats-tile-label">${label}</div></div>`;
+}
+
+// Rows with a proportional bar (widest = 100%) - shared by per-track plays
+// and top locations.
+function barRows(rows) {
+  const max = Math.max(...rows.map((r) => r.value), 1);
+  return rows.map((r) => `
+    <div class="stats-bar-row">
+      <div class="stats-bar-row-text">
+        <span class="stats-bar-row-label" title="${escapeHtml(r.label)}">${escapeHtml(r.label)}</span>
+        <span class="stats-bar-row-meta">${r.meta}</span>
+      </div>
+      <div class="stats-bar-track"><div class="stats-bar-fill" style="width:${(r.value / max) * 100}%"></div></div>
+    </div>`).join("");
+}
+
+function section(title, body) {
+  return `<div class="stats-section"><div class="stats-section-title">${title}</div>${body}</div>`;
+}
+
+// Pages never play anything themselves (a page's Player blocks are counted
+// under their own reel's stats) - so a page's view is opens-only.
+function renderStatsHTML(summary, { opensOnly, hasAnyEvents, analyticsEnabled }) {
   if (summary.totalViews === 0 && summary.totalPlays === 0) {
-    return '<p class="builder-empty-state">No activity recorded yet.</p>';
+    const message = !hasAnyEvents
+      ? (analyticsEnabled === false
+        ? "Analytics is off for this item - turn on Track Analytics to start collecting."
+        : "No activity recorded yet.")
+      : "No activity in this period.";
+    return `<p class="builder-empty-state builder-empty-state--block">${message}</p>`;
   }
 
-  const summaryLine = `
-    <p style="margin-bottom:1rem;">
-      <strong>${summary.totalViews}</strong> open${summary.totalViews === 1 ? "" : "s"}
-      &middot; <strong>${summary.totalPlays}</strong> play${summary.totalPlays === 1 ? "" : "s"}
-      &middot; <strong>${formatDuration(summary.totalListenSeconds)}</strong> total listen time
-    </p>
-  `;
+  const avgListen = summary.totalPlays ? summary.totalListenSeconds / summary.totalPlays : 0;
+  const tiles = opensOnly
+    ? statTile(summary.totalViews, "Opens")
+    : statTile(summary.totalViews, "Opens") +
+      statTile(summary.totalPlays, "Plays") +
+      statTile(formatDuration(summary.totalListenSeconds), "Listen time") +
+      statTile(formatDuration(avgListen), "Avg per play");
 
-  const perTrackTable = summary.perTrack.length ? `
-    <div style="margin-bottom:1.2rem;">
-      <div style="font-weight:600;margin-bottom:0.4rem;">Plays per track</div>
-      <div style="max-height:160px;overflow-y:auto;">
-        ${summary.perTrack.map((t) => `
-          <div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.3rem 0;border-bottom:1px solid #444;font-size:0.85rem;">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.trackTitle)}</span>
-            <span style="flex-shrink:0;color:#888;">${t.count} play${t.count === 1 ? "" : "s"} &middot; ${formatDuration(t.totalListenSeconds)}</span>
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  ` : "";
+  const perTrack = !opensOnly && summary.perTrack.length
+    ? section("Plays per track", `<div class="stats-scroll">${barRows(summary.perTrack.map((t) => ({
+        label: t.trackTitle,
+        value: t.count,
+        meta: `${plural(t.count, "play")} &middot; ${formatDuration(t.totalListenSeconds)}`,
+      })))}</div>`)
+    : "";
 
-  const sessionsTable = `
-    <div>
-      <div style="font-weight:600;margin-bottom:0.4rem;">Recent sessions</div>
-      <div style="max-height:240px;overflow-y:auto;">
-        ${summary.sessions.map((s) => `
-          <div style="padding:0.4rem 0;border-bottom:1px solid #444;font-size:0.85rem;">
-            <div style="display:flex;justify-content:space-between;gap:0.5rem;">
-              <span>${s.ts ? new Date(s.ts).toLocaleString() : "Unknown time"}</span>
-              <span style="color:#888;">${formatLocation(s)}</span>
-            </div>
-            ${s.plays.length ? `<div style="color:#888;margin-top:0.15rem;">${s.plays.length} play${s.plays.length === 1 ? "" : "s"} &middot; ${formatDuration(s.totalListenSeconds)}</div>` : ""}
-          </div>
-        `).join("")}
-      </div>
-    </div>
-  `;
+  const locations = summary.topLocations.length
+    ? section("Top locations", barRows(summary.topLocations.map((l) => ({
+        label: l.place, value: l.count, meta: plural(l.count, "visit"),
+      }))))
+    : "";
 
-  return summaryLine + perTrackTable + sessionsTable;
+  const sessions = section("Recent visits", `<div class="stats-scroll stats-scroll--tall">${summary.sessions.map((s) => `
+    <div class="stats-session">
+      <span>${s.ts ? new Date(s.ts).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unknown time"}</span>
+      <span class="stats-session-meta">${formatLocation(s)}${!opensOnly && s.plays.length ? ` &middot; ${plural(s.plays.length, "play")}, ${formatDuration(s.totalListenSeconds)}` : ""}</span>
+    </div>`).join("")}</div>`);
+
+  return `<div class="stats-tiles${opensOnly ? " stats-tiles--single" : ""}">${tiles}</div>${perTrack}${locations}${sessions}`;
 }
 
 const RANGES = [
   { value: "7", label: "Last 7 days" },
   { value: "30", label: "Last 30 days" },
   { value: "90", label: "Last 90 days" },
-  { value: "all", label: "All time (up to 13 months)" },
+  { value: "all", label: "All time (13 months)" },
 ];
 
 function filterByRange(events, range) {
@@ -150,8 +182,10 @@ function filterByRange(events, range) {
  *  @param {string} label - display name shown in the modal title
  *  @param {string[]} [aliases] - older ids the item was published under
  *    (e.g. its current publishedEmbedId/publishedSlug) whose pre-existing
- *    events should be merged in */
-export async function openStatsModal(targetType, targetId, label, aliases = []) {
+ *    events should be merged in
+ *  @param {{analyticsEnabled?: boolean}} [options] - lets the empty state
+ *    say *why* there's nothing (tracking off vs. just no visitors yet) */
+export async function openStatsModal(targetType, targetId, label, aliases = [], { analyticsEnabled } = {}) {
   const password = await getBuilderPassword();
   if (!password) return;
 
@@ -163,16 +197,21 @@ export async function openStatsModal(targetType, targetId, label, aliases = []) 
     return;
   }
 
+  const renderOptions = { opensOnly: targetType === "page", hasAnyEvents: events.length > 0, analyticsEnabled };
+  const render = (range) => renderStatsHTML(summarizeStats(filterByRange(events, range)), renderOptions);
+
   const rangeSelect = `
-    <select id="statsRangeSelect" title="Only count activity from this period" aria-label="Date range" style="margin-bottom:1rem;">
-      ${RANGES.map((r) => `<option value="${r.value}"${r.value === "30" ? " selected" : ""}>${r.label}</option>`).join("")}
-    </select>`;
+    <div class="stats-toolbar">
+      <select id="statsRangeSelect" class="stats-range-select" title="Only count activity from this period" aria-label="Date range">
+        ${RANGES.map((r) => `<option value="${r.value}"${r.value === "30" ? " selected" : ""}>${r.label}</option>`).join("")}
+      </select>
+    </div>`;
 
   dialog.createDialog({
     type: "custom",
     message: `Stats — ${label || "(untitled)"}`,
-    content: `${rangeSelect}<div id="statsModalBody">${renderStatsHTML(summarizeStats(filterByRange(events, "30")))}</div>`,
-    maxWidth: "500px",
+    content: `${rangeSelect}<div id="statsModalBody">${render("30")}</div>`,
+    maxWidth: "560px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
     ]
@@ -183,7 +222,7 @@ export async function openStatsModal(targetType, targetId, label, aliases = []) 
     const body = document.getElementById("statsModalBody");
     if (!select || !body) return;
     select.addEventListener("change", () => {
-      body.innerHTML = renderStatsHTML(summarizeStats(filterByRange(events, select.value)));
+      body.innerHTML = render(select.value);
     });
   }, 0);
 }

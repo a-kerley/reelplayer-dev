@@ -778,7 +778,7 @@ export function initCardsController() {
     });
     document.getElementById("cardAnalyticsSlot").replaceChildren(analyticsToggle);
     document.getElementById("viewCardStatsBtn").onclick = () =>
-      openStatsModal("card", card.id, card.title, [card.publishedEmbedId]);
+      openStatsModal("card", card.id, card.title, [card.publishedEmbedId], { analyticsEnabled: card.analyticsEnabled === true });
 
     // --- Card Style Overrides -------------------------------------------
     const showReelTitleToggle = createToggleSwitch({

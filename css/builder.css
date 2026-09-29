@@ -949,6 +949,143 @@ body {
   background: rgba(74, 144, 226, 0.15);
 }
 
+/* ==============================================
+   STATS MODAL (js/modules/statsViewer.js)
+   Rendered inside dialogSystem's .dialog-box, which is appended to <body>
+   (outside .builder-app) - hence plain classes, :root vars only.
+   ============================================== */
+.stats-toolbar {
+  display: flex;
+  justify-content: flex-end;
+  margin: -0.5rem 0 1rem;
+}
+
+.stats-range-select {
+  background: #1e1e1e;
+  color: #ccc;
+  border: 1px solid #444;
+  border-radius: 5px;
+  padding: 0.3rem 0.5rem;
+  font-size: var(--builder-text-sm);
+  cursor: pointer;
+}
+
+.stats-tiles {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.5rem;
+  margin-bottom: 1.25rem;
+}
+
+.stats-tiles--single {
+  grid-template-columns: minmax(0, 10rem);
+}
+
+.stats-tile {
+  background: #252525;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 0.65rem 0.75rem;
+  min-width: 0;
+}
+
+.stats-tile-value {
+  color: #fff;
+  font-size: 1.25rem;
+  font-weight: 600;
+  line-height: 1.2;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.stats-tile-label {
+  color: #999;
+  font-size: 0.72rem;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+  margin-top: 0.2rem;
+}
+
+.stats-section {
+  margin-bottom: 1.1rem;
+}
+
+.stats-section-title {
+  color: #fff;
+  font-weight: 600;
+  font-size: var(--builder-text-base);
+  margin-bottom: 0.5rem;
+}
+
+.stats-scroll {
+  max-height: 150px;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.stats-scroll--tall {
+  max-height: 200px;
+}
+
+.stats-bar-row {
+  padding: 0.3rem 0;
+}
+
+.stats-bar-row-text {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  font-size: var(--builder-text-sm);
+  margin-bottom: 0.25rem;
+}
+
+.stats-bar-row-label {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #ddd;
+}
+
+.stats-bar-row-meta,
+.stats-session-meta {
+  flex-shrink: 0;
+  color: #888;
+}
+
+.stats-bar-track {
+  height: 4px;
+  border-radius: 2px;
+  background: #1e1e1e;
+  overflow: hidden;
+}
+
+.stats-bar-fill {
+  height: 100%;
+  background: var(--builder-accent);
+  border-radius: 2px;
+}
+
+.stats-session {
+  display: flex;
+  justify-content: space-between;
+  gap: 0.75rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #3a3a3a;
+  font-size: var(--builder-text-sm);
+}
+
+.stats-session:last-child {
+  border-bottom: none;
+}
+
+@media (max-width: 480px) {
+  .stats-tiles {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+
 /* The in-editor lock/unlock control (#reelLockBtn/#pageLockBtn) - amber
    when locked (matches the sidebar lock icon's locked color) rather than
    the plain accent-blue every other button here uses, so a locked state
