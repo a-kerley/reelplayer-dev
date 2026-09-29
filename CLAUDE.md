@@ -190,6 +190,27 @@ is always the same shape: keep the grid item itself (the one whose
 padding on a further-nested child instead - it can be clipped away
 entirely rather than fighting the collapse.
 
+## No third-party requests from the public surfaces
+
+`player.html` (embedded on other people's sites) and `page.html` must never
+load anything from a third-party host: every such request sends the
+visitor's IP to that host without consent (GDPR - the reason fonts moved
+off fonts.googleapis.com), and a floating CDN tag can change under us (it
+did: Pickr broke every colour swatch). Fonts live in `assets/fonts/`
+(regenerate with `scripts/self-host-fonts.py` after adding one to
+`TEXT_FONT_OPTIONS`), libraries in `vendor/<name>-<version>/` (see
+`vendor/README.md` - hyphen, not `@`, in folder names). The only external
+origin allowed is our own media domain (`R2_PUBLIC_URL`). The builder may
+still use third-party CDNs for builder-only chrome (Material Symbols), since
+only the operator loads it.
+
+`.assetsignore` keeps non-runtime files (docs, `*.md`, `src/`, scripts)
+out of the public site - the repo root is the assets directory, so anything
+not listed there is publicly downloadable. `run_worker_first` in
+`wrangler.jsonc` is limited to the paths `src/index.js` actually handles;
+widening it back to `true` makes every static file of every embed load a
+metered Worker request.
+
 ## Builder dark theme — scope boundary
 
 The builder chrome (sidebar, forms, buttons, dialogs) is dark-themed,

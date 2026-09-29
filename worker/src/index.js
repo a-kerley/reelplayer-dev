@@ -155,6 +155,38 @@ function reelStorageKey(id) {
   return id.startsWith("live-") ? `reel_stable_${id.slice(5)}` : `reel_${id}`;
 }
 
+// Rate-limit helpers. The IP is only the in-memory counting key for
+// Cloudflare's rate limiter - never stored. Fails open if a binding is
+// missing or errors: a limiter outage must never block publishing or stats.
+function clientIp(request) {
+  return request.headers.get("CF-Connecting-IP") || "unknown";
+}
+
+async function withinLimit(limiter, key) {
+  if (!limiter) return true;
+  try {
+    return (await limiter.limit({ key })).success;
+  } catch {
+    return true;
+  }
+}
+
+// IPs that tripped AUTH_LIMITER, refused outright until the timestamp.
+// In-memory, so per isolate/location - best-effort, not a guarantee; a long
+// random password is the real defence. The rate limiter can't be queried
+// without incrementing it, hence this separate record.
+// ponytail: per-isolate map; move to a Durable Object if guessing ever gets distributed
+const authBlockedUntil = new Map();
+
+function isAuthBlocked(ip) {
+  return (authBlockedUntil.get(ip) || 0) > Date.now();
+}
+
+function blockAuth(ip) {
+  if (authBlockedUntil.size > 10000) authBlockedUntil.clear();
+  authBlockedUntil.set(ip, Date.now() + 60 * 1000);
+}
+
 async function parseJsonBody(request) {
   try {
     return { body: JSON.parse(await request.text()) };
@@ -544,6 +576,20 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
+    // Password guessing: only failed attempts are counted (limit() is only
+    // called on a wrong password), so the builder's own normal traffic never
+    // gets near it. Once an IP trips it, EVERY attempt from it is refused
+    // for a minute - right password included - otherwise 429 vs 200 still
+    // tells a guesser when they've hit it and the limit slows nothing.
+    if (request.headers.has("Authorization")) {
+      const ip = clientIp(request);
+      if (isAuthBlocked(ip)) return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
+      if (!isAuthorized(request, env) && !(await withinLimit(env.AUTH_LIMITER, ip))) {
+        blockAuth(ip);
+        return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
+      }
+    }
+
     // GET /reels - list all published reels (management view)
     if (pathname === "/reels" && request.method === "GET") {
       const authError = requireAuth(request, env);
@@ -930,6 +976,17 @@ export default {
         const { body, error } = await parseJsonBody(request);
         if (error) return error;
 
+        // Abuse limits - each stat event is a KV write, and KV's daily write
+        // allowance is shared with publishing/draft saves, so a spam loop
+        // could otherwise lock the builder out. Dropped silently (same 200
+        // as an opted-out target), giving nothing to probe against.
+        const ip = clientIp(request);
+        if (!(await withinLimit(env.STATS_LIMITER, ip))) return jsonResponse({ ok: true });
+        if (body?.event === "view" &&
+            !(await withinLimit(env.VIEW_LIMITER, `${ip}:${targetType}:${targetId}`))) {
+          return jsonResponse({ ok: true });
+        }
+
         // Only record a beacon for a target that actually exists and has
         // opted in - this also means flipping analyticsEnabled off stops
         // the Worker from accepting any further beacons for it immediately,
@@ -969,7 +1026,10 @@ export default {
         if (event === "play") {
           record.trackIndex = typeof trackIndex === "number" ? trackIndex : null;
           record.trackTitle = typeof trackTitle === "string" ? trackTitle.slice(0, 150) : "";
-          record.listenSeconds = typeof listenSeconds === "number" ? Math.round(listenSeconds) : 0;
+          // Capped so a forged beacon can't skew listen-time totals.
+          record.listenSeconds = typeof listenSeconds === "number"
+            ? Math.min(Math.max(Math.round(listenSeconds), 0), 4 * 60 * 60)
+            : 0;
         }
 
         // The record doubles as KV metadata (1024-byte cap) so GET can read

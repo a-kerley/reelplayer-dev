@@ -26,6 +26,9 @@ const PROTECTED_PATHS = new Set(["/", "/index.html"]);
 // with nothing upstream able to intervene first.
 const PAGE_PATH_PATTERN = /^\/p\/([a-zA-Z0-9_-]+)$/;
 
+// IPs that tripped AUTH_LIMITER - in-memory, per isolate, best-effort.
+const authBlockedUntil = new Map();
+
 const COOKIE_NAME = "builder_auth";
 const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
 
@@ -93,8 +96,25 @@ export default {
     }
 
     const suppliedPassword = extractPassword(request.headers.get("Authorization") || "");
+    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
+    const tooMany = () => new Response("Too many attempts - try again in a minute.", { status: 429 });
+
+    // Refuse every attempt (right password included) from an IP that
+    // recently tripped the limit - otherwise 429 vs success still tells a
+    // guesser when they've hit it. See worker/src/index.js for the same.
+    if (suppliedPassword !== null && (authBlockedUntil.get(ip) || 0) > Date.now()) return tooMany();
 
     if (suppliedPassword !== env.BUILDER_ACCESS_PASSWORD) {
+      // Only wrong guesses are counted (a first visit with no password yet
+      // just gets the browser prompt). Fails open if the binding is absent.
+      if (suppliedPassword !== null && env.AUTH_LIMITER) {
+        const { success } = await env.AUTH_LIMITER.limit({ key: ip }).catch(() => ({ success: true }));
+        if (!success) {
+          if (authBlockedUntil.size > 10000) authBlockedUntil.clear();
+          authBlockedUntil.set(ip, Date.now() + 60 * 1000);
+          return tooMany();
+        }
+      }
       return new Response("Authentication required", {
         status: 401,
         headers: { "WWW-Authenticate": 'Basic realm="ReelPlayer Builder"' },

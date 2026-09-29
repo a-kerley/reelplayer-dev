@@ -42,6 +42,15 @@ requiring the client to make a second request.
   never its referenced reel's - the card is the marketing unit on the host
   page, so it gets its own stats independent of the reel's standalone
   embed stats.
+- Public write paths are rate-limited per IP via Workers Rate Limiting
+  bindings (`worker/wrangler.toml`'s `[[ratelimits]]`): `STATS_LIMITER`
+  (20 beacons/min), `VIEW_LIMITER` (2 opens/min per target), `AUTH_LIMITER`
+  (10 failed passwords/min, after which *every* attempt from that IP is
+  refused for a minute via an in-memory block list - see
+  `isAuthBlocked()`). Stat beacons over the limit are dropped silently. Any
+  new public route that writes to KV needs the same treatment: KV's daily
+  write allowance is shared with publishing, so an unlimited public write
+  path is a way to lock the builder out.
 - `worker/secret` holds the plaintext shared password locally and is
   gitignored — never let it leak into a committed file. Grep for it before
   committing if you've touched worker/auth-related code.
