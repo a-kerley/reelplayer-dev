@@ -22,12 +22,22 @@ requiring the client to make a second request.
 
 - Opt-in per-item analytics (`reel.analyticsEnabled`/`page.analyticsEnabled`/
   `card.analyticsEnabled`, default `false`) stores raw view/play events under
-  `stat_<type>_<id>_<ts>_<rand>` (`<type>` is `reel`, `page`, or `card`) in
-  the same `REELS` namespace - one KV entry per beacon, no server-side
-  aggregation (the builder's "View Stats" modal sums/groups client-side).
+  `stat_<type>_<stableId>_<ts>_<rand>` (`<type>` is `reel`, `page`, or `card`)
+  in the same `REELS` namespace - one KV entry per beacon (record duplicated
+  as KV metadata so GET reads from list() alone), 13-month `expirationTtl`,
+  no server-side aggregation (the builder's "View Stats" modal sums/groups
+  client-side). `<stableId>` is the item's *draft* id (`sourceReelId` /
+  `page.id` / `sourceCardId`), resolved server-side from whatever id the
+  embed loaded (hash, `live-<id>`, slug) - so republishing, page renames and
+  Page/Card embeds all feed one history. Events from before that (keyed by
+  hash/slug) are merged back in on GET and moved under the stable id when
+  their publish is deleted (`retireStats()`). Deleting a draft purges its
+  stats best-effort (capped per request; the TTL mops up the rest).
   `POST /stats/:type/:id` is public but only writes if the target exists
   and has opted in, re-checked on every beacon - see `worker/README.md`'s
-  "Stats" section. A card's own play events (`player.html`'s
+  "Stats" section. Visitor IPs are never stored (only Cloudflare's derived
+  city/country), and the builder must HTML-escape anything from a stat
+  record - it's written by an unauthenticated public endpoint. A card's own play events (`player.html`'s
   `analyticsStatsType`/`analyticsStatsId`) always target the *card's* id,
   never its referenced reel's - the card is the marketing unit on the host
   page, so it gets its own stats independent of the reel's standalone

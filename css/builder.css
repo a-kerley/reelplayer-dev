@@ -930,6 +930,25 @@ body {
   background: rgba(74, 144, 226, 0.15);
 }
 
+/* "View Stats" beside each Track Analytics toggle (reel/page/card) - same
+   outline look as the Manage Published rows' own Stats buttons. */
+.view-stats-btn {
+  background: transparent;
+  color: var(--builder-accent);
+  border: 1px solid var(--builder-accent);
+  border-radius: 4px;
+  font-size: var(--builder-text-base);
+  padding: 0.25rem 0.7rem;
+  margin-left: 0.6rem;
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: background 0.18s;
+}
+
+.view-stats-btn:hover {
+  background: rgba(74, 144, 226, 0.15);
+}
+
 /* The in-editor lock/unlock control (#reelLockBtn/#pageLockBtn) - amber
    when locked (matches the sidebar lock icon's locked color) rather than
    the plain accent-blue every other button here uses, so a locked state

@@ -20,6 +20,7 @@ import { renderBlock } from "./modules/pageBlockRenderer.js";
 import { publishPage, slugify, isValidSlug, publicPageUrl, contentFingerprint } from "./modules/pagePublish.js";
 import { setupPageManagerButton } from "./modules/pageManager.js";
 import { createToggleSwitch, createUrlInputRow, makeSectionCollapsible } from "./modules/domUtils.js";
+import { openStatsModal } from "./modules/statsViewer.js";
 import { createValueControl } from "./modules/valueControl.js";
 import { applyPageBackground } from "./modules/pageBackground.js";
 import { applyTextStyles } from "./modules/pageTextStyles.js";
@@ -407,12 +408,16 @@ export function initPagesController() {
       slot.appendChild(createToggleSwitch({
         id: "pageAnalyticsEnabled",
         checked: !!page.analyticsEnabled,
-        tooltip: "Track how many times this page is opened. See stats via Manage Published Pages.",
+        tooltip: "Track how many times this page is opened.",
         onChange: (e) => {
           page.analyticsEnabled = e.target.checked;
           updateCurrentPage();
         },
       }));
+    }
+    const statsBtn = document.getElementById("viewPageStatsBtn");
+    if (statsBtn) {
+      statsBtn.onclick = () => openStatsModal("page", page.id, page.title, [page.publishedSlug]);
     }
   }
 
@@ -827,8 +832,9 @@ export function initPagesController() {
         <button type="button" id="managePagesBtn" title="View and manage all pages you've published, including their stats and unpublishing.">Manage Published Pages</button>
         <button type="button" id="customizeTextStylesBtn" title="Define reusable text style roles (font, size, weight, color) this page's blocks can reference.">Customize Text Styles...</button>
         <div class="color-row" style="margin-top:0.6rem;">
-          <label for="pageAnalyticsEnabled" style="cursor:pointer;" title="Track how many times this page is opened. See stats via Manage Published Pages.">Track Analytics (opens)</label>
+          <label for="pageAnalyticsEnabled" style="cursor:pointer;" title="Track how many times this page is opened.">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
+          <button type="button" id="viewPageStatsBtn" class="view-stats-btn" title="View how many times this page has been opened.">View Stats</button>
         </div>
         <fieldset id="pageBackgroundFieldset" style="margin-top:1.2rem;border:1px solid #444;border-radius:8px;padding:1rem;">
           <legend class="builder-section-legend">Background Image</legend>

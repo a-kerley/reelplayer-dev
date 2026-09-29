@@ -33,6 +33,9 @@ export async function publishCard(card) {
   const cardData = {
     ...contentFor(card),
     id: cardId,
+    // Stable draft id - the Worker files this card's stat events under it
+    // rather than the per-publish content-hash id above.
+    sourceCardId: card.id,
     title: card.title || "",
     reelId: card.reelId || null,
     analyticsEnabled: card.analyticsEnabled === true,

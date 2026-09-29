@@ -34,6 +34,14 @@ function isOperatorBrowser() {
   }
 }
 
+// Visitors whose browser sends Global Privacy Control or Do Not Track are
+// never counted. Not a legal requirement for this (cookie-less, no stored
+// identifiers) kind of analytics in the UK/EU - a deliberate courtesy.
+function prefersNoTracking() {
+  return navigator.globalPrivacyControl === true ||
+    navigator.doNotTrack === "1" || window.doNotTrack === "1";
+}
+
 /** One id per page load, ties a page/reel's "view" beacon to whichever
  * "play" beacons happen during that same visit - not persisted across
  * reloads, since a reload is a new visit. */
@@ -42,11 +50,12 @@ export function createSessionId() {
 }
 
 /** @param {'reel'|'page'|'card'} targetType
- *  @param {string} targetId - reel's publishedEmbedId, page's publishedSlug,
- *    or card's own published id
+ *  @param {string} targetId - whatever id this embed loaded with (reel hash
+ *    or `live-<id>`, page slug, card id) - the Worker resolves it to the
+ *    item's stable draft id before filing the event
  *  @param {Object} payload - {event: 'view'|'play', sessionId, trackIndex?, trackTitle?, listenSeconds?} */
 export function sendStatBeacon(targetType, targetId, payload) {
-  if (isOperatorBrowser()) return;
+  if (isOperatorBrowser() || prefersNoTracking()) return;
   try {
     fetch(`${WORKER_BASE_URL}/stats/${targetType}/${targetId}`, {
       method: "POST",

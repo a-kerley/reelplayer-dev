@@ -881,7 +881,7 @@
        ============================================ */
     function setupPlaybackEventListeners() {
       // Update to pause icon when playing
-      document.addEventListener("playback:play", () => {
+      document.addEventListener("playback:play", (e) => {
         const playPauseBtn = playerApp.elements.playPauseBtn;
         if (playPauseBtn) {
           playPauseBtn.innerHTML = `
@@ -890,11 +890,14 @@
             </svg>
           `;
         }
-        beginListenSegment();
+        // Click-intent dispatches (e.detail.intent, see togglePlayback())
+        // arrive before audio actually starts/stops - listen time follows
+        // only the real playback events that follow them.
+        if (!e.detail?.intent) beginListenSegment();
       });
 
       // Update to play icon when paused
-      document.addEventListener("playback:pause", () => {
+      document.addEventListener("playback:pause", (e) => {
         const playPauseBtn = playerApp.elements.playPauseBtn;
         if (playPauseBtn) {
           playPauseBtn.innerHTML = `
@@ -903,7 +906,7 @@
             </svg>
           `;
         }
-        endListenSegment();
+        if (!e.detail?.intent) endListenSegment();
       });
 
       // No icon change needed here (playback:pause already fired alongside

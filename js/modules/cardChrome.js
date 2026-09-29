@@ -30,6 +30,7 @@
 //   whitelist - player.html wires it directly into the existing
 //   pageRoleStyles slot in its resolveTextUnit()/applyReelStyleVars()
 //   pair (PLAN.md §5's "second drift pair"), not through this function.
+import { escapeHtml } from "./domUtils.js";
 const OVERRIDE_SETTINGS_FIELD = {
   accent: "varUiAccent",
   waveformUnplayed: "varWaveformUnplayed",
@@ -111,12 +112,6 @@ function stopBannerVideoPreview(videoEl, card) {
     videoEl.removeEventListener("canplaythrough", videoEl._pendingRevealListener);
     videoEl._pendingRevealListener = null;
   }
-}
-
-function escapeHtml(value) {
-  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
-    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
-  }[c]));
 }
 
 // PLAN.md §3 "Banner visual" fallback chain: cardOverrides.bannerImage wins,

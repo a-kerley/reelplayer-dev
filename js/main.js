@@ -14,6 +14,7 @@ import { embedExporter } from "./modules/embedExporter.js";
 import { setupEmbedManagerButton } from "./modules/embedManager.js";
 import { createToggleSwitch, withBusyButton } from "./modules/domUtils.js";
 import { markAsOperatorBrowser } from "./modules/statsBeacon.js";
+import { openStatsModal } from "./modules/statsViewer.js";
 import { renderMediaLibraryTab } from "./modules/mediaLibrary.js";
 import { createTabController } from "./modules/tabController.js";
 import { initSidebarResize } from "./modules/sidebarResize.js";
@@ -138,11 +139,16 @@ document.addEventListener("DOMContentLoaded", async () => {
         slot.appendChild(createToggleSwitch({
           id: "reelAnalyticsEnabled",
           checked: !!reel.analyticsEnabled,
+          tooltip: "Track opens, plays, and listen time for this reel wherever it's embedded.",
           onChange: (e) => {
             reel.analyticsEnabled = e.target.checked;
             updateCurrentReel();
           },
         }));
+      }
+      const statsBtn = document.getElementById("viewReelStatsBtn");
+      if (statsBtn) {
+        statsBtn.onclick = () => openStatsModal("reel", reel.id, reel.title, [reel.publishedEmbedId]);
       }
     }
 

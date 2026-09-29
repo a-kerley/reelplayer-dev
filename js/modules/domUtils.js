@@ -545,3 +545,10 @@ export function setupDebouncedInput(input, callback, delay = 300) {
     input.removeEventListener("input", handler);
   };
 }
+
+// Escapes a value for interpolation into an HTML string/attribute.
+export function escapeHtml(value) {
+  return String(value ?? "").replace(/[&<>"']/g, (c) => ({
+    "&": "&amp;", "<": "&lt;", ">": "&gt;", '"': "&quot;", "'": "&#39;",
+  }[c]));
+}

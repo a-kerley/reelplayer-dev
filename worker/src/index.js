@@ -75,10 +75,13 @@
 //                               that rewrite above would touch - {matches: [{key, type, title}]}
 //   DELETE /media/delete      - password-gated, ?key=<key>
 //   POST   /stats/:type/:id   - public, body {event, sessionId, trackIndex?, trackTitle?,
-//                               listenSeconds?}; :type is "reel", "page", or "card". No-ops (200,
-//                               no write) unless the target exists and has analyticsEnabled=true.
-//   GET    /stats/:type/:id   - password-gated, lists every raw stat event for that target,
-//                               newest first - the builder aggregates client-side.
+//                               listenSeconds?}; :type is "reel", "page", or "card", :id whatever
+//                               the embed loaded (hash, `live-<id>`, slug). No-ops (200, no write)
+//                               unless the target exists and has analyticsEnabled=true. Filed
+//                               under the target's stable draft id, expiring after ~13 months.
+//   GET    /stats/:type/:id   - password-gated, :id is the stable draft id (optional repeatable
+//                               ?alias=<id>); lists every raw stat event newest first, merging in
+//                               events filed under older publish ids - the builder aggregates.
 //   GET    /folder-meta/:type - password-gated, :type is "reel"/"page"/"card", returns
 //                               {names: string[], collapsed: string[]} (sidebar folder grouping).
 //   POST   /folder-meta/:type - password-gated, replaces the stored {names, collapsed} wholesale.
@@ -160,6 +163,121 @@ async function parseJsonBody(request) {
   }
 }
 
+// KV's list() returns at most 1000 keys per call - follow the cursor, or
+// anything past the first page (e.g. a busy reel's stat events) silently
+// disappears.
+async function listAllKeys(env, prefix) {
+  const keys = [];
+  let cursor;
+  do {
+    const page = await env.REELS.list({ prefix, cursor });
+    keys.push(...page.keys);
+    cursor = page.list_complete ? undefined : page.cursor;
+  } while (cursor);
+  return keys;
+}
+
+// ---- Stats ---------------------------------------------------------------
+// Stat events are keyed by the target's *stable* id, not whatever id the
+// embed happened to load with: a reel's publish id is a content hash that
+// changes on every republish (and Pages/Cards load it as `live-<id>`), a
+// page's slug can be renamed, and a card's id is also a hash. Filing under
+// the draft id (sourceReelId / page.id / sourceCardId) keeps one continuous
+// history per item. Events written before this existed live under the old
+// ids - GET merges those back in (see statsAliasIds()).
+const STATS_TTL_SECONDS = 60 * 60 * 24 * 396; // ~13 months retention
+const STAT_KEY_SUFFIX = /^\d+_[0-9a-f]{8}$/; // <timestamp>_<rand>, guards prefix collisions
+
+function statsTargetKey(type, id) {
+  return type === "reel" ? reelStorageKey(id) : `${type}_${id}`;
+}
+
+function canonicalStatsId(type, id, record) {
+  if (type === "reel") return record.sourceReelId || (id.startsWith("live-") ? id.slice(5) : id);
+  if (type === "page") return record.id || id;
+  return record.sourceCardId || id;
+}
+
+async function listStatKeys(env, type, id) {
+  const prefix = `stat_${type}_${id}_`;
+  const keys = await listAllKeys(env, prefix);
+  return keys.filter((k) => STAT_KEY_SUFFIX.test(k.name.slice(prefix.length)));
+}
+
+// Every id a stable id's events may have been filed under before stable
+// keying: each hash publish of a reel/card, and a page's current slug.
+async function statsAliasIds(env, type, id) {
+  if (type === "reel") {
+    const reels = await listEntries(env, "reel_", (r) => r, ["reel_stable_"]);
+    return reels.filter((r) => r.sourceReelId === id).map((r) => r.id);
+  }
+  if (type === "page") {
+    const pages = await listEntries(env, "page_", (p) => p);
+    return pages.filter((p) => p.id === id).map((p) => p.slug);
+  }
+  const cards = await listEntries(env, "card_", (c) => c);
+  return cards.filter((c) => c.sourceCardId === id).map((c) => c.id);
+}
+
+// Best-effort and capped: a Worker invocation gets ~1000 KV operations, so a
+// very busy item can't be purged in one request. Anything left over still
+// expires on its own STATS_TTL_SECONDS, and a cleanup failure must never
+// fail the delete the user actually asked for.
+// ponytail: caps at 900 deletes per request; loop/queue if volume ever needs a full purge
+async function deleteStats(env, type, id) {
+  try {
+    const keys = await listStatKeys(env, type, id);
+    await Promise.all(keys.slice(0, 900).map((k) => env.REELS.delete(k.name)));
+  } catch (e) {
+    console.warn("deleteStats failed (entries will still expire)", type, id, e);
+  }
+}
+
+// Unpublishing one old hash/slug version shouldn't erase its share of the
+// item's history: move its legacy-keyed events under the stable id (keeping
+// each one's original 13-month expiry) before the version's own record - the
+// only thing statsAliasIds() could have found it by - disappears. Falls back
+// to plain deletion when there's no stable id to move them to.
+async function retireStats(env, type, fromId, recordValue) {
+  let record = null;
+  try {
+    record = recordValue ? JSON.parse(recordValue) : null;
+  } catch {
+    record = null;
+  }
+  const toId = record ? canonicalStatsId(type, fromId, record) : fromId;
+  if (toId === fromId) return deleteStats(env, type, fromId);
+
+  const prefix = `stat_${type}_${fromId}_`;
+  // 3 KV ops per moved event (get/put/delete) - capped for the same
+  // per-invocation limit as deleteStats(); leftovers expire on their own.
+  let keys;
+  try {
+    keys = (await listStatKeys(env, type, fromId)).slice(0, 300);
+  } catch (e) {
+    console.warn("retireStats list failed", type, fromId, e);
+    return;
+  }
+  const nowSeconds = Date.now() / 1000;
+  await Promise.allSettled(keys.map(async (key) => {
+    const value = await env.REELS.get(key.name);
+    let event = key.metadata;
+    try {
+      event = event || (value ? JSON.parse(value) : null);
+    } catch {
+      event = null;
+    }
+    const expiration = event?.ts ? Math.floor(Date.parse(event.ts) / 1000) + STATS_TTL_SECONDS : 0;
+    if (value && expiration > nowSeconds + 60) {
+      await env.REELS.put(`stat_${type}_${toId}_${key.name.slice(prefix.length)}`, value, {
+        expiration,
+        ...(key.metadata ? { metadata: key.metadata } : {}),
+      });
+    }
+    await env.REELS.delete(key.name);
+  }));
+}
+
 // Shared shape for the /reels and /drafts list routes: list every key under
 // a prefix, fetch + parse each one, and pluck out just the summary fields
 // each listing view needs.
@@ -172,13 +290,13 @@ async function parseJsonBody(request) {
 // "draft_card_" have no shorter prefix elsewhere in this namespace that
 // would similarly swallow them. Accepts a single string or an array.
 async function listEntries(env, prefix, pickFields, excludePrefixes) {
-  const list = await env.REELS.list({ prefix });
+  const allKeys = await listAllKeys(env, prefix);
   const excludes = excludePrefixes
     ? [].concat(excludePrefixes)
     : [];
   const keys = excludes.length
-    ? list.keys.filter((key) => !excludes.some((ex) => key.name.startsWith(ex)))
-    : list.keys;
+    ? allKeys.filter((key) => !excludes.some((ex) => key.name.startsWith(ex)))
+    : allKeys;
   const entries = await Promise.all(
     keys.map(async (key) => {
       const value = await env.REELS.get(key.name);
@@ -477,7 +595,9 @@ export default {
       if (request.method === "DELETE") {
         const authError = requireAuth(request, env);
         if (authError) return authError;
+        const deletedValue = await env.REELS.get(key);
         await env.REELS.delete(key);
+        if (!match[1].startsWith("live-")) await retireStats(env, "reel", match[1], deletedValue);
         return jsonResponse({ ok: true });
       }
     }
@@ -560,6 +680,7 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
         await env.REELS.delete(key);
+        await deleteStats(env, "reel", draftMatch[1]);
         return jsonResponse({ ok: true });
       }
     }
@@ -592,6 +713,7 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
         await env.REELS.delete(key);
+        await deleteStats(env, "page", pageDraftMatch[1]);
         return jsonResponse({ ok: true });
       }
     }
@@ -624,6 +746,7 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
         await env.REELS.delete(key);
+        await deleteStats(env, "card", cardDraftMatch[1]);
         return jsonResponse({ ok: true });
       }
     }
@@ -684,6 +807,7 @@ export default {
         // for a matching id (would be an unbounded list() on every publish).
         if (previousSlug && previousSlug !== slug) {
           await env.REELS.delete(`page_${previousSlug}`);
+          await retireStats(env, "page", previousSlug, JSON.stringify({ id }));
         }
 
         const published = {
@@ -717,7 +841,9 @@ export default {
       if (request.method === "DELETE") {
         const authError = requireAuth(request, env);
         if (authError) return authError;
+        const deletedValue = await env.REELS.get(`page_${slugParam}`);
         await env.REELS.delete(`page_${slugParam}`);
+        await retireStats(env, "page", slugParam, deletedValue);
         return jsonResponse({ ok: true });
       }
     }
@@ -786,7 +912,9 @@ export default {
       if (request.method === "DELETE") {
         const authError = requireAuth(request, env);
         if (authError) return authError;
+        const deletedValue = await env.REELS.get(key);
         await env.REELS.delete(key);
+        await retireStats(env, "card", cardMatch[1], deletedValue);
         return jsonResponse({ ok: true });
       }
     }
@@ -797,7 +925,6 @@ export default {
     const statsMatch = pathname.match(/^\/stats\/(reel|page|card)\/([a-zA-Z0-9_-]+)$/);
     if (statsMatch) {
       const [, targetType, targetId] = statsMatch;
-      const targetKey = `${targetType}_${targetId}`;
 
       if (request.method === "POST") {
         const { body, error } = await parseJsonBody(request);
@@ -806,8 +933,10 @@ export default {
         // Only record a beacon for a target that actually exists and has
         // opted in - this also means flipping analyticsEnabled off stops
         // the Worker from accepting any further beacons for it immediately,
-        // not just future ones from an updated client.
-        const targetValue = await env.REELS.get(targetKey);
+        // not just future ones from an updated client. statsTargetKey()
+        // resolves `live-<id>` reel references (Pages/Cards) the same way
+        // /reels/:id does.
+        const targetValue = await env.REELS.get(statsTargetKey(targetType, targetId));
         if (!targetValue) return jsonResponse({ ok: true });
         let target;
         try {
@@ -822,11 +951,15 @@ export default {
           return jsonResponse({ error: "Invalid stat event" }, 400);
         }
 
+        const statsId = canonicalStatsId(targetType, targetId, target);
+        // City/country come from Cloudflare's per-request geo lookup - the
+        // visitor's IP itself is never stored.
         const record = {
           event,
           targetType,
-          targetId,
-          sessionId,
+          targetId: statsId,
+          viaId: targetId,
+          sessionId: sessionId.slice(0, 64),
           ts: new Date().toISOString(),
           country: request.cf?.country || null,
           city: request.cf?.city || null,
@@ -835,12 +968,18 @@ export default {
         };
         if (event === "play") {
           record.trackIndex = typeof trackIndex === "number" ? trackIndex : null;
-          record.trackTitle = typeof trackTitle === "string" ? trackTitle : "";
+          record.trackTitle = typeof trackTitle === "string" ? trackTitle.slice(0, 150) : "";
           record.listenSeconds = typeof listenSeconds === "number" ? Math.round(listenSeconds) : 0;
         }
 
-        const statKey = `stat_${targetType}_${targetId}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
-        await env.REELS.put(statKey, JSON.stringify(record));
+        // The record doubles as KV metadata (1024-byte cap) so GET can read
+        // every event straight from list() instead of one get() per event.
+        const serialized = JSON.stringify(record);
+        const statKey = `stat_${targetType}_${statsId}_${Date.now()}_${crypto.randomUUID().slice(0, 8)}`;
+        await env.REELS.put(statKey, serialized, {
+          expirationTtl: STATS_TTL_SECONDS,
+          ...(serialized.length <= 1000 ? { metadata: record } : {}),
+        });
         return jsonResponse({ ok: true });
       }
 
@@ -848,9 +987,27 @@ export default {
         const authError = requireAuth(request, env);
         if (authError) return authError;
 
-        const entries = await listEntries(env, `stat_${targetType}_${targetId}_`, (r) => r);
-        entries.sort((a, b) => (a.ts < b.ts ? 1 : -1));
-        return jsonResponse(entries);
+        // ?alias=<id> (repeatable) lets the builder add ids it knows the
+        // target was published under but the Worker can't look up - e.g. a
+        // card published before sourceCardId existed.
+        const params = new URL(request.url).searchParams;
+        const clientAliases = params.getAll("alias")
+          .filter((a) => /^[a-zA-Z0-9_-]+$/.test(a)).slice(0, 20);
+        const ids = new Set([targetId, ...clientAliases, ...(await statsAliasIds(env, targetType, targetId))]);
+
+        const keyLists = await Promise.all([...ids].map((id) => listStatKeys(env, targetType, id)));
+        const entries = await Promise.all(keyLists.flat().map(async (key) => {
+          if (key.metadata) return key.metadata;
+          const value = await env.REELS.get(key.name);
+          try {
+            return value ? JSON.parse(value) : null;
+          } catch {
+            return null;
+          }
+        }));
+        const events = entries.filter(Boolean);
+        events.sort((a, b) => (a.ts < b.ts ? 1 : -1));
+        return jsonResponse(events);
       }
     }
 

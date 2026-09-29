@@ -1,5 +1,5 @@
 // statsViewer.js - "View Stats" modal: fetches the raw view/play events a
-// reel or page has collected (see js/modules/statsBeacon.js for how they're
+// reel, page or card has collected (see js/modules/statsBeacon.js for how they're
 // recorded) and summarizes them client-side, matching js/modules/
 // embedManager.js's/pageManager.js's fetch -> render HTML string ->
 // dialog.createDialog pattern. The Worker deliberately does no aggregation
@@ -8,9 +8,11 @@
 import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { escapeHtml } from "./domUtils.js";
 
-async function fetchStats(targetType, targetId, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/stats/${targetType}/${targetId}`, {
+async function fetchStats(targetType, targetId, aliases, password) {
+  const query = aliases.filter(Boolean).map((a) => `alias=${encodeURIComponent(a)}`).join("&");
+  const response = await fetch(`${WORKER_BASE_URL}/stats/${targetType}/${targetId}${query ? `?${query}` : ""}`, {
     headers: { "Authorization": `Bearer ${password}` }
   });
 
@@ -79,7 +81,7 @@ export function summarizeStats(events) {
 
 function formatLocation(entry) {
   if (!entry.city && !entry.country) return "Unknown location";
-  return [entry.city, entry.country].filter(Boolean).join(", ");
+  return escapeHtml([entry.city, entry.country].filter(Boolean).join(", "));
 }
 
 function renderStatsHTML(summary) {
@@ -101,7 +103,7 @@ function renderStatsHTML(summary) {
       <div style="max-height:160px;overflow-y:auto;">
         ${summary.perTrack.map((t) => `
           <div style="display:flex;justify-content:space-between;gap:0.5rem;padding:0.3rem 0;border-bottom:1px solid #444;font-size:0.85rem;">
-            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${t.trackTitle}</span>
+            <span style="overflow:hidden;text-overflow:ellipsis;white-space:nowrap;">${escapeHtml(t.trackTitle)}</span>
             <span style="flex-shrink:0;color:#888;">${t.count} play${t.count === 1 ? "" : "s"} &middot; ${formatDuration(t.totalListenSeconds)}</span>
           </div>
         `).join("")}
@@ -129,31 +131,59 @@ function renderStatsHTML(summary) {
   return summaryLine + perTrackTable + sessionsTable;
 }
 
+const RANGES = [
+  { value: "7", label: "Last 7 days" },
+  { value: "30", label: "Last 30 days" },
+  { value: "90", label: "Last 90 days" },
+  { value: "all", label: "All time (up to 13 months)" },
+];
+
+function filterByRange(events, range) {
+  if (range === "all") return events;
+  const cutoff = Date.now() - Number(range) * 24 * 60 * 60 * 1000;
+  return events.filter((e) => e.ts && Date.parse(e.ts) >= cutoff);
+}
+
 /** @param {'reel'|'page'|'card'} targetType
- *  @param {string} targetId - reel's publishedEmbedId, page's publishedSlug,
- *    or card's own published id (not its referenced reelId)
- *  @param {string} label - display name shown in the modal title */
-export async function openStatsModal(targetType, targetId, label) {
+ *  @param {string} targetId - the item's stable draft id (reel.id/page.id/
+ *    card.id) - the Worker files every event under it
+ *  @param {string} label - display name shown in the modal title
+ *  @param {string[]} [aliases] - older ids the item was published under
+ *    (e.g. its current publishedEmbedId/publishedSlug) whose pre-existing
+ *    events should be merged in */
+export async function openStatsModal(targetType, targetId, label, aliases = []) {
   const password = await getBuilderPassword();
   if (!password) return;
 
   let events;
   try {
-    events = await fetchStats(targetType, targetId, password);
+    events = await fetchStats(targetType, targetId, aliases, password);
   } catch (error) {
     dialog.alert(error.message);
     return;
   }
 
-  const summary = summarizeStats(events);
+  const rangeSelect = `
+    <select id="statsRangeSelect" title="Only count activity from this period" aria-label="Date range" style="margin-bottom:1rem;">
+      ${RANGES.map((r) => `<option value="${r.value}"${r.value === "30" ? " selected" : ""}>${r.label}</option>`).join("")}
+    </select>`;
 
   dialog.createDialog({
     type: "custom",
     message: `Stats — ${label || "(untitled)"}`,
-    content: renderStatsHTML(summary),
+    content: `${rangeSelect}<div id="statsModalBody">${renderStatsHTML(summarizeStats(filterByRange(events, "30")))}</div>`,
     maxWidth: "500px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
     ]
   });
+
+  setTimeout(() => {
+    const select = document.getElementById("statsRangeSelect");
+    const body = document.getElementById("statsModalBody");
+    if (!select || !body) return;
+    select.addEventListener("change", () => {
+      body.innerHTML = renderStatsHTML(summarizeStats(filterByRange(events, select.value)));
+    });
+  }, 0);
 }

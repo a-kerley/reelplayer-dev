@@ -165,12 +165,16 @@ curl -X DELETE http://localhost:8787/pages/my-page-slug -H "Authorization: Beare
 
 ## Stats (opt-in per-reel/per-page analytics)
 
-Each reel/page has an `analyticsEnabled` flag (off by default). When on,
+Each reel/page/card has an `analyticsEnabled` flag (off by default). When on,
 `player.html`/`page.html` POST small "view"/"play" beacons to this Worker,
-stored as individual `stat_<type>_<id>_<timestamp>_<rand>` KV entries in
-the same `REELS` namespace - no aggregation happens server-side, since
-expected volume is low; the builder's "View Stats" modal fetches the raw
-list and summarizes it client-side. The POST route is public (called from
+stored as individual `stat_<type>_<stableId>_<timestamp>_<rand>` KV entries
+in the same `REELS` namespace, each expiring after ~13 months. `<stableId>`
+is the item's draft id, resolved from whatever id the embed used, so
+republishes and Page/Card embeds share one history. No aggregation happens
+server-side, since expected volume is low; the builder's "View Stats" modal
+fetches the raw list and summarizes it client-side. Visitors sending Global
+Privacy Control / Do Not Track, and any browser that has opened the builder,
+are never counted. The POST route is public (called from
 any visitor's browser) but is a no-op unless the target exists and has
 opted in - flip `analyticsEnabled` off and the Worker immediately stops
 accepting further beacons for it, regardless of what a stale client sends:
@@ -186,11 +190,13 @@ curl -X POST http://localhost:8787/stats/reel/test123 \
   -H "Content-Type: application/json" \
   -d '{"event":"play","sessionId":"abc123","trackIndex":0,"trackTitle":"Track One","listenSeconds":42}'
 
-# Fetch raw events for a target, newest first (password-gated)
-curl http://localhost:8787/stats/reel/test123 -H "Authorization: Bearer YOUR_PASSWORD"
+# Fetch raw events for a target by its stable draft id, newest first
+# (password-gated). Optional repeatable ?alias=<id> merges in events filed
+# under an older id the Worker can't look up itself.
+curl http://localhost:8787/stats/reel/reel-1234567890 -H "Authorization: Bearer YOUR_PASSWORD"
 
-# Same shape for pages, keyed by slug instead of id
-curl http://localhost:8787/stats/page/my-page-slug -H "Authorization: Bearer YOUR_PASSWORD"
+# Same shape for pages (page draft id) and cards (card draft id)
+curl http://localhost:8787/stats/page/page-1234567890 -H "Authorization: Bearer YOUR_PASSWORD"
 ```
 
 ## Redeploying after changes

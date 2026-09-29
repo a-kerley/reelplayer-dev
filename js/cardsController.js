@@ -35,6 +35,7 @@ import { buildValueControl, wireValueControl } from "./modules/valueControl.js";
 import { renderCardChrome, mergeCardOverrides } from "./modules/cardChrome.js";
 import { playerApp } from "./player.js";
 import { PreviewManager } from "./modules/previewManager.js";
+import { openStatsModal } from "./modules/statsViewer.js";
 
 // The fixed set of icon files shipped in assets/card-icons/ (link icons on
 // the Info tab) - a static, code-coupled asset set (see CLAUDE.md's "Asset
@@ -563,6 +564,7 @@ export function initCardsController() {
       <div class="color-row" style="margin-top: 1rem;">
         <label for="cardAnalyticsEnabled" title="Track plays/engagement analytics for this card.">Analytics Enabled:</label>
         <span id="cardAnalyticsSlot"></span>
+        <button type="button" id="viewCardStatsBtn" class="view-stats-btn" title="View views, plays and listen time for this card.">View Stats</button>
       </div>
 
       <button type="button" id="cardPublishBtn" title="Publish this card so it can be embedded on boxedape.com." style="margin-top: 1rem;">Publish Card</button>
@@ -775,6 +777,8 @@ export function initCardsController() {
       onChange: (e) => { card.analyticsEnabled = e.target.checked; updateCurrentCard(); },
     });
     document.getElementById("cardAnalyticsSlot").replaceChildren(analyticsToggle);
+    document.getElementById("viewCardStatsBtn").onclick = () =>
+      openStatsModal("card", card.id, card.title, [card.publishedEmbedId]);
 
     // --- Card Style Overrides -------------------------------------------
     const showReelTitleToggle = createToggleSwitch({

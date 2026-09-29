@@ -1500,8 +1500,14 @@ const playerAppCore = {
     // to whichever wavesurfer event eventually fires once the fade lands.
     const wasDesiredPlaying = this.desiredPlaying;
     this.desiredPlaying = !wasDesiredPlaying;
+    // detail.intent marks this as the click, not actual playback - the real
+    // wavesurfer "play"/"pause" handlers dispatch the same events again
+    // once audio really starts/stops. Icon listeners take either; listen-
+    // time analytics (player.html) only trusts the real ones.
     document.dispatchEvent(
-      new CustomEvent(this.desiredPlaying ? "playback:play" : "playback:pause")
+      new CustomEvent(this.desiredPlaying ? "playback:play" : "playback:pause", {
+        detail: { intent: true },
+      })
     );
 
     if (wasDesiredPlaying) {
