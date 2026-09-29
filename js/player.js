@@ -2609,3 +2609,17 @@ for (const type of ["pointerup", "touchend", "click", "keydown"]) {
     if (ctx && ctx.state !== "running") ctx.resume().catch(() => {});
   }, { capture: true, passive: true });
 }
+
+// WHY: iOS mutes Web Audio when the ring/silent switch is on, but not a
+// playing <audio> element - and while one plays, iOS moves the page's audio
+// session to "playback", un-muting Web Audio with it. So loop an inaudible
+// clip alongside real playback. wavesurfer's own navigator.audioSession fix
+// wasn't enough in a real cross-origin embed (silent switch still muted it on
+// Squarespace). The first playback:play fires synchronously inside the
+// user's tap, which unlocks this element for later programmatic plays too.
+const silentKeepAlive = new Audio(
+  "data:audio/wav;base64,UklGRogAAABXQVZFZm10IBAAAAABAAEAQB8AAEAfAAABAAgAZGF0YWQAAACAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICAgICA"
+);
+silentKeepAlive.loop = true;
+document.addEventListener("playback:play", () => silentKeepAlive.play().catch(() => {}));
+document.addEventListener("playback:pause", () => silentKeepAlive.pause());
