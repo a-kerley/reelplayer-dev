@@ -1034,14 +1034,15 @@ const playerAppCore = {
   // rectangular box. Deliberately not applied to .hover-overlay itself: that
   // would also mask ::after's hover-playhead line down to the waveform's
   // shape, hiding it over any quiet/silent stretch - see the CSS comment.
-  updateHoverWaveformMask() {
-    // Touch has no hover - it's a discrete tap/drag-to-seek, never a fill
-    // that previews where you'd land, so there's nothing to keep this in
-    // sync for. Skipping it here avoids the cost of re-encoding a PNG
-    // snapshot (canvas.toDataURL()) on every redraw for devices that will
-    // never actually display it - see updateScrubPreview() below, which
-    // skips showing the fill itself for the same reason.
-    if (this.isTouchDevice()) return;
+  updateHoverWaveformMask(force = false) {
+    // Touch only shows the fill during a drag-to-scrub, so don't re-encode a
+    // PNG snapshot (canvas.toDataURL()) on every redraw there - just mark it
+    // stale, and the waveform's touchstart handler encodes it (force) the
+    // first time a drag actually needs it.
+    if (this.isTouchDevice() && !force) {
+      this._hoverMaskStale = true;
+      return;
+    }
 
     const fillEl = this.elements.hoverOverlay;
     const waveformEl = this.elements.waveform;
@@ -1123,14 +1124,8 @@ const playerAppCore = {
       );
       const duration = this.wavesurfer.getDuration();
       const time = duration * percent;
-      // The fill is a hover preview - touch has no hover, just a tap/drag
-      // that seeks directly, so skip showing it there (see
-      // updateHoverWaveformMask()'s matching skip above). The time label
-      // below stays for both: useful feedback while a finger is still down.
-      if (!this.isTouchDevice()) {
-        hoverOverlay.style.width = `${percent * 100}%`;
-        hoverOverlay.style.opacity = "1";
-      }
+      hoverOverlay.style.width = `${percent * 100}%`;
+      hoverOverlay.style.opacity = "1";
       hoverTime.textContent = this.formatTime(time);
       hoverTime.style.opacity = "1";
       const pixelX = clientX - rect.left;
@@ -1158,13 +1153,41 @@ const playerAppCore = {
       hideScrubPreview();
     });
 
-    // Touch equivalent of the hover preview above - WaveSurfer's own tap-to-seek
-    // (interact: true) already handles the actual seek natively via touch, this
-    // just drives the same scrub-preview overlay/time label while the finger
-    // is down, since touch has no hover to trigger it otherwise.
-    waveformEl.addEventListener("touchstart", (e) => updateScrubPreview(e.touches[0].clientX), { passive: true });
-    waveformEl.addEventListener("touchmove", (e) => updateScrubPreview(e.touches[0].clientX), { passive: true });
-    waveformEl.addEventListener("touchend", hideScrubPreview);
+    // Touch equivalent of the hover preview above: the same fill/playhead/time
+    // follow the finger, and releasing a drag seeks to where it ended. A plain
+    // tap (under the threshold) is left to WaveSurfer's own tap-to-seek - a
+    // drag suppresses that click, which is why drags used to do nothing.
+    // #waveform's touch-action: pan-y hands vertical swipes to page scrolling,
+    // which cancels the touch (touchcancel) - no seek then.
+    const TOUCH_SCRUB_THRESHOLD_PX = 8;
+    let touchScrub = null;
+    waveformEl.addEventListener("touchstart", (e) => {
+      if (this._hoverMaskStale) {
+        this._hoverMaskStale = false;
+        this.updateHoverWaveformMask(true);
+      }
+      const x = e.touches[0].clientX;
+      touchScrub = { startX: x, x };
+      updateScrubPreview(x);
+    }, { passive: true });
+    waveformEl.addEventListener("touchmove", (e) => {
+      if (!touchScrub) return;
+      touchScrub.x = e.touches[0].clientX;
+      updateScrubPreview(touchScrub.x);
+    }, { passive: true });
+    waveformEl.addEventListener("touchend", () => {
+      hideScrubPreview();
+      const scrub = touchScrub;
+      touchScrub = null;
+      if (!scrub || !this.isWaveformReady) return;
+      if (Math.abs(scrub.x - scrub.startX) <= TOUCH_SCRUB_THRESHOLD_PX) return;
+      const rect = waveformEl.getBoundingClientRect();
+      this.wavesurfer.seekTo(Math.min(Math.max((scrub.x - rect.left) / rect.width, 0), 1));
+    });
+    waveformEl.addEventListener("touchcancel", () => {
+      touchScrub = null;
+      hideScrubPreview();
+    });
 
     // Duck audio around a mid-playback seek (click or drag on the
     // waveform) to mask the click a non-zero-crossing buffer jump causes -
@@ -1208,6 +1231,8 @@ const playerAppCore = {
       // playlistScroll.js's own thumb-drag release handling).
       document.addEventListener("mouseup", handleSeekPointerUp);
       document.addEventListener("touchend", handleSeekPointerUp);
+      // A touch that turns into a page scroll ends in touchcancel, not touchend.
+      document.addEventListener("touchcancel", handleSeekPointerUp);
     }
 
     this.wavesurfer.on("ready", () => {

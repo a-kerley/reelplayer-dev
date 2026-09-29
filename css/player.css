@@ -207,6 +207,9 @@
      overflow: visible above). */
   flex-basis: 0px;
   contain: layout;
+  /* Horizontal drags scrub (js/player.js's touch handlers in
+     setupWaveformEvents()); vertical swipes still scroll the page. */
+  touch-action: pan-y;
 }
 .waveform-and-volume {
   display: flex;
