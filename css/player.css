@@ -470,16 +470,6 @@ button {
   animation: track-info-marquee var(--track-info-marquee-duration, 8s) linear 2s infinite;
 }
 
-/* Optional reel setting (hoverDarkenTrackTitle): the track title follows the
-   background's hover-darken - --hover-darken-brightness is set on the wrapper
-   by every darken rule (hover, touch, un-darken on idle), so it just inherits.
-   On this inner span rather than .track-info because expandable.css rewrites
-   .track-info's transition in a dozen states, which would snap the filter. */
-.player-wrapper.hover-darken-track-title .track-info-text {
-  filter: brightness(var(--hover-darken-brightness, 1));
-  transition: opacity 0.25s ease, transform 0.4s ease, filter var(--hover-darken-transition-duration) ease-in-out;
-}
-
 @keyframes track-info-marquee {
   from {
     transform: translateX(0);
@@ -831,6 +821,13 @@ button {
 .player-wrapper.playback-idle #total-time.visible {
   opacity: 1 !important;
   transition: opacity var(--playback-idle-transition-in) ease-out;
+}
+
+/* Optional reel setting (keepTrackTitleOnIdle): the track title stays fully
+   visible through playback-idle, same as #total-time above. Not while
+   collapsed-idle - expandable mode hides the whole collapsed UI then. */
+.player-wrapper.playback-idle.keep-track-title-on-idle:not(.collapsed-idle) .track-info.visible {
+  opacity: 1 !important;
 }
 
 /* No spacebar fallback on touch, so play/volume shouldn't dim to

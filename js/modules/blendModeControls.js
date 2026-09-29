@@ -349,7 +349,7 @@ export function setupHoverDarkenControls(reel, onChange) {
   const hoverDarkenAmount = document.getElementById("hoverDarkenAmount");
   const hoverDarkenAmountSlider = document.getElementById("hoverDarkenAmountSlider");
   const hoverDarkenUndarkenOnIdle = document.getElementById("hoverDarkenUndarkenOnIdle");
-  const hoverDarkenTrackTitle = document.getElementById("hoverDarkenTrackTitle");
+  const keepTrackTitleOnIdle = document.getElementById("keepTrackTitleOnIdle");
 
   if (!hoverDarkenEnabled || !hoverDarkenAmount) return;
 
@@ -357,14 +357,13 @@ export function setupHoverDarkenControls(reel, onChange) {
   hoverDarkenAmount.value = reel.hoverDarkenAmount ?? 15;
   if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.value = hoverDarkenAmount.value;
   if (hoverDarkenUndarkenOnIdle) hoverDarkenUndarkenOnIdle.checked = reel.hoverDarkenUndarkenOnIdle || false;
-  if (hoverDarkenTrackTitle) hoverDarkenTrackTitle.checked = reel.hoverDarkenTrackTitle || false;
+  if (keepTrackTitleOnIdle) keepTrackTitleOnIdle.checked = reel.keepTrackTitleOnIdle || false;
 
   const updateEnabledState = () => {
     const isEnabled = hoverDarkenEnabled.checked;
     hoverDarkenAmount.disabled = !isEnabled;
     if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.disabled = !isEnabled;
     if (hoverDarkenUndarkenOnIdle) hoverDarkenUndarkenOnIdle.disabled = !isEnabled;
-    if (hoverDarkenTrackTitle) hoverDarkenTrackTitle.disabled = !isEnabled;
     reel.hoverDarkenEnabled = isEnabled;
   };
   updateEnabledState();
@@ -387,9 +386,11 @@ export function setupHoverDarkenControls(reel, onChange) {
     });
   }
 
-  if (hoverDarkenTrackTitle) {
-    hoverDarkenTrackTitle.addEventListener("change", () => {
-      reel.hoverDarkenTrackTitle = hoverDarkenTrackTitle.checked;
+  // Independent of hover-darken (playback-idle dims the UI either way) - it
+  // just shares this row.
+  if (keepTrackTitleOnIdle) {
+    keepTrackTitleOnIdle.addEventListener("change", () => {
+      reel.keepTrackTitleOnIdle = keepTrackTitleOnIdle.checked;
       onChange();
     });
   }

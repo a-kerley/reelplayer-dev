@@ -52,7 +52,7 @@ export function createEmptyReel() {
     hoverDarkenEnabled: false,
     hoverDarkenAmount: 15,
     hoverDarkenUndarkenOnIdle: false,
-    hoverDarkenTrackTitle: false,
+    keepTrackTitleOnIdle: false,
     idleUnblurEnabled: false,
     idleUnblurAmount: 50,
     // Player configuration
@@ -366,8 +366,8 @@ function createColorPickersSection() {
         <input type="checkbox" id="hoverDarkenUndarkenOnIdle" class="toggle toggle-primary toggle-sm" style="margin-left:0.5rem;margin-right:0.3rem;" title="Also un-darken automatically once the player has sat idle for a while, even if the mouse never left it (static mode only)." />
         <span style="font-size:0.8rem;color:#999;white-space:nowrap;">Un-darken on Idle</span>
         <span style="color:#444;">|</span>
-        <input type="checkbox" id="hoverDarkenTrackTitle" class="toggle toggle-primary toggle-sm" style="margin-left:0.5rem;margin-right:0.3rem;" title="Also darken the currently playing track title whenever the player darkens." />
-        <span style="font-size:0.8rem;color:#999;white-space:nowrap;">Darken Track Title</span>
+        <input type="checkbox" id="keepTrackTitleOnIdle" class="toggle toggle-primary toggle-sm" style="margin-left:0.5rem;margin-right:0.3rem;" title="Keep the currently playing track title fully visible when the rest of the player dims during playback idle." />
+        <span style="font-size:0.8rem;color:#999;white-space:nowrap;">Keep Track Title on Idle</span>
       </div>
       <div class="color-row">
         <span>Unblur on Idle:</span>

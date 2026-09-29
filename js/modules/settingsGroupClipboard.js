@@ -49,7 +49,7 @@ const GROUP_KEYS = {
     "hoverDarkenEnabled",
     "hoverDarkenAmount",
     "hoverDarkenUndarkenOnIdle",
-    "hoverDarkenTrackTitle",
+    "keepTrackTitleOnIdle",
     "idleUnblurEnabled",
     "idleUnblurAmount",
   ],
