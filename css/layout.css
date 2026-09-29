@@ -1,3 +1,11 @@
+/* WHY: stop iOS Safari's text autosizing - it inflates text by how wide/long a
+   block is, so the track title changed size between truncated, scrolling
+   (deliberately wider than its box) and short titles inside the embed iframe. */
+html {
+  -webkit-text-size-adjust: 100%;
+  text-size-adjust: 100%;
+}
+
 body {
   font-family: 'Inter', sans-serif;
   font-weight: 600;
