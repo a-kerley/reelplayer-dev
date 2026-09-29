@@ -121,17 +121,113 @@ function jsonResponse(data, status = 200) {
   });
 }
 
-function isAuthorized(request, env) {
+// ---- Auth ------------------------------------------------------------------
+// The builder runs on reels-admin.boxedape.com behind Cloudflare Access
+// (email one-time PIN, @boxedape.com only). Access attaches a signed JWT to
+// every request it lets through (Cf-Access-Jwt-Assertion header, plus the
+// CF_Authorization cookie), which arrives here via the site Worker's /api
+// forwarding. The header is NOT trusted on presence: this Worker is also
+// reachable on the public host and its own workers.dev URL, where anyone can
+// send one - so the signature (team JWKS), audience, issuer and expiry are
+// all verified.
+//
+// Two other ways in: the legacy shared bearer password (BUILDER_PASSWORD,
+// transitional - removed once Access is confirmed), and LOCAL_DEV_AUTH=1,
+// which only worker/.dev.vars sets, so `wrangler dev` on localhost needs no
+// sign-in. Deploys never read .dev.vars, and the hostname check means even a
+// misplaced var couldn't open up production.
+const jwksCache = { keys: null, fetchedAt: 0 };
+
+function base64UrlToBytes(value) {
+  const base64 = value.replace(/-/g, "+").replace(/_/g, "/").padEnd(Math.ceil(value.length / 4) * 4, "=");
+  return Uint8Array.from(atob(base64), (c) => c.charCodeAt(0));
+}
+
+async function accessSigningKeys(env, forceRefresh = false) {
+  const maxAgeMs = 60 * 60 * 1000;
+  if (!forceRefresh && jwksCache.keys && Date.now() - jwksCache.fetchedAt < maxAgeMs) return jwksCache.keys;
+  const response = await fetch(`${env.ACCESS_TEAM_DOMAIN}/cdn-cgi/access/certs`);
+  if (!response.ok) throw new Error(`Access certs fetch failed (${response.status})`);
+  jwksCache.keys = (await response.json()).keys || [];
+  jwksCache.fetchedAt = Date.now();
+  return jwksCache.keys;
+}
+
+function accessToken(request) {
+  const header = request.headers.get("Cf-Access-Jwt-Assertion");
+  if (header) return header;
+  const cookie = request.headers.get("Cookie") || "";
+  const match = cookie.match(/(?:^|;\s*)CF_Authorization=([^;]+)/);
+  return match ? match[1] : null;
+}
+
+// Returns the signed-in email, or null if there's no valid Access token.
+async function verifyAccessToken(request, env) {
+  const token = accessToken(request);
+  if (!token || !env.ACCESS_TEAM_DOMAIN || !env.ACCESS_AUD) return null;
+  const parts = token.split(".");
+  if (parts.length !== 3) return null;
+  try {
+    const header = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[0])));
+    const payload = JSON.parse(new TextDecoder().decode(base64UrlToBytes(parts[1])));
+    if (header.alg !== "RS256") return null;
+
+    let jwk = (await accessSigningKeys(env)).find((k) => k.kid === header.kid);
+    if (!jwk) jwk = (await accessSigningKeys(env, true)).find((k) => k.kid === header.kid); // key rotation
+    if (!jwk) return null;
+    const key = await crypto.subtle.importKey("jwk", jwk, { name: "RSASSA-PKCS1-v1_5", hash: "SHA-256" }, false, ["verify"]);
+    const valid = await crypto.subtle.verify(
+      "RSASSA-PKCS1-v1_5", key, base64UrlToBytes(parts[2]), new TextEncoder().encode(`${parts[0]}.${parts[1]}`)
+    );
+    if (!valid) return null;
+
+    const audiences = [].concat(payload.aud || []);
+    const now = Date.now() / 1000;
+    if (!audiences.includes(env.ACCESS_AUD)) return null;
+    if (payload.iss !== env.ACCESS_TEAM_DOMAIN) return null;
+    if (typeof payload.exp !== "number" || payload.exp < now) return null;
+    if (typeof payload.nbf === "number" && payload.nbf > now + 60) return null;
+    const email = typeof payload.email === "string" ? payload.email.toLowerCase() : "";
+    if (!email.endsWith("@boxedape.com")) return null; // mirrors the Access policy
+    return email;
+  } catch {
+    return null;
+  }
+}
+
+function isLocalDevRequest(request, env) {
+  if (env.LOCAL_DEV_AUTH !== "1") return false;
+  const { hostname } = new URL(request.url);
+  return hostname === "localhost" || hostname === "127.0.0.1";
+}
+
+function hasLegacyPassword(request, env) {
   const auth = request.headers.get("Authorization") || "";
   const match = auth.match(/^Bearer (.+)$/);
-  return !!match && match[1] === env.BUILDER_PASSWORD;
+  return !!env.BUILDER_PASSWORD && !!match && match[1] === env.BUILDER_PASSWORD;
+}
+
+// Resolved once per request at the top of fetch() (verification is async),
+// then read synchronously by every requireAuth() call site below.
+const authResults = new WeakMap();
+
+async function resolveAuth(request, env) {
+  const ok = isLocalDevRequest(request, env) ||
+    hasLegacyPassword(request, env) ||
+    !!(await verifyAccessToken(request, env));
+  authResults.set(request, ok);
+  return ok;
+}
+
+function isAuthorized(request) {
+  return authResults.get(request) === true;
 }
 
 // Returns a 401 Response if the request isn't authorized, or null if it's
 // fine to proceed - callers do `const authError = requireAuth(...); if
 // (authError) return authError;`.
-function requireAuth(request, env) {
-  return isAuthorized(request, env) ? null : jsonResponse({ error: "Unauthorized" }, 401);
+function requireAuth(request) {
+  return isAuthorized(request) ? null : jsonResponse({ error: "Unauthorized" }, 401);
 }
 
 // Raw pass-through of an already-JSON-string KV value, for GET routes that
@@ -581,10 +677,11 @@ export default {
     // gets near it. Once an IP trips it, EVERY attempt from it is refused
     // for a minute - right password included - otherwise 429 vs 200 still
     // tells a guesser when they've hit it and the limit slows nothing.
+    const authorized = await resolveAuth(request, env);
     if (request.headers.has("Authorization")) {
       const ip = clientIp(request);
       if (isAuthBlocked(ip)) return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
-      if (!isAuthorized(request, env) && !(await withinLimit(env.AUTH_LIMITER, ip))) {
+      if (!authorized && !(await withinLimit(env.AUTH_LIMITER, ip))) {
         blockAuth(ip);
         return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
       }

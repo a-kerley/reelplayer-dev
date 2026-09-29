@@ -67,7 +67,17 @@ function promptForBuilderPassword() {
  * @param {boolean} options.forcePrompt - Skip the cache and prompt anyway
  * @returns {Promise<string|null>} The password, or null if the user cancelled
  */
+// On reels-admin.boxedape.com the API authenticates the Cloudflare Access
+// session (cookie/JWT) and on localhost the local Worker trusts the machine
+// (LOCAL_DEV_AUTH) - no password exists there to ask for. Callers still send
+// "Bearer <this>", which the API ignores once the Access token checks out.
+// Transitional: the legacy password flow below only remains for the old
+// workers.dev / reels.boxedape.com builder until it's removed.
+const PASSWORDLESS_HOSTS = ["reels-admin.boxedape.com", "localhost", "127.0.0.1"];
+const PASSWORDLESS_TOKEN = "access-session";
+
 export async function getBuilderPassword({ forcePrompt = false } = {}) {
+  if (PASSWORDLESS_HOSTS.includes(window.location.hostname)) return PASSWORDLESS_TOKEN;
   if (!forcePrompt) {
     const cached = getCachedBuilderPassword();
     if (cached) return cached;

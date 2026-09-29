@@ -10,6 +10,13 @@ r2_buckets = [
   { binding = "MEDIA", bucket_name = "reelplayer-media" }
 ]
 
+# Cloudflare Access (see "Auth" in src/index.js). Public identifiers, not
+# secrets: the team's signing keys are fetched from ACCESS_TEAM_DOMAIN and
+# tokens must carry ACCESS_AUD (the reels-admin.boxedape.com Access app).
+[vars]
+ACCESS_TEAM_DOMAIN = "https://boxedape.cloudflareaccess.com"
+ACCESS_AUD = "2e29c1b5799630e719957735e6af76b77df644ae10fa8aa9e550e9fc983f971c"
+
 # Per-IP rate limiting (Cloudflare's Workers Rate Limiting binding - counted
 # per location, in memory; nothing stored). IPs are only used as the
 # counting key. period must be 10 or 60 (seconds).
