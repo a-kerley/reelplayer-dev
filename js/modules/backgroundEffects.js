@@ -328,7 +328,7 @@ export async function renderPerTrackBackgrounds(reel, onChange) {
     const updatePreview = () => {
       if (track.backgroundImage) {
         previewPane.innerHTML = createExpandablePreview(track.backgroundImage, reel, track.backgroundZoom);
-        attachZoomListener(previewPane, track);
+        attachZoomListener(previewPane, track, onChange);
       } else {
         previewPane.innerHTML = '<p style="text-align:center;color:#999;margin:1rem 0;">No image selected</p>';
       }
