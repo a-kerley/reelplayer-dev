@@ -761,23 +761,46 @@ export async function renderMediaBrowser(container, options = {}) {
   // BEFORE calling renameFile. Returns true if it's fine to proceed
   // (nothing referenced it, or the user confirmed anyway).
   async function confirmIfInUse(keys) {
-    let matches;
+    const matches = await usagesOf(keys);
+    if (matches === null) return false;
+    if (matches.length === 0) return true;
+    return dialog.confirm(
+      `This will update ${matches.length} place(s) that reference the file(s) you're moving: ${describeUsages(matches)}. Continue?`,
+      "Move", "Cancel"
+    );
+  }
+
+  // Every reel/page referencing any of `keys`, de-duplicated - or null if
+  // the check itself failed (already reported), so callers abort rather
+  // than proceed blind.
+  async function usagesOf(keys) {
     try {
       const perKey = await Promise.all(keys.map((key) => fetchMediaUsages(key)));
       const seen = new Set();
-      matches = perKey.flat().filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)));
+      return perKey.flat().filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)));
     } catch (error) {
       dialog.alert(error.message);
-      return false;
+      return null;
     }
-    if (matches.length === 0) return true;
+  }
 
-    const list = matches.slice(0, 10).map((m) => `${m.title} (${m.type})`).join(", ")
+  function describeUsages(matches) {
+    return matches.slice(0, 10).map((m) => `${m.title} (${m.type})`).join(", ")
       + (matches.length > 10 ? `, and ${matches.length - 10} more` : "");
-    return dialog.confirm(
-      `This will update ${matches.length} place(s) that reference the file(s) you're moving: ${list}. Continue?`,
-      "Move", "Cancel"
-    );
+  }
+
+  // Unlike a move, a delete can't be self-healed by the Worker - anything
+  // still pointing at the file just breaks - so the usage warning is folded
+  // into the delete confirmation itself rather than being a second dialog.
+  async function confirmDelete(label, keys) {
+    beginBusy();
+    const matches = await usagesOf(keys);
+    endBusy();
+    if (matches === null) return false;
+    const warning = matches.length
+      ? ` ${matches.length} reel(s)/page(s) still use it and will break: ${describeUsages(matches)}.`
+      : "";
+    return dialog.confirm(`Delete ${label}?${warning} This cannot be undone.`, "Delete", "Cancel");
   }
 
   // Shared by a file row's "Move to..." context-menu entry (single file or
@@ -906,9 +929,10 @@ export async function renderMediaBrowser(container, options = {}) {
         disabled: isProtected,
         onClick: async () => {
           const filesToDelete = state.files.filter(f => f.key.startsWith(path));
-          const confirmed = await dialog.confirm(
-            `Delete folder "${path}" and all ${filesToDelete.length} file(s) inside it? This cannot be undone.`,
-            "Delete", "Cancel"
+          const realFiles = filesToDelete.filter(f => !isFolderMarker(f));
+          const confirmed = await confirmDelete(
+            `folder "${path}" and all ${realFiles.length} file(s) inside it`,
+            realFiles.map(f => f.key)
           );
           if (!confirmed) return;
           beginBusy();
@@ -1383,8 +1407,7 @@ export async function renderMediaBrowser(container, options = {}) {
       danger: true,
       onClick: async () => {
         const label = multi ? `${keys.length} file(s)` : `"${file.name}"`;
-        const confirmed = await dialog.confirm(`Delete ${label}? This cannot be undone.`, "Delete", "Cancel");
-        if (!confirmed) return;
+        if (!(await confirmDelete(label, keys))) return;
         beginBusy();
         try {
           for (const key of keys) {
