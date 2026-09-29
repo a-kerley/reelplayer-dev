@@ -515,6 +515,64 @@
   width: 6.5rem;
 }
 
+.media-browser-selection-summary {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+  color: #ccc;
+  font-size: var(--builder-text-base);
+}
+
+.media-browser-selection-summary button {
+  height: 26px;
+  flex-shrink: 0;
+  padding: 0 0.6rem;
+  background: #3a3a3a;
+  border: 1px solid #444;
+  border-radius: 4px;
+  color: #ccc;
+  cursor: pointer;
+  font-size: var(--builder-text-sm);
+}
+
+.media-browser-selection-summary button:hover {
+  border-color: #4a90e2;
+  color: #fff;
+}
+
+.media-browser-col-actions {
+  width: 3rem;
+}
+
+.media-browser-more-btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+  width: 28px;
+  height: 28px;
+  padding: 0;
+  background: transparent;
+  border: none;
+  border-radius: 4px;
+  color: #888;
+  cursor: pointer;
+}
+
+.media-browser-more-btn:hover,
+.media-browser-more-btn:focus-visible {
+  background: #3a3a3a;
+  color: #fff;
+}
+
+.media-browser-card-more {
+  position: absolute;
+  top: 4px;
+  right: 4px;
+  background: rgba(30, 30, 30, 0.85);
+}
+
 .media-browser-table th {
   text-align: left;
   padding: 0.5rem;

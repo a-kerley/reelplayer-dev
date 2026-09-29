@@ -22,6 +22,9 @@ const ICONS = {
   VIDEO: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:16px;height:16px;">
     <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
   </svg>`,
+  MORE: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;height:18px;">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
+  </svg>`,
   FILE: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:16px;height:16px;">
     <path stroke-linecap="round" stroke-linejoin="round" d="M19.5 14.25v-2.625a3.375 3.375 0 0 0-3.375-3.375h-1.5A1.125 1.125 0 0 1 13.5 7.125v-1.5a3.375 3.375 0 0 0-3.375-3.375H8.25m0 12.75h7.5m-7.5 3H12M10.5 2.25H5.625c-.621 0-1.125.504-1.125 1.125v17.25c0 .621.504 1.125 1.125 1.125h12.75c.621 0 1.125-.504 1.125-1.125V11.25a9 9 0 0 0-9-9Z" />
   </svg>`
@@ -1039,8 +1042,27 @@ export async function renderMediaBrowser(container, options = {}) {
       return main;
     }
 
+    if (mode === 'manage') {
+      const selectedCount = visibleSelection().length;
+      if (selectedCount > 1) main.appendChild(renderSelectionSummary(selectedCount));
+    }
+
     main.appendChild(state.viewMode === 'list' ? renderTable(files) : renderGrid(files));
     return main;
+  }
+
+  // Says what a bulk action ("⋯" or right-click on a checked file) will hit.
+  function renderSelectionSummary(count) {
+    const bar = document.createElement("div");
+    bar.className = "media-browser-selection-summary";
+    bar.textContent = `${count} selected - use ⋯ or right-click on any of them to move or delete. `;
+    const clear = document.createElement("button");
+    clear.type = "button";
+    clear.textContent = "Clear";
+    clear.title = "Uncheck all files";
+    clear.onclick = () => { state.selected.clear(); renderMainOnly(); };
+    bar.appendChild(clear);
+    return bar;
   }
 
   // Folder selection only ever shows files sitting directly in that folder
@@ -1310,6 +1332,11 @@ export async function renderMediaBrowser(container, options = {}) {
     headRow.appendChild(sortHeader("Track #", "trackNumber", "media-browser-col-track"));
     headRow.appendChild(sortHeader("Size", "size", "media-browser-col-size"));
     headRow.appendChild(sortHeader("Uploaded", "uploaded", "media-browser-col-uploaded"));
+    if (mode === 'manage') {
+      const th = document.createElement("th");
+      th.className = "media-browser-col-actions";
+      headRow.appendChild(th);
+    }
     thead.appendChild(headRow);
     table.appendChild(thead);
 
@@ -1335,13 +1362,35 @@ export async function renderMediaBrowser(container, options = {}) {
     });
     el.oncontextmenu = (e) => {
       e.preventDefault();
-      if (!state.selected.has(file.key)) {
-        state.selected.clear();
-        state.selected.add(file.key);
-        renderMainOnly();
-      }
-      showRowMenu(file, e);
+      openFileMenu(file, e);
     };
+  }
+
+  function openFileMenu(file, e, anchorRect = null) {
+    if (!state.selected.has(file.key)) {
+      state.selected.clear();
+      state.selected.add(file.key);
+      renderMainOnly();
+    }
+    showRowMenu(file, e, anchorRect);
+  }
+
+  // Visible counterpart to right-click, so the file actions are
+  // discoverable. Manage mode only, same as the right-click menu.
+  function createMoreButton(file) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "media-browser-more-btn";
+    btn.innerHTML = ICONS.MORE;
+    btn.title = "File actions (Copy URL, Rename, Move, Delete)";
+    btn.setAttribute("aria-label", `Actions for ${file.name}`);
+    btn.onclick = (e) => {
+      e.stopPropagation();
+      // renderMainOnly() inside openFileMenu can replace this button, so
+      // anchor to its position captured now rather than the element.
+      openFileMenu(file, e, btn.getBoundingClientRect());
+    };
+    return btn;
   }
 
   function createFileCheckbox(file) {
@@ -1433,6 +1482,12 @@ export async function renderMediaBrowser(container, options = {}) {
     uploadedTd.textContent = file.uploaded ? new Date(file.uploaded).toLocaleDateString() : "—";
     row.appendChild(uploadedTd);
 
+    if (mode === 'manage') {
+      const actionsTd = document.createElement("td");
+      if (!file.readOnly) actionsTd.appendChild(createMoreButton(file));
+      row.appendChild(actionsTd);
+    }
+
     return row;
   }
 
@@ -1481,7 +1536,7 @@ export async function renderMediaBrowser(container, options = {}) {
   // handler above, which collapses the selection to this row first
   // otherwise. Rename/Copy URL don't have a sane multi-target meaning, so
   // they're only offered for a single target.
-  function showRowMenu(file, e) {
+  function showRowMenu(file, e, anchorRect = null) {
     const keys = targetKeysFor(file);
     const multi = keys.length > 1;
 
@@ -1549,7 +1604,9 @@ export async function renderMediaBrowser(container, options = {}) {
       }
     });
 
-    openContextMenuAtCursor(e, items);
+    // A keyboard-activated button click has no real cursor position, so the
+    // "⋯" button passes its own rect and the menu opens under it instead.
+    openContextMenuAtCursor(anchorRect ? { clientX: anchorRect.left, clientY: anchorRect.bottom } : e, items);
   }
 
   function renderGrid(files) {
@@ -1587,6 +1644,12 @@ export async function renderMediaBrowser(container, options = {}) {
       name.className = "media-browser-card-name";
       name.textContent = file.name;
       card.appendChild(name);
+
+      if (mode === 'manage' && !file.readOnly) {
+        const more = createMoreButton(file);
+        more.classList.add("media-browser-card-more");
+        card.appendChild(more);
+      }
 
       card.onclick = () => activateFile(file);
 
