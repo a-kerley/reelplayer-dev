@@ -1585,7 +1585,9 @@ const playerAppCore = {
       fillParent: true, // Re-enable fillParent for proper width
       normalize: true,
       backend: "WebAudio", // Use WebAudio for accurate duration/playback
-      minPxPerSec: 1,
+      // WHY: no minPxPerSec - any value > 0 makes a track longer than
+      // (container px / value) seconds wider than its box, so WaveSurfer turns
+      // on overflow-x scrolling and the waveform can be touch-dragged sideways.
     });
     
     // EXPERIMENT: re-snapshot the waveform canvas into .hover-overlay's mask
