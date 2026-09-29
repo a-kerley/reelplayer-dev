@@ -1182,15 +1182,22 @@ const playerAppCore = {
       if (!scrub || !this.isWaveformReady) return;
       if (Math.abs(scrub.x - scrub.startX) <= TOUCH_SCRUB_THRESHOLD_PX) return;
       const rect = waveformEl.getBoundingClientRect();
+      // Audio keeps playing through the drag; duck/restore only around the
+      // jump itself, same as seekRelative().
+      const wasPlaying = this.wavesurfer.isPlaying();
+      if (wasPlaying) this.duckForSeek();
       this.wavesurfer.seekTo(Math.min(Math.max((scrub.x - rect.left) / rect.width, 0), 1));
+      if (wasPlaying) this.restoreAfterSeek();
     });
     waveformEl.addEventListener("touchcancel", () => {
       touchScrub = null;
       hideScrubPreview();
     });
 
-    // Duck audio around a mid-playback seek (click or drag on the
-    // waveform) to mask the click a non-zero-crossing buffer jump causes -
+    // Duck audio around a mid-playback mouse seek (click or drag on the
+    // waveform; touch ducks around its own release seek above instead, so
+    // audio keeps playing while a finger drags) to mask the click a
+    // non-zero-crossing buffer jump causes -
     // see audioFades.js's duckForSeek()/restoreAfterSeek(). The pointerdown
     // listener MUST be capture-phase: WaveSurfer's own interact:true
     // click/drag-to-seek handler runs on the same native event, and
@@ -1199,7 +1206,7 @@ const playerAppCore = {
     // instead of reacting after it.
     //
     // this._seekDucked (not a closure-local variable) tracks whether THIS
-    // gesture actually ducked, so an unrelated mouseup/touchend elsewhere
+    // gesture actually ducked, so an unrelated mouseup elsewhere
     // on the page never fires a stray restore - stored on `this` because
     // it has to be shared between the pointerdown handler below (rebound
     // fresh on every call to this method, same as updateScrubPreview's
@@ -1213,11 +1220,6 @@ const playerAppCore = {
       this._seekDucked = true;
       this.duckForSeek();
     }, { capture: true });
-    waveformEl.addEventListener("touchstart", () => {
-      if (!this.wavesurfer?.isPlaying()) return;
-      this._seekDucked = true;
-      this.duckForSeek();
-    }, { capture: true, passive: true });
 
     if (!this._seekDuckReleaseBound) {
       this._seekDuckReleaseBound = true;
@@ -1230,9 +1232,6 @@ const playerAppCore = {
       // pointer no longer over the waveform (same reasoning as
       // playlistScroll.js's own thumb-drag release handling).
       document.addEventListener("mouseup", handleSeekPointerUp);
-      document.addEventListener("touchend", handleSeekPointerUp);
-      // A touch that turns into a page scroll ends in touchcancel, not touchend.
-      document.addEventListener("touchcancel", handleSeekPointerUp);
     }
 
     this.wavesurfer.on("ready", () => {
