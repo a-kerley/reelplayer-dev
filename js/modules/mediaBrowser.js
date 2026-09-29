@@ -707,6 +707,13 @@ export async function renderMediaBrowser(container, options = {}) {
     sidebar.className = "media-browser-sidebar";
     sidebar.style.width = `${state.sidebarWidth}px`;
 
+    const allMediaRow = folderNavItem("All Media", () => { state.view = { type: 'all' }; persistFolder(); render(); },
+      state.view.type === 'all', countsFor(state.files, null));
+    allMediaRow.style.marginBottom = "0.75rem";
+    allMediaRow.style.borderBottom = "1px solid #444";
+    allMediaRow.style.paddingBottom = "0.75rem";
+    sidebar.appendChild(allMediaRow);
+
     const unfiledRow = folderNavItem("Unfiled", () => navigateToFolder(''),
       state.view.type === 'folder' && state.view.path === '', countsFor(state.files, ''), 0, '');
     sidebar.appendChild(unfiledRow);
@@ -751,13 +758,6 @@ export async function renderMediaBrowser(container, options = {}) {
         });
       sidebar.appendChild(row);
     });
-
-    const allMediaRow = folderNavItem("All Media", () => { state.view = { type: 'all' }; persistFolder(); render(); },
-      state.view.type === 'all', countsFor(state.files, null));
-    allMediaRow.style.marginTop = "0.75rem";
-    allMediaRow.style.borderTop = "1px solid #444";
-    allMediaRow.style.paddingTop = "0.75rem";
-    sidebar.appendChild(allMediaRow);
 
     return sidebar;
   }
@@ -833,6 +833,15 @@ export async function renderMediaBrowser(container, options = {}) {
     const countsDiv = document.createElement("div");
     countsDiv.className = "media-browser-folder-counts";
     countsDiv.textContent = counts.total;
+    // A named folder's count rolls up its subfolders, but opening it lists
+    // only its direct files - say so, or "12" next to an empty list looks
+    // like a bug.
+    if (path) {
+      const direct = state.files.filter(f => folderOf(f.key) === path && !isFolderMarker(f)).length;
+      if (direct !== counts.total) {
+        countsDiv.title = `${counts.total} files in total: ${direct} in this folder, ${counts.total - direct} in subfolders`;
+      }
+    }
     row.appendChild(countsDiv);
 
     // Every real, named folder gets a right-click menu in manage mode
