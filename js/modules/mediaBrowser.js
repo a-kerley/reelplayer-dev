@@ -22,6 +22,12 @@ const ICONS = {
   VIDEO: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:16px;height:16px;">
     <path stroke-linecap="round" stroke-linejoin="round" d="m15.75 10.5 4.72-4.72a.75.75 0 0 1 1.28.53v11.38a.75.75 0 0 1-1.28.53l-4.72-4.72M4.5 18.75h9a2.25 2.25 0 0 0 2.25-2.25v-9a2.25 2.25 0 0 0-2.25-2.25h-9A2.25 2.25 0 0 0 2.25 7.5v9a2.25 2.25 0 0 0 2.25 2.25Z" />
   </svg>`,
+  PLAY: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 5.653c0-.856.917-1.398 1.667-.986l11.54 6.347a1.125 1.125 0 0 1 0 1.972l-11.54 6.347a1.125 1.125 0 0 1-1.667-.986V5.653Z" />
+  </svg>`,
+  STOP: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor">
+    <path stroke-linecap="round" stroke-linejoin="round" d="M5.25 7.5A2.25 2.25 0 0 1 7.5 5.25h9a2.25 2.25 0 0 1 2.25 2.25v9a2.25 2.25 0 0 1-2.25 2.25h-9a2.25 2.25 0 0 1-2.25-2.25v-9Z" />
+  </svg>`,
   MORE: `<svg xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24" stroke-width="1.5" stroke="currentColor" style="width:18px;height:18px;">
     <path stroke-linecap="round" stroke-linejoin="round" d="M6.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM12.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0ZM18.75 12a.75.75 0 1 1-1.5 0 .75.75 0 0 1 1.5 0Z" />
   </svg>`,
@@ -357,6 +363,50 @@ export async function renderMediaBrowser(container, options = {}) {
     render();
   }
 
+  // One shared element for the audio play/stop buttons, so starting one
+  // preview stops the previous. Nothing tells this component when it's
+  // hidden (tab switch) or removed (picker closed), so it checks on each
+  // timeupdate (~4x/s while playing) and stops itself.
+  const previewAudio = new Audio();
+  let previewKey = null;
+  previewAudio.onended = () => stopPreview();
+  previewAudio.ontimeupdate = () => {
+    if (!container.isConnected || container.offsetParent === null) stopPreview();
+  };
+
+  function togglePreview(file) {
+    if (previewKey === file.key) return stopPreview();
+    previewKey = file.key;
+    previewAudio.src = file.url;
+    previewAudio.play().catch(() => stopPreview());
+    syncPreviewButtons();
+  }
+
+  function stopPreview() {
+    previewAudio.pause();
+    previewKey = null;
+    syncPreviewButtons();
+  }
+
+  function syncPreviewButtons() {
+    container.querySelectorAll(".media-browser-preview-btn").forEach(btn => {
+      const playing = btn.dataset.key === previewKey;
+      btn.innerHTML = playing ? ICONS.STOP : ICONS.PLAY;
+      btn.classList.toggle("playing", playing);
+      btn.title = playing ? "Stop preview" : "Play preview";
+      btn.setAttribute("aria-label", btn.title);
+    });
+  }
+
+  function createPreviewButton(file) {
+    const btn = document.createElement("button");
+    btn.type = "button";
+    btn.className = "media-browser-preview-btn";
+    btn.dataset.key = file.key;
+    btn.onclick = (e) => { e.stopPropagation(); togglePreview(file); };
+    return btn;
+  }
+
   // Containing block for the busy-overlay spinner (see beginBusy/endBusy
   // below) - set once here rather than in CSS, since this same element is
   // whatever the caller happened to hand in (a tab pane, a modal body).
@@ -498,6 +548,7 @@ export async function renderMediaBrowser(container, options = {}) {
     body.appendChild(renderResizeHandle());
     body.appendChild(renderMain());
     container.appendChild(body);
+    syncPreviewButtons();
     notifySelectionChange();
   }
 
@@ -1112,6 +1163,7 @@ export async function renderMediaBrowser(container, options = {}) {
     const oldMain = body.querySelector(".media-browser-main");
     const newMain = renderMain();
     body.replaceChild(newMain, oldMain);
+    syncPreviewButtons();
     notifySelectionChange();
   }
 
@@ -1441,7 +1493,8 @@ export async function renderMediaBrowser(container, options = {}) {
 
     const iconTd = document.createElement("td");
     iconTd.className = `media-browser-icon media-browser-icon-${type}`;
-    iconTd.innerHTML = typeIcon(type);
+    if (type === 'audio') iconTd.appendChild(createPreviewButton(file));
+    else iconTd.innerHTML = typeIcon(type);
     row.appendChild(iconTd);
 
     const nameTd = document.createElement("td");
@@ -1636,7 +1689,8 @@ export async function renderMediaBrowser(container, options = {}) {
         preview.appendChild(img);
       } else {
         preview.classList.add(`media-browser-icon-${type}`);
-        preview.innerHTML = typeIcon(type);
+        if (type === 'audio') preview.appendChild(createPreviewButton(file));
+        else preview.innerHTML = typeIcon(type);
       }
       card.appendChild(preview);
 
