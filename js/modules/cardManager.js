@@ -4,22 +4,14 @@
 // (sourceCardId) the same way reels are - stats are per card, not per
 // version. Cards have no live alias (unlike reels), so a hosting page embeds
 // one exact version - deleting it breaks that embed.
-import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { openStatsModal } from "./statsViewer.js";
 import { escapeHtml } from "./domUtils.js";
 import { publicCardPlayerUrl } from "./cardPublish.js";
 
-async function authedFetch(path, password, options = {}) {
-  const response = await fetch(`${WORKER_BASE_URL}${path}`, {
-    ...options,
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function authedFetch(path, options = {}) {
+  const response = await apiFetch(path, options);
   if (!response.ok) {
     throw new Error(`Request failed (status ${response.status}).`);
   }
@@ -90,12 +82,9 @@ function renderListHTML(groups, currentCardId) {
 }
 
 async function openCardManager(getCurrentCard) {
-  const password = await getBuilderPassword();
-  if (!password) return;
-
   let entries;
   try {
-    entries = await (await authedFetch("/cards", password)).json();
+    entries = await (await authedFetch("/cards")).json();
   } catch (error) {
     dialog.alert(error.message);
     return;
@@ -136,7 +125,7 @@ async function openCardManager(getCurrentCard) {
         if (!confirmed) return;
 
         try {
-          await authedFetch(`/cards/${btn.dataset.id}`, password, { method: "DELETE" });
+          await authedFetch(`/cards/${btn.dataset.id}`, { method: "DELETE" });
           openCardManager(getCurrentCard); // refresh the list
         } catch (error) {
           dialog.alert(error.message);

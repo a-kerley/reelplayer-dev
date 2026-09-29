@@ -13,19 +13,11 @@
 // it this way stays current across future republishes of the reel instead
 // of freezing on today's hash. Falls back to the raw hash for reels
 // published before this field existed.
-import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 
-async function fetchReelList(password) {
-  const response = await fetch(`${WORKER_BASE_URL}/reels`, {
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function fetchReelList() {
+  const response = await apiFetch("/reels");
   if (!response.ok) {
     throw new Error(`Failed to load published reels (status ${response.status}).`);
   }
@@ -58,12 +50,9 @@ function renderListHTML(entries) {
  * @param {(reelId: string, reelTitle: string) => void} opts.onSelect
  */
 export async function openReelPicker({ onSelect }) {
-  const password = await getBuilderPassword();
-  if (!password) return;
-
   let entries;
   try {
-    entries = await fetchReelList(password);
+    entries = await fetchReelList();
   } catch (error) {
     dialog.alert(error.message);
     return;

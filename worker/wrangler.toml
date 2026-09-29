@@ -21,8 +21,7 @@ ACCESS_AUD = "2e29c1b5799630e719957735e6af76b77df644ae10fa8aa9e550e9fc983f971c"
 # per location, in memory; nothing stored). IPs are only used as the
 # counting key. period must be 10 or 60 (seconds).
 # STATS_LIMITER: all stat beacons from one IP. VIEW_LIMITER: "view" beacons
-# per IP per target - caps reload-spam at 2 opens/minute. AUTH_LIMITER:
-# failed password attempts on password-gated routes.
+# per IP per target - caps reload-spam at 2 opens/minute.
 [[ratelimits]]
 name = "STATS_LIMITER"
 namespace_id = "1001"
@@ -32,8 +31,3 @@ simple = { limit = 20, period = 60 }
 name = "VIEW_LIMITER"
 namespace_id = "1002"
 simple = { limit = 2, period = 60 }
-
-[[ratelimits]]
-name = "AUTH_LIMITER"
-namespace_id = "1003"
-simple = { limit = 10, period = 60 }

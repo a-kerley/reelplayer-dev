@@ -3,8 +3,8 @@
 // postReelToWorker(). Modeled on the reel side (content-hash id, no slug/
 // rename machinery), not js/modules/pagePublish.js - see
 // docs/project-cards/PLAN.md §1/§4.
-import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { PUBLIC_APP_ORIGIN } from "../config.js";
+import { apiFetch } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
 
 // Card-only fields (docs/project-cards/PLAN.md §3) - everything but the
@@ -26,7 +26,7 @@ export function generateCardId(card) {
 /**
  * @param {Object} card - a card draft (see js/modules/cardDraftStore.js)
  * @returns {Promise<{cardId: string, cardData: Object}>}
- * @throws if no password is set or the Worker request fails.
+ * @throws if the Worker request fails (or the sign-in has expired).
  */
 export async function publishCard(card) {
   const cardId = generateCardId(card);
@@ -42,21 +42,12 @@ export async function publishCard(card) {
     created: new Date().toISOString(),
   };
 
-  const password = await getBuilderPassword();
-  if (!password) {
-    throw new Error("A password is required to publish this card.");
-  }
-
-  const response = await fetch(`${WORKER_BASE_URL}/cards/${cardId}`, {
+  const response = await apiFetch(`/cards/${cardId}`, {
     method: "POST",
-    headers: { "Content-Type": "application/json", Authorization: `Bearer ${password}` },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify(cardData),
   });
 
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password. Please try publishing again.");
-  }
   if (!response.ok) {
     throw new Error(`Failed to publish card (server responded with status ${response.status}).`);
   }

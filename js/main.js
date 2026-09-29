@@ -30,7 +30,6 @@ import {
   onSaveStatusChange,
 } from "./modules/draftStore.js";
 import { maybeRunMigration } from "./modules/draftMigration.js";
-import { getBuilderPassword } from "./modules/builderAuth.js";
 
 document.addEventListener("DOMContentLoaded", async () => {
   // If the builder UI exists, use builder mode. Otherwise, use classic playlist.txt mode.
@@ -70,17 +69,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     function hideBuilderLoading() {
       if (loadingOverlay) loadingOverlay.hidden = true;
-    }
-
-    function showAuthRequiredState() {
-      showBuilderLoading(
-        `<div>
-          <p>A password is required to load your reels.</p>
-          <button type="button" id="authRetryBtn">Retry</button>
-        </div>`
-      );
-      const retryBtn = document.getElementById("authRetryBtn");
-      if (retryBtn) retryBtn.onclick = () => init();
     }
 
     function updateSaveStatusIndicator(status) {
@@ -201,12 +189,6 @@ document.addEventListener("DOMContentLoaded", async () => {
 
     async function init() {
       showBuilderLoading();
-
-      const password = await getBuilderPassword();
-      if (!password) {
-        showAuthRequiredState();
-        return;
-      }
 
       let listEntries;
       try {

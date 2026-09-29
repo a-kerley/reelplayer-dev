@@ -1,18 +1,23 @@
-// Forwards /api/* to the API Worker (see the service binding in
-// wrangler.jsonc), and gates the builder's entry page behind a shared password (HTTP Basic Auth,
-// so the browser's own native login prompt handles it - no custom login page
-// needed). Runs in front of every request (assets.run_worker_first in
-// wrangler.jsonc), but only actually checks auth for the builder's own entry
-// document - player.html, page.html, and every css/js asset they share with
-// the builder must stay fully public, since they're loaded by anonymous
-// visitors' browsers wherever a reel is embedded or a page link is shared.
-// Everything not explicitly gated here falls straight through to static
-// asset serving - except /p/<slug> (see PAGE_PATH_PATTERN below), which
-// gets rewritten to page.html so a published page's clean URL works.
-const PROTECTED_PATHS = new Set(["/", "/index.html"]);
+// Site Worker for reelplayer-app. Only runs first for the paths listed in
+// wrangler.jsonc's run_worker_first; everything else is served straight
+// from static assets. Three jobs:
+//
+// 1. /api/* is forwarded to the reelplayer-api Worker over a service
+//    binding, so the builder, player and pages call the API on their own
+//    origin.
+// 2. /p/<slug> serves page.html for a published page's clean URL.
+// 3. The builder's entry page lives only on reels-admin.boxedape.com, which
+//    Cloudflare Access protects at the edge (email one-time PIN,
+//    @boxedape.com) before this Worker ever runs - so there's no password
+//    check here any more. On any other host (the public reels.boxedape.com,
+//    the legacy workers.dev URL) the builder page redirects there. The
+//    builder's JS/CSS being publicly downloadable is fine: every action it
+//    takes goes through the API, which verifies the Access session itself.
+const BUILDER_HOST = "reels-admin.boxedape.com";
+const BUILDER_PATHS = new Set(["/", "/index.html"]);
 
-// A published page's clean public URL - boxedape.com/p/<slug> instead of
-// boxedape.com/page?slug=<slug>. Matches js/modules/pagePublish.js's own
+// A published page's clean public URL - reels.boxedape.com/p/<slug> instead
+// of /page?slug=<slug>. Matches js/modules/pagePublish.js's own
 // SLUG_PATTERN exactly (same character set) - keep the two in sync if
 // either ever changes. A reserved, fixed prefix (rather than a bare
 // /<slug> at the root) deliberately, not just for clarity - it also means
@@ -27,52 +32,14 @@ const PROTECTED_PATHS = new Set(["/", "/index.html"]);
 // with nothing upstream able to intervene first.
 const PAGE_PATH_PATTERN = /^\/p\/([a-zA-Z0-9_-]+)$/;
 
-// IPs that tripped AUTH_LIMITER - in-memory, per isolate, best-effort.
-const authBlockedUntil = new Map();
-
-const COOKIE_NAME = "builder_auth";
-const COOKIE_MAX_AGE = 60 * 60 * 24 * 30; // 30 days
-
-// The cookie stores a hash of the password, not the password itself - a
-// stateless "remember me" with no session store needed, since there's only
-// ever one valid password to check against. Rotating BUILDER_ACCESS_PASSWORD
-// automatically invalidates every previously-issued cookie, since none of
-// them will hash-match the new value anymore.
-async function hashPassword(password) {
-  const bytes = new TextEncoder().encode(password);
-  const digest = await crypto.subtle.digest("SHA-256", bytes);
-  return [...new Uint8Array(digest)].map((b) => b.toString(16).padStart(2, "0")).join("");
-}
-
-function getCookie(request, name) {
-  const header = request.headers.get("Cookie") || "";
-  const match = header.match(new RegExp(`(?:^|;\\s*)${name}=([^;]+)`));
-  return match ? match[1] : null;
-}
-
-// Basic Auth always carries a "username:password" pair even though this gate
-// only has one shared password and no concept of a username - decode it and
-// check just the password half, so whatever's typed into the username field
-// (blank, a name, anything) is accepted.
-function extractPassword(authHeader) {
-  if (!authHeader.startsWith("Basic ")) return null;
-  try {
-    const decoded = atob(authHeader.slice("Basic ".length));
-    const colonIndex = decoded.indexOf(":");
-    return colonIndex === -1 ? decoded : decoded.slice(colonIndex + 1);
-  } catch {
-    return null;
-  }
-}
-
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
 
     // Same-origin API: /api/<route> -> the reelplayer-api Worker's /<route>.
     // new Request(url, request) keeps the method, headers (incl.
-    // CF-Connecting-IP for its rate limiters), body and request.cf (geo for
-    // stats).
+    // CF-Connecting-IP for its rate limiters and Access's JWT header),
+    // body and request.cf (geo for stats).
     if (url.pathname.startsWith("/api/")) {
       const apiUrl = new URL(request.url);
       apiUrl.pathname = url.pathname.slice("/api".length);
@@ -96,50 +63,15 @@ export default {
       return env.ASSETS.fetch(new Request(rewritten, request));
     }
 
-    if (!PROTECTED_PATHS.has(url.pathname)) {
-      return env.ASSETS.fetch(request);
+    // Redirect only from the known public hosts - an allowlist of where NOT
+    // to serve the builder, rather than "anything but BUILDER_HOST", so an
+    // unexpected hostname can never turn into a redirect loop that locks
+    // the builder out (or break localhost dev).
+    const isPublicHost = url.hostname === "reels.boxedape.com" || url.hostname.endsWith(".workers.dev");
+    if (BUILDER_PATHS.has(url.pathname) && isPublicHost) {
+      return Response.redirect(`https://${BUILDER_HOST}/`, 302);
     }
 
-    const expectedToken = await hashPassword(env.BUILDER_ACCESS_PASSWORD);
-
-    if (getCookie(request, COOKIE_NAME) === expectedToken) {
-      return env.ASSETS.fetch(request);
-    }
-
-    const suppliedPassword = extractPassword(request.headers.get("Authorization") || "");
-    const ip = request.headers.get("CF-Connecting-IP") || "unknown";
-    const tooMany = () => new Response("Too many attempts - try again in a minute.", { status: 429 });
-
-    // Refuse every attempt (right password included) from an IP that
-    // recently tripped the limit - otherwise 429 vs success still tells a
-    // guesser when they've hit it. See worker/src/index.js for the same.
-    if (suppliedPassword !== null && (authBlockedUntil.get(ip) || 0) > Date.now()) return tooMany();
-
-    if (suppliedPassword !== env.BUILDER_ACCESS_PASSWORD) {
-      // Only wrong guesses are counted (a first visit with no password yet
-      // just gets the browser prompt). Fails open if the binding is absent.
-      if (suppliedPassword !== null && env.AUTH_LIMITER) {
-        const { success } = await env.AUTH_LIMITER.limit({ key: ip }).catch(() => ({ success: true }));
-        if (!success) {
-          if (authBlockedUntil.size > 10000) authBlockedUntil.clear();
-          authBlockedUntil.set(ip, Date.now() + 60 * 1000);
-          return tooMany();
-        }
-      }
-      return new Response("Authentication required", {
-        status: 401,
-        headers: { "WWW-Authenticate": 'Basic realm="ReelPlayer Builder"' },
-      });
-    }
-
-    // Correct password just supplied via the browser's Basic Auth prompt -
-    // remember this browser for 30 days so it isn't re-prompted every visit.
-    const response = await env.ASSETS.fetch(request);
-    const remembered = new Response(response.body, response);
-    remembered.headers.append(
-      "Set-Cookie",
-      `${COOKIE_NAME}=${expectedToken}; Path=/; Max-Age=${COOKIE_MAX_AGE}; HttpOnly; Secure; SameSite=Lax`
-    );
-    return remembered;
+    return env.ASSETS.fetch(request);
   },
 };

@@ -6,8 +6,8 @@
 // previously-published one (if renaming) to clean up the old entry and
 // reject genuine collisions. See worker/src/index.js's POST /pages/:slug
 // handler for the other half of this contract.
-import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { PUBLIC_APP_ORIGIN } from "../config.js";
+import { apiFetch } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
 
 const SLUG_PATTERN = /^[a-zA-Z0-9_-]+$/;
@@ -69,19 +69,11 @@ export function publicPageUrl(slug) {
  * @returns {Promise<{ok: boolean, slug: string}>}
  */
 export async function publishPage(page, slug) {
-  const password = await getBuilderPassword();
-  if (!password) {
-    throw new Error("A password is required to publish this page.");
-  }
-
   const previousSlug = page.publishedSlug && page.publishedSlug !== slug ? page.publishedSlug : undefined;
 
-  const response = await fetch(`${WORKER_BASE_URL}/pages/${slug}`, {
+  const response = await apiFetch(`/pages/${slug}`, {
     method: "POST",
-    headers: {
-      "Content-Type": "application/json",
-      Authorization: `Bearer ${password}`,
-    },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({
       id: page.id,
       slug,
@@ -108,10 +100,6 @@ export async function publishPage(page, slug) {
     }),
   });
 
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password. Please try publishing again.");
-  }
   if (response.status === 409) {
     throw new Error(`The URL "/p/${slug}" is already taken by another page - choose a different URL.`);
   }

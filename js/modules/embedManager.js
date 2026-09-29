@@ -1,36 +1,20 @@
 // embedManager.js - "Manage Published Embeds" modal: lists reels published to
 // the Cloudflare Worker and lets you delete ones you no longer need.
-import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { openStatsModal } from "./statsViewer.js";
 import { escapeHtml } from "./domUtils.js";
 
-async function fetchReelList(password) {
-  const response = await fetch(`${WORKER_BASE_URL}/reels`, {
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function fetchReelList() {
+  const response = await apiFetch("/reels");
   if (!response.ok) {
     throw new Error(`Failed to load published reels (status ${response.status}).`);
   }
   return response.json();
 }
 
-async function deleteReel(id, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/reels/${id}`, {
-    method: "DELETE",
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function deleteReel(id) {
+  const response = await apiFetch(`/reels/${id}`, { method: "DELETE" });
   if (!response.ok) {
     throw new Error(`Failed to delete reel (status ${response.status}).`);
   }
@@ -105,12 +89,9 @@ function renderListHTML(groups, currentReelId) {
 }
 
 async function openEmbedManager(getCurrentReel) {
-  const password = await getBuilderPassword();
-  if (!password) return;
-
   let entries;
   try {
-    entries = await fetchReelList(password);
+    entries = await fetchReelList();
   } catch (error) {
     dialog.alert(error.message);
     return;
@@ -148,7 +129,7 @@ async function openEmbedManager(getCurrentReel) {
         if (!confirmed) return;
 
         try {
-          await deleteReel(id, password);
+          await deleteReel(id);
           openEmbedManager(getCurrentReel); // refresh the list
         } catch (error) {
           dialog.alert(error.message);

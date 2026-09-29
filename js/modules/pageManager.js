@@ -4,39 +4,23 @@
 // js/modules/embedManager.js, with a slug + "Copy Link" button in place of
 // the embed id shown there (a page's slug IS its public identifier, unlike
 // a reel's embed id which nothing outside this app ever needs to see).
-import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { showToast } from "./toast.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { publicPageUrl } from "./pagePublish.js";
 import { openStatsModal } from "./statsViewer.js";
 import { escapeHtml } from "./domUtils.js";
 
-async function fetchPageList(password) {
-  const response = await fetch(`${WORKER_BASE_URL}/pages`, {
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function fetchPageList() {
+  const response = await apiFetch("/pages");
   if (!response.ok) {
     throw new Error(`Failed to load published pages (status ${response.status}).`);
   }
   return response.json();
 }
 
-async function deletePublishedPage(slug, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/pages/${slug}`, {
-    method: "DELETE",
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function deletePublishedPage(slug) {
+  const response = await apiFetch(`/pages/${slug}`, { method: "DELETE" });
   if (!response.ok) {
     throw new Error(`Failed to delete page (status ${response.status}).`);
   }
@@ -94,12 +78,9 @@ function renderListHTML(entries, currentPageId) {
 }
 
 async function openPageManager(getCurrentPage) {
-  const password = await getBuilderPassword();
-  if (!password) return;
-
   let entries;
   try {
-    entries = await fetchPageList(password);
+    entries = await fetchPageList();
   } catch (error) {
     dialog.alert(error.message);
     return;
@@ -143,7 +124,7 @@ async function openPageManager(getCurrentPage) {
         if (!confirmed) return;
 
         try {
-          await deletePublishedPage(slug, password);
+          await deletePublishedPage(slug);
           openPageManager(getCurrentPage); // refresh the list
         } catch (error) {
           dialog.alert(error.message);

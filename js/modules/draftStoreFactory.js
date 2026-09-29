@@ -4,8 +4,7 @@
 // (js/modules/pageDraftStore.js) without a second hand-copy of this logic.
 // Backed by the Worker's /drafts* (or /drafts/pages*) routes - see
 // worker/README.md.
-import { WORKER_BASE_URL } from "../config.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 
 /**
  * @param {Object} opts
@@ -35,29 +34,13 @@ export function createDraftStore({ prefix, normalize = (item) => item }) {
     statusListeners.add(fn);
   }
 
+  // apiFetch() handles auth (Cloudflare Access session / local trust) and
+  // an expired sign-in; this just turns any other non-2xx into an error.
   async function authorizedFetch(path, options = {}) {
-    const password = await getBuilderPassword();
-    if (!password) {
-      throw new Error("A password is required.");
-    }
-
-    const response = await fetch(`${WORKER_BASE_URL}${path}`, {
-      ...options,
-      headers: {
-        ...(options.headers || {}),
-        Authorization: `Bearer ${password}`,
-      },
-    });
-
-    if (response.status === 401) {
-      clearBuilderPassword();
-      throw new Error("Incorrect password.");
-    }
-
+    const response = await apiFetch(path, options);
     if (!response.ok) {
       throw new Error(`Request failed (status ${response.status}).`);
     }
-
     return response;
   }
 
@@ -69,26 +52,13 @@ export function createDraftStore({ prefix, normalize = (item) => item }) {
 
   /** GET {prefix}/:id - full item object, or null on 404. */
   async function loadDraft(id) {
-    const password = await getBuilderPassword();
-    if (!password) {
-      throw new Error("A password is required.");
-    }
-
-    const response = await fetch(`${WORKER_BASE_URL}${prefix}/${id}`, {
-      headers: { Authorization: `Bearer ${password}` },
-    });
-
+    const response = await apiFetch(`${prefix}/${id}`);
     if (response.status === 404) {
       return null;
-    }
-    if (response.status === 401) {
-      clearBuilderPassword();
-      throw new Error("Incorrect password.");
     }
     if (!response.ok) {
       throw new Error(`Request failed (status ${response.status}).`);
     }
-
     return normalize(await response.json());
   }
 

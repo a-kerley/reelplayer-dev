@@ -131,11 +131,11 @@ function jsonResponse(data, status = 200) {
 // send one - so the signature (team JWKS), audience, issuer and expiry are
 // all verified.
 //
-// Two other ways in: the legacy shared bearer password (BUILDER_PASSWORD,
-// transitional - removed once Access is confirmed), and LOCAL_DEV_AUTH=1,
-// which only worker/.dev.vars sets, so `wrangler dev` on localhost needs no
-// sign-in. Deploys never read .dev.vars, and the hostname check means even a
-// misplaced var couldn't open up production.
+// The only other way in is LOCAL_DEV_AUTH=1, which only worker/.dev.vars
+// sets, so `wrangler dev` on localhost needs no sign-in. Deploys never read
+// .dev.vars, and the hostname check means even a misplaced var couldn't
+// open up production. There is no shared password any more - nothing to
+// guess, so no password-attempt rate limiting either.
 const jwksCache = { keys: null, fetchedAt: 0 };
 
 function base64UrlToBytes(value) {
@@ -201,20 +201,12 @@ function isLocalDevRequest(request, env) {
   return hostname === "localhost" || hostname === "127.0.0.1";
 }
 
-function hasLegacyPassword(request, env) {
-  const auth = request.headers.get("Authorization") || "";
-  const match = auth.match(/^Bearer (.+)$/);
-  return !!env.BUILDER_PASSWORD && !!match && match[1] === env.BUILDER_PASSWORD;
-}
-
 // Resolved once per request at the top of fetch() (verification is async),
 // then read synchronously by every requireAuth() call site below.
 const authResults = new WeakMap();
 
 async function resolveAuth(request, env) {
-  const ok = isLocalDevRequest(request, env) ||
-    hasLegacyPassword(request, env) ||
-    !!(await verifyAccessToken(request, env));
+  const ok = isLocalDevRequest(request, env) || !!(await verifyAccessToken(request, env));
   authResults.set(request, ok);
   return ok;
 }
@@ -265,22 +257,6 @@ async function withinLimit(limiter, key) {
   } catch {
     return true;
   }
-}
-
-// IPs that tripped AUTH_LIMITER, refused outright until the timestamp.
-// In-memory, so per isolate/location - best-effort, not a guarantee; a long
-// random password is the real defence. The rate limiter can't be queried
-// without incrementing it, hence this separate record.
-// ponytail: per-isolate map; move to a Durable Object if guessing ever gets distributed
-const authBlockedUntil = new Map();
-
-function isAuthBlocked(ip) {
-  return (authBlockedUntil.get(ip) || 0) > Date.now();
-}
-
-function blockAuth(ip) {
-  if (authBlockedUntil.size > 10000) authBlockedUntil.clear();
-  authBlockedUntil.set(ip, Date.now() + 60 * 1000);
 }
 
 async function parseJsonBody(request) {
@@ -672,20 +648,7 @@ export default {
       return new Response(null, { status: 204, headers: CORS_HEADERS });
     }
 
-    // Password guessing: only failed attempts are counted (limit() is only
-    // called on a wrong password), so the builder's own normal traffic never
-    // gets near it. Once an IP trips it, EVERY attempt from it is refused
-    // for a minute - right password included - otherwise 429 vs 200 still
-    // tells a guesser when they've hit it and the limit slows nothing.
-    const authorized = await resolveAuth(request, env);
-    if (request.headers.has("Authorization")) {
-      const ip = clientIp(request);
-      if (isAuthBlocked(ip)) return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
-      if (!authorized && !(await withinLimit(env.AUTH_LIMITER, ip))) {
-        blockAuth(ip);
-        return jsonResponse({ error: "Too many attempts - try again in a minute." }, 429);
-      }
-    }
+    await resolveAuth(request, env);
 
     // GET /reels - list all published reels (management view)
     if (pathname === "/reels" && request.method === "GET") {

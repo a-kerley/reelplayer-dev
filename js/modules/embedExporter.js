@@ -1,6 +1,6 @@
 // embedExporter.js - Handles exporting embed code for Squarespace and other platforms
 import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 import { hashContent } from "./contentHash.js";
 
@@ -206,24 +206,11 @@ export class EmbedExporter {
       created: new Date().toISOString()
     };
 
-    const password = await getBuilderPassword();
-    if (!password) {
-      throw new Error("A password is required to publish this reel.");
-    }
-
-    const response = await fetch(`${WORKER_BASE_URL}/reels/${reelId}`, {
+    const response = await apiFetch(`/reels/${reelId}`, {
       method: "POST",
-      headers: {
-        "Content-Type": "application/json",
-        "Authorization": `Bearer ${password}`
-      },
+      headers: { "Content-Type": "application/json" },
       body: JSON.stringify(reelData)
     });
-
-    if (response.status === 401) {
-      clearBuilderPassword();
-      throw new Error("Incorrect password. Please try exporting again.");
-    }
 
     if (!response.ok) {
       throw new Error(`Failed to publish reel (server responded with status ${response.status}).`);

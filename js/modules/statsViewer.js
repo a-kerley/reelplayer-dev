@@ -5,21 +5,13 @@
 // dialog.createDialog pattern. The Worker deliberately does no aggregation
 // (see worker/CLAUDE.md) - expected volume is low enough that summarizing
 // here on every open is trivial, and keeps the Worker dumb.
-import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { escapeHtml } from "./domUtils.js";
 
-async function fetchStats(targetType, targetId, aliases, password) {
+async function fetchStats(targetType, targetId, aliases) {
   const query = aliases.filter(Boolean).map((a) => `alias=${encodeURIComponent(a)}`).join("&");
-  const response = await fetch(`${WORKER_BASE_URL}/stats/${targetType}/${targetId}${query ? `?${query}` : ""}`, {
-    headers: { "Authorization": `Bearer ${password}` }
-  });
-
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+  const response = await apiFetch(`/stats/${targetType}/${targetId}${query ? `?${query}` : ""}`);
   if (!response.ok) {
     throw new Error(`Failed to load stats (status ${response.status}).`);
   }
@@ -189,12 +181,9 @@ function filterByRange(events, range) {
  *  @param {{analyticsEnabled?: boolean}} [options] - lets the empty state
  *    say *why* there's nothing (tracking off vs. just no visitors yet) */
 export async function openStatsModal(targetType, targetId, label, aliases = [], { analyticsEnabled } = {}) {
-  const password = await getBuilderPassword();
-  if (!password) return;
-
   let events;
   try {
-    events = await fetchStats(targetType, targetId, aliases, password);
+    events = await fetchStats(targetType, targetId, aliases);
   } catch (error) {
     dialog.alert(error.message);
     return;

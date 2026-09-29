@@ -4,9 +4,9 @@
 // folders, search, sort, list/grid view - with only the row-click action and
 // the visibility of management controls (upload/rename/delete/bulk actions)
 // differing by mode.
-import { WORKER_BASE_URL, R2_PUBLIC_URL } from "../config.js";
+import { R2_PUBLIC_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
-import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
+import { apiFetch } from "./builderAuth.js";
 import { openContextMenuAtCursor } from "./contextMenu.js";
 
 const ICONS = {
@@ -106,18 +106,8 @@ function formatBytes(bytes) {
   return `${(bytes / (1024 * 1024)).toFixed(1)} MB`;
 }
 
-function authHeaders(password) {
-  return { "Authorization": `Bearer ${password}` };
-}
-
-async function fetchAllR2Files(password) {
-  const response = await fetch(`${WORKER_BASE_URL}/media/list?prefix=&flat=1`, {
-    headers: authHeaders(password)
-  });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function fetchAllR2Files() {
+  const response = await apiFetch("/media/list?prefix=&flat=1");
   if (!response.ok) {
     throw new Error(`Failed to load media (status ${response.status}).`);
   }
@@ -133,32 +123,24 @@ async function fetchAllR2Files(password) {
   }));
 }
 
-async function uploadFile(folder, file, password) {
+async function uploadFile(folder, file) {
   const key = `${folder}${file.name}`;
-  const response = await fetch(`${WORKER_BASE_URL}/media/upload?key=${encodeURIComponent(key)}`, {
+  const response = await apiFetch(`/media/upload?key=${encodeURIComponent(key)}`, {
     method: "POST",
-    headers: { ...authHeaders(password), "Content-Type": file.type || "application/octet-stream" },
+    headers: { "Content-Type": file.type || "application/octet-stream" },
     body: file
   });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
   if (!response.ok) {
     throw new Error(`Failed to upload ${file.name} (status ${response.status}).`);
   }
 }
 
-async function renameFile(from, to, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/media/rename`, {
+async function renameFile(from, to) {
+  const response = await apiFetch("/media/rename", {
     method: "POST",
-    headers: { ...authHeaders(password), "Content-Type": "application/json" },
+    headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ from, to })
   });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
   if (!response.ok) {
     throw new Error(`Failed to rename file (status ${response.status}).`);
   }
@@ -168,14 +150,8 @@ async function renameFile(from, to, password) {
 // worker/src/index.js's findMediaReferences(). Used to warn before a
 // rename/move that a file is actually in use, not to perform the rewrite
 // itself (the Worker does that unconditionally as part of the rename call).
-async function fetchMediaUsages(key, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/media/usages?key=${encodeURIComponent(key)}`, {
-    headers: authHeaders(password)
-  });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function fetchMediaUsages(key) {
+  const response = await apiFetch(`/media/usages?key=${encodeURIComponent(key)}`);
   if (!response.ok) {
     throw new Error(`Failed to check file usages (status ${response.status}).`);
   }
@@ -183,15 +159,8 @@ async function fetchMediaUsages(key, password) {
   return matches;
 }
 
-async function deleteFile(key, password) {
-  const response = await fetch(`${WORKER_BASE_URL}/media/delete?key=${encodeURIComponent(key)}`, {
-    method: "DELETE",
-    headers: authHeaders(password)
-  });
-  if (response.status === 401) {
-    clearBuilderPassword();
-    throw new Error("Incorrect password.");
-  }
+async function deleteFile(key) {
+  const response = await apiFetch(`/media/delete?key=${encodeURIComponent(key)}`, { method: "DELETE" });
   if (!response.ok) {
     throw new Error(`Failed to delete file (status ${response.status}).`);
   }
@@ -324,7 +293,6 @@ export async function renderMediaBrowser(container, options = {}) {
     sidebarWidth: savedPrefs.sidebarWidth,
     selected: new Set(),
     files: [],
-    password: null,
     expandedFolders: new Set(),
     editingFolderPath: null
   };
@@ -367,12 +335,6 @@ export async function renderMediaBrowser(container, options = {}) {
     render();
   }
 
-  const password = await getBuilderPassword();
-  if (!password) {
-    container.innerHTML = '<p style="color:#888;">A password is required to use the Media Library.</p>';
-    return;
-  }
-  state.password = password;
   // Containing block for the busy-overlay spinner (see beginBusy/endBusy
   // below) - set once here rather than in CSS, since this same element is
   // whatever the caller happened to hand in (a tab pane, a modal body).
@@ -382,7 +344,7 @@ export async function renderMediaBrowser(container, options = {}) {
 
   let r2Files;
   try {
-    r2Files = await fetchAllR2Files(password);
+    r2Files = await fetchAllR2Files();
   } catch (error) {
     container.innerHTML = `<p style="color:#e66;">${error.message}</p>`;
     return;
@@ -469,7 +431,7 @@ export async function renderMediaBrowser(container, options = {}) {
 
   async function refresh() {
     try {
-      r2Files = await fetchAllR2Files(state.password);
+      r2Files = await fetchAllR2Files();
     } catch (error) {
       dialog.alert(error.message);
       return;
@@ -489,8 +451,8 @@ export async function renderMediaBrowser(container, options = {}) {
   async function createFolder(path) {
     beginBusy();
     try {
-      await uploadFile(path, new File([], FOLDER_MARKER_NAME), state.password);
-      r2Files = await fetchAllR2Files(state.password);
+      await uploadFile(path, new File([], FOLDER_MARKER_NAME));
+      r2Files = await fetchAllR2Files();
       state.files = applyExtFilter(r2Files);
     } catch (error) {
       dialog.alert(error.message);
@@ -801,7 +763,7 @@ export async function renderMediaBrowser(container, options = {}) {
   async function confirmIfInUse(keys) {
     let matches;
     try {
-      const perKey = await Promise.all(keys.map((key) => fetchMediaUsages(key, state.password)));
+      const perKey = await Promise.all(keys.map((key) => fetchMediaUsages(key)));
       const seen = new Set();
       matches = perKey.flat().filter((m) => (seen.has(m.key) ? false : (seen.add(m.key), true)));
     } catch (error) {
@@ -833,7 +795,7 @@ export async function renderMediaBrowser(container, options = {}) {
     try {
       for (const key of toMove) {
         const file = state.files.find(f => f.key === key);
-        await renameFile(key, `${destFolder}${file.name}`, state.password);
+        await renameFile(key, `${destFolder}${file.name}`);
       }
       await refresh();
     } catch (error) {
@@ -883,7 +845,7 @@ export async function renderMediaBrowser(container, options = {}) {
     try {
       for (const f of filesToMove) {
         const newKey = `${newPrefix}${f.key.slice(path.length)}`;
-        await renameFile(f.key, newKey, state.password);
+        await renameFile(f.key, newKey);
       }
       if (state.view.type === 'folder' && state.view.path.startsWith(path)) {
         state.view = { type: 'folder', path: newPrefix + state.view.path.slice(path.length) };
@@ -952,7 +914,7 @@ export async function renderMediaBrowser(container, options = {}) {
           beginBusy();
           try {
             for (const f of filesToDelete) {
-              await deleteFile(f.key, state.password);
+              await deleteFile(f.key);
             }
             if (state.view.type === 'folder' && state.view.path.startsWith(path)) {
               state.view = { type: 'folder', path: '' };
@@ -1122,7 +1084,7 @@ export async function renderMediaBrowser(container, options = {}) {
         const file = files[i];
         zone.textContent = `Uploading ${i + 1} of ${files.length}: ${file.name}...`;
         try {
-          await uploadFile(targetFolder, file, state.password);
+          await uploadFile(targetFolder, file);
           succeeded.push(file.name);
         } catch (error) {
           failures.push(`${file.name}: ${error.message}`);
@@ -1403,7 +1365,7 @@ export async function renderMediaBrowser(container, options = {}) {
           if (!(await confirmIfInUse([file.key]))) return;
           beginBusy();
           try {
-            await renameFile(file.key, `${folderOf(file.key)}${newName}`, state.password);
+            await renameFile(file.key, `${folderOf(file.key)}${newName}`);
             await refresh();
           } catch (error) {
             dialog.alert(error.message);
@@ -1428,7 +1390,7 @@ export async function renderMediaBrowser(container, options = {}) {
           for (const key of keys) {
             const f = state.files.find(f => f.key === key);
             if (!f || f.readOnly) continue;
-            await deleteFile(key, state.password);
+            await deleteFile(key);
           }
           await refresh();
         } catch (error) {
