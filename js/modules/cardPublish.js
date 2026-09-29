@@ -66,10 +66,8 @@ export async function publishCard(card) {
 
 // Extensionless "player" (not "player.html") - matches embedExporter.js's
 // own iframe src convention, so a card embed never takes the .html ->
-// extensionless redirect hop. mode:"card" rendering doesn't exist in
-// player.html yet (PLAN.md §5, not built as part of this spine step) - this
-// URL is for testing the publish round-trip against GET /cards/:id, not a
-// working embed yet.
+// extensionless redirect hop. &type=card is required: without it
+// player.html treats the id as a reel's and fails to load it.
 export function publicCardPlayerUrl(cardId) {
-  return `${window.location.origin}${window.location.pathname.replace("index.html", "")}player?id=${cardId}`;
+  return `${window.location.origin}${window.location.pathname.replace("index.html", "")}player?id=${cardId}&type=card`;
 }

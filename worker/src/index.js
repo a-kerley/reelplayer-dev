@@ -857,7 +857,7 @@ export default {
 
       const entries = await listEntries(env, "card_", (c) => ({
         id: c.id, title: c.title, reelId: c.reelId, created: c.created,
-        analyticsEnabled: c.analyticsEnabled === true,
+        analyticsEnabled: c.analyticsEnabled === true, sourceCardId: c.sourceCardId || null,
       }));
       return jsonResponse(entries);
     }

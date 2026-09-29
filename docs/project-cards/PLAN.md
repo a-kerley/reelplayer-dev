@@ -50,9 +50,10 @@ Also has its own live preview pane (`#cardPreviewPane`, mirrors the Reels
 tab's debounced-refresh-plus-manual-button pattern) that calls the exact
 same `renderCardChrome()`/`mergeCardOverrides()`/`playerApp.renderPlayer()`
 a real embed uses - never a second render copy for the builder's own
-preview either. **Not yet built**: a "Manage Published Cards" modal
-(needed before a Stats button can be wired up - `statsViewer.js` itself is
-already fully generic on `targetType`, no code changes needed there).
+preview either. "Manage Published Cards" (`js/modules/cardManager.js`)
+lists published versions grouped per card draft (`sourceCardId`) with
+Stats/Open/Delete, and a "View Stats" button sits beside the analytics
+toggle.
 
 ### `player.html?id=<cardId>&type=card` render (§7.4/§5 - done)
 `js/modules/cardChrome.js` + `css/card.css` render the full card chrome:

@@ -36,6 +36,7 @@ import { renderCardChrome, mergeCardOverrides } from "./modules/cardChrome.js";
 import { playerApp } from "./player.js";
 import { PreviewManager } from "./modules/previewManager.js";
 import { openStatsModal } from "./modules/statsViewer.js";
+import { setupCardManagerButton } from "./modules/cardManager.js";
 
 // The fixed set of icon files shipped in assets/card-icons/ (link icons on
 // the Info tab) - a static, code-coupled asset set (see CLAUDE.md's "Asset
@@ -568,6 +569,7 @@ export function initCardsController() {
       </div>
 
       <button type="button" id="cardPublishBtn" title="Publish this card so it can be embedded on boxedape.com." style="margin-top: 1rem;">Publish Card</button>
+      <button type="button" id="manageCardsBtn" title="View and manage every card you've published, including their stats and old versions.">Manage Published Cards</button>
       <p id="cardPublishResult" style="margin-top: 0.75rem;"></p>
     `;
 
@@ -863,6 +865,8 @@ export function initCardsController() {
       ],
       updateCurrentCard
     );
+
+    setupCardManagerButton(() => card);
 
     // --- Publish ----------------------------------------------------------
     document.getElementById("cardPublishBtn").onclick = async () => {

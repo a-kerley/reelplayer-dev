@@ -865,6 +865,7 @@ body {
 #getEmbedCodeBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
+#manageCardsBtn,
 #previewPageBtn,
 #customizeTextStylesBtn,
 #refreshPreviewBtn,
@@ -886,6 +887,7 @@ body {
 #getEmbedCodeBtn,
 #manageEmbedsBtn,
 #managePagesBtn,
+#manageCardsBtn,
 #previewPageBtn,
 #customizeTextStylesBtn,
 #refreshCardPreviewBtn,
@@ -900,6 +902,7 @@ body {
 #getEmbedCodeBtn:hover,
 #manageEmbedsBtn:hover,
 #managePagesBtn:hover,
+#manageCardsBtn:hover,
 #previewPageBtn:hover,
 #customizeTextStylesBtn:hover,
 #refreshPreviewBtn:hover,
@@ -1029,6 +1032,11 @@ body {
 .manage-badge--on {
   color: var(--builder-accent);
   border-color: var(--builder-accent);
+}
+
+.manage-badge--warn {
+  color: #e0a84a;
+  border-color: #7a5a2a;
 }
 
 .manage-id {
