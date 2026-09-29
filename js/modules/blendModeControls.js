@@ -349,6 +349,7 @@ export function setupHoverDarkenControls(reel, onChange) {
   const hoverDarkenAmount = document.getElementById("hoverDarkenAmount");
   const hoverDarkenAmountSlider = document.getElementById("hoverDarkenAmountSlider");
   const hoverDarkenUndarkenOnIdle = document.getElementById("hoverDarkenUndarkenOnIdle");
+  const hoverDarkenTrackTitle = document.getElementById("hoverDarkenTrackTitle");
 
   if (!hoverDarkenEnabled || !hoverDarkenAmount) return;
 
@@ -356,12 +357,14 @@ export function setupHoverDarkenControls(reel, onChange) {
   hoverDarkenAmount.value = reel.hoverDarkenAmount ?? 15;
   if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.value = hoverDarkenAmount.value;
   if (hoverDarkenUndarkenOnIdle) hoverDarkenUndarkenOnIdle.checked = reel.hoverDarkenUndarkenOnIdle || false;
+  if (hoverDarkenTrackTitle) hoverDarkenTrackTitle.checked = reel.hoverDarkenTrackTitle || false;
 
   const updateEnabledState = () => {
     const isEnabled = hoverDarkenEnabled.checked;
     hoverDarkenAmount.disabled = !isEnabled;
     if (hoverDarkenAmountSlider) hoverDarkenAmountSlider.disabled = !isEnabled;
     if (hoverDarkenUndarkenOnIdle) hoverDarkenUndarkenOnIdle.disabled = !isEnabled;
+    if (hoverDarkenTrackTitle) hoverDarkenTrackTitle.disabled = !isEnabled;
     reel.hoverDarkenEnabled = isEnabled;
   };
   updateEnabledState();
@@ -380,6 +383,13 @@ export function setupHoverDarkenControls(reel, onChange) {
   if (hoverDarkenUndarkenOnIdle) {
     hoverDarkenUndarkenOnIdle.addEventListener("change", () => {
       reel.hoverDarkenUndarkenOnIdle = hoverDarkenUndarkenOnIdle.checked;
+      onChange();
+    });
+  }
+
+  if (hoverDarkenTrackTitle) {
+    hoverDarkenTrackTitle.addEventListener("change", () => {
+      reel.hoverDarkenTrackTitle = hoverDarkenTrackTitle.checked;
       onChange();
     });
   }
