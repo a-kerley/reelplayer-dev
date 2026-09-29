@@ -1304,6 +1304,14 @@ body {
    COLOR PICKERS & EFFECTS SECTION
    ============================================== */
 
+/* daisyUI's <label class="toggle"> (toggle with icons) assumes Preflight's
+   border-box, which this project disables - without it the icons swell the
+   toggle to ~40x27 instead of matching a plain toggle's size. */
+.builder-app label.toggle,
+.builder-app label.toggle > * {
+  box-sizing: border-box;
+}
+
 .builder-app input.url-deleted::placeholder {
   color: #dc3545;
   opacity: 1;
