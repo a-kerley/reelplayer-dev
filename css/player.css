@@ -39,6 +39,19 @@
   opacity: 0;
 }
 
+/* Own compositor layers for WaveSurfer's two canvas stacks. During playback
+   WaveSurfer rewrites the unplayed layer's clip-path and the played layer's
+   width on every tick; without this, each tick re-rasterizes both canvases
+   (inside the mask group above) and at a fractional devicePixelRatio -
+   browser zoom != 100%, or Windows 125%/150% display scaling - the canvases
+   sit between device pixels, so every re-raster resamples them at a slightly
+   different sub-pixel phase: visible shimmer along every bar edge. Integer
+   ratios (100% zoom, retina 2x) map 1:1 and never showed it. */
+#waveform > div:last-child::part(canvases),
+#waveform > div:last-child::part(progress) {
+  will-change: transform;
+}
+
 /* ========================================
    PLAY/PAUSE BUTTON
    ======================================== */

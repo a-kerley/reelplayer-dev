@@ -1579,7 +1579,6 @@ const playerAppCore = {
       normalize: true,
       backend: "WebAudio", // Use WebAudio for accurate duration/playback
       minPxPerSec: 1,
-      pixelRatio: Math.ceil(window.devicePixelRatio || 1), // Ensure whole number for Safari
     });
     
     // EXPERIMENT: re-snapshot the waveform canvas into .hover-overlay's mask
