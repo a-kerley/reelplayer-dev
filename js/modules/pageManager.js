@@ -10,6 +10,7 @@ import { showToast } from "./toast.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { publicPageUrl } from "./pagePublish.js";
 import { openStatsModal } from "./statsViewer.js";
+import { escapeHtml } from "./domUtils.js";
 
 async function fetchPageList(password) {
   const response = await fetch(`${WORKER_BASE_URL}/pages`, {
@@ -41,59 +42,55 @@ async function deletePublishedPage(slug, password) {
   }
 }
 
-const BADGE_STYLE = "display:inline-block;background:#1e1e1e;border:1px solid #444;border-radius:4px;padding:0.15em 0.55em;font-size:0.75rem;color:#999;";
+function formatDate(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unknown date";
+}
 
-// currentSlug - the publishedSlug of the page currently open in the
-// builder, if any (js/pagesController.js's handlePublish() sets this on
-// publish) - marks that one row so "which of these is the one I'm looking
-// at right now" doesn't require cross-referencing slugs by eye.
-function renderListHTML(entries, currentSlug) {
+// currentPageId - the draft id of the page open in the builder, matched
+// against each entry's id so the highlight survives a slug rename.
+function renderListHTML(entries, currentPageId) {
   // Mirrors embedManager.js's identical note - KV writes aren't instantly
   // consistent across every edge location, so a page published moments ago
   // can briefly be missing from this list even though the publish itself
   // succeeded.
-  const lagNotice = `<p style="font-size:0.8rem;color:#888;margin:0 0 1rem;">Just published something? It can take a few seconds to show up here - reopen this dialog if you don't see it yet.</p>`;
+  const lagNotice = `<p class="manage-footnote">Just published something? It can take a few seconds to show up here - reopen this window if you don't see it yet.</p>`;
 
   if (!entries.length) {
-    return lagNotice + '<p class="builder-empty-state">No published pages yet.</p>';
+    return '<p class="builder-empty-state builder-empty-state--block">No published pages yet.</p>' + lagNotice;
   }
 
-  const rows = `
-    <div style="max-height:420px;overflow-y:auto;">
-      ${entries.map(entry => {
-        const isCurrent = currentSlug && entry.slug === currentSlug;
-        const analyticsBadge = entry.analyticsEnabled
-          ? `<span style="${BADGE_STYLE}color:var(--builder-accent);border-color:var(--builder-accent);">Analytics on</span>`
-          : `<span style="${BADGE_STYLE}">Analytics off</span>`;
-        const dateBadge = entry.published
-          ? `<span style="${BADGE_STYLE}">Published ${new Date(entry.published).toLocaleString()}</span>`
-          : "";
-        const slugBadge = `<span style="${BADGE_STYLE}font-family:monospace;">/p/${entry.slug}</span>`;
+  const cards = [...entries]
+    .sort((a, b) => ((a.published || "") < (b.published || "") ? 1 : -1))
+    .map((entry) => {
+      const title = escapeHtml(entry.title || "(untitled)");
+      const slug = escapeHtml(entry.slug);
+      const isCurrent = currentPageId && entry.id === currentPageId;
+      const analyticsBadge = entry.analyticsEnabled
+        ? '<span class="manage-badge manage-badge--on">Analytics on</span>'
+        : '<span class="manage-badge">Analytics off</span>';
 
-        return `
-        <div class="page-manager-row" data-slug="${entry.slug}" style="display:flex;align-items:center;justify-content:space-between;padding:0.85rem 0;border-bottom:1px solid #444;gap:1rem;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
-          <div style="min-width:0;flex:1;">
-            <div style="font-weight:600;font-size:0.95rem;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.4rem;">
-              ${dateBadge}${analyticsBadge}${slugBadge}
-            </div>
-          </div>
-          <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-            <button type="button" class="page-manager-stats-btn" data-slug="${entry.slug}" data-id="${entry.id || ""}" data-analytics="${entry.analyticsEnabled ? "on" : "off"}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
-              title="View how many times this page has been opened"
-              style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
-            <button type="button" class="page-manager-copy-btn" data-slug="${entry.slug}"
-              style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Copy Link</button>
-            <button type="button" class="page-manager-delete-btn" data-slug="${entry.slug}"
-              style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
+      return `
+      <div class="manage-card${isCurrent ? " is-current" : ""}">
+        <div class="manage-card-header">
+          <div class="manage-card-title">${title}${isCurrent ? '<span class="manage-current-tag">Currently editing</span>' : ""}</div>
+          <div class="manage-card-actions">
+            <button type="button" class="manage-btn page-manager-stats-btn" data-slug="${slug}" data-id="${escapeHtml(entry.id || "")}" data-analytics="${entry.analyticsEnabled ? "on" : "off"}" data-title="${title}"
+              title="View how many times this page has been opened">Stats</button>
+            <button type="button" class="manage-btn page-manager-copy-btn" data-slug="${slug}"
+              title="Copy this page's public link">Copy Link</button>
+            <button type="button" class="manage-btn manage-btn--danger page-manager-delete-btn" data-slug="${slug}" data-title="${title}"
+              title="Unpublish this page - its link stops working">Delete</button>
           </div>
         </div>
-      `;
-      }).join("")}
-    </div>
-  `;
+        <div class="manage-badges">
+          ${analyticsBadge}
+          <span class="manage-badge">Published ${formatDate(entry.published)}</span>
+          <code class="manage-id" title="Public path">/p/${slug}</code>
+        </div>
+      </div>`;
+    }).join("");
 
-  return lagNotice + rows;
+  return `<div class="manage-list">${cards}</div>${lagNotice}`;
 }
 
 async function openPageManager(getCurrentPage) {
@@ -108,12 +105,10 @@ async function openPageManager(getCurrentPage) {
     return;
   }
 
-  const currentSlug = getCurrentPage?.()?.publishedSlug;
-
   dialog.createDialog({
     type: "custom",
-    message: "Published Pages",
-    content: renderListHTML(entries, currentSlug),
+    message: `Published Pages (${entries.length})`,
+    content: renderListHTML(entries, getCurrentPage?.()?.id),
     maxWidth: "640px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
@@ -141,7 +136,7 @@ async function openPageManager(getCurrentPage) {
       btn.addEventListener("click", async () => {
         const slug = btn.dataset.slug;
         const confirmed = await dialog.confirm(
-          `Delete published page "/p/${slug}"? This cannot be undone.`,
+          `Unpublish "${btn.dataset.title}" (/p/${slug})? Its link will stop working. The draft stays in your Pages list, so you can publish it again.`,
           "Delete",
           "Cancel"
         );
@@ -161,7 +156,7 @@ async function openPageManager(getCurrentPage) {
 /**
  * @param {() => Object|undefined} [getCurrentPage] - returns the page
  *   currently open in the builder, if any - used only to highlight its
- *   entry in the list (via its publishedSlug). Omit to skip that.
+ *   entry in the list (via its draft id). Omit to skip that.
  */
 export function setupPageManagerButton(getCurrentPage) {
   const btn = document.getElementById("managePagesBtn");

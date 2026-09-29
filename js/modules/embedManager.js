@@ -4,6 +4,7 @@ import { WORKER_BASE_URL } from "../config.js";
 import { dialog } from "./dialogSystem.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { openStatsModal } from "./statsViewer.js";
+import { escapeHtml } from "./domUtils.js";
 
 async function fetchReelList(password) {
   const response = await fetch(`${WORKER_BASE_URL}/reels`, {
@@ -35,61 +36,72 @@ async function deleteReel(id, password) {
   }
 }
 
-const BADGE_STYLE = "display:inline-block;background:#1e1e1e;border:1px solid #444;border-radius:4px;padding:0.15em 0.55em;font-size:0.75rem;color:#999;";
+function formatDate(iso) {
+  return iso ? new Date(iso).toLocaleString(undefined, { dateStyle: "medium", timeStyle: "short" }) : "Unknown date";
+}
 
-// currentEmbedId - the reel currently open in the builder's own
-// publishedEmbedId (js/main.js's updateReelPublishStatus() sets this on
-// publish), if any. Since a reel's embed id is a content hash, this only
-// ever matches when the currently-open draft is exactly what's live at
-// that entry - marks that one row so "which of these is the one I'm
-// looking at right now" doesn't require cross-referencing ids by eye.
-function renderListHTML(entries, currentEmbedId) {
+// Every publish mints a new content-hash id, so one reel usually has several
+// entries here. Grouped by its draft id (sourceReelId) - one card per reel,
+// its versions underneath - since stats are per reel, not per version.
+// Legacy publishes with no sourceReelId stand alone as their own group.
+function groupByReel(entries) {
+  const groups = new Map();
+  entries.forEach((entry) => {
+    const key = entry.sourceReelId || entry.id;
+    if (!groups.has(key)) groups.set(key, { key, sourceReelId: entry.sourceReelId, versions: [] });
+    groups.get(key).versions.push(entry);
+  });
+  const byNewest = (a, b) => (a.created || "") < (b.created || "") ? 1 : -1;
+  return [...groups.values()]
+    .map((g) => ({ ...g, versions: g.versions.sort(byNewest) }))
+    .sort((a, b) => byNewest(a.versions[0], b.versions[0]));
+}
+
+// currentReelId - the draft id of the reel open in the builder, matched
+// against each group's sourceReelId so the highlight survives republishes.
+function renderListHTML(groups, currentReelId) {
   // KV writes aren't instantly consistent across every edge location, so a
   // reel published moments ago can briefly be missing from this list even
   // though the publish itself succeeded - this note is shown unconditionally
   // (not just on a suspicious-looking empty list) since there's no reliable
   // way to detect "this is probably that case" from here.
-  const lagNotice = `<p style="font-size:0.8rem;color:#888;margin:0 0 1rem;">Just published something? It can take a few seconds to show up here - reopen this dialog if you don't see it yet.</p>`;
+  const lagNotice = `<p class="manage-footnote">Just published something? It can take a few seconds to show up here - reopen this window if you don't see it yet.</p>`;
 
-  if (!entries.length) {
-    return lagNotice + '<p class="builder-empty-state">No published reels yet.</p>';
+  if (!groups.length) {
+    return '<p class="builder-empty-state builder-empty-state--block">No published reels yet.</p>' + lagNotice;
   }
 
-  const rows = `
-    <div style="max-height:420px;overflow-y:auto;">
-      ${entries.map(entry => {
-        const isCurrent = currentEmbedId && entry.id === currentEmbedId;
-        const analyticsBadge = entry.analyticsEnabled
-          ? `<span style="${BADGE_STYLE}color:var(--builder-accent);border-color:var(--builder-accent);">Analytics on</span>`
-          : `<span style="${BADGE_STYLE}">Analytics off</span>`;
-        const dateBadge = entry.created
-          ? `<span style="${BADGE_STYLE}">Published ${new Date(entry.created).toLocaleString()}</span>`
-          : "";
-        const idBadge = `<span style="${BADGE_STYLE}font-family:monospace;">${entry.id}</span>`;
+  const cards = groups.map((group) => {
+    const latest = group.versions[0];
+    const title = escapeHtml(latest.title || "(untitled)");
+    const isCurrent = currentReelId && group.sourceReelId === currentReelId;
+    const analyticsBadge = latest.analyticsEnabled
+      ? '<span class="manage-badge manage-badge--on">Analytics on</span>'
+      : '<span class="manage-badge">Analytics off</span>';
+    const versionCount = `<span class="manage-badge">${group.versions.length} version${group.versions.length === 1 ? "" : "s"}</span>`;
 
-        return `
-        <div class="embed-manager-row" data-id="${entry.id}" style="display:flex;align-items:center;justify-content:space-between;gap:1rem;padding:0.85rem 0;border-bottom:1px solid #444;${isCurrent ? "background:rgba(74,144,226,0.1);" : ""}">
-          <div style="min-width:0;flex:1;">
-            <div style="font-weight:600;font-size:0.95rem;">${entry.title || "(untitled)"}${isCurrent ? ' <span style="color:var(--builder-accent);font-weight:600;font-size:0.8rem;">(currently editing)</span>' : ""}</div>
-            <div style="display:flex;flex-wrap:wrap;gap:0.4rem;margin-top:0.4rem;">
-              ${dateBadge}${analyticsBadge}${idBadge}
-            </div>
-          </div>
-          <div style="display:flex;gap:0.4rem;flex-shrink:0;">
-            <button type="button" class="embed-manager-stats-btn" data-id="${entry.id}" data-source-id="${entry.sourceReelId || ""}" data-analytics="${entry.analyticsEnabled ? "on" : "off"}" data-title="${(entry.title || "").replace(/"/g, "&quot;")}"
-              title="View opens/plays/listen-time analytics for this reel (all its published versions combined)"
-              style="background:none;border:1px solid var(--builder-accent);color:var(--builder-accent);border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Stats</button>
-            <button type="button" class="embed-manager-delete-btn" data-id="${entry.id}"
-              title="Permanently delete this published embed"
-              style="background:#dc3545;color:#fff;border:none;border-radius:4px;padding:0.4em 0.8em;cursor:pointer;">Delete</button>
-          </div>
+    const versions = group.versions.map((v, i) => `
+      <div class="manage-version">
+        <span class="manage-version-date">${formatDate(v.created)}</span>
+        ${i === 0 ? '<span class="manage-badge manage-badge--on">Latest</span>' : ""}
+        <code class="manage-id" title="Embed id">${escapeHtml(v.id)}</code>
+        <button type="button" class="manage-btn manage-btn--danger embed-manager-delete-btn" data-id="${escapeHtml(v.id)}" data-title="${title}" data-created="${escapeHtml(formatDate(v.created))}"
+          title="Permanently delete this published version">Delete</button>
+      </div>`).join("");
+
+    return `
+      <div class="manage-card${isCurrent ? " is-current" : ""}">
+        <div class="manage-card-header">
+          <div class="manage-card-title">${title}${isCurrent ? '<span class="manage-current-tag">Currently editing</span>' : ""}</div>
+          <button type="button" class="manage-btn embed-manager-stats-btn" data-id="${escapeHtml(latest.id)}" data-source-id="${escapeHtml(group.sourceReelId || "")}" data-analytics="${latest.analyticsEnabled ? "on" : "off"}" data-title="${title}"
+            title="View opens/plays/listen-time analytics for this reel (all its published versions combined)">Stats</button>
         </div>
-      `;
-      }).join("")}
-    </div>
-  `;
+        <div class="manage-badges">${analyticsBadge}${versionCount}</div>
+        <div class="manage-versions">${versions}</div>
+      </div>`;
+  }).join("");
 
-  return lagNotice + rows;
+  return `<div class="manage-list">${cards}</div>${lagNotice}`;
 }
 
 async function openEmbedManager(getCurrentReel) {
@@ -104,12 +116,12 @@ async function openEmbedManager(getCurrentReel) {
     return;
   }
 
-  const currentEmbedId = getCurrentReel?.()?.publishedEmbedId;
+  const groups = groupByReel(entries);
 
   dialog.createDialog({
     type: "custom",
-    message: "Published Reels",
-    content: renderListHTML(entries, currentEmbedId),
+    message: `Published Reels (${groups.length})`,
+    content: renderListHTML(groups, getCurrentReel?.()?.id),
     maxWidth: "640px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
@@ -129,7 +141,7 @@ async function openEmbedManager(getCurrentReel) {
       btn.addEventListener("click", async () => {
         const id = btn.dataset.id;
         const confirmed = await dialog.confirm(
-          `Delete published reel "${id}"? This cannot be undone.`,
+          `Delete the version of "${btn.dataset.title}" published ${btn.dataset.created}? Standalone embeds using this version will stop working. Pages and Project Cards always use the latest version and aren't affected. This can't be undone.`,
           "Delete",
           "Cancel"
         );
@@ -149,7 +161,7 @@ async function openEmbedManager(getCurrentReel) {
 /**
  * @param {() => Object|undefined} [getCurrentReel] - returns the reel
  *   currently open in the builder, if any - used only to highlight its
- *   entry in the list (via its publishedEmbedId). Omit to skip that.
+ *   card in the list (via its draft id). Omit to skip that.
  */
 export function setupEmbedManagerButton(getCurrentReel) {
   const btn = document.getElementById("manageEmbedsBtn");

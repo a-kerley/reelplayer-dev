@@ -950,6 +950,156 @@ body {
 }
 
 /* ==============================================
+   MANAGE PUBLISHED MODALS (js/modules/embedManager.js, pageManager.js)
+   Same situation as the stats modal below - rendered into dialogSystem's
+   <body>-level .dialog-box, so plain classes and :root vars only.
+   ============================================== */
+.manage-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.6rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding-right: 0.25rem;
+}
+
+.manage-card {
+  background: #252525;
+  border: 1px solid #3a3a3a;
+  border-radius: 8px;
+  padding: 0.75rem 0.85rem;
+}
+
+.manage-card.is-current {
+  border-color: var(--builder-accent);
+  background: rgba(74, 144, 226, 0.08);
+}
+
+.manage-card-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+.manage-card-title {
+  min-width: 0;
+  color: #fff;
+  font-weight: 600;
+  font-size: 0.95rem;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.manage-current-tag {
+  margin-left: 0.5rem;
+  color: var(--builder-accent);
+  font-size: 0.72rem;
+  font-weight: 600;
+  text-transform: uppercase;
+  letter-spacing: 0.04em;
+}
+
+.manage-card-actions {
+  display: flex;
+  gap: 0.4rem;
+  flex-shrink: 0;
+}
+
+.manage-badges {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.35rem;
+  margin-top: 0.45rem;
+}
+
+.manage-badge {
+  display: inline-block;
+  background: #1e1e1e;
+  border: 1px solid #444;
+  border-radius: 4px;
+  padding: 0.1em 0.5em;
+  font-size: 0.72rem;
+  color: #999;
+  white-space: nowrap;
+}
+
+.manage-badge--on {
+  color: var(--builder-accent);
+  border-color: var(--builder-accent);
+}
+
+.manage-id {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  font-size: 0.72rem;
+  color: #888;
+}
+
+.manage-versions {
+  margin-top: 0.6rem;
+  border-top: 1px solid #3a3a3a;
+}
+
+.manage-version {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.4rem 0;
+  border-bottom: 1px solid #333;
+  font-size: var(--builder-text-sm);
+}
+
+.manage-version:last-child {
+  border-bottom: none;
+  padding-bottom: 0;
+}
+
+.manage-version-date {
+  color: #ccc;
+}
+
+.manage-version .manage-btn {
+  margin-left: auto;
+}
+
+.manage-btn {
+  background: transparent;
+  color: var(--builder-accent);
+  border: 1px solid var(--builder-accent);
+  border-radius: 4px;
+  padding: 0.25rem 0.7rem;
+  font-size: var(--builder-text-sm);
+  cursor: pointer;
+  flex-shrink: 0;
+  white-space: nowrap;
+  transition: background 0.18s, color 0.18s;
+}
+
+.manage-btn:hover {
+  background: rgba(74, 144, 226, 0.15);
+}
+
+.manage-btn--danger {
+  color: #e57373;
+  border-color: #6b3a3a;
+}
+
+.manage-btn--danger:hover {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: #fff;
+}
+
+.manage-footnote {
+  font-size: 0.75rem;
+  color: #777;
+  margin: 0.75rem 0 0;
+  text-align: center;
+}
+
+/* ==============================================
    STATS MODAL (js/modules/statsViewer.js)
    Rendered inside dialogSystem's .dialog-box, which is appended to <body>
    (outside .builder-app) - hence plain classes, :root vars only.
