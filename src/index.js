@@ -1,4 +1,5 @@
-// Gates the builder's entry page behind a shared password (HTTP Basic Auth,
+// Forwards /api/* to the API Worker (see the service binding in
+// wrangler.jsonc), and gates the builder's entry page behind a shared password (HTTP Basic Auth,
 // so the browser's own native login prompt handles it - no custom login page
 // needed). Runs in front of every request (assets.run_worker_first in
 // wrangler.jsonc), but only actually checks auth for the builder's own entry
@@ -67,6 +68,16 @@ function extractPassword(authHeader) {
 export default {
   async fetch(request, env) {
     const url = new URL(request.url);
+
+    // Same-origin API: /api/<route> -> the reelplayer-api Worker's /<route>.
+    // new Request(url, request) keeps the method, headers (incl.
+    // CF-Connecting-IP for its rate limiters), body and request.cf (geo for
+    // stats).
+    if (url.pathname.startsWith("/api/")) {
+      const apiUrl = new URL(request.url);
+      apiUrl.pathname = url.pathname.slice("/api".length);
+      return env.API.fetch(new Request(apiUrl, request));
+    }
 
     if (request.method === "GET" && PAGE_PATH_PATTERN.test(url.pathname)) {
       // Internal rewrite, not an HTTP redirect - the address bar stays at

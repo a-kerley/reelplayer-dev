@@ -19,13 +19,21 @@
     "binding": "ASSETS",
     // Only the paths src/index.js actually handles run the Worker first: the
     // builder's password gate ("/", "/index.html") and the /p/<slug> page
-    // rewrite. Everything else (player, css, js, fonts) is served as a plain
+    // rewrite, plus /api/* forwarding. Everything else (player, css, js,
+    // fonts) is served as a plain
     // static asset - free and uncounted, whereas running the script first
     // made every embed load cost ~20 metered Worker requests. /index (the
     // clean-URL form) needs no entry: asset handling 307s it to "/", which
     // is gated.
-    "run_worker_first": ["/", "/index.html", "/p/*"]
+    "run_worker_first": ["/", "/index.html", "/p/*", "/api/*"]
   },
+  // /api/* is forwarded to the reelplayer-api Worker (worker/) over this
+  // internal binding, so the builder, player and pages call the API on
+  // their own origin - no CORS, and one origin for Cloudflare Access's
+  // session cookie to cover. The API's own workers.dev URL still works.
+  "services": [
+    { "binding": "API", "service": "reelplayer-api" }
+  ],
   // Failed builder-password attempts per IP (src/index.js) - the IP is only
   // the in-memory counting key, never stored. period must be 10 or 60.
   "ratelimits": [

@@ -1,10 +1,11 @@
 // config.js - single source of truth for external service URLs.
 //
-// Update PROD_WORKER_BASE_URL after deploying the Cloudflare Worker in
-// worker/ (see worker/README.md). Both player.html and
-// embedExporter.js/embedManager.js import WORKER_BASE_URL so there's
-// exactly one place to change it.
-const PROD_WORKER_BASE_URL = "https://reelplayer-api.ali-27a.workers.dev";
+// Same-origin: the site Worker (src/index.js) forwards /api/* to the
+// reelplayer-api Worker over a service binding. Root-relative, so it works
+// on whichever host served the page (custom domain or workers.dev) - every
+// caller is a fetch from our own builder/player/page, never from markup
+// placed on a third-party site.
+const PROD_WORKER_BASE_URL = "/api";
 
 // dev-server.py serves the builder/player from localhost - when it does,
 // point at a Worker also running locally (`npx wrangler dev` from worker/,
