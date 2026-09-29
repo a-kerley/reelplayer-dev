@@ -73,4 +73,10 @@ requiring the client to make a second request.
   forwards `/api/*` to this Worker over a service binding and redirects the
   builder page from the public hosts to reels-admin. Adding a custom domain
   needs a local `npx wrangler deploy` (the Workers Builds token can't create
-  DNS records) - everything else deploys on push.
+  DNS records) - everything else *in the static site* deploys on push.
+- **This API Worker (`reelplayer-api`, `worker/src/index.js`) does NOT
+  deploy on push.** Any change here needs a manual
+  `npx wrangler deploy --config worker/wrangler.toml` from the repo root -
+  until then the live API runs the old code, and a builder change that
+  depends on a new route just 404s (happened with the multipart upload
+  routes). Pushing only redeploys the static site.
