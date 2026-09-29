@@ -79,7 +79,8 @@
 //                               orphans a reference (see findMediaReferences()).
 //   GET    /media/usages      - password-gated, ?key=<key>, read-only preview of exactly what
 //                               that rewrite above would touch - {matches: [{key, type, title}]}
-//   DELETE /media/delete      - password-gated, ?key=<key>
+//   DELETE /media/delete      - password-gated, ?key=<key>. Also blanks every reel/page/card field
+//                               holding the file's exact URL, recording it as `<field>Deleted` -> {ok, cleared}
 //   POST   /stats/:type/:id   - public, body {event, sessionId, trackIndex?, trackTitle?,
 //                               listenSeconds?}; :type is "reel", "page", or "card", :id whatever
 //                               the embed loaded (hash, `live-<id>`, slug). No-ops (200, no write)
@@ -1213,6 +1214,51 @@ async function findMediaReferences(env, urlSubstring) {
   return matches;
 }
 
+// After a media file is deleted, blank every field whose value is exactly its
+// URL and record the old URL beside it as `<field>Deleted`, so the builder can
+// show "file deleted" on the now-empty field. Parses and walks the JSON (unlike
+// rewriteMediaReferences' text replace) because clearing needs to know which
+// field held the URL. Exact-match only: a URL embedded inside a longer string
+// (e.g. a CSS url(...)) is still reported by /media/usages but not cleared.
+function clearUrlInTree(node, url) {
+  let count = 0;
+  if (Array.isArray(node)) {
+    for (const item of node) count += clearUrlInTree(item, url);
+  } else if (node && typeof node === "object") {
+    for (const k of Object.keys(node)) {
+      if (node[k] === url) {
+        node[k] = "";
+        node[`${k}Deleted`] = url;
+        count++;
+      } else {
+        count += clearUrlInTree(node[k], url);
+      }
+    }
+  }
+  return count;
+}
+
+async function clearMediaReferences(env, url) {
+  const list = await env.REELS.list({ prefix: "" });
+  let cleared = 0;
+  for (const key of list.keys) {
+    if (key.name.startsWith("stat_")) continue;
+    const value = await env.REELS.get(key.name);
+    if (!value || !value.includes(url)) continue;
+    let parsed;
+    try {
+      parsed = JSON.parse(value);
+    } catch {
+      continue;
+    }
+    const n = clearUrlInTree(parsed, url);
+    if (!n) continue;
+    await env.REELS.put(key.name, JSON.stringify(parsed));
+    cleared += n;
+  }
+  return cleared;
+}
+
 // After a media file's R2 key changes (rename or move - same worker
 // operation, see POST /media/rename), rewrite every reference to its old
 // URL found by findMediaReferences() to the new one, in place. A plain
@@ -1400,7 +1446,8 @@ async function rewriteMediaReferences(env, fromUrl, toUrl) {
         return jsonResponse({ error: "Invalid key" }, 400);
       }
       await env.MEDIA.delete(key);
-      return jsonResponse({ ok: true });
+      const cleared = await clearMediaReferences(env, `${R2_PUBLIC_URL}/${key}`);
+      return jsonResponse({ ok: true, cleared });
     }
 
     return jsonResponse({ error: "Not found" }, 404);

@@ -258,6 +258,7 @@ export function createExpandableModeSettings(reel, onChange, onPasteApplied) {
     id: 'projectTitleImage',
     label: 'Collapsed Banner Image URL:',
     value: reel.projectTitleImage || '',
+    deletedUrl: reel.projectTitleImageDeleted,
     placeholder: 'https://example.com/title-image.jpg',
     tooltip: 'Shown in place of the reel title when the player is collapsed',
     pickerOptions: {
@@ -285,6 +286,7 @@ export function createExpandableModeSettings(reel, onChange, onPasteApplied) {
     id: 'playerClosedIdleVideo',
     label: 'Fade to idle video when paused & collapsed',
     value: reel.playerClosedIdleVideo || '',
+    deletedUrl: reel.playerClosedIdleVideoDeleted,
     placeholder: 'https://example.com/idle-video.mp4',
     tooltip: 'When playback stops and the player is collapsed, fade in the idle video below instead of the normal collapsed banner. Fallback order: this video, then the collapsed banner image, then the current track\'s background',
     pickerOptions: {

@@ -443,6 +443,7 @@ function createBannerImageConfig(block, onChange, refreshPreview) {
     id: `${block.blockId}-imageUrl`,
     label: "Image:",
     value: block.imageUrl,
+    deletedUrl: block.imageUrlDeleted,
     placeholder: "Paste an image URL or select from Media Library",
     tooltip: "The banner image shown for this block, at full content width.",
     pickerOptions: {
@@ -1840,6 +1841,7 @@ function createImageConfig(block, onChange, refreshPreview) {
     id: `${block.blockId}-imageUrl`,
     label: "Image:",
     value: block.imageUrl,
+    deletedUrl: block.imageUrlDeleted,
     placeholder: "Paste an image URL or select from Media Library",
     tooltip: "The image shown for this block.",
     pickerOptions: {
@@ -2333,6 +2335,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     id: `${block.blockId}-ev-closedBgImage`,
     label: "Collapsed Image:",
     value: block.closedBgImage || "",
+    deletedUrl: block.closedBgImageDeleted,
     placeholder: "Paste an image URL or select from Media Library",
     tooltip: "Custom image shown behind the collapsed video, used when Collapsed Background is set to Custom image.",
     pickerOptions: {
@@ -2435,6 +2438,7 @@ function createEmbeddedVideoConfig(block, page, onChange, refreshPreview) {
     id: `${block.blockId}-ev-overlayImage`,
     label: "Overlay Image:",
     value: block.overlayImage || "",
+    deletedUrl: block.overlayImageDeleted,
     placeholder: "Paste an image URL or select from Media Library",
     tooltip: "Image shown on top of the collapsed video, used when Overlay is set to Image.",
     pickerOptions: {

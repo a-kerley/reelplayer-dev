@@ -395,7 +395,7 @@ export function createClearButton({ onClick }) {
  * @param {Function} options.onInput - Input event handler
  * @returns {{row: HTMLDivElement, input: HTMLInputElement}}
  */
-export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onPickerClick = null, onInput = null, toggle = null }) {
+export function createUrlInputRow({ id, label, value = "", placeholder = "", tooltip = "", pickerOptions = null, onPickerClick = null, onInput = null, toggle = null, deletedUrl = "" }) {
   const row = document.createElement("div");
   row.className = "color-row";
 
@@ -431,6 +431,12 @@ export function createUrlInputRow({ id, label, value = "", placeholder = "", too
   input.type = "url";
   input.value = value;
   input.placeholder = placeholder;
+  // A Media Library delete blanked this field and left the old URL in
+  // `<field>Deleted` - show it as a red placeholder until something is entered.
+  if (deletedUrl && !value) {
+    input.placeholder = `File deleted: ${deletedUrl.split("/").pop()}`;
+    input.classList.add("url-deleted");
+  }
   input.style.cssText = "flex:1;padding:0.5rem;border:1px solid #444;border-radius:4px;font-size:var(--builder-text-md);background:#1e1e1e;color:#fff;";
 
   row.appendChild(input);

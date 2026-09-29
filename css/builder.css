@@ -1304,6 +1304,11 @@ body {
    COLOR PICKERS & EFFECTS SECTION
    ============================================== */
 
+.builder-app input.url-deleted::placeholder {
+  color: #dc3545;
+  opacity: 1;
+}
+
 .color-row {
   display: flex;
   align-items: center;

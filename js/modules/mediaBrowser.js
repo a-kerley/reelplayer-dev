@@ -970,16 +970,16 @@ export async function renderMediaBrowser(container, options = {}) {
       + (matches.length > 10 ? `, and ${matches.length - 10} more` : "");
   }
 
-  // Unlike a move, a delete can't be self-healed by the Worker - anything
-  // still pointing at the file just breaks - so the usage warning is folded
-  // into the delete confirmation itself rather than being a second dialog.
+  // The Worker blanks every exact-URL reference on delete (see
+  // clearMediaReferences()), so the usage warning is folded into the delete
+  // confirmation itself rather than being a second dialog.
   async function confirmDelete(label, keys) {
     beginBusy();
     const matches = await usagesOf(keys);
     endBusy();
     if (matches === null) return false;
     const warning = matches.length
-      ? ` ${matches.length} reel(s)/page(s) still use it and will break: ${describeUsages(matches)}.`
+      ? ` ${matches.length} reel(s)/page(s) still use it and will have that field cleared: ${describeUsages(matches)}.`
       : "";
     return dialog.confirm(`Delete ${label}?${warning} This cannot be undone.`, "Delete", "Cancel");
   }

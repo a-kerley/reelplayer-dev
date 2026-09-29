@@ -448,6 +448,7 @@ export function initPagesController() {
         id: "pageBackgroundImage",
         label: "Image:",
         value: page.backgroundImage || "",
+        deletedUrl: page.backgroundImageDeleted,
         placeholder: "Paste an image URL or select from Media Library",
         tooltip: "Image shown full-page behind this page's content, cropped/blurred per the settings below.",
         pickerOptions: {
