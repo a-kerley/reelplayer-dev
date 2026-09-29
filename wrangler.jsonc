@@ -17,9 +17,13 @@
     // avoided by having embedExporter.js generate the canonical extensionless
     // url directly, so embeds never hit the redirect either.
     "binding": "ASSETS",
-    // Route every request through src/index.js first, so it can gate the
-    // builder's entry page before any asset is served. src/index.js passes
-    // everything non-gated straight through to env.ASSETS.fetch().
-    "run_worker_first": true
+    // Only the paths src/index.js actually handles run the Worker first: the
+    // builder's password gate ("/", "/index.html") and the /p/<slug> page
+    // rewrite. Everything else (player, css, js, fonts) is served as a plain
+    // static asset - free and uncounted, whereas running the script first
+    // made every embed load cost ~20 metered Worker requests. /index (the
+    // clean-URL form) needs no entry: asset handling 307s it to "/", which
+    // is gated.
+    "run_worker_first": ["/", "/index.html", "/p/*"]
   }
 }

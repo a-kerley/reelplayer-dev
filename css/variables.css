@@ -3,7 +3,9 @@
    Central configuration for all player styles
    ======================================== */
 
-@import url('https://fonts.googleapis.com/css2?family=Inter:ital,opsz,wght@0,14..32,100..900;1,14..32,100..900&family=Open+Sans:ital,wght@0,300..800;1,300..800&display=swap');
+/* Self-hosted, never fonts.googleapis.com - loading from Google hands every
+   visitor's IP to Google without consent (GDPR). See scripts/self-host-fonts.py. */
+@import url('../assets/fonts/inter.css');
 
 :root {
   /* ========================================

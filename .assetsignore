@@ -18,3 +18,17 @@ node_modules
 # config instead of worker/wrangler.toml - see that file's own README for
 # why `--config wrangler.toml` should be passed explicitly whenever unsure).
 .claude
+# Project internals - none needed by the builder/player/page at runtime, and
+# publicly served otherwise (the whole repo root is the assets directory):
+# docs and CLAUDE.md map out the auth scheme and architecture for anyone
+# curious. Keep this list to non-runtime files only.
+*.md
+docs
+scripts
+src
+testHTMLpages
+graphify-out
+.vscode
+dev-server.py
+package.json
+package-lock.json
