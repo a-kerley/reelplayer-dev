@@ -43,17 +43,20 @@ export function summarizeStats(events) {
 
   const totalListenSeconds = plays.reduce((sum, p) => sum + (p.listenSeconds || 0), 0);
 
+  // Grouped by title, not playlist position - stats span republishes, and a
+  // reordered playlist would otherwise lump different tracks into one row.
+  // Index is only the fallback for an untitled track.
   const perTrackMap = new Map();
   plays.forEach((p) => {
-    if (typeof p.trackIndex !== "number") return;
-    const existing = perTrackMap.get(p.trackIndex) || { trackTitle: p.trackTitle || `Track ${p.trackIndex + 1}`, count: 0, totalListenSeconds: 0 };
+    if (typeof p.trackIndex !== "number" && !p.trackTitle) return;
+    const key = p.trackTitle || `#${p.trackIndex}`;
+    const existing = perTrackMap.get(key) || { trackTitle: p.trackTitle || `Track ${p.trackIndex + 1}`, count: 0, totalListenSeconds: 0 };
     existing.count += 1;
     existing.totalListenSeconds += p.listenSeconds || 0;
-    perTrackMap.set(p.trackIndex, existing);
+    perTrackMap.set(key, existing);
   });
-  const perTrack = [...perTrackMap.entries()]
-    .sort((a, b) => a[0] - b[0])
-    .map(([trackIndex, data]) => ({ trackIndex, ...data }));
+  const perTrack = [...perTrackMap.values()]
+    .sort((a, b) => b.count - a.count || b.totalListenSeconds - a.totalListenSeconds);
 
   const sessionMap = new Map();
   events.forEach((e) => {
