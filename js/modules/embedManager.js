@@ -28,7 +28,7 @@ function formatDate(iso) {
 // entries here. Grouped by its draft id (sourceReelId) - one card per reel,
 // its versions underneath - since stats are per reel, not per version.
 // Legacy publishes with no sourceReelId stand alone as their own group.
-function groupByReel(entries) {
+export function groupByReel(entries) {
   const groups = new Map();
   entries.forEach((entry) => {
     const key = entry.sourceReelId || entry.id;
