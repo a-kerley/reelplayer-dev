@@ -253,7 +253,12 @@ thumb, clipped by the track's own `overflow:hidden`), so it needed no
 JS-tracked state at all - simpler than the hand-rolled version it replaced.
 Default to using daisyUI's real classes/markup going forward now that the
 pipeline exists; hand-porting is still the fallback for anything daisyUI
-doesn't have a component for. This is the **first Node/npm dependency
+doesn't have a component for. **Exception: daisyUI's `btn`.** `css/player.css`
+(loaded by the builder too) has an unlayered `button {}` rule (reel accent
+background, white text), and unlayered CSS beats daisyUI's `@layer`ed rules
+regardless of specificity - a `btn btn-primary` renders as a washed-out
+accent-coloured block. Use an existing builder button class instead
+(`.page-block-add-btn` for a small outlined action). This is the **first Node/npm dependency
 this repo has ever had** - everything else is still plain
 `<script type="module">` with no bundler (see top of this file). Scope is
 deliberately narrow: a CSS build step only, never touching how the app's

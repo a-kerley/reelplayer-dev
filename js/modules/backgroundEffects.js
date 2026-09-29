@@ -545,13 +545,13 @@ function createVideoStartEditor(track, onCommit) {
   readout.style.cssText = "font-variant-numeric:tabular-nums;min-width:9em;";
   const setBtn = document.createElement("button");
   setBtn.type = "button";
-  setBtn.className = "btn btn-primary btn-xs";
+  setBtn.className = "page-block-add-btn";
   setBtn.textContent = "Set start here";
   setBtn.title = "Start this track's video from the frame shown.";
   setBtn.disabled = true;
   const resetBtn = document.createElement("button");
   resetBtn.type = "button";
-  resetBtn.className = "btn btn-ghost btn-xs";
+  resetBtn.className = "page-block-add-btn";
   resetBtn.textContent = "Reset";
   resetBtn.title = "Start this track's video from the beginning.";
   const startLabel = document.createElement("span");
