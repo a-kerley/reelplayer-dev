@@ -5,11 +5,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>My Reel</title>
     <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Material+Symbols+Outlined" />
-    <!-- Pickr Color Picker -->
-    <link rel="stylesheet" href="https://cdn.jsdelivr.net/npm/@simonwep/pickr/dist/themes/nano.min.css"/>
-    <script src="https://cdn.jsdelivr.net/npm/@simonwep/pickr"></script>
-    <!-- Lottie Web -->
-    <script src="https://unpkg.com/@dotlottie/player-component@latest/dist/dotlottie-player.mjs" type="module"></script>
+    <!-- Pickr Color Picker - vendored + pinned (see vendor/README.md) -->
+    <link rel="stylesheet" href="vendor/pickr-1.10.2/nano.min.css"/>
+    <script src="vendor/pickr-1.10.2/pickr.min.js"></script>
     <link rel="stylesheet" href="css/variables.css" />
     <link rel="stylesheet" href="css/layout.css" />
     <link rel="stylesheet" href="css/player.css" />
@@ -113,7 +111,7 @@
     </div>
     <!-- === Builder UI (end) === -->
 
-    <script src="https://unpkg.com/wavesurfer.js@7"></script>
+    <script src="vendor/wavesurfer-7.12.12/wavesurfer.min.js"></script>
     <script type="module" src="js/main.js"></script>
   </body>
 </html>
