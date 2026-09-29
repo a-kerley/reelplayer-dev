@@ -40,6 +40,27 @@ export class DialogSystem {
   }
 
   /**
+   * Shows a dialog with any number of choices.
+   * @param {string} message - The message to display
+   * @param {Array<{text: string, value: *, type?: 'primary'|'secondary'|'danger'}>} choices -
+   *   the first choice is also what Escape/overlay-click resolves to, so make it the "cancel" one
+   * @returns {Promise<*>} - Resolves to the chosen choice's value
+   */
+  choose(message, choices) {
+    return new Promise((resolve) => {
+      this.createDialog({
+        type: 'confirm',
+        message,
+        buttons: choices.map(c => ({
+          text: c.text,
+          type: c.type || 'secondary',
+          onClick: () => { this.closeDialog(); resolve(c.value); }
+        }))
+      });
+    });
+  }
+
+  /**
    * Shows an alert dialog
    * @param {string} message - The message to display
    * @param {string} buttonText - Text for the button (default: "OK")

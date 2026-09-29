@@ -65,9 +65,10 @@
 //                               /drafts (reel drafts), since cards are id-based like reels, not
 //                               slug-based like pages
 //   DELETE /drafts/cards/:id  - password-gated, removes the entry
-//   POST   /media/upload      - password-gated, ?key=<key>, body = raw file bytes
+//   POST   /media/upload      - password-gated, ?key=<key>[&overwrite=1], body = raw file bytes.
+//                               409 if the key exists and overwrite isn't set
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
-//   POST   /media/rename      - password-gated, body {from, to}. Also scans every reel/page
+//   POST   /media/rename      - password-gated, body {from, to}, 409 if `to` exists. Also scans every reel/page
 //                               (published and draft) for a stored URL pointing at `from` and
 //                               rewrites it to `to` in place - a rename/move never silently
 //                               orphans a reference (see findMediaReferences()).
@@ -1236,6 +1237,11 @@ async function rewriteMediaReferences(env, fromUrl, toUrl) {
       if (!isValidMediaKey(key)) {
         return jsonResponse({ error: "Invalid key" }, 400);
       }
+      // Never silently overwrite - a same-named upload replaces the file under
+      // every reel/page using it, so the builder has to ask for that explicitly.
+      if (new URL(request.url).searchParams.get("overwrite") !== "1" && await env.MEDIA.head(key)) {
+        return jsonResponse({ error: "File already exists" }, 409);
+      }
       const contentType = request.headers.get("Content-Type") || "application/octet-stream";
 
       let uploadBody = request.body;
@@ -1319,6 +1325,9 @@ async function rewriteMediaReferences(env, fromUrl, toUrl) {
       const { from, to } = body || {};
       if (!isValidMediaKey(from) || !isValidMediaKey(to)) {
         return jsonResponse({ error: "Invalid key" }, 400);
+      }
+      if (from !== to && await env.MEDIA.head(to)) {
+        return jsonResponse({ error: "Destination already exists" }, 409);
       }
       const existing = await env.MEDIA.get(from);
       if (!existing) {

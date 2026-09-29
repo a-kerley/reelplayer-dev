@@ -60,6 +60,17 @@ function folderOf(key) {
   return parts.length ? parts.join('/') + '/' : '';
 }
 
+// "song.mp3" -> "song (2).mp3", "song (3).mp3", ... - first one not in
+// `takenKeys` within `folder`.
+function uniqueFileName(folder, name, takenKeys) {
+  const dot = name.lastIndexOf('.');
+  const stem = dot > 0 ? name.slice(0, dot) : name;
+  const ext = dot > 0 ? name.slice(dot) : '';
+  let candidate = name;
+  for (let n = 2; takenKeys.has(`${folder}${candidate}`); n++) candidate = `${stem} (${n})${ext}`;
+  return candidate;
+}
+
 // R2 has no real concept of a folder - one only shows up in the sidebar
 // because some file's key happens to start with that prefix (see
 // computeFolders()). A brand-new folder with nothing in it yet has no key
@@ -123,13 +134,18 @@ async function fetchAllR2Files() {
   }));
 }
 
-async function uploadFile(folder, file) {
-  const key = `${folder}${file.name}`;
-  const response = await apiFetch(`/media/upload?key=${encodeURIComponent(key)}`, {
+// The Worker refuses to overwrite an existing key unless `overwrite` is set
+// - see renderUploadZone()'s Replace/Keep both prompt.
+async function uploadFile(folder, file, name = file.name, overwrite = false) {
+  const key = `${folder}${name}`;
+  const response = await apiFetch(`/media/upload?key=${encodeURIComponent(key)}${overwrite ? "&overwrite=1" : ""}`, {
     method: "POST",
     headers: { "Content-Type": file.type || "application/octet-stream" },
     body: file
   });
+  if (response.status === 409) {
+    throw new Error(`"${name}" already exists in this folder.`);
+  }
   if (!response.ok) {
     throw new Error(`Failed to upload ${file.name} (status ${response.status}).`);
   }
@@ -141,6 +157,9 @@ async function renameFile(from, to) {
     headers: { "Content-Type": "application/json" },
     body: JSON.stringify({ from, to })
   });
+  if (response.status === 409) {
+    throw new Error(`"${baseName(to)}" already exists in that folder.`);
+  }
   if (!response.ok) {
     throw new Error(`Failed to rename file (status ${response.status}).`);
   }
@@ -807,10 +826,17 @@ export async function renderMediaBrowser(container, options = {}) {
   // whole checkbox selection) and drag-and-drop - both are just this same
   // rename-to-a-new-prefix operation, one call per file.
   async function moveFiles(keys, destFolder) {
+    const takenKeys = new Set(r2Files.map(f => f.key));
+    const clashing = [];
     const toMove = keys.filter((key) => {
       const file = state.files.find(f => f.key === key);
-      return file && !file.readOnly && folderOf(file.key) !== destFolder;
+      if (!file || file.readOnly || folderOf(file.key) === destFolder) return false;
+      if (takenKeys.has(`${destFolder}${file.name}`)) { clashing.push(file.name); return false; }
+      return true;
     });
+    if (clashing.length) {
+      await dialog.alert(`${clashing.join(", ")} ${clashing.length === 1 ? "wasn't" : "weren't"} moved - "${destFolder || "Unfiled"}" already has a file with that name. Rename first to move ${clashing.length === 1 ? "it" : "them"}.`);
+    }
     if (toMove.length === 0) return;
     if (!(await confirmIfInUse(toMove))) return;
 
@@ -862,6 +888,15 @@ export async function renderMediaBrowser(container, options = {}) {
   async function renameFolder(path, newName) {
     const parentPath = folderOf(path.slice(0, -1));
     const newPrefix = `${parentPath}${newName}/`;
+    // Would merge into an existing folder, where same-named files would
+    // collide - refuse outright rather than half-merge.
+    if (newName.includes("/") || r2Files.some(f => f.key.startsWith(newPrefix))) {
+      await dialog.alert(newName.includes("/")
+        ? 'Folder names can\'t contain "/".'
+        : `A folder named "${newName}" already exists here.`);
+      renderSidebarOnly();
+      return;
+    }
     const filesToMove = state.files.filter(f => f.key.startsWith(path));
     if (!(await confirmIfInUse(filesToMove.map(f => f.key)))) return;
     beginBusy();
@@ -1102,14 +1137,36 @@ export async function renderMediaBrowser(container, options = {}) {
       const files = Array.from(fileList);
       if (!files.length) return;
 
+      // r2Files, not state.files - a picker's extension filter could hide
+      // the very file this would overwrite.
+      const takenKeys = new Set(r2Files.map(f => f.key));
+      const clashes = files.filter(f => takenKeys.has(`${targetFolder}${f.name}`));
+      let clashMode = null;
+      if (clashes.length) {
+        const names = clashes.slice(0, 5).map(f => f.name).join(", ")
+          + (clashes.length > 5 ? `, and ${clashes.length - 5} more` : "");
+        clashMode = await dialog.choose(
+          `${names} already ${clashes.length === 1 ? "exists" : "exist"} in this folder. Replacing changes every reel/page that uses ${clashes.length === 1 ? "it" : "them"}.`,
+          [
+            { text: "Cancel", value: null },
+            { text: "Keep Both", value: "keep", type: "primary" },
+            { text: "Replace", value: "replace", type: "danger" }
+          ]
+        );
+        if (!clashMode) return;
+      }
+
       const failures = [];
       const succeeded = [];
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        zone.textContent = `Uploading ${i + 1} of ${files.length}: ${file.name}...`;
+        const clashes = takenKeys.has(`${targetFolder}${file.name}`);
+        const name = clashes && clashMode === "keep" ? uniqueFileName(targetFolder, file.name, takenKeys) : file.name;
+        zone.textContent = `Uploading ${i + 1} of ${files.length}: ${name}...`;
         try {
-          await uploadFile(targetFolder, file);
-          succeeded.push(file.name);
+          await uploadFile(targetFolder, file, name, clashes && clashMode === "replace");
+          takenKeys.add(`${targetFolder}${name}`);
+          succeeded.push(name);
         } catch (error) {
           failures.push(`${file.name}: ${error.message}`);
         }
@@ -1384,8 +1441,20 @@ export async function renderMediaBrowser(container, options = {}) {
       items.push({
         label: "Rename",
         onClick: async () => {
-          const newName = await promptForText("Rename file", file.name);
+          let newName = await promptForText("Rename file", file.name);
           if (!newName || newName === file.name) return;
+          if (newName.includes("/")) {
+            dialog.alert('File names can\'t contain "/" - use "Move to..." to change folders.');
+            return;
+          }
+          // Keep the extension if it was dropped - fileType() and the
+          // player's own media handling both key off it.
+          const ext = `.${extOf(file.name)}`;
+          if (file.name.includes(".") && !newName.toLowerCase().endsWith(ext.toLowerCase())) newName += ext;
+          if (r2Files.some(f => f.key === `${folderOf(file.key)}${newName}`)) {
+            dialog.alert(`"${newName}" already exists in this folder.`);
+            return;
+          }
           if (!(await confirmIfInUse([file.key]))) return;
           beginBusy();
           try {
