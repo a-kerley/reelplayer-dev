@@ -855,12 +855,19 @@ export async function renderMediaBrowser(container, options = {}) {
     }
   }
 
-  // Keys carried by an in-progress drag - a dragged file that's part of the
-  // active multi-selection drags the whole selection, otherwise just itself.
-  function dragKeysFor(file) {
-    return state.selected.has(file.key) && state.selected.size > 1
-      ? Array.from(state.selected)
-      : [file.key];
+  // What a drag or right-click menu on `file` acts on - the whole visible
+  // selection if `file` is part of it, otherwise just `file` itself.
+  function targetKeysFor(file) {
+    const selection = visibleSelection();
+    return selection.includes(file.key) && selection.length > 1 ? selection : [file.key];
+  }
+
+  // The checked files actually on screen right now. The selection survives
+  // folder changes and search (a multi-pick picker relies on that), so
+  // anything a bulk Move/Delete acts on must go through this - otherwise
+  // files checked in a folder you've since left get swept up unseen.
+  function visibleSelection() {
+    return visibleFiles().map(f => f.key).filter(key => state.selected.has(key));
   }
 
   function setupFolderDropTarget(row, path) {
@@ -1186,7 +1193,7 @@ export async function renderMediaBrowser(container, options = {}) {
     link.onclick = (e) => { e.preventDefault(); input.click(); };
     input.onchange = () => handleFiles(input.files);
     // types.includes("Files") excludes an internal file-row/card drag (see
-    // dragKeysFor()'s "application/x-media-keys" payload) from lighting up
+    // targetKeysFor()'s "application/x-media-keys" payload) from lighting up
     // this zone as a drop target - that drag is for moving between
     // folders, not uploading, and dataTransfer.files is empty for it
     // anyway, but skipping the dragover highlight avoids a confusing flash
@@ -1292,7 +1299,7 @@ export async function renderMediaBrowser(container, options = {}) {
       row.draggable = true;
       row.addEventListener("dragstart", (e) => {
         e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("application/x-media-keys", JSON.stringify(dragKeysFor(file)));
+        e.dataTransfer.setData("application/x-media-keys", JSON.stringify(targetKeysFor(file)));
       });
       // Right-click the row itself instead of a dedicated "..." button -
       // same convention as the folder rows above and
@@ -1425,9 +1432,7 @@ export async function renderMediaBrowser(container, options = {}) {
   // otherwise. Rename/Copy URL don't have a sane multi-target meaning, so
   // they're only offered for a single target.
   function showRowMenu(file, e) {
-    const keys = state.selected.has(file.key) && state.selected.size > 1
-      ? Array.from(state.selected)
-      : [file.key];
+    const keys = targetKeysFor(file);
     const multi = keys.length > 1;
 
     const items = [];
@@ -1510,7 +1515,7 @@ export async function renderMediaBrowser(container, options = {}) {
         card.draggable = true;
         card.addEventListener("dragstart", (e) => {
           e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("application/x-media-keys", JSON.stringify(dragKeysFor(file)));
+          e.dataTransfer.setData("application/x-media-keys", JSON.stringify(targetKeysFor(file)));
         });
       }
 
