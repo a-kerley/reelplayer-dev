@@ -17,6 +17,13 @@ import { WORKER_BASE_URL } from "../config.js";
 // something this mechanism tries to solve.
 const OPERATOR_FLAG_KEY = "reelplayer_operator";
 
+// The builder (reels-admin.boxedape.com) and the public player/pages
+// (reels.boxedape.com) are different origins, so localStorage alone can't
+// carry the flag across - it's also written as a cookie for the whole
+// boxedape.com domain. Holds nothing but "1". localStorage stays for local
+// dev and the legacy workers.dev host, where the cookie can't be shared.
+const OPERATOR_COOKIE_DOMAIN = "boxedape.com";
+
 export function markAsOperatorBrowser() {
   try {
     localStorage.setItem(OPERATOR_FLAG_KEY, "1");
@@ -24,9 +31,13 @@ export function markAsOperatorBrowser() {
     // Private-browsing/storage-disabled - fine, just means this browser
     // won't get excluded; not worth surfacing.
   }
+  if (window.location.hostname.endsWith(OPERATOR_COOKIE_DOMAIN)) {
+    document.cookie = `${OPERATOR_FLAG_KEY}=1; Domain=${OPERATOR_COOKIE_DOMAIN}; Path=/; Max-Age=31536000; SameSite=Lax; Secure`;
+  }
 }
 
 function isOperatorBrowser() {
+  if (document.cookie.split("; ").includes(`${OPERATOR_FLAG_KEY}=1`)) return true;
   try {
     return localStorage.getItem(OPERATOR_FLAG_KEY) === "1";
   } catch {

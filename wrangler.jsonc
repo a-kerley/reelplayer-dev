@@ -8,6 +8,17 @@
   "name": "reelplayer-app",
   "compatibility_date": "2024-11-01",
   "main": "src/index.js",
+  // Two hostnames, one Worker: reels.boxedape.com is the public surface
+  // (player embeds, /p/<slug> pages, public API reads + stats beacons);
+  // reels-admin.boxedape.com is the builder, behind Cloudflare Access for
+  // the whole host. Separate origins so nothing on the embeddable public
+  // origin can ever reach the builder's session. workers.dev stays on so
+  // embed codes/page links issued before the custom domains keep working.
+  "workers_dev": true,
+  "routes": [
+    { "pattern": "reels.boxedape.com", "custom_domain": true },
+    { "pattern": "reels-admin.boxedape.com", "custom_domain": true }
+  ],
   "assets": {
     "directory": "./",
     // Deliberately left at the default html_handling ("auto-trailing-slash")

@@ -1,12 +1,12 @@
 // embedExporter.js - Handles exporting embed code for Squarespace and other platforms
-import { WORKER_BASE_URL } from "../config.js";
+import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
 import { hashContent } from "./contentHash.js";
 
 export class EmbedExporter {
   constructor() {
-    this.baseURL = window.location.origin + window.location.pathname;
+    this.baseURL = `${PUBLIC_APP_ORIGIN}/`;
   }
 
   // Validates the reel, then POSTs it to the Worker and returns
@@ -243,6 +243,5 @@ export const embedExporter = new EmbedExporter();
  * same extensionless "player" convention as js/modules/pagePublish.js's
  * publicPageUrl()/js/modules/cardPublish.js's publicCardPlayerUrl(). */
 export function publicReelPlayerUrl(reelId) {
-  const baseURL = (window.location.origin + window.location.pathname).replace(/index\.html$/, "");
-  return `${baseURL}player?id=${reelId}`;
+  return `${PUBLIC_APP_ORIGIN}/player?id=${reelId}`;
 }

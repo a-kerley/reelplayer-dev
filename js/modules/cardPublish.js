@@ -3,7 +3,7 @@
 // postReelToWorker(). Modeled on the reel side (content-hash id, no slug/
 // rename machinery), not js/modules/pagePublish.js - see
 // docs/project-cards/PLAN.md §1/§4.
-import { WORKER_BASE_URL } from "../config.js";
+import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
 
@@ -69,5 +69,5 @@ export async function publishCard(card) {
 // extensionless redirect hop. &type=card is required: without it
 // player.html treats the id as a reel's and fails to load it.
 export function publicCardPlayerUrl(cardId) {
-  return `${window.location.origin}${window.location.pathname.replace("index.html", "")}player?id=${cardId}&type=card`;
+  return `${PUBLIC_APP_ORIGIN}/player?id=${cardId}&type=card`;
 }

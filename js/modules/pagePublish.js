@@ -6,7 +6,7 @@
 // previously-published one (if renaming) to clean up the old entry and
 // reject genuine collisions. See worker/src/index.js's POST /pages/:slug
 // handler for the other half of this contract.
-import { WORKER_BASE_URL } from "../config.js";
+import { WORKER_BASE_URL, PUBLIC_APP_ORIGIN } from "../config.js";
 import { getBuilderPassword, clearBuilderPassword } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
 
@@ -60,8 +60,7 @@ export function isValidSlug(slug) {
  * boxedape.com/p/<slug>, not boxedape.com/page?slug=<slug> - see
  * src/index.js's PAGE_PATH_PATTERN rewrite for the other half of this. */
 export function publicPageUrl(slug) {
-  const baseURL = (window.location.origin + window.location.pathname).replace(/index\.html$/, "");
-  return `${baseURL}p/${slug}`;
+  return `${PUBLIC_APP_ORIGIN}/p/${slug}`;
 }
 
 /**

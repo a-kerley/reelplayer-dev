@@ -19,6 +19,15 @@ const isLocalDev = ["localhost", "127.0.0.1"].includes(window.location.hostname)
 
 export const WORKER_BASE_URL = isLocalDev ? "http://localhost:8787" : PROD_WORKER_BASE_URL;
 
+// Where published reels/pages/cards are publicly served, for every link the
+// builder generates (embed code, page links, card links). The builder itself
+// runs on reels-admin.boxedape.com behind Cloudflare Access, so its own
+// origin must never end up in something shared publicly. Local dev and the
+// legacy workers.dev host keep their own origin.
+export const PUBLIC_APP_ORIGIN = window.location.hostname.endsWith("boxedape.com")
+  ? "https://reels.boxedape.com"
+  : window.location.origin;
+
 // Base URL for the R2 bucket's public custom domain (connected via the R2
 // bucket's Settings > Custom Domains, fronted by Cloudflare's CDN - not the
 // pub-*.r2.dev dev URL, which is rate-limited and skips Cloudflare caching).
