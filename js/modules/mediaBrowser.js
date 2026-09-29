@@ -609,6 +609,29 @@ export async function renderMediaBrowser(container, options = {}) {
     gridBtn.title = "Show files as a grid of thumbnails";
     gridBtn.onclick = () => { state.viewMode = 'grid'; persistPrefs(); render(); };
 
+    // Grid has no column headers to click, so it gets its own sort control
+    // over the same sortField/sortDir state the list headers drive.
+    if (state.viewMode === 'grid') {
+      const sortSelect = document.createElement("select");
+      sortSelect.className = "builder-select";
+      sortSelect.title = "Sort files";
+      sortSelect.setAttribute("aria-label", "Sort files");
+      [
+        ['uploaded:desc', 'Newest first'], ['uploaded:asc', 'Oldest first'],
+        ['name:asc', 'Name A–Z'], ['name:desc', 'Name Z–A'],
+        ['size:desc', 'Largest first'], ['size:asc', 'Smallest first'],
+        ['type:asc', 'Type A–Z'], ['type:desc', 'Type Z–A'],
+        ['trackNumber:asc', 'Track # low–high'], ['trackNumber:desc', 'Track # high–low']
+      ].forEach(([value, label]) => sortSelect.add(new Option(label, value)));
+      sortSelect.value = `${state.sortField}:${state.sortDir}`;
+      sortSelect.onchange = () => {
+        [state.sortField, state.sortDir] = sortSelect.value.split(':');
+        persistPrefs();
+        renderMainOnly();
+      };
+      bar.appendChild(sortSelect);
+    }
+
     bar.append(listBtn, gridBtn);
     return bar;
   }
@@ -1287,6 +1310,60 @@ export async function renderMediaBrowser(container, options = {}) {
     return table;
   }
 
+  // Shared by list rows and grid cards so both views behave the same.
+  // Drag-to-folder and right-click menu (manage mode only). Right-clicking
+  // an item that's already part of a multi-checkbox selection operates on
+  // the whole selection (see showRowMenu); right-clicking outside it
+  // collapses the selection down to just this item first, like
+  // Finder/Explorer.
+  function wireManageActions(el, file) {
+    if (mode !== 'manage' || file.readOnly) return;
+    el.draggable = true;
+    el.addEventListener("dragstart", (e) => {
+      e.dataTransfer.effectAllowed = "move";
+      e.dataTransfer.setData("application/x-media-keys", JSON.stringify(targetKeysFor(file)));
+    });
+    el.oncontextmenu = (e) => {
+      e.preventDefault();
+      if (!state.selected.has(file.key)) {
+        state.selected.clear();
+        state.selected.add(file.key);
+        renderMainOnly();
+      }
+      showRowMenu(file, e);
+    };
+  }
+
+  function createFileCheckbox(file) {
+    const checkbox = document.createElement("input");
+    checkbox.type = "checkbox";
+    checkbox.disabled = file.readOnly;
+    checkbox.checked = state.selected.has(file.key);
+    checkbox.title = "Select this file";
+    checkbox.onclick = (e) => e.stopPropagation(); // don't also activate the grid card it sits on
+    checkbox.onchange = () => toggleSelected(file.key);
+    return checkbox;
+  }
+
+  function toggleSelected(key) {
+    if (state.selected.has(key)) state.selected.delete(key);
+    else state.selected.add(key);
+    renderMainOnly();
+  }
+
+  // Clicking a file's name (list) or card (grid).
+  function activateFile(file) {
+    if (mode === 'select' && multiple) {
+      // Checkbox-driven batch pick instead of pick-and-close - the
+      // caller's own UI (see onSelectionChange) confirms the actual add.
+      toggleSelected(file.key);
+    } else if (mode === 'select' && onSelect) {
+      onSelect(file.url);
+    } else {
+      window.open(file.url, '_blank', 'noopener');
+    }
+  }
+
   function renderRow(file) {
     const type = fileType(file.name);
     const row = document.createElement("tr");
@@ -1295,42 +1372,11 @@ export async function renderMediaBrowser(container, options = {}) {
     // them here doubles as "these are what you're about to act on."
     row.className = `media-browser-row${state.selected.has(file.key) ? ' selected' : ''}`;
 
-    if (mode === 'manage' && !file.readOnly) {
-      row.draggable = true;
-      row.addEventListener("dragstart", (e) => {
-        e.dataTransfer.effectAllowed = "move";
-        e.dataTransfer.setData("application/x-media-keys", JSON.stringify(targetKeysFor(file)));
-      });
-      // Right-click the row itself instead of a dedicated "..." button -
-      // same convention as the folder rows above and
-      // js/modules/sidebarList.js's item rows. Right-clicking a row that's
-      // already part of a multi-checkbox selection operates on the whole
-      // selection (see showRowMenu); right-clicking outside it collapses
-      // the selection down to just this row first, like Finder/Explorer.
-      row.oncontextmenu = (e) => {
-        e.preventDefault();
-        if (!state.selected.has(file.key)) {
-          state.selected.clear();
-          state.selected.add(file.key);
-          renderMainOnly();
-        }
-        showRowMenu(file, e);
-      };
-    }
+    wireManageActions(row, file);
 
     if (showCheckboxes) {
       const cb = document.createElement("td");
-      const checkbox = document.createElement("input");
-      checkbox.type = "checkbox";
-      checkbox.disabled = file.readOnly;
-      checkbox.checked = state.selected.has(file.key);
-      checkbox.title = "Select this file";
-      checkbox.onchange = () => {
-        if (checkbox.checked) state.selected.add(file.key);
-        else state.selected.delete(file.key);
-        renderMainOnly();
-      };
-      cb.appendChild(checkbox);
+      cb.appendChild(createFileCheckbox(file));
       row.appendChild(cb);
     }
 
@@ -1345,17 +1391,11 @@ export async function renderMediaBrowser(container, options = {}) {
     link.target = "_blank";
     link.rel = "noopener";
     link.textContent = file.name;
+    // Manage mode keeps the link's native behavior (new tab, cmd-click etc).
     link.onclick = (e) => {
-      if (mode === 'select' && multiple) {
-        // Checkbox-driven batch pick instead of pick-and-close - the
-        // caller's own UI (see onSelectionChange) confirms the actual add.
+      if (mode === 'select') {
         e.preventDefault();
-        if (state.selected.has(file.key)) state.selected.delete(file.key);
-        else state.selected.add(file.key);
-        renderMainOnly();
-      } else if (mode === 'select' && onSelect) {
-        e.preventDefault();
-        onSelect(file.url);
+        activateFile(file);
       }
     };
     nameTd.appendChild(link);
@@ -1509,20 +1549,24 @@ export async function renderMediaBrowser(container, options = {}) {
     files.forEach(file => {
       const type = fileType(file.name);
       const card = document.createElement("div");
-      card.className = "media-browser-card";
+      card.className = `media-browser-card${state.selected.has(file.key) ? ' selected' : ''}`;
+      card.title = file.name;
+      wireManageActions(card, file);
 
-      if (mode === 'manage' && !file.readOnly) {
-        card.draggable = true;
-        card.addEventListener("dragstart", (e) => {
-          e.dataTransfer.effectAllowed = "move";
-          e.dataTransfer.setData("application/x-media-keys", JSON.stringify(targetKeysFor(file)));
-        });
+      if (showCheckboxes) {
+        const checkbox = createFileCheckbox(file);
+        checkbox.classList.add("media-browser-card-check");
+        card.appendChild(checkbox);
       }
 
       const preview = document.createElement("div");
       preview.className = "media-browser-card-preview";
       if (type === 'image') {
-        preview.innerHTML = `<img src="${file.url}" alt="${file.name}" loading="lazy" />`;
+        const img = document.createElement("img");
+        img.src = file.url;
+        img.alt = file.name;
+        img.loading = "lazy";
+        preview.appendChild(img);
       } else {
         preview.classList.add(`media-browser-icon-${type}`);
         preview.innerHTML = typeIcon(type);
@@ -1534,13 +1578,7 @@ export async function renderMediaBrowser(container, options = {}) {
       name.textContent = file.name;
       card.appendChild(name);
 
-      card.onclick = () => {
-        if (mode === 'select' && onSelect) {
-          onSelect(file.url);
-        } else {
-          window.open(file.url, '_blank', 'noopener');
-        }
-      };
+      card.onclick = () => activateFile(file);
 
       grid.appendChild(card);
     });

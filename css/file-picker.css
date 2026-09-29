@@ -669,6 +669,7 @@
 }
 
 .media-browser-card {
+  position: relative;
   cursor: pointer;
   border-radius: 6px;
   overflow: hidden;
@@ -678,6 +679,19 @@
 
 .media-browser-card:hover {
   border-color: #4a90e2;
+}
+
+.media-browser-card.selected {
+  border-color: #4a90e2;
+  background: rgba(74, 144, 226, 0.16);
+}
+
+.media-browser-card-check {
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  z-index: 1;
+  margin: 0;
 }
 
 .media-browser-card-preview {
