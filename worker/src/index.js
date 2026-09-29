@@ -66,7 +66,12 @@
 //                               slug-based like pages
 //   DELETE /drafts/cards/:id  - password-gated, removes the entry
 //   POST   /media/upload      - password-gated, ?key=<key>[&overwrite=1], body = raw file bytes.
-//                               409 if the key exists and overwrite isn't set
+//                               409 if the key exists and overwrite isn't set. Capped at ~100MB
+//                               by Cloudflare's edge, so larger files use the multipart routes:
+//   POST   /media/upload/start    - password-gated, ?key=[&overwrite=1], same 400/409 checks -> {uploadId}
+//   POST   /media/upload/part     - password-gated, ?key=&uploadId=&n=<1-based>, body = one chunk -> {partNumber, etag}
+//   POST   /media/upload/complete - password-gated, ?key=&uploadId=, body {parts: [{partNumber, etag}]}
+//   DELETE /media/upload/abort    - password-gated, ?key=&uploadId=
 //   GET    /media/list        - password-gated, ?prefix=<prefix>, lists folders/files under it
 //   POST   /media/rename      - password-gated, body {from, to}, 409 if `to` exists. Also scans every reel/page
 //                               (published and draft) for a stored URL pointing at `from` and
@@ -1261,6 +1266,49 @@ async function rewriteMediaReferences(env, fromUrl, toUrl) {
         ...(customMetadata ? { customMetadata } : {}),
       });
       return jsonResponse({ key });
+    }
+
+// Multipart upload for files over Cloudflare's ~100MB request-body cap.
+    // The Worker only relays chunks; R2 assembles them on /complete.
+    if (pathname.startsWith("/media/upload/")) {
+      const authError = requireAuth(request, env);
+      if (authError) return authError;
+      const params = new URL(request.url).searchParams;
+      const key = params.get("key");
+      if (!isValidMediaKey(key)) {
+        return jsonResponse({ error: "Invalid key" }, 400);
+      }
+      const action = pathname.slice("/media/upload/".length);
+
+      if (action === "start" && request.method === "POST") {
+        if (params.get("overwrite") !== "1" && await env.MEDIA.head(key)) {
+          return jsonResponse({ error: "File already exists" }, 409);
+        }
+        const upload = await env.MEDIA.createMultipartUpload(key, {
+          httpMetadata: { contentType: request.headers.get("Content-Type") || "application/octet-stream" },
+        });
+        return jsonResponse({ uploadId: upload.uploadId });
+      }
+
+      const uploadId = params.get("uploadId");
+      if (!uploadId) return jsonResponse({ error: "Missing uploadId" }, 400);
+      const upload = env.MEDIA.resumeMultipartUpload(key, uploadId);
+
+      if (action === "part" && request.method === "POST") {
+        const n = parseInt(params.get("n"), 10);
+        if (!(n >= 1 && n <= 10000)) return jsonResponse({ error: "Invalid part number" }, 400);
+        const part = await upload.uploadPart(n, request.body);
+        return jsonResponse({ partNumber: part.partNumber, etag: part.etag });
+      }
+      if (action === "complete" && request.method === "POST") {
+        const { parts } = await request.json();
+        await upload.complete(parts);
+        return jsonResponse({ key });
+      }
+      if (action === "abort" && request.method === "DELETE") {
+        await upload.abort();
+        return jsonResponse({ key });
+      }
     }
 
     // GET /media/list?prefix=<prefix>[&flat=1]

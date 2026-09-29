@@ -145,18 +145,58 @@ async function fetchAllR2Files() {
 
 // The Worker refuses to overwrite an existing key unless `overwrite` is set
 // - see renderUploadZone()'s Replace/Keep both prompt.
+// Cloudflare rejects request bodies over ~100MB (413), so bigger files go up
+// as fixed-size parts via the Worker's multipart routes. R2 requires every
+// part but the last to be the same size (and >= 5MiB).
+const SINGLE_UPLOAD_MAX = 90 * 1024 * 1024;
+const UPLOAD_PART_SIZE = 50 * 1024 * 1024;
+
 async function uploadFile(folder, file, name = file.name, overwrite = false) {
   const key = `${folder}${name}`;
-  const response = await apiFetch(`/media/upload?key=${encodeURIComponent(key)}${overwrite ? "&overwrite=1" : ""}`, {
-    method: "POST",
-    headers: { "Content-Type": file.type || "application/octet-stream" },
-    body: file
-  });
-  if (response.status === 409) {
-    throw new Error(`"${name}" already exists in this folder.`);
-  }
-  if (!response.ok) {
+  const contentType = file.type || "application/octet-stream";
+  const fail = (response) => {
+    if (response.status === 409) throw new Error(`"${name}" already exists in this folder.`);
     throw new Error(`Failed to upload ${file.name} (status ${response.status}).`);
+  };
+
+  if (file.size <= SINGLE_UPLOAD_MAX) {
+    const response = await apiFetch(`/media/upload?key=${encodeURIComponent(key)}${overwrite ? "&overwrite=1" : ""}`, {
+      method: "POST",
+      headers: { "Content-Type": contentType },
+      body: file
+    });
+    if (!response.ok) fail(response);
+    return;
+  }
+
+  const q = `key=${encodeURIComponent(key)}`;
+  const start = await apiFetch(`/media/upload/start?${q}${overwrite ? "&overwrite=1" : ""}`, {
+    method: "POST",
+    headers: { "Content-Type": contentType }
+  });
+  if (!start.ok) fail(start);
+  const { uploadId } = await start.json();
+  const uq = `${q}&uploadId=${encodeURIComponent(uploadId)}`;
+
+  try {
+    const parts = [];
+    for (let offset = 0, n = 1; offset < file.size; offset += UPLOAD_PART_SIZE, n++) {
+      const response = await apiFetch(`/media/upload/part?${uq}&n=${n}`, {
+        method: "POST",
+        body: file.slice(offset, offset + UPLOAD_PART_SIZE)
+      });
+      if (!response.ok) fail(response);
+      parts.push(await response.json());
+    }
+    const done = await apiFetch(`/media/upload/complete?${uq}`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ parts })
+    });
+    if (!done.ok) fail(done);
+  } catch (err) {
+    await apiFetch(`/media/upload/abort?${uq}`, { method: "DELETE" }).catch(() => {});
+    throw err;
   }
 }
 
