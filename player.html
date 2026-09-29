@@ -677,7 +677,7 @@
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
               `<div class="reel-title">${reelData.title}</div>` : ''}
-            <div class="track-info"></div>
+            <div class="track-info"><span class="track-info-text"></span></div>
             <div class="player-container">
               <button id="playPause" class="icon-button">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">
@@ -818,17 +818,10 @@
         // Pre-buffer the inactive video layer so the first crossfade is
         // instant, matching renderPlayer()'s call in js/player.js.
         playerApp.preloadVideos();
+        // No separate track-info write here - initializePlayer() already set it
+        // via updateTrackInfo(); a plain textContent write would wipe the
+        // .track-info-text span the one-line/marquee styling lives on.
 
-        // Set initial track info display
-        const trackInfo = playerApp.elements.trackInfo;
-        if (trackInfo) {
-          const fileName = firstTrack.title || 
-            firstTrack.url.split('/').pop().split('?')[0]
-              .replace(/[_-]/g, ' ').replace(/\.[^/.]+$/, '');
-          trackInfo.textContent = fileName;
-          trackInfo.classList.add('visible');
-        }
-        
         console.log(`✓ Loaded ${reelData.playlist.length} track(s)`);
       }
       
