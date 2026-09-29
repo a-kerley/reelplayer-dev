@@ -808,6 +808,10 @@ const playerAppCore = {
     // proportionally longer rather than always taking the same duration.
     const PX_PER_SECOND = 20; // ~40% slower than the original 34
     trackInfo.style.setProperty('--track-info-marquee-duration', `${Math.max(4, copyDistance / PX_PER_SECOND)}s`);
+    // Longer pause before scrolling on touch devices. JS rather than a width
+    // media query so it also covers landscape phones/tablets and the
+    // builder's Mobile Preview (forceTouchPreview).
+    trackInfo.style.setProperty('--track-info-marquee-delay', this.isTouchDevice() ? '5s' : '2s');
     textEl.classList.add('scrolling');
   },
 
