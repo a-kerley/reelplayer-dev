@@ -19,6 +19,13 @@
 #
 # Usage: ./sync-from-prod.sh   (run from worker/)
 set -euo pipefail
+
+# WHY: `env bash` can resolve to an x86_64 Homebrew bash on Apple Silicon;
+# wrangler's arm64 workerd binary then fails, and it used to fail silently.
+if [ "$(uname -m)" = "x86_64" ] && [ "$(sysctl -n hw.optional.arm64 2>/dev/null)" = "1" ]; then
+  exec arch -arm64 /bin/bash "$0" "$@"
+fi
+
 cd "$(dirname "$0")"
 
 PREFIXES=(reel_ draft_ page_ card_)
@@ -29,13 +36,13 @@ for prefix in "${PREFIXES[@]}"; do
   # --config wrangler.toml is required - wrangler otherwise silently picks
   # up the root wrangler.jsonc (the static-assets project), same gotcha
   # worker/README.md warns about for `wrangler dev`.
-  keys=$(npx wrangler kv key list --binding REELS --remote --config wrangler.toml --prefix "$prefix" 2>/dev/null | jq -r '.[].name')
+  keys=$(npx wrangler kv key list --binding REELS --remote --config wrangler.toml --prefix "$prefix" | jq -r '.[].name')
   if [ -z "$keys" ]; then
     continue
   fi
   while IFS= read -r key; do
     echo "Syncing $key"
-    npx wrangler kv key get "$key" --binding REELS --remote --config wrangler.toml --text > "$TMP" 2>/dev/null
+    npx wrangler kv key get "$key" --binding REELS --remote --config wrangler.toml --text > "$TMP"
     npx wrangler kv key put "$key" --binding REELS --local --config wrangler.toml --path "$TMP" > /dev/null
   done <<< "$keys"
 done

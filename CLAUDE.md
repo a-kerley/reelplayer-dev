@@ -425,6 +425,18 @@ See `js/modules/CLAUDE.md` for the shared media-browser component
 text-style toolbar/dialog toolkit (`styleToolbarWidgets.js`), and
 `worker/CLAUDE.md` for the Cloudflare Worker + KV + R2 backend.
 
+## Local dev stack
+
+`scripts/dev.sh` is the standard way to run it: `start` (syncs production
+KV into the local Worker via `worker/sync-from-prod.sh`, then starts
+`wrangler dev` on :8787 and `dev-server.py` on :8777), `start --no-sync`,
+`stop`, and `status`. The sync is read-only against production; R2 media
+always loads from the real CDN, so it isn't mirrored. Both scripts re-exec
+under arm64 because an x86_64 Homebrew `bash` on the PATH otherwise makes
+wrangler's `workerd` fail. A page/card published to production before a
+change ships won't have any new fields until it's re-saved, so check
+defaults when testing against synced data.
+
 ## Verification workflow
 
 Prefer DOM inspection (`page.evaluate()` + `getBoundingClientRect()` /
