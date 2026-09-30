@@ -1,4 +1,5 @@
 // Cloudflare Worker backing the ReelPlayer embed system.
+// Deploys on push to main via Workers Builds - see worker/CLAUDE.md.
 //
 // Stores each published reel's config JSON in KV under the key `reel_<id>`,
 // so player.html can fetch it by ID from any origin (fixing the previous
