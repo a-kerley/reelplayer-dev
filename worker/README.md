@@ -208,7 +208,7 @@ curl http://localhost:8787/stats/page/page-1234567890
 
 ## Redeploying after changes
 
-Any time `worker/src/index.js` changes, run `npx wrangler deploy` again from this directory. The URL stays the same, so `js/config.js` doesn't need updating unless you tear down and recreate the Worker itself.
+Any time `worker/src/index.js` changes, pushing to `main` redeploys it (Workers Builds, see `CLAUDE.md` in this directory); `npx wrangler deploy` from this directory still works as a manual fallback. The URL stays the same, so `js/config.js` doesn't need updating unless you tear down and recreate the Worker itself.
 
 ## Media Library setup (R2)
 

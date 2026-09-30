@@ -74,9 +74,15 @@ requiring the client to make a second request.
   builder page from the public hosts to reels-admin. Adding a custom domain
   needs a local `npx wrangler deploy` (the Workers Builds token can't create
   DNS records) - everything else *in the static site* deploys on push.
-- **This API Worker (`reelplayer-api`, `worker/src/index.js`) does NOT
-  deploy on push.** Any change here needs a manual
-  `npx wrangler deploy --config worker/wrangler.toml` from the repo root -
-  until then the live API runs the old code, and a builder change that
-  depends on a new route just 404s (happened with the multipart upload
-  routes). Pushing only redeploys the static site.
+- **This API Worker (`reelplayer-api`, `worker/src/index.js`) deploys on
+  push to `main`** via its own Workers Builds connection (dashboard:
+  reelplayer-api > Settings > Build - root directory `worker`, deploy
+  command `npx wrangler deploy --config wrangler.toml`, preview builds off,
+  watch paths `worker/*` excluding `worker/*.md`). A push that touches only
+  the site doesn't redeploy it. Before this existed, a builder change that
+  depended on a new route just 404'd until someone deployed by hand
+  (happened with the multipart upload routes) - if a new route 404s live,
+  check that build's log in the dashboard first. Confirm what's live with
+  `npx wrangler deployments list --config worker/wrangler.toml`; a manual
+  `npx wrangler deploy --config worker/wrangler.toml` from the repo root
+  still works as a fallback.
