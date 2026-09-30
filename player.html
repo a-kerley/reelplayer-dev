@@ -86,7 +86,7 @@
     import { WORKER_BASE_URL } from './js/config.js';
     import { createPlayerClosedIdleManager } from './js/modules/playerClosedIdle.js';
     import { createSessionId, sendStatBeacon } from './js/modules/statsBeacon.js';
-    import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './js/modules/pageTextStyles.js';
+    import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR, ensurePlaylistUnselected, isTextUnitEmpty } from './js/modules/pageTextStyles.js';
     import { renderCardChrome, mergeCardOverrides } from './js/modules/cardChrome.js';
 
     // Opt-in analytics (see js/modules/statsBeacon.js / worker/CLAUDE.md) -
@@ -368,6 +368,7 @@
         // existed - see js/modules/playerTextStyles.js's
         // ensurePlayerTextStyles() for the identical (mutating) version.
         if (!pts.roleFallbacks) pts.roleFallbacks = {};
+        ensurePlaylistUnselected(pts);
         return pts;
       }
 
@@ -388,6 +389,7 @@
         },
         trackName: {},
         playlist: {},
+        playlistUnselected: {},
         roleFallbacks: {},
       };
     }
@@ -409,7 +411,7 @@
         // Falls back to the same ROLE_DEFAULT_COLOR the fallback-styles
         // dialog's own preview already shows for an untouched role - see
         // js/modules/previewManager.js's identical copy for the full comment.
-        color: source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body,
+        color: source.colorFromAccent ? "var(--ui-accent)" : (source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body),
       };
     }
 
@@ -521,6 +523,9 @@
       applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles, pts.roleFallbacks));
       applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles, pts.roleFallbacks));
       applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles, pts.roleFallbacks));
+      if (!isTextUnitEmpty(pts.playlistUnselected)) {
+        applyTextUnitStyleVars(root, 'reel-playlist-unselected', resolveTextUnit(pts.playlistUnselected, pageRoleStyles, pts.roleFallbacks));
+      }
 
       // Background variables
       root.style.setProperty('--background-image', backgroundImage ? `url("${backgroundImage}")` : 'none');

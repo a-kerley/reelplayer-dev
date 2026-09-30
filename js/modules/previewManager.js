@@ -1,6 +1,6 @@
 // previewManager.js - Handles preview functionality with template-based approach
 import { getColorFilters, REEL_COLOR_DEFAULTS } from './colorUtils.js';
-import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR } from './pageTextStyles.js';
+import { TEXT_FONT_OPTIONS, ensureInlineGoogleFont, ROLE_DEFAULT_COLOR, ensurePlaylistUnselected, isTextUnitEmpty } from './pageTextStyles.js';
 
 // Shared by generateStyleConfig() below and player.html's identical copy
 // (applyReelStyles()) - the one real duplication this feature couldn't
@@ -52,7 +52,9 @@ function resolveTextUnit(unit, pageRoleStyles, reelRoleFallbacks) {
     // (whatever UI Accent Colour happened to be) than what the dialog had
     // shown the user. ROLE_DEFAULT_COLOR.body covers "Custom" mode (role
     // left unset, so no role key to look up at all).
-    color: source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body,
+    // WHY var(): resolves against whichever --ui-accent this preview/embed root
+    // carries, so a card's accent override is picked up with no extra plumbing.
+    color: source.colorFromAccent ? "var(--ui-accent)" : (source.color || ROLE_DEFAULT_COLOR[role] || ROLE_DEFAULT_COLOR.body),
   };
 }
 
@@ -178,6 +180,7 @@ export class PreviewManager {
 
   generateStyleConfig(reel) {
     const pts = reel.playerTextStyles || { title: {}, trackName: {}, playlist: {}, roleFallbacks: {} };
+    ensurePlaylistUnselected(pts);
 
     // Process padding value - a plain px number (or undefined) in the new
     // data model, unlike the old reel.titleAppearance.paddingBottom's
@@ -192,6 +195,8 @@ export class PreviewManager {
     const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null, pts.roleFallbacks));
     const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null, pts.roleFallbacks));
     const playlistVars = textUnitStyleVars("reel-playlist", resolveTextUnit(pts.playlist, null, pts.roleFallbacks));
+    const playlistUnselectedVars = textUnitStyleVars("reel-playlist-unselected",
+      isTextUnitEmpty(pts.playlistUnselected) ? {} : resolveTextUnit(pts.playlistUnselected, null, pts.roleFallbacks));
 
     // Process background image - only if enabled
     const backgroundImage = (reel.backgroundImageEnabled && reel.backgroundImage && reel.backgroundImage.trim()) 
@@ -262,6 +267,7 @@ export class PreviewManager {
       ...titleVars,
       ...trackNameVars,
       ...playlistVars,
+      ...playlistUnselectedVars,
 
       // Background effects variables
       "--background-image": backgroundImage,

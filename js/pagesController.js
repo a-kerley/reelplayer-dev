@@ -62,6 +62,7 @@ function createEmptyPage() {
     contentPaddingTop: 0,
     contentPaddingBottom: 0,
     textStyleDefs: {},
+    accent: "#4a90e2",
     title: "",
     createdAt: Date.now(),
     blocks: [],
@@ -833,6 +834,10 @@ export function initPagesController() {
         <button type="button" id="managePagesBtn" title="View and manage all pages you've published, including their stats and unpublishing.">Manage Published Pages</button>
         <button type="button" id="customizeTextStylesBtn" title="Define reusable text style roles (font, size, weight, color) this page's blocks can reference.">Customize Text Styles...</button>
         <div class="color-row" style="margin-top:0.6rem;">
+          <span>Accent Colour:</span>
+          <span id="pageAccentSlot"></span>
+        </div>
+        <div class="color-row" style="margin-top:0.6rem;">
           <label for="pageAnalyticsEnabled" style="cursor:pointer;" title="Track how many times this page is opened.">Track Analytics (opens)</label>
           <span id="pageAnalyticsToggleSlot"></span>
           <button type="button" id="viewPageStatsBtn" class="view-stats-btn" title="View how many times this page has been opened.">View Stats</button>
@@ -915,6 +920,13 @@ export function initPagesController() {
     // calls renderPagePreview() itself, so there's no separate row preview
     // to refresh from this call site - refreshPreview is a no-op.
     document.getElementById("customizeTextStylesBtn").onclick = () => openCustomizeStylesDialog(page, updateCurrentPage, () => {});
+    const accentSlot = document.getElementById("pageAccentSlot");
+    const accentPickr = createColorPickrButton(page.accent || "#4a90e2", (hex) => {
+      page.accent = hex;
+      updateCurrentPage();
+    }, pageFormPickrInstances);
+    accentPickr.btn.title = "The page's accent colour. Text styles set to \"Use accent colour\" follow it, including inside embedded players.";
+    accentSlot.appendChild(accentPickr.btn);
     updatePublishStatus(page);
     setupPageManagerButton(() => page);
     setupAnalyticsControls(page);

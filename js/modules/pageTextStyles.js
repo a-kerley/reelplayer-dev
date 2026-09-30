@@ -20,8 +20,14 @@
 // (js/modules/playerTextStyles.js) when that reel sits in a Player block on
 // this page. applyTextStyles() below still writes its --page-text-* vars
 // like any other role; they're just unread by css/page.css itself.
-export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link", "playlistItem"];
-export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link", playlistItem: "Playlist Item" };
+export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link", "playerTitle", "playerTrackName", "playlistItem", "playlistItemUnselected"];
+export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link", playerTitle: "Player Title", playerTrackName: "Player Track Name", playlistItem: "Playlist Item (Selected)", playlistItemUnselected: "Playlist Item (Unselected)" };
+
+// Roles only a reel's Player Text Styles rows can inherit - like
+// playlistItem above, they style nothing on the page itself (css/page.css
+// has no [data-text-role] rule for them), so they're kept out of page
+// blocks' own role menus via PAGE_TEXT_ROLES below.
+export const PLAYER_TEXT_ROLES = ["playerTitle", "playerTrackName", "playlistItem", "playlistItemUnselected"];
 
 // Every role that can be assigned wholesale to something other than
 // inline-selected text - the Customize Text Styles dialog's rows
@@ -31,6 +37,8 @@ export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", 
 // within a text block (createTextConfig()'s B/I/U buttons), not a style a
 // whole block/button can "be" the way h1/h2/h3/body/link can.
 export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", "underline"].includes(role));
+// What a page block (button, expandable overlay) can actually render a role as.
+export const PAGE_TEXT_ROLES = ASSIGNABLE_TEXT_ROLES.filter((role) => !PLAYER_TEXT_ROLES.includes(role));
 
 // Read as both the Customize Text Styles dialog's initial value for every
 // field (js/modules/pageBlocksEditor.js) and the "Edit Fallback Text
@@ -50,13 +58,47 @@ export const ASSIGNABLE_TEXT_ROLES = ROLES.filter((role) => !["bold", "italic", 
 // for every role, on purpose, so opening the color picker (or hitting
 // Reset) always lands on white rather than a role-specific pre-chosen
 // hue.
-export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playlistItem: 16 };
-export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playlistItem: 400 };
+// Player roles mirror css/player.css / css/playlist.css's own fallbacks
+// (title 1.3rem/700, track name 0.9rem/600, selected row 600).
+export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playerTitle: 21, playerTrackName: 14, playlistItem: 16, playlistItemUnselected: 16 };
+export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playerTitle: 700, playerTrackName: 600, playlistItem: 600, playlistItemUnselected: 400 };
 // Unitless line-height. Matches the fallbacks baked into css/page.css's
 // .page-block-text {h1,h2,h3,p} rules, so an uncustomized role renders
 // exactly as before.
-export const ROLE_DEFAULT_LINE_HEIGHT = { h1: 1.2, h2: 1.25, h3: 1.3, body: 1.6, link: 1.6, playlistItem: 1.6 };
-export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#ffffff", link: "#ffffff", playlistItem: "#ffffff" };
+export const ROLE_DEFAULT_LINE_HEIGHT = { h1: 1.2, h2: 1.25, h3: 1.3, body: 1.6, link: 1.6, playerTitle: 1.2, playerTrackName: 1.3, playlistItem: 1.6, playlistItemUnselected: 1.6 };
+export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#ffffff", link: "#ffffff", playerTitle: "#ffffff", playerTrackName: "#ffffff", playlistItem: "#ffffff", playlistItemUnselected: "#ffffff" };
+
+// A role with colorFromAccent set follows the accent colour of whatever it
+// renders in (a page's page.accent, or a reel/card's --ui-accent) instead of
+// its own stored `color`, which is kept so toggling back restores it.
+export const DEFAULT_PAGE_ACCENT = "#4a90e2";
+
+// Shared by the builder (playerTextStyles.js, previewManager.js) and
+// player.html, so the migration below can't drift between the two.
+//
+// Before the Playlist row split into Selected/Unselected, one `playlist`
+// unit styled every row, but css/playlist.css forced the selected row to
+// weight 600 regardless. Copying that unit into playlistUnselected, and
+// pinning a Custom selected row to 600, keeps an existing reel rendering
+// exactly as before. (A role-based selected row now takes its role's
+// weight instead of 600 - no way to pin that without leaving role mode.)
+export function ensurePlaylistUnselected(pts) {
+  if (pts.playlistUnselected) return;
+  // A reel from the brief split playlistItem/playlistDuration format can
+  // reach here un-normalized (the Cards tab previews the fetched reel as-is).
+  if (!pts.playlist) pts.playlist = pts.playlistItem || {};
+  pts.playlistUnselected = { ...pts.playlist };
+  if (!pts.playlist.role) pts.playlist.fontWeight = "600";
+}
+
+// An untouched Unselected row sets no vars, so css/playlist.css falls back
+// to the Selected row's own (see .playlist-item:not(.active)).
+export function isTextUnitEmpty(unit) {
+  return !unit || !["role", "fontFamily", "fontSize", "fontWeight", "color", "colorFromAccent"].some((key) => unit[key]);
+}
+export function resolveRoleColor(def, role, accent) {
+  return def?.colorFromAccent ? accent : (def?.color || ROLE_DEFAULT_COLOR[role]);
+}
 
 // A curated pick, not an open text field - three system/web-safe stacks
 // (no network request) plus a spread of Google Fonts across sans/serif/
@@ -204,7 +246,9 @@ export function applyTextStyles(scopeEl, page) {
       scopeEl.style.removeProperty(`--page-text-${role}-font-weight`);
     }
 
-    if (def.color) {
+    if (def.colorFromAccent) {
+      scopeEl.style.setProperty(`--page-text-${role}-color`, page.accent || DEFAULT_PAGE_ACCENT);
+    } else if (def.color) {
       scopeEl.style.setProperty(`--page-text-${role}-color`, def.color);
     } else {
       scopeEl.style.removeProperty(`--page-text-${role}-color`);

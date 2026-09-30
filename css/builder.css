@@ -645,13 +645,6 @@ body {
   margin-bottom: 1rem;
 }
 
-#reelShowTitle {
-  font-size: var(--builder-text-lg);
-  font-weight: var(--builder-weight-bold);
-  color: var(--builder-accent);
-  margin-bottom: 1.5rem;
-}
-
 /* Browsers give <fieldset> a UA-default min-width of min-content (a
    long-standing legacy quirk), which refuses to shrink the fieldset - and
    everything inside it - below its content's natural width, regardless of
@@ -1306,9 +1299,12 @@ body {
 
 /* daisyUI's <label class="toggle"> (toggle with icons) assumes Preflight's
    border-box, which this project disables - without it the icons swell the
-   toggle to ~40x27 instead of matching a plain toggle's size. */
+   toggle to ~40x27 instead of matching a plain toggle's size. Dialogs are
+   mounted on <body>, outside .builder-app, so they need the same fix. */
 .builder-app label.toggle,
-.builder-app label.toggle > * {
+.builder-app label.toggle > *,
+.dialog-overlay label.toggle,
+.dialog-overlay label.toggle > * {
   box-sizing: border-box;
 }
 
@@ -2424,6 +2420,76 @@ input.filename-display:focus {
 
 .text-style-toolbar .pickr {
   margin-top: -1px;
+}
+
+/* domUtils.js's createChoiceSwitch() - a left/right choice between two
+   options, not on/off, so it looks the same in both positions: builder-blue
+   knob with a white chevron pointing at the chosen side, on a plain dark
+   track. Both daisyUI states are overridden (it paints the knob from
+   currentColor when checked, --input-color when not). */
+.choice-switch,
+.choice-switch:has(> input:checked) {
+  --input-color: #4a90e2;
+  color: #4a90e2;
+  background-color: #1e1e1e;
+  border-color: #4a4a4a;
+}
+
+.choice-switch > svg {
+  color: #ffffff;
+}
+
+/* openTextStyleDefsDialog()'s "Player" divider row between the page and
+   player roles. */
+.text-style-defs-group {
+  padding: 0.9rem 0.3rem 0.3rem;
+  border-bottom: 1px solid #3a3a3a;
+  color: #999;
+  font-size: var(--builder-text-sm);
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+}
+
+/* "Accent (<|>) [swatch]" color-source chooser - shared by the text-style
+   toolbar and the Customize/Fallback Text Styles dialog's Color column. */
+.accent-color-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+  white-space: nowrap;
+  color: #ccc;
+  font-size: var(--builder-text-sm);
+}
+
+.accent-color-label {
+  cursor: pointer;
+}
+
+.accent-color-label {
+  transition: color 0.15s ease;
+}
+
+.accent-color-swatch {
+  transition: opacity 0.15s ease;
+}
+
+.accent-color-swatch {
+  display: inline-flex;
+  align-items: center;
+}
+
+/* Label dims via the palette's dimmed-text grey, not opacity - 0.35 opacity
+   text was too faint to read. The swatch still fades, it's not text. */
+.accent-color-label.is-inactive {
+  color: #888;
+}
+
+.accent-color-swatch.is-inactive {
+  opacity: 0.35;
+}
+
+.accent-color-swatch.is-inactive {
+  pointer-events: none;
 }
 
 /* Sit Pickr's swatch on the shared centerline. It carries a little built-in

@@ -14,7 +14,7 @@
 // third-party embeds, so a reel's rendering logic itself is never
 // duplicated a third time either.
 import { sanitizeHtml } from "./htmlSanitizer.js";
-import { ASSIGNABLE_TEXT_ROLES, TEXT_FONT_OPTIONS, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ASSIGNABLE_TEXT_ROLES, TEXT_FONT_OPTIONS, ensureInlineGoogleFont, DEFAULT_PAGE_ACCENT } from "./pageTextStyles.js";
 
 const DEFAULT_BANNER_MAX_HEIGHT = 600;
 const WIDTH_PRESETS = { full: "100%", medium: "70%", small: "40%" };
@@ -312,7 +312,10 @@ function renderPlayer(block, page) {
   // param, and the reel falls back to its own custom/default values.
   const iframeParams = new URLSearchParams({ id: block.reelId });
   if (page?.textStyleDefs && Object.keys(page.textStyleDefs).length) {
-    iframeParams.set("pageTextStyles", JSON.stringify(page.textStyleDefs));
+    // WHY: a page's accent wins over the embedded reel's own for accent-following roles.
+    const forwarded = Object.fromEntries(Object.entries(page.textStyleDefs).map(([role, def]) =>
+      [role, def?.colorFromAccent ? { ...def, colorFromAccent: false, color: page.accent || DEFAULT_PAGE_ACCENT } : def]));
+    iframeParams.set("pageTextStyles", JSON.stringify(forwarded));
   }
   // Real overrides applied on top of the reel's own configured heights by
   // player.html's applyPageHeightOverrides() - not just a pre-load guess

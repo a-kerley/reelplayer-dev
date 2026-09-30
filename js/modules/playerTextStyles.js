@@ -29,6 +29,7 @@ import { ValidationUtils } from "./validation.js";
 import { createValueControl } from "./valueControl.js";
 import { createToggleSwitch, makeSectionCollapsible } from "./domUtils.js";
 import { REEL_COLOR_DEFAULTS } from "./colorUtils.js";
+import { ensurePlaylistUnselected } from "./pageTextStyles.js";
 import { createTextStyleToolbar, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 import { attachSettingsGroupClipboard } from "./settingsGroupClipboard.js";
 
@@ -71,6 +72,7 @@ function ensurePlayerTextStyles(reel) {
     // resolveTextUnit() (previewManager.js/player.html) for what this
     // actually does.
     if (!pts.roleFallbacks) pts.roleFallbacks = {};
+    ensurePlaylistUnselected(pts);
     return;
   }
 
@@ -92,6 +94,7 @@ function ensurePlayerTextStyles(reel) {
     },
     trackName: {},
     playlist: {},
+    playlistUnselected: {},
     roleFallbacks: {},
   };
   delete reel.titleAppearance;
@@ -152,8 +155,11 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     <div class="builder-section-legend" style="margin-top:1.2rem;">Track Name</div>
     <div id="trackNameStyleToolbarSlot" style="margin-top:0.4rem;"></div>
 
-    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist (track names &amp; lengths)</div>
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist &ndash; Selected Track</div>
     <div id="playlistStyleToolbarSlot" style="margin-top:0.4rem;"></div>
+
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist &ndash; Unselected Tracks</div>
+    <div id="playlistUnselectedStyleToolbarSlot" style="margin-top:0.4rem;"></div>
   `;
 
   // Reuses the exact same Style/Font/Size/Weight/Color/Reset table as the
@@ -169,6 +175,7 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     openTextStyleDefsDialog({
       title: "Edit Fallback Text Styles",
       defs: reel.playerTextStyles.roleFallbacks,
+      getAccent: () => reel.varUiAccent || REEL_COLOR_DEFAULTS.uiAccent,
       onCommit: onChange,
     });
   };
@@ -206,6 +213,8 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     setFontWeight: (value) => { reel.playerTextStyles.title.fontWeight = value; },
     getColor: () => reel.playerTextStyles.title.color || defaultColor(),
     setColor: (value) => { reel.playerTextStyles.title.color = value; },
+    getColorFromAccent: () => reel.playerTextStyles.title.colorFromAccent,
+    setColorFromAccent: (value) => { reel.playerTextStyles.title.colorFromAccent = value; },
     pickrInstances: toolbarPickrInstances,
     onCommit: onChange,
   });
@@ -224,15 +233,16 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     setFontWeight: (value) => { reel.playerTextStyles.trackName.fontWeight = value; },
     getColor: () => reel.playerTextStyles.trackName.color || defaultColor(),
     setColor: (value) => { reel.playerTextStyles.trackName.color = value; },
+    getColorFromAccent: () => reel.playerTextStyles.trackName.colorFromAccent,
+    setColorFromAccent: (value) => { reel.playerTextStyles.trackName.colorFromAccent = value; },
     pickrInstances: toolbarPickrInstances,
     onCommit: onChange,
   });
   section.querySelector("#trackNameStyleToolbarSlot").appendChild(trackNameToolbar);
 
-  // Shared control for the whole playlist row (css/playlist.css's
-  // .playlist-item-title track name and .playlist-duration length) - one
-  // style, not independently configurable, per the original design of this
-  // section.
+  // The selected (.active) playlist row - track name and length together
+  // (css/playlist.css's .playlist-item-title and .playlist-duration), one
+  // style, not independently configurable.
   const { toolbar: playlistToolbar } = createTextStyleToolbar({
     idPrefix: "reelPlaylist",
     roleDefs: reel.playerTextStyles.roleFallbacks,
@@ -246,10 +256,34 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     setFontWeight: (value) => { reel.playerTextStyles.playlist.fontWeight = value; },
     getColor: () => reel.playerTextStyles.playlist.color || defaultColor(),
     setColor: (value) => { reel.playerTextStyles.playlist.color = value; },
+    getColorFromAccent: () => reel.playerTextStyles.playlist.colorFromAccent,
+    setColorFromAccent: (value) => { reel.playerTextStyles.playlist.colorFromAccent = value; },
     pickrInstances: toolbarPickrInstances,
     onCommit: onChange,
   });
   section.querySelector("#playlistStyleToolbarSlot").appendChild(playlistToolbar);
+
+  // Unset, it inherits the Selected row above (css/playlist.css's
+  // .playlist-item:not(.active) fallbacks) - see isTextUnitEmpty().
+  const { toolbar: playlistUnselectedToolbar } = createTextStyleToolbar({
+    idPrefix: "reelPlaylistUnselected",
+    roleDefs: reel.playerTextStyles.roleFallbacks,
+    getRole: () => reel.playerTextStyles.playlistUnselected.role,
+    setRole: (role) => { reel.playerTextStyles.playlistUnselected.role = role; },
+    getFontFamily: () => reel.playerTextStyles.playlistUnselected.fontFamily,
+    setFontFamily: (value) => { reel.playerTextStyles.playlistUnselected.fontFamily = value; },
+    getFontSize: () => reel.playerTextStyles.playlistUnselected.fontSize || PLAYLIST_DEFAULTS.fontSize,
+    setFontSize: (value) => { reel.playerTextStyles.playlistUnselected.fontSize = value; },
+    getFontWeight: () => reel.playerTextStyles.playlistUnselected.fontWeight || PLAYLIST_DEFAULTS.fontWeight,
+    setFontWeight: (value) => { reel.playerTextStyles.playlistUnselected.fontWeight = value; },
+    getColor: () => reel.playerTextStyles.playlistUnselected.color || defaultColor(),
+    setColor: (value) => { reel.playerTextStyles.playlistUnselected.color = value; },
+    getColorFromAccent: () => reel.playerTextStyles.playlistUnselected.colorFromAccent,
+    setColorFromAccent: (value) => { reel.playerTextStyles.playlistUnselected.colorFromAccent = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: onChange,
+  });
+  section.querySelector("#playlistUnselectedStyleToolbarSlot").appendChild(playlistUnselectedToolbar);
 
   makeSectionCollapsible(section);
   attachSettingsGroupClipboard(section, reel, onPasteApplied);

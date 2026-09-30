@@ -197,10 +197,29 @@
   }
 }
 
+/* js/modules/playerTextStyles.js's "Playlist - Unselected Tracks" row -
+   each var falls back to the Selected row's own (.playlist-item above), so
+   an untouched Unselected row looks exactly as before the split. */
+.playlist-item:not(.active) {
+  font-family: var(--reel-playlist-unselected-font-family, var(--reel-playlist-font-family, inherit));
+  font-size: var(--reel-playlist-unselected-size, var(--reel-playlist-size, inherit));
+  font-weight: var(--reel-playlist-unselected-weight, inherit);
+  color: var(--reel-playlist-unselected-color, var(--reel-playlist-color, #ffffff));
+}
+
+.playlist-item:not(.active) .playlist-duration {
+  font-family: var(--reel-playlist-unselected-font-family, var(--reel-playlist-font-family, inherit));
+  font-size: var(--reel-playlist-unselected-size, var(--reel-playlist-size, 0.85rem));
+  font-weight: var(--reel-playlist-unselected-weight, inherit);
+  color: var(--reel-playlist-unselected-color, var(--reel-playlist-color, #ffffff));
+}
+
 .playlist-item.active {
   transform: scale(1);
   opacity: 1;
-  font-weight: 600;
+  /* The "Playlist - Selected Track" row's weight; 600 was hardcoded here
+     before it was configurable (ensurePlaylistUnselected() migrates). */
+  font-weight: var(--reel-playlist-weight, 600);
   background-color: rgba(255, 255, 255, 0.05);
   box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
 }
@@ -222,6 +241,6 @@
 
 .playlist-item.active .playlist-duration {
   color: var(--reel-playlist-color, #ffffff);
-  font-weight: 600;
+  font-weight: var(--reel-playlist-weight, 600);
   opacity: 1;
 }

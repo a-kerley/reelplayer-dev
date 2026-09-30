@@ -6,6 +6,7 @@
 // previously-published one (if renaming) to clean up the old entry and
 // reject genuine collisions. See worker/src/index.js's POST /pages/:slug
 // handler for the other half of this contract.
+import { DEFAULT_PAGE_ACCENT } from "./pageTextStyles.js";
 import { PUBLIC_APP_ORIGIN } from "../config.js";
 import { apiFetch } from "./builderAuth.js";
 import { hashContent } from "./contentHash.js";
@@ -39,6 +40,9 @@ export function contentFingerprint(page) {
     contentPaddingTop: page.contentPaddingTop,
     contentPaddingBottom: page.contentPaddingBottom,
     textStyleDefs: page.textStyleDefs || {},
+    // WHY: omitted (JSON.stringify drops undefined) while still the default,
+    // so pages published before accent existed don't all read as edited.
+    accent: page.accent === DEFAULT_PAGE_ACCENT ? undefined : page.accent,
   });
 }
 
@@ -97,6 +101,7 @@ export async function publishPage(page, slug) {
       contentPaddingTop: typeof page.contentPaddingTop === "number" ? page.contentPaddingTop : 0,
       contentPaddingBottom: typeof page.contentPaddingBottom === "number" ? page.contentPaddingBottom : 0,
       textStyleDefs: page.textStyleDefs && typeof page.textStyleDefs === "object" ? page.textStyleDefs : {},
+      accent: typeof page.accent === "string" ? page.accent : "#4a90e2",
     }),
   });
 

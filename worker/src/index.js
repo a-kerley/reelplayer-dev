@@ -945,6 +945,7 @@ export default {
           contentPaddingTop: typeof body.contentPaddingTop === "number" ? body.contentPaddingTop : 0,
           contentPaddingBottom: typeof body.contentPaddingBottom === "number" ? body.contentPaddingBottom : 0,
           textStyleDefs: body.textStyleDefs && typeof body.textStyleDefs === "object" ? body.textStyleDefs : {},
+          accent: typeof body.accent === "string" ? body.accent : "#4a90e2",
           published: new Date().toISOString(),
         };
         await env.REELS.put(`page_${slug}`, JSON.stringify(published));

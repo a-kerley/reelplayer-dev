@@ -33,6 +33,7 @@ function normalizePage(page) {
   if (page.contentPaddingTop === undefined) page.contentPaddingTop = 0;
   if (page.contentPaddingBottom === undefined) page.contentPaddingBottom = 0;
   if (page.textStyleDefs === undefined) page.textStyleDefs = {};
+  if (page.accent === undefined) page.accent = "#4a90e2";
   return page;
 }
 

@@ -36,6 +36,17 @@ Same reasoning as the mediaBrowser.js note above: extend this shared
 toolkit and thread through the relevant getter/setter/`defs` params,
 don't re-fork the table- or toolbar-building code a third or fourth time.
 
+# Choosing between two options: `createChoiceSwitch()`, not a toggle
+
+When a setting picks one of two sources (e.g. accent colour vs. a picked
+color) rather than turning something on/off, use `domUtils.js`'s
+`createChoiceSwitch()` - a daisyUI icon toggle whose chevron points at the
+chosen side and which looks identical in both positions. A plain on/off
+toggle there reads as "enable the thing on the left" (user-tested - it
+confused). Put the left option's label before it and the right option's
+control after it, and dim whichever side isn't chosen; see
+`styleToolbarWidgets.js`'s `createAccentColorGroup()` as the reference.
+
 # One shared "label + text field + browse button" row, not per-field markup
 
 `domUtils.js`'s `createUrlInputRow()` is the single row builder behind

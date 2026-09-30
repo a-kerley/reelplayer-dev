@@ -261,6 +261,35 @@ export function createToggleSwitch({ id, checked = false, onChange = null, toolt
 }
 
 /**
+ * A left/right switch choosing between two options - not an on/off toggle
+ * (use createToggleSwitch() for that). The knob carries a chevron pointing
+ * at the chosen side and looks identical in both positions, so neither side
+ * reads as "enabled". Callers label/dim the two sides themselves (see
+ * styleToolbarWidgets.js's createAccentColorGroup() for the pattern).
+ * @param {Object} options
+ * @param {string} options.id - id of the underlying checkbox (for <label for>)
+ * @param {boolean} options.isRight - initial side
+ * @param {(isRight: boolean) => void} [options.onChange]
+ * @param {string} options.tooltip - title, also used as aria-label
+ * @returns {{ el: HTMLLabelElement, setRight: (isRight: boolean) => void }}
+ */
+export function createChoiceSwitch({ id, isRight = false, onChange = null, tooltip = "" }) {
+  // daisyUI's icon toggle: the 2nd child shows while unchecked (knob left),
+  // the 3rd while checked (knob right).
+  const el = document.createElement("label");
+  el.className = "toggle toggle-sm choice-switch";
+  el.title = tooltip;
+  const chevron = (d) => `<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="${d}"/></svg>`;
+  el.innerHTML = `<input type="checkbox">${chevron("M15 6l-6 6 6 6")}${chevron("M9 6l6 6-6 6")}`;
+  const input = el.querySelector("input");
+  input.id = id;
+  input.checked = isRight;
+  if (tooltip) input.setAttribute("aria-label", tooltip);
+  if (onChange) input.addEventListener("change", () => onChange(input.checked));
+  return { el, setRight: (right) => { input.checked = right; } };
+}
+
+/**
  * Creates a file picker button with folder icon
  * @param {Object} options - Configuration options
  * @param {string} options.id - Button element ID

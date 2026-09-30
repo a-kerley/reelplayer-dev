@@ -13,7 +13,7 @@ import { WORKER_BASE_URL } from "../config.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
 import { loadBlockPresets, addBlockPreset, deleteBlockPreset } from "./pageBlockPresets.js";
-import { ROLE_LABELS, TEXT_FONT_OPTIONS, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, applyTextStyles } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, resolveRoleColor, DEFAULT_PAGE_ACCENT, PAGE_TEXT_ROLES, applyTextStyles } from "./pageTextStyles.js";
 import { sanitizeHtml, normalizeFontFamily } from "./htmlSanitizer.js";
 import { createColorPickrButton, createToolbarDivider, createDropdownMenuButton, setDropdownLabel, fontMenuItems, createTextStyleToolbar, createWeightControl, openTextStyleDefsDialog } from "./styleToolbarWidgets.js";
 
@@ -1788,7 +1788,7 @@ function styleMenuItems(page, onPick) {
     const styleParts = [
       `font-size:${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`,
       `font-weight:${def.fontWeight || ROLE_DEFAULT_WEIGHT[role]}`,
-      `color:${def.color || ROLE_DEFAULT_COLOR[role]}`,
+      `color:${resolveRoleColor(def, role, page.accent || DEFAULT_PAGE_ACCENT)}`,
     ];
     if (font) styleParts.push(`font-family:${font.stack}`);
     return {
@@ -1805,6 +1805,7 @@ export function openCustomizeStylesDialog(page, onChange, refreshPreview) {
   openTextStyleDefsDialog({
     title: "Customize Text Styles",
     defs: page.textStyleDefs,
+    getAccent: () => page.accent || DEFAULT_PAGE_ACCENT,
     // Also refreshes any text block editors currently open on screen, not
     // just the row/page preview panes - a customization applies to every
     // block using that role, and an open contenteditable field (see
@@ -2604,6 +2605,8 @@ function createButtonConfig(block, page, onChange, refreshPreview) {
   const { toolbar: styleToolbar } = createTextStyleToolbar({
     idPrefix: `${block.blockId}-button`,
     roleDefs: page?.textStyleDefs,
+    roles: PAGE_TEXT_ROLES,
+    getAccent: () => page?.accent || DEFAULT_PAGE_ACCENT,
     getRole: () => block.textStyleRole,
     setRole: (role) => { block.textStyleRole = role; },
     getFontFamily: () => block.fontFamily,

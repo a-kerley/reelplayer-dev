@@ -8,9 +8,10 @@
 // builder domains (page blocks, reel player) isn't hand-copied a second
 // or third time.
 import { createValueControl } from "./valueControl.js";
+import { createChoiceSwitch } from "./domUtils.js";
 import { openContextMenu } from "./contextMenu.js";
 import { dialog } from "./dialogSystem.js";
-import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ROLE_DEFAULT_LINE_HEIGHT, ensureInlineGoogleFont } from "./pageTextStyles.js";
+import { ROLE_LABELS, TEXT_FONT_OPTIONS, WEIGHT_LABELS, fontWeightsFor, ASSIGNABLE_TEXT_ROLES, PLAYER_TEXT_ROLES, ROLE_DEFAULT_SIZE_PX, ROLE_DEFAULT_WEIGHT, ROLE_DEFAULT_COLOR, ROLE_DEFAULT_LINE_HEIGHT, ensureInlineGoogleFont, resolveRoleColor } from "./pageTextStyles.js";
 
 const TEXT_COLOR_SWATCHES = ["#ffffff", "#000000", "#4a90e2", "#dc3545", "#219e36", "#f4cd2a"];
 
@@ -47,6 +48,12 @@ export function createColorPickrButton(initialColor, onApply, instanceList, { op
     });
     pickrRef = pickr;
     instanceList.push(pickr);
+    // WHY: this Pickr build ignores the `default` option, so every swatch
+    // opened on black - same library defect colorPicker.js's initPickrs()
+    // works around (commit 857d182). Must be non-silent (silent skips the
+    // visible swatch) and must run BEFORE the "save" handler below exists,
+    // or it would fire onApply and write the value back as a user edit.
+    pickr.setColor(initialColor || "#ffffff");
     // Built from the raw RGB channels rather than color.toHEXA().toString()
     // - Pickr's own HEXA stringification includes an alpha suffix (e.g.
     // "#dc3545ff") that htmlSanitizer.js's 6-digit COLOR_RE rejects
@@ -239,6 +246,38 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
   return { control: wrap, refresh: render };
 }
 
+// "Accent (<|>) [swatch]" chooser for a color field that can follow the
+// accent colour (colorFromAccent) instead of its own picked hex - built on
+// domUtils.js's createChoiceSwitch(): knob left = accent, right = picker
+// (the default), and whichever side isn't in use dims. The picked color is
+// kept while following the accent. `swatchEl` must be a wrapper span around
+// the Pickr button, not the button itself (see createTextStyleToolbar()'s
+// colorWrap comment).
+function createAccentColorGroup({ id, checked, onToggle, swatchEl }) {
+  const group = document.createElement("span");
+  group.className = "accent-color-group";
+  const label = document.createElement("label");
+  label.htmlFor = id;
+  label.textContent = "Accent";
+  label.className = "accent-color-label";
+  const choice = createChoiceSwitch({
+    id,
+    isRight: !checked,
+    tooltip: "Color source: left follows the accent colour, right uses the picked color (kept while following the accent).",
+    onChange: (isRight) => { apply(!isRight); onToggle(!isRight); },
+  });
+  label.title = choice.el.title;
+  swatchEl.classList.add("accent-color-swatch");
+  function apply(fromAccent) {
+    choice.setRight(!fromAccent);
+    swatchEl.classList.toggle("is-inactive", fromAccent);
+    label.classList.toggle("is-inactive", !fromAccent);
+  }
+  apply(checked);
+  group.append(label, choice.el, swatchEl);
+  return { group, setChecked: apply };
+}
+
 // createTextStyleToolbar()'s own role menu, same preview treatment as
 // fontMenuItems() above (js/modules/pageBlocksEditor.js's text block
 // "Apply style..." menu does the identical thing for its own, separate
@@ -255,16 +294,19 @@ export function createWeightControl({ idPrefix, getFontFamily, getWeight, setWei
 // that file's own header comment), so each preview reflects whichever
 // defs object actually governs that toolbar's own "inherit" resolution.
 // Omitted entirely falls back to ROLE_DEFAULT_* for every role.
-export function roleMenuItems(defs, onPick) {
+// `accent` is what an accent-following role previews as: the reel's own
+// --ui-accent by default, but a page caller must pass page.accent - on the
+// Pages tab --ui-accent still holds whichever reel/card was last previewed.
+export function roleMenuItems(defs, onPick, roles = ASSIGNABLE_TEXT_ROLES, accent = "var(--ui-accent)") {
   return [
     { label: "Custom", onClick: () => onPick(undefined) },
-    ...ASSIGNABLE_TEXT_ROLES.map((role) => {
+    ...roles.map((role) => {
       const def = defs?.[role] || {};
       const font = TEXT_FONT_OPTIONS.find((f) => f.value === def.fontFamily);
       const styleParts = [
         `font-size:${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`,
         `font-weight:${def.fontWeight || ROLE_DEFAULT_WEIGHT[role]}`,
-        `color:${def.color || ROLE_DEFAULT_COLOR[role]}`,
+        `color:${resolveRoleColor(def, role, accent)}`,
       ];
       if (font) styleParts.push(`font-family:${font.stack}`);
       return { label: ROLE_LABELS[role], style: styleParts.join(";"), onClick: () => onPick(role) };
@@ -301,6 +343,9 @@ export function createTextStyleToolbar({
   getFontSize, setFontSize,
   getFontWeight, setFontWeight,
   getColor, setColor,
+  getColorFromAccent, setColorFromAccent,
+  roles,
+  getAccent,
   pickrInstances,
   onCommit,
 }) {
@@ -310,7 +355,7 @@ export function createTextStyleToolbar({
   const styleBtn = createDropdownMenuButton(getRole() ? ROLE_LABELS[getRole()] : "Custom");
   styleBtn.title = "Inherit a named text style, or choose Custom to set font/size/weight/color yourself.";
   styleBtn.onclick = () => {
-    openContextMenu(styleBtn, roleMenuItems(roleDefs, selectRole));
+    openContextMenu(styleBtn, roleMenuItems(roleDefs, selectRole, roles, getAccent?.()));
   };
   toolbar.appendChild(styleBtn);
   toolbar.appendChild(createToolbarDivider());
@@ -395,8 +440,20 @@ export function createTextStyleToolbar({
   }, pickrInstances);
   colorPickr.btn.title = "Text color";
   colorWrap.appendChild(colorPickr.btn);
-  toolbar.appendChild(colorWrap);
-  customControls.push(colorWrap);
+  // Optional - only callers whose renderer understands colorFromAccent pass it.
+  if (setColorFromAccent) {
+    const { group } = createAccentColorGroup({
+      id: `${idPrefix}-colorFromAccent`,
+      checked: !!getColorFromAccent(),
+      onToggle: (on) => { setColorFromAccent(on || undefined); onCommit(); },
+      swatchEl: colorWrap,
+    });
+    toolbar.appendChild(group);
+    customControls.push(group);
+  } else {
+    toolbar.appendChild(colorWrap);
+    customControls.push(colorWrap);
+  }
 
   function updateVisibility() {
     const hasRole = !!getRole();
@@ -421,7 +478,7 @@ export function createTextStyleToolbar({
 // context needs re-applied, e.g. the page dialog's open text-block
 // editors/player-block row previews, which this shared function has no
 // business knowing about).
-export function openTextStyleDefsDialog({ title, defs, onCommit }) {
+export function openTextStyleDefsDialog({ title, defs, getAccent, onCommit }) {
   const pickrInstances = [];
   function destroyPickrInstances() {
     pickrInstances.forEach((p) => p.destroy());
@@ -440,7 +497,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       labelTd.style.fontSize = `${def.fontSize || ROLE_DEFAULT_SIZE_PX[role]}px`;
       labelTd.style.fontWeight = def.fontWeight || ROLE_DEFAULT_WEIGHT[role];
       labelTd.style.lineHeight = String(def.lineHeight != null ? def.lineHeight : ROLE_DEFAULT_LINE_HEIGHT[role]);
-      labelTd.style.color = def.color || ROLE_DEFAULT_COLOR[role];
+      labelTd.style.color = resolveRoleColor(def, role, getAccent());
       labelTd.style.fontFamily = font ? font.stack : "";
     });
   }
@@ -492,7 +549,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       <th style="width:90px;text-align:center;padding:0.3rem;">Size</th>
       <th style="width:110px;text-align:center;padding:0.3rem;">Weight</th>
       <th style="width:90px;text-align:center;padding:0.3rem;">Line ht.</th>
-      <th style="width:60px;text-align:center;padding:0.3rem;">Color</th>
+      <th style="width:150px;text-align:center;padding:0.3rem;">Color</th>
       <th style="width:80px;padding:0.3rem;"></th>
     </tr>
   `;
@@ -500,6 +557,11 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
 
   const tbody = document.createElement("tbody");
   ASSIGNABLE_TEXT_ROLES.forEach((role) => {
+    if (role === PLAYER_TEXT_ROLES[0]) {
+      const groupRow = document.createElement("tr");
+      groupRow.innerHTML = `<td colspan="7" class="text-style-defs-group">Player</td>`;
+      tbody.appendChild(groupRow);
+    }
     if (!defs[role]) defs[role] = {};
     const def = defs[role];
     // Center-aligned to sit under their (also center-aligned) column
@@ -601,7 +663,15 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     colorTd.style.cssText = cellStyle;
     const colorPickr = createColorPickrButton(def.color || ROLE_DEFAULT_COLOR[role], (hex) => { def.color = hex; commitAll(); }, pickrInstances);
     colorPickr.btn.title = "Text color for this role";
-    colorTd.appendChild(colorPickr.btn);
+    const swatchWrap = document.createElement("span");
+    swatchWrap.appendChild(colorPickr.btn);
+    const accentControl = createAccentColorGroup({
+      id: `${role}-textStyleDefsAccent`,
+      checked: !!def.colorFromAccent,
+      onToggle: (on) => { def.colorFromAccent = on || undefined; commitAll(); },
+      swatchEl: swatchWrap,
+    });
+    colorTd.appendChild(accentControl.group);
     tr.appendChild(colorTd);
 
     // A Pickr swatch/select/spinner always holds a concrete value, so
@@ -632,6 +702,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
       sizeControl.input.value = ROLE_DEFAULT_SIZE_PX[role];
       weightControl.refresh();
       colorPickr.reset(ROLE_DEFAULT_COLOR[role]);
+      accentControl.setChecked(false);
       commitAll();
     };
     resetTd.appendChild(resetBtn);
@@ -655,7 +726,7 @@ export function openTextStyleDefsDialog({ title, defs, onCommit }) {
     // the table's real rendered width (each column's padding adds to its
     // th's declared width, so the table always ends up a bit wider than
     // the raw column-width sum).
-    maxWidth: "960px",
+    maxWidth: "1050px",
   });
   // createDialog's `content` option only innerHTML's an HTML string - these
   // rows need real onchange handlers, so an empty placeholder slot is
