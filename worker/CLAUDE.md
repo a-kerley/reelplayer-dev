@@ -82,7 +82,10 @@ requiring the client to make a second request.
   the site doesn't redeploy it. Before this existed, a builder change that
   depended on a new route just 404'd until someone deployed by hand
   (happened with the multipart upload routes) - if a new route 404s live,
-  check that build's log in the dashboard first. Confirm what's live with
-  `npx wrangler deployments list --config worker/wrangler.toml`; a manual
+  check that build's log in the dashboard first (reelplayer-api >
+  Deployments shows each build and the commit it deployed). `npx wrangler
+  deployments list --config worker/wrangler.toml` shows what's live, but
+  labels build and manual deploys identically (`Unknown (deployment)`), so
+  it can't tell you which one ran. A manual
   `npx wrangler deploy --config worker/wrangler.toml` from the repo root
   still works as a fallback.
