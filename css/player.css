@@ -1137,3 +1137,16 @@ button {
 .player-wrapper.idle-unblur-enabled.expandable-mode.is-playing.expanded.touch-settled {
   --idle-unblur-blur: calc(var(--background-blur) * (1 - var(--idle-unblur-target-reduction, 0.5)));
 }
+/* Pins idle-unblur / idle-undarken until the background images have loaded
+   (js/player.js gateEffectsOnBackground()). Doubled class beats every rule above. */
+.player-wrapper.bg-loading.bg-loading {
+  --idle-unblur-blur: var(--background-blur);
+}
+@media (hover: hover) and (pointer: fine) {
+  .player-wrapper.bg-loading.bg-loading.hover-darken-enabled:hover {
+    --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
+  }
+}
+.player-wrapper.bg-loading.bg-loading.hover-darken-enabled.touch-darkened {
+  --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
+}

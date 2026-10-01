@@ -345,7 +345,7 @@ function createColorPickersSection() {
         <div style="display:flex;align-items:center;justify-content:space-between;cursor:pointer;padding:0.5rem 0;" title="Set a different background image/video per track, overriding the reel's own background for that track." onclick="this.classList.toggle('expanded');const list=document.getElementById('perTrackBackgroundsList');const arrow=this.querySelector('.expand-arrow');if(list.style.display==='none'||!list.style.display){list.style.display='block';arrow.style.transform='rotate(90deg)';}else{list.style.display='none';arrow.style.transform='rotate(0deg)';}">
           <div style="display:flex;align-items:center;gap:0.2rem;">
             <span class="expand-arrow" style="font-size:0.8rem;transition:transform 0.2s;display:inline-block;">▶</span>
-            <span>Per-Track Backgrounds:</span>
+            <span style="color:#4a90e2;">Per-Track Backgrounds:</span>
           </div>
           <span style="font-size:0.75rem;color:#999;">Click to expand</span>
         </div>

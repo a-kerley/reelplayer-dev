@@ -1785,8 +1785,45 @@ const playerAppCore = {
     this.expandable.mobileManualOverrideUntil = Date.now() + fadeDuration + transitionDuration + 150;
     console.log('[vol-debug] expandFromMobileTap - override cooldown until', this.expandable.mobileManualOverrideUntil, '(now =', Date.now(), ')');
     this.expandPlayer();
+    this.wakeFromTouchIdle();
+  },
+
+  // WHY: undarken/unblur animate a background that pops in half-way if the image
+  // is still downloading. .bg-loading pins both effects (css/player.css) until
+  // the main + first-track images are decoded, or 8s passes so a dead URL can't
+  // block them forever. Videos aren't gated - loadVideo() already waits on
+  // canplaythrough. Called from renderPlayer() AND player.html's bootstrap.
+  gateEffectsOnBackground() {
+    const wrapper = this.elements.playerWrapper;
+    const r = this.currentReelSettings;
+    if (!wrapper || !r) return;
+    const urls = [
+      r.backgroundImageEnabled && r.backgroundImage,
+      activeTrackImage(r.playlist?.[0])
+    ].filter((u) => u && u.trim());
+    if (!urls.length) return;
+    wrapper.classList.add('bg-loading');
+    const done = () => wrapper.classList.remove('bg-loading');
+    Promise.race([
+      Promise.all(urls.map((u) => new Promise((res) => {
+        const img = new Image();
+        img.onload = img.onerror = res;
+        img.src = u;
+      }))),
+      new Promise((res) => setTimeout(res, 8000))
+    ]).then(done);
+  },
+
+  // WHY: on touch, expand/collapse can be triggered by scroll (IntersectionObserver)
+  // with no touchstart on the player, so nothing re-armed the idle timers - the
+  // player stayed dimmed/unblurred ("idle") after opening or closing.
+  wakeFromTouchIdle() {
     this.exitPlaybackIdle();
     this.exitCollapsedIdle();
+    this._lastIdleResetAt = undefined; // bypass RESET_THROTTLE_MS so the timer re-arms
+    this.resetPlaybackIdleTimer();
+    this.idleUnblurTouch?.handler?.();
+    this.hoverDarkenTouch?.handler?.();
   },
 
   setupExpandableModeTouchInteractions(wrapper) {
@@ -1829,8 +1866,7 @@ const playerAppCore = {
         console.log('[vol-debug] scroll observer fired and NOT blocked - isIntersecting:', entry.isIntersecting, ', isExpanded:', this.expandable.isExpanded);
         if (entry.isIntersecting) {
           if (!this.expandable.isExpanded) this.expandPlayer();
-          this.exitPlaybackIdle();
-          this.exitCollapsedIdle();
+          this.wakeFromTouchIdle();
         } else if (this.expandable.isExpanded) {
           console.log('[vol-debug] scroll observer TRIGGERING COLLAPSE');
           // immediate - by the time the default ~1.2s pre-collapsing/fade
@@ -1847,6 +1883,7 @@ const playerAppCore = {
           // already down near the edge of the screen with little to no
           // visible space below it, so nothing perceptible needs anchoring.
           this.collapsePlayer(true, isInTopHalf);
+          this.wakeFromTouchIdle();
         }
       });
     }, { threshold: 0, rootMargin: '-33% 0px -33% 0px' });
@@ -1857,8 +1894,7 @@ const playerAppCore = {
       if (this.expandable.isExpanded) {
         this.expandable.mobileManualOverrideUntil = Date.now() + TAP_COOLDOWN_MS;
         this.collapsePlayer(true); // immediate - explicit tap, not incidental hover-leave
-        this.exitPlaybackIdle();
-        this.exitCollapsedIdle();
+        this.wakeFromTouchIdle();
       } else {
         this.expandFromMobileTap();
       }
@@ -2594,6 +2630,7 @@ const playerAppCore = {
     }
     this.setupHoverDarkenTouchInteractions();
     this.setupIdleUnblurTouchInteractions();
+    this.gateEffectsOnBackground();
     this.setupWaveformWidthTracking();
 
     this.setupWaveSurfer();
