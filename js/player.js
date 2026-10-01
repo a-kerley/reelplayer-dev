@@ -2534,6 +2534,7 @@ const playerAppCore = {
     if (reel?.hoverDarkenEnabled) wrapperClasses += ' hover-darken-enabled';
     if (reel?.hoverDarkenUndarkenOnIdle) wrapperClasses += ' hover-darken-undarken-on-idle';
     if (reel?.keepTrackTitleOnIdle) wrapperClasses += ' keep-track-title-on-idle';
+    if (reel?.subtitleInline) wrapperClasses += ' subtitle-inline';
     if (reel?.idleUnblurEnabled) wrapperClasses += ' idle-unblur-enabled';
 
     // Build project title overlay HTML for expandable mode

@@ -187,6 +187,7 @@ export class EmbedExporter {
         hoverDarkenAmount: reel.hoverDarkenAmount ?? 15,
         hoverDarkenUndarkenOnIdle: reel.hoverDarkenUndarkenOnIdle === true,
         keepTrackTitleOnIdle: reel.keepTrackTitleOnIdle === true,
+        subtitleInline: reel.subtitleInline === true,
         idleUnblurEnabled: reel.idleUnblurEnabled === true,
         idleUnblurAmount: reel.idleUnblurAmount ?? 50,
 

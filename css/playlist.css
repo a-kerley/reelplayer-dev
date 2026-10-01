@@ -267,3 +267,28 @@
   white-space: nowrap;
   text-overflow: ellipsis;
 }
+
+/* Stacked subtitle adds a line, so trim the row's own vertical padding to
+   keep the overall height close to a single-line row. Inline mode keeps the
+   original padding (no extra line). */
+.player-wrapper:not(.subtitle-inline) .playlist-item.has-subtitle {
+  padding-top: 0.45rem;
+  padding-bottom: 0.45rem;
+}
+
+/* Reel setting subtitleInline: subtitle follows the title on the same row. */
+.player-wrapper.subtitle-inline .playlist-item-text {
+  flex-direction: row;
+  align-items: baseline;
+  gap: 0.5em;
+}
+.player-wrapper.subtitle-inline .playlist-item-text .playlist-item-title {
+  flex: 0 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}
+.player-wrapper.subtitle-inline .playlist-item-subtitle {
+  flex: 0 1 auto;
+}

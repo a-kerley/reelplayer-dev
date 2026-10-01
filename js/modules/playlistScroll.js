@@ -36,6 +36,7 @@ export const playlistScroll = {
         const textWrap = document.createElement("div");
         textWrap.className = "playlist-item-text";
         textWrap.append(titleEl, subtitleEl);
+        trackEl.classList.add("has-subtitle");
         trackEl.appendChild(textWrap);
       } else {
         trackEl.appendChild(titleEl);

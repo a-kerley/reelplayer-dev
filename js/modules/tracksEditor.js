@@ -3,7 +3,7 @@
 import { ValidationUtils } from './validation.js';
 import { openFilePicker } from './filePicker.js';
 import { extractFileName } from './urlUtils.js';
-import { createFilePickerButton as createFilePickerButtonEl } from './domUtils.js';
+import { createFilePickerButton as createFilePickerButtonEl, createToggleSwitch } from './domUtils.js';
 
 export function updateTracksEditor(reel, onChange) {
 
@@ -12,6 +12,7 @@ export function updateTracksEditor(reel, onChange) {
   
   tracksEditor.innerHTML = "";
 
+  tracksEditor.appendChild(createSubtitleLayoutRow(reel, onChange));
   tracksEditor.appendChild(createHeaderRow(reel));
 
   reel.playlist.forEach((track, i) => {
@@ -22,6 +23,22 @@ export function updateTracksEditor(reel, onChange) {
   // Add the phantom "Add" row
   const addRow = createAddTrackRow(reel, onChange);
   tracksEditor.appendChild(addRow);
+}
+
+function createSubtitleLayoutRow(reel, onChange) {
+  const row = document.createElement("div");
+  row.className = "color-row";
+  row.style.marginBottom = "0.6rem";
+  const label = document.createElement("span");
+  label.textContent = "Subtitle on Same Row:";
+  const toggle = createToggleSwitch({
+    id: "subtitleInline",
+    checked: !!reel.subtitleInline,
+    tooltip: "Show each playlist item's subtitle after its title on the same line, instead of on a smaller line below it.",
+    onChange: (e) => { reel.subtitleInline = e.target.checked; onChange(); },
+  });
+  row.append(label, toggle);
+  return row;
 }
 
 // Column labels above the track rows - mirrors createTrackRow()'s own

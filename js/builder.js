@@ -53,6 +53,7 @@ export function createEmptyReel() {
     hoverDarkenAmount: 15,
     hoverDarkenUndarkenOnIdle: false,
     keepTrackTitleOnIdle: false,
+    subtitleInline: false,
     idleUnblurEnabled: false,
     idleUnblurAmount: 50,
     // Player configuration
