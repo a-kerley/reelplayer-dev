@@ -1177,16 +1177,25 @@ button {
 /* ========================================
    STAGED LOAD-IN
    ======================================== */
-/* js/player.js runLoadIn(): .load-in parks each part on its first keyframe
-   (paused + backwards fill), .load-in-run plays them once the background has
-   loaded. `from`-only keyframes animate toward each element's own current
-   opacity/transform, so hidden parts (collapsed expandable, idle) stay hidden.
-   Fill is backwards only, so nothing lingers to fight later transitions. */
+/* js/player.js runLoadIn(): the wrapper (panel colour + overlay tint, i.e.
+   ::before) fades in straight away, so the overlays/filters are already in
+   place while the media loads. .load-in parks the background media and the UI
+   on their first keyframe (paused + backwards fill); .load-in-run plays them
+   once the background has loaded - media fades in under the tint (already
+   blurred/darkened, since those filters live on the media layers themselves),
+   then the UI. `from`-only keyframes animate toward each element's own current
+   opacity/transform, so hidden parts (inactive layers, collapsed expandable)
+   stay hidden. Fill is backwards only, so nothing lingers to fight later
+   transitions. */
 @keyframes rp-load-fade { from { opacity: 0; } }
 @keyframes rp-load-rise { from { opacity: 0; transform: translateY(6px); } }
 
 .player-wrapper.load-in {
-  animation: rp-load-fade 400ms ease-out backwards paused;
+  animation: rp-load-fade 300ms ease-out backwards;
+}
+.player-wrapper.load-in::after,
+.player-wrapper.load-in :is(.track-background-layer, .background-video) {
+  animation: rp-load-fade 600ms ease-out backwards paused;
 }
 .player-wrapper.load-in :is(.reel-title, .track-info) {
   animation: rp-load-rise 400ms ease-out 150ms backwards paused;
@@ -1197,13 +1206,14 @@ button {
 .player-wrapper.load-in .playlist-item {
   animation: rp-load-rise 400ms ease-out calc(450ms + var(--load-in-i, 0) * 60ms) backwards paused;
 }
-.player-wrapper.load-in-run,
-.player-wrapper.load-in-run :is(.reel-title, .track-info, .player-container, .playlist-item) {
+.player-wrapper.load-in-run::after,
+.player-wrapper.load-in-run :is(.track-background-layer, .background-video, .reel-title, .track-info, .player-container, .playlist-item) {
   animation-play-state: running;
 }
 @media (prefers-reduced-motion: reduce) {
   .player-wrapper.load-in,
-  .player-wrapper.load-in :is(.reel-title, .track-info, .player-container, .playlist-item) {
+  .player-wrapper.load-in::after,
+  .player-wrapper.load-in :is(.track-background-layer, .background-video, .reel-title, .track-info, .player-container, .playlist-item) {
     animation: none;
   }
 }
