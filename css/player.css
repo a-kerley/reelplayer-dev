@@ -1150,3 +1150,21 @@ button {
 .player-wrapper.bg-loading.bg-loading.hover-darken-enabled.touch-darkened {
   --hover-darken-brightness: var(--hover-darken-target-brightness, 0.85);
 }
+
+/* Optional second line under the now-playing title (track.subtitle) - ellipsis
+   only, no marquee. Empty = collapsed, so reels without subtitles are unchanged. */
+.track-info-subtitle {
+  display: block;
+  font-family: var(--reel-subtitle-font-family, inherit);
+  font-size: var(--reel-subtitle-size, 12px);
+  font-weight: var(--reel-subtitle-weight, 400);
+  color: var(--reel-subtitle-color, #ffffff);
+  opacity: 0.75;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+  transition: opacity 0.25s ease;
+}
+.track-info-subtitle:empty {
+  display: none;
+}

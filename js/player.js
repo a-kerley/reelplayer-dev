@@ -481,7 +481,8 @@ const playerAppCore = {
     this.updateActivePlaylistItem(index);
     
     // Update track info display
-    this.updateTrackInfo(audioURL, title);
+    const track = (this.currentReelSettings || window.currentReelSettings)?.playlist?.[index];
+    this.updateTrackInfo(audioURL, title, track?.subtitle || "");
     
     // Update track background with cross-dissolve
     this.updateTrackBackground(index);
@@ -693,7 +694,8 @@ const playerAppCore = {
     }
   },
 
-  updateTrackInfo(audioURL, title) {
+  // subtitle undefined = leave the current one alone (main.js's track:change handler omits it).
+  updateTrackInfo(audioURL, title, subtitle) {
     const trackInfo = this.elements.trackInfo;
     if (!trackInfo) return;
     const fileName = title || extractFileName(audioURL);
@@ -707,7 +709,9 @@ const playerAppCore = {
       trackInfo.textContent = fileName;
       return;
     }
-    if (trackInfo.dataset.title === fileName) {
+    const subtitleEl = trackInfo.querySelector('.track-info-subtitle');
+    const newSubtitle = subtitle ?? trackInfo.dataset.subtitle ?? '';
+    if (trackInfo.dataset.title === fileName && (trackInfo.dataset.subtitle ?? '') === newSubtitle) {
       // Same track re-selected (e.g. re-clicking the active playlist item) -
       // nothing to crossfade, but the box may have been resized since the
       // last measurement.
@@ -722,8 +726,11 @@ const playerAppCore = {
     // transition (css/player.css).
     clearTimeout(this._trackInfoFadeTimeout);
     textEl.style.opacity = '0';
+    if (subtitleEl) subtitleEl.style.opacity = '0';
     this._trackInfoFadeTimeout = setTimeout(() => {
       trackInfo.dataset.title = fileName;
+      trackInfo.dataset.subtitle = newSubtitle;
+      if (subtitleEl) { subtitleEl.textContent = newSubtitle; subtitleEl.style.opacity = ''; }
       this.refreshTrackInfoScroll();
       textEl.style.opacity = '1';
     }, 250);
@@ -2555,7 +2562,7 @@ const playerAppCore = {
             ? `<div class="reel-title">${title}</div>`
             : ""
         }
-        <div class="track-info"><span class="track-info-text"></span></div>
+        <div class="track-info"><span class="track-info-text"></span><span class="track-info-subtitle"></span></div>
         <div class="player-container">
           <button id="playPause" class="icon-button">
             <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">

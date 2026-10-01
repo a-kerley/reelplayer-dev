@@ -39,6 +39,7 @@ import { attachSettingsGroupClipboard } from "./settingsGroupClipboard.js";
 // text actually currently looks like, never a blank/generic placeholder.
 const TITLE_DEFAULTS = { fontSize: 21, fontWeight: "700" };
 const TRACK_NAME_DEFAULTS = { fontSize: 14, fontWeight: "600" };
+const TRACK_SUBTITLE_DEFAULTS = { fontSize: 12, fontWeight: "400" };
 const PLAYLIST_DEFAULTS = { fontSize: 16, fontWeight: "400" };
 
 let toolbarPickrInstances = [];
@@ -72,6 +73,7 @@ function ensurePlayerTextStyles(reel) {
     // resolveTextUnit() (previewManager.js/player.html) for what this
     // actually does.
     if (!pts.roleFallbacks) pts.roleFallbacks = {};
+    if (!pts.trackSubtitle) pts.trackSubtitle = {};
     ensurePlaylistUnselected(pts);
     return;
   }
@@ -93,6 +95,7 @@ function ensurePlayerTextStyles(reel) {
       paddingBottom: parsePx(ta.paddingBottom),
     },
     trackName: {},
+    trackSubtitle: {},
     playlist: {},
     playlistUnselected: {},
     roleFallbacks: {},
@@ -154,6 +157,9 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
 
     <div class="builder-section-legend" style="margin-top:1.2rem;">Track Name</div>
     <div id="trackNameStyleToolbarSlot" style="margin-top:0.4rem;"></div>
+
+    <div class="builder-section-legend" style="margin-top:1.2rem;">Track Subtitle</div>
+    <div id="trackSubtitleStyleToolbarSlot" style="margin-top:0.4rem;"></div>
 
     <div class="builder-section-legend" style="margin-top:1.2rem;">Playlist &ndash; Selected Track</div>
     <div id="playlistStyleToolbarSlot" style="margin-top:0.4rem;"></div>
@@ -239,6 +245,26 @@ export function createPlayerTextStylesSection(reel, onChange, onPasteApplied) {
     onCommit: onChange,
   });
   section.querySelector("#trackNameStyleToolbarSlot").appendChild(trackNameToolbar);
+
+  const { toolbar: trackSubtitleToolbar } = createTextStyleToolbar({
+    idPrefix: "reelTrackSubtitle",
+    roleDefs: reel.playerTextStyles.roleFallbacks,
+    getRole: () => reel.playerTextStyles.trackSubtitle.role,
+    setRole: (role) => { reel.playerTextStyles.trackSubtitle.role = role; },
+    getFontFamily: () => reel.playerTextStyles.trackSubtitle.fontFamily,
+    setFontFamily: (value) => { reel.playerTextStyles.trackSubtitle.fontFamily = value; },
+    getFontSize: () => reel.playerTextStyles.trackSubtitle.fontSize || TRACK_SUBTITLE_DEFAULTS.fontSize,
+    setFontSize: (value) => { reel.playerTextStyles.trackSubtitle.fontSize = value; },
+    getFontWeight: () => reel.playerTextStyles.trackSubtitle.fontWeight || TRACK_SUBTITLE_DEFAULTS.fontWeight,
+    setFontWeight: (value) => { reel.playerTextStyles.trackSubtitle.fontWeight = value; },
+    getColor: () => reel.playerTextStyles.trackSubtitle.color || defaultColor(),
+    setColor: (value) => { reel.playerTextStyles.trackSubtitle.color = value; },
+    getColorFromAccent: () => reel.playerTextStyles.trackSubtitle.colorFromAccent,
+    setColorFromAccent: (value) => { reel.playerTextStyles.trackSubtitle.colorFromAccent = value; },
+    pickrInstances: toolbarPickrInstances,
+    onCommit: onChange,
+  });
+  section.querySelector("#trackSubtitleStyleToolbarSlot").appendChild(trackSubtitleToolbar);
 
   // The selected (.active) playlist row - track name and length together
   // (css/playlist.css's .playlist-item-title and .playlist-duration), one

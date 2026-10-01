@@ -96,8 +96,15 @@ function createTrackRow(track, index, reel, onChange) {
   const removeBtn = createRemoveButton(index, reel, onChange);
 
   // Assemble row
+  // Title + optional subtitle stacked in one column so the header labels still line up.
+  const subtitleField = createSubtitleField(track, onChange);
+  const titleCol = document.createElement("div");
+  titleCol.style.cssText = "display:flex;flex-direction:column;gap:0.25rem;flex:0 1 18rem;min-width:14rem;";
+  titleField.style.width = subtitleField.style.width = "100%";
+  titleCol.append(titleField, subtitleField);
+
   row.appendChild(dragHandle);
-  row.appendChild(titleField);
+  row.appendChild(titleCol);
   row.appendChild(copyBtn);
   row.appendChild(fileNameSpan);
   row.appendChild(urlField);
@@ -160,6 +167,19 @@ function createTitleField(track, onChange) {
   };
   
   return titleField;
+}
+
+function createSubtitleField(track, onChange) {
+  const field = document.createElement("input");
+  field.type = "text";
+  field.className = "filename-display";
+  field.setAttribute("autocomplete", "off");
+  field.placeholder = "Subtitle (optional, e.g. project or studio)";
+  field.title = "Smaller second line shown under this track's title in the playlist and now-playing area.";
+  field.value = track.subtitle || "";
+  field.oninput = (e) => { track.subtitle = e.target.value; };
+  field.onblur = () => onChange();
+  return field;
 }
 
 function createUrlField(track, onChange) {

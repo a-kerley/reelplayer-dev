@@ -244,3 +244,26 @@
   font-weight: var(--reel-playlist-weight, 600);
   opacity: 1;
 }
+
+/* Optional second line under a track's title (track.subtitle). Styled by
+   js/modules/playerTextStyles.js's "Track Subtitle" row; same size/weight/colour
+   whether the row is selected or not. */
+.playlist-item-text {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+}
+.playlist-item-text .playlist-item-title {
+  flex: none;
+}
+.playlist-item-subtitle {
+  font-family: var(--reel-subtitle-font-family, inherit);
+  font-size: var(--reel-subtitle-size, 12px);
+  font-weight: var(--reel-subtitle-weight, 400);
+  color: var(--reel-subtitle-color, #ffffff);
+  opacity: 0.75;
+  overflow: hidden;
+  white-space: nowrap;
+  text-overflow: ellipsis;
+}

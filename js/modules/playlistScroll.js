@@ -29,7 +29,17 @@ export const playlistScroll = {
       durationEl.className = "playlist-duration";
       durationEl.textContent = "...";
 
-      trackEl.appendChild(titleEl);
+      if (track.subtitle) {
+        const subtitleEl = document.createElement("span");
+        subtitleEl.className = "playlist-item-subtitle";
+        subtitleEl.textContent = track.subtitle;
+        const textWrap = document.createElement("div");
+        textWrap.className = "playlist-item-text";
+        textWrap.append(titleEl, subtitleEl);
+        trackEl.appendChild(textWrap);
+      } else {
+        trackEl.appendChild(titleEl);
+      }
       trackEl.appendChild(durationEl);
 
       trackEl.addEventListener("click", () => {

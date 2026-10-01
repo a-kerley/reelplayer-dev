@@ -388,6 +388,7 @@
           paddingBottom: parsePx(ta.paddingBottom),
         },
         trackName: {},
+        trackSubtitle: {},
         playlist: {},
         playlistUnselected: {},
         roleFallbacks: {},
@@ -522,6 +523,7 @@
       root.style.setProperty('--reel-title-padding-bottom', paddingBottom);
       applyTextUnitStyleVars(root, 'reel-title', resolveTextUnit(pts.title, pageRoleStyles, pts.roleFallbacks));
       applyTextUnitStyleVars(root, 'reel-track', resolveTextUnit(pts.trackName, pageRoleStyles, pts.roleFallbacks));
+      applyTextUnitStyleVars(root, 'reel-subtitle', resolveTextUnit(pts.trackSubtitle, pageRoleStyles, pts.roleFallbacks));
       applyTextUnitStyleVars(root, 'reel-playlist', resolveTextUnit(pts.playlist, pageRoleStyles, pts.roleFallbacks));
       if (!isTextUnitEmpty(pts.playlistUnselected)) {
         applyTextUnitStyleVars(root, 'reel-playlist-unselected', resolveTextUnit(pts.playlistUnselected, pageRoleStyles, pts.roleFallbacks));
@@ -683,7 +685,7 @@
           <div class="player-content">
             ${reelData.showTitle && reelData.title && reelData.title.trim() ? 
               `<div class="reel-title">${reelData.title}</div>` : ''}
-            <div class="track-info"><span class="track-info-text"></span></div>
+            <div class="track-info"><span class="track-info-text"></span><span class="track-info-subtitle"></span></div>
             <div class="player-container">
               <button id="playPause" class="icon-button">
                 <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" class="heroicon">

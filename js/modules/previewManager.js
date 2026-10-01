@@ -194,6 +194,7 @@ export class PreviewManager {
 
     const titleVars = textUnitStyleVars("reel-title", resolveTextUnit(pts.title, null, pts.roleFallbacks));
     const trackNameVars = textUnitStyleVars("reel-track", resolveTextUnit(pts.trackName, null, pts.roleFallbacks));
+    const subtitleVars = textUnitStyleVars("reel-subtitle", resolveTextUnit(pts.trackSubtitle, null, pts.roleFallbacks));
     const playlistVars = textUnitStyleVars("reel-playlist", resolveTextUnit(pts.playlist, null, pts.roleFallbacks));
     const playlistUnselectedVars = textUnitStyleVars("reel-playlist-unselected",
       isTextUnitEmpty(pts.playlistUnselected) ? {} : resolveTextUnit(pts.playlistUnselected, null, pts.roleFallbacks));
@@ -266,6 +267,7 @@ export class PreviewManager {
       "--reel-title-padding-bottom": paddingBottom,
       ...titleVars,
       ...trackNameVars,
+      ...subtitleVars,
       ...playlistVars,
       ...playlistUnselectedVars,
 

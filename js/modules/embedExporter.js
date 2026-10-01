@@ -113,6 +113,7 @@ export class EmbedExporter {
       title: reel.title,
       playlist: reel.playlist?.map(t => ({
         title: t.title,
+        subtitle: t.subtitle || undefined,
         url: t.url,
         backgroundImage: t.backgroundImage,
         backgroundZoom: t.backgroundZoom
@@ -135,6 +136,7 @@ export class EmbedExporter {
       .map(track => ({
         url: track.url,
         title: track.title,
+        subtitle: track.subtitle || "",
         backgroundImage: track.backgroundImage || "",
         backgroundVideo: track.backgroundVideo || "",
         backgroundType: trackBackgroundType(track),
