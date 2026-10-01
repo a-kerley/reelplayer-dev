@@ -731,7 +731,7 @@ const playerAppCore = {
     this._trackInfoFadeTimeout = setTimeout(() => {
       trackInfo.dataset.title = fileName;
       trackInfo.dataset.subtitle = newSubtitle;
-      if (subtitleEl) { subtitleEl.textContent = newSubtitle; subtitleEl.style.opacity = ''; }
+      if (subtitleEl) subtitleEl.style.opacity = '';
       this.refreshTrackInfoScroll();
       textEl.style.opacity = '1';
     }, 250);
@@ -753,8 +753,10 @@ const playerAppCore = {
     const textEl = trackInfo?.querySelector('.track-info-text');
     if (!trackInfo || !textEl) return;
     const isPlaying = !!this.elements.playerWrapper?.classList.contains('is-playing');
+    const subtitleEl = trackInfo.querySelector('.track-info-subtitle');
+    const wasScrolling = trackInfo.querySelector('.track-info-text.scrolling, .track-info-subtitle-text.scrolling');
 
-    if (textEl.classList.contains('scrolling') && !isPlaying) {
+    if (wasScrolling && !isPlaying) {
       // Was actively carouselling and playback just stopped - a very quick
       // fade out/in around the reset (rather than relying only on the
       // transform transition to slide it back) masks the abrupt swap from
@@ -764,13 +766,14 @@ const playerAppCore = {
       // crossfade elsewhere) - cleared again once the fade-in lands so it
       // doesn't linger and slow down a later crossfade.
       const FAST_MS = 120;
+      const fadeEls = [textEl, subtitleEl].filter(Boolean);
       clearTimeout(this._trackInfoResetFadeTimeout);
-      textEl.style.transition = `opacity ${FAST_MS}ms ease`;
-      textEl.style.opacity = '0';
+      fadeEls.forEach((el) => { el.style.transition = `opacity ${FAST_MS}ms ease`; el.style.opacity = '0'; });
       this._trackInfoResetFadeTimeout = setTimeout(() => {
         this.applyTrackInfoContent();
         textEl.style.opacity = '1';
-        setTimeout(() => { textEl.style.transition = ''; }, FAST_MS);
+        if (subtitleEl) subtitleEl.style.opacity = '';
+        setTimeout(() => fadeEls.forEach((el) => { el.style.transition = ''; }), FAST_MS);
       }, FAST_MS);
       return;
     }
@@ -780,47 +783,74 @@ const playerAppCore = {
 
   // The actual measure-and-rebuild step behind refreshTrackInfoScroll() -
   // split out so the playback-stopped reset above can wrap it in a fade
-  // without duplicating this logic.
+  // without duplicating this logic. Title and subtitle are measured and
+  // carouselled independently (each against its own box, with its own
+  // distance/duration vars), so either can scroll while the other sits still.
   applyTrackInfoContent() {
     const trackInfo = this.elements.trackInfo;
     const textEl = trackInfo?.querySelector('.track-info-text');
     if (!trackInfo || !textEl) return;
-    const title = trackInfo.dataset.title || '';
     const isPlaying = !!this.elements.playerWrapper?.classList.contains('is-playing');
 
+    const titleOverflows = this.applyTrackInfoMarquee(textEl, trackInfo, trackInfo.dataset.title || '', isPlaying);
+    trackInfo.classList.toggle('overflowing', titleOverflows);
+
+    const subtitleEl = trackInfo.querySelector('.track-info-subtitle');
+    if (!subtitleEl) return;
+    const subtitle = trackInfo.dataset.subtitle || '';
+    if (!subtitle) {
+      subtitleEl.replaceChildren(); // :empty collapses the line (css/player.css)
+      return;
+    }
+    // WHY: created here rather than in the markup so player.html's
+    // renderPlayerHTML() and renderPlayer() don't need a matching edit.
+    // The outer element is the clipping box; this inner span ellipsizes/scrolls,
+    // the same split as .track-info / .track-info-text.
+    let inner = subtitleEl.querySelector('.track-info-subtitle-text');
+    if (!inner) {
+      inner = document.createElement('span');
+      inner.className = 'track-info-subtitle-text';
+      subtitleEl.replaceChildren(inner);
+    }
+    this.applyTrackInfoMarquee(inner, subtitleEl, subtitle, isPlaying);
+  },
+
+  // Measures `text` in `el` against `box` and, while playing and overflowing,
+  // builds the two-copy continuous carousel. Returns whether it overflows.
+  applyTrackInfoMarquee(el, box, text, isPlaying) {
     // Always measure against a single plain copy first - a duplicated
     // marquee copy would inflate scrollWidth and give a wrong reading.
-    textEl.classList.remove('scrolling');
-    textEl.textContent = title;
-    const overflow = textEl.scrollWidth - trackInfo.clientWidth;
-    trackInfo.classList.toggle('overflowing', overflow > 2);
+    el.classList.remove('scrolling');
+    el.textContent = text;
+    const overflows = el.scrollWidth - box.clientWidth > 2;
 
     const reduceMotion = window.matchMedia('(prefers-reduced-motion: reduce)').matches;
-    if (!isPlaying || overflow <= 2 || reduceMotion) {
-      // Plain single copy stays - .track-info-text's own ellipsis handles
-      // the static truncated look.
-      return;
+    if (!isPlaying || !overflows || reduceMotion) {
+      // Plain single copy stays - the element's own ellipsis handles the
+      // static truncated look.
+      return overflows;
     }
 
     const GAP_PX = 40;
     const first = document.createElement('span');
-    first.textContent = title;
+    first.textContent = text;
     first.style.marginRight = `${GAP_PX}px`;
     const second = first.cloneNode(true);
     second.style.marginRight = '0';
-    textEl.replaceChildren(first, second);
+    el.replaceChildren(first, second);
     const copyDistance = first.getBoundingClientRect().width + GAP_PX;
 
-    trackInfo.style.setProperty('--track-info-scroll-distance', `-${copyDistance}px`);
+    el.style.setProperty('--track-info-scroll-distance', `-${copyDistance}px`);
     // Constant px/sec regardless of title length, so a longer title takes
     // proportionally longer rather than always taking the same duration.
     const PX_PER_SECOND = 20; // ~40% slower than the original 34
-    trackInfo.style.setProperty('--track-info-marquee-duration', `${Math.max(4, copyDistance / PX_PER_SECOND)}s`);
+    el.style.setProperty('--track-info-marquee-duration', `${Math.max(4, copyDistance / PX_PER_SECOND)}s`);
     // Longer pause before scrolling on touch devices. JS rather than a width
     // media query so it also covers landscape phones/tablets and the
     // builder's Mobile Preview (forceTouchPreview).
-    trackInfo.style.setProperty('--track-info-marquee-delay', this.isTouchDevice() ? '5s' : '2s');
-    textEl.classList.add('scrolling');
+    el.style.setProperty('--track-info-marquee-delay', this.isTouchDevice() ? '5s' : '2s');
+    el.classList.add('scrolling');
+    return overflows;
   },
 
   updateActivePlaylistItem(index) {

@@ -443,7 +443,8 @@ button {
    .scrolling - plain single-copy text otherwise, so ellipsis keeps working)
    and hands it the --track-info-scroll-distance/-marquee-duration vars the
    loop below reads. */
-.track-info-text {
+.track-info-text,
+.track-info-subtitle-text {
   display: inline-block;
   max-width: 100%;
   overflow: hidden;
@@ -463,7 +464,8 @@ button {
    needs JS regardless; pausing/stopping removes the class, dropping back to
    the plain single copy, and .track-info-text's own transition (above)
    eases the transform back to translateX(0) rather than snapping. */
-.track-info-text.scrolling {
+.track-info-text.scrolling,
+.track-info-subtitle-text.scrolling {
   max-width: none;
   overflow: visible;
   text-overflow: clip;
@@ -483,7 +485,8 @@ button {
 }
 
 @media (prefers-reduced-motion: reduce) {
-  .track-info-text.scrolling {
+  .track-info-text.scrolling,
+  .track-info-subtitle-text.scrolling {
     animation: none;
     max-width: 100%;
     overflow: hidden;
@@ -1160,9 +1163,11 @@ button {
   font-weight: var(--reel-subtitle-weight, 400);
   color: var(--reel-subtitle-color, #ffffff);
   opacity: 0.75;
+  /* Clipping box only - the inner .track-info-subtitle-text (built by
+     applyTrackInfoContent()) owns the ellipsis and the carousel, same split
+     as .track-info / .track-info-text. */
   overflow: hidden;
   white-space: nowrap;
-  text-overflow: ellipsis;
   transition: opacity 0.25s ease;
 }
 .track-info-subtitle:empty {
