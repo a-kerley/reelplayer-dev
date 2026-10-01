@@ -20,14 +20,14 @@
 // (js/modules/playerTextStyles.js) when that reel sits in a Player block on
 // this page. applyTextStyles() below still writes its --page-text-* vars
 // like any other role; they're just unread by css/page.css itself.
-export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link", "playerTitle", "playerTrackName", "playlistItem", "playlistItemUnselected"];
-export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link", playerTitle: "Player Title", playerTrackName: "Player Track Name", playlistItem: "Playlist Item (Selected)", playlistItemUnselected: "Playlist Item (Unselected)" };
+export const ROLES = ["h1", "h2", "h3", "bold", "italic", "underline", "body", "link", "playerTitle", "playerTrackName", "playerTrackSubtitle", "playlistItem", "playlistItemUnselected"];
+export const ROLE_LABELS = { h1: "Heading 1", h2: "Heading 2", h3: "Heading 3", bold: "Bold", italic: "Italic", underline: "Underline", body: "Body", link: "Link", playerTitle: "Player Title", playerTrackName: "Player Track Name", playerTrackSubtitle: "Player Track Subtitle", playlistItem: "Playlist Item (Selected)", playlistItemUnselected: "Playlist Item (Unselected)" };
 
 // Roles only a reel's Player Text Styles rows can inherit - like
 // playlistItem above, they style nothing on the page itself (css/page.css
 // has no [data-text-role] rule for them), so they're kept out of page
 // blocks' own role menus via PAGE_TEXT_ROLES below.
-export const PLAYER_TEXT_ROLES = ["playerTitle", "playerTrackName", "playlistItem", "playlistItemUnselected"];
+export const PLAYER_TEXT_ROLES = ["playerTitle", "playerTrackName", "playerTrackSubtitle", "playlistItem", "playlistItemUnselected"];
 
 // Every role that can be assigned wholesale to something other than
 // inline-selected text - the Customize Text Styles dialog's rows
@@ -60,13 +60,13 @@ export const PAGE_TEXT_ROLES = ASSIGNABLE_TEXT_ROLES.filter((role) => !PLAYER_TE
 // hue.
 // Player roles mirror css/player.css / css/playlist.css's own fallbacks
 // (title 1.3rem/700, track name 0.9rem/600, selected row 600).
-export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playerTitle: 21, playerTrackName: 14, playlistItem: 16, playlistItemUnselected: 16 };
-export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playerTitle: 700, playerTrackName: 600, playlistItem: 600, playlistItemUnselected: 400 };
+export const ROLE_DEFAULT_SIZE_PX = { h1: 32, h2: 22, h3: 18, body: 16, link: 16, playerTitle: 21, playerTrackName: 14, playerTrackSubtitle: 12, playlistItem: 16, playlistItemUnselected: 16 };
+export const ROLE_DEFAULT_WEIGHT = { h1: 700, h2: 700, h3: 600, body: 400, link: 400, playerTitle: 700, playerTrackName: 600, playerTrackSubtitle: 400, playlistItem: 600, playlistItemUnselected: 400 };
 // Unitless line-height. Matches the fallbacks baked into css/page.css's
 // .page-block-text {h1,h2,h3,p} rules, so an uncustomized role renders
 // exactly as before.
-export const ROLE_DEFAULT_LINE_HEIGHT = { h1: 1.2, h2: 1.25, h3: 1.3, body: 1.6, link: 1.6, playerTitle: 1.2, playerTrackName: 1.3, playlistItem: 1.6, playlistItemUnselected: 1.6 };
-export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#ffffff", link: "#ffffff", playerTitle: "#ffffff", playerTrackName: "#ffffff", playlistItem: "#ffffff", playlistItemUnselected: "#ffffff" };
+export const ROLE_DEFAULT_LINE_HEIGHT = { h1: 1.2, h2: 1.25, h3: 1.3, body: 1.6, link: 1.6, playerTitle: 1.2, playerTrackName: 1.3, playerTrackSubtitle: 1.3, playlistItem: 1.6, playlistItemUnselected: 1.6 };
+export const ROLE_DEFAULT_COLOR = { h1: "#ffffff", h2: "#ffffff", h3: "#ffffff", body: "#ffffff", link: "#ffffff", playerTitle: "#ffffff", playerTrackName: "#ffffff", playerTrackSubtitle: "#ffffff", playlistItem: "#ffffff", playlistItemUnselected: "#ffffff" };
 
 // A role with colorFromAccent set follows the accent colour of whatever it
 // renders in (a page's page.accent, or a reel/card's --ui-accent) instead of

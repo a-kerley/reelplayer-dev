@@ -727,6 +727,15 @@ body {
    TRACKS EDITOR SECTION
    ============================================== */
 
+/* Secondary to the title input above it - smaller and dimmer, like the
+   subtitle line it produces in the player. */
+#tracksEditor input.track-subtitle-input[type="text"] {
+  font-size: var(--builder-text-xs, 0.75rem);
+  color: #ccc;
+  padding-top: 0.3rem;
+  padding-bottom: 0.3rem;
+}
+
 #tracksEditor input[type="text"] {
   min-width: 14rem;
   width: 18rem;

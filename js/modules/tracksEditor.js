@@ -75,6 +75,9 @@ function createTrackRow(track, index, reel, onChange) {
   row.style.display = "flex";
   row.style.gap = "0.5rem";
   row.style.marginBottom = "0.5rem";
+  // WHY: the stacked title/subtitle column is taller than the rest of the row -
+  // top-align so the file field and buttons line up with the title, not stretch.
+  row.style.alignItems = "flex-start";
   row.draggable = false;
 
   // Drag handle
@@ -172,7 +175,7 @@ function createTitleField(track, onChange) {
 function createSubtitleField(track, onChange) {
   const field = document.createElement("input");
   field.type = "text";
-  field.className = "filename-display";
+  field.className = "filename-display track-subtitle-input";
   field.setAttribute("autocomplete", "off");
   field.placeholder = "Subtitle (optional, e.g. project or studio)";
   field.title = "Smaller second line shown under this track's title in the playlist and now-playing area.";

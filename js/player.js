@@ -481,8 +481,7 @@ const playerAppCore = {
     this.updateActivePlaylistItem(index);
     
     // Update track info display
-    const track = (this.currentReelSettings || window.currentReelSettings)?.playlist?.[index];
-    this.updateTrackInfo(audioURL, title, track?.subtitle || "");
+    this.updateTrackInfo(audioURL, title);
     
     // Update track background with cross-dissolve
     this.updateTrackBackground(index);
@@ -694,8 +693,7 @@ const playerAppCore = {
     }
   },
 
-  // subtitle undefined = leave the current one alone (main.js's track:change handler omits it).
-  updateTrackInfo(audioURL, title, subtitle) {
+  updateTrackInfo(audioURL, title) {
     const trackInfo = this.elements.trackInfo;
     if (!trackInfo) return;
     const fileName = title || extractFileName(audioURL);
@@ -710,7 +708,10 @@ const playerAppCore = {
       return;
     }
     const subtitleEl = trackInfo.querySelector('.track-info-subtitle');
-    const newSubtitle = subtitle ?? trackInfo.dataset.subtitle ?? '';
+    // WHY: looked up here, not passed in - main.js's track:change handler re-calls
+    // this without it mid-crossfade, which used to wipe the pending subtitle.
+    const playlist = (this.currentReelSettings || window.currentReelSettings)?.playlist;
+    const newSubtitle = playlist?.[this.currentTrackIndex]?.subtitle || '';
     if (trackInfo.dataset.title === fileName && (trackInfo.dataset.subtitle ?? '') === newSubtitle) {
       // Same track re-selected (e.g. re-clicking the active playlist item) -
       // nothing to crossfade, but the box may have been resized since the
