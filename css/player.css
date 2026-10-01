@@ -1173,3 +1173,37 @@ button {
 .track-info-subtitle:empty {
   display: none;
 }
+
+/* ========================================
+   STAGED LOAD-IN
+   ======================================== */
+/* js/player.js runLoadIn(): .load-in parks each part on its first keyframe
+   (paused + backwards fill), .load-in-run plays them once the background has
+   loaded. `from`-only keyframes animate toward each element's own current
+   opacity/transform, so hidden parts (collapsed expandable, idle) stay hidden.
+   Fill is backwards only, so nothing lingers to fight later transitions. */
+@keyframes rp-load-fade { from { opacity: 0; } }
+@keyframes rp-load-rise { from { opacity: 0; transform: translateY(6px); } }
+
+.player-wrapper.load-in {
+  animation: rp-load-fade 400ms ease-out backwards paused;
+}
+.player-wrapper.load-in :is(.reel-title, .track-info) {
+  animation: rp-load-rise 400ms ease-out 150ms backwards paused;
+}
+.player-wrapper.load-in .player-container {
+  animation: rp-load-rise 400ms ease-out 300ms backwards paused;
+}
+.player-wrapper.load-in .playlist-item {
+  animation: rp-load-rise 400ms ease-out calc(450ms + var(--load-in-i, 0) * 60ms) backwards paused;
+}
+.player-wrapper.load-in-run,
+.player-wrapper.load-in-run :is(.reel-title, .track-info, .player-container, .playlist-item) {
+  animation-play-state: running;
+}
+@media (prefers-reduced-motion: reduce) {
+  .player-wrapper.load-in,
+  .player-wrapper.load-in :is(.reel-title, .track-info, .player-container, .playlist-item) {
+    animation: none;
+  }
+}

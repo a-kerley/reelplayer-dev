@@ -10,6 +10,7 @@ export const playlistScroll = {
       const trackEl = document.createElement("div");
       trackEl.className = "playlist-item";
       trackEl.dataset.index = index;
+      trackEl.style.setProperty("--load-in-i", Math.min(index, 8)); // stagger cap, css/player.css
 
       const titleEl = document.createElement("span");
       titleEl.className = "playlist-item-title";

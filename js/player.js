@@ -1831,18 +1831,19 @@ const playerAppCore = {
   // the main + first-track images are decoded, or 8s passes so a dead URL can't
   // block them forever. Videos aren't gated - loadVideo() already waits on
   // canplaythrough. Called from renderPlayer() AND player.html's bootstrap.
+  // Returns a promise for "background ready" (also what runLoadIn() waits on).
   gateEffectsOnBackground() {
     const wrapper = this.elements.playerWrapper;
     const r = this.currentReelSettings;
-    if (!wrapper || !r) return;
+    if (!wrapper || !r) return Promise.resolve();
     const urls = [
       r.backgroundImageEnabled && r.backgroundImage,
       activeTrackImage(r.playlist?.[0])
     ].filter((u) => u && u.trim());
-    if (!urls.length) return;
+    if (!urls.length) return Promise.resolve();
     wrapper.classList.add('bg-loading');
     const done = () => wrapper.classList.remove('bg-loading');
-    Promise.race([
+    return Promise.race([
       Promise.all(urls.map((u) => new Promise((res) => {
         const img = new Image();
         img.onload = img.onerror = res;
@@ -1850,6 +1851,22 @@ const playerAppCore = {
       }))),
       new Promise((res) => setTimeout(res, 8000))
     ]).then(done);
+  },
+
+  // Staged load-in (css/player.css "STAGED LOAD-IN"): .load-in holds every part
+  // at its first keyframe (paused), .load-in-run plays the sequence once the
+  // background is ready. `key` is the reel id - the builder re-renders on every
+  // edit, so it only plays the first time a given reel is rendered.
+  runLoadIn(bgReady, key) {
+    const wrapper = this.elements.playerWrapper;
+    if (!wrapper || (key !== undefined && this._loadInKey === key)) return;
+    this._loadInKey = key;
+    wrapper.classList.add('load-in');
+    bgReady.then(() => {
+      wrapper.classList.add('load-in-run');
+      // Longest part: playlist row 8 (450 + 8*60ms delay) + 400ms animation.
+      setTimeout(() => wrapper.classList.remove('load-in', 'load-in-run'), 1400);
+    });
   },
 
   // WHY: on touch, expand/collapse can be triggered by scroll (IntersectionObserver)
@@ -2669,7 +2686,7 @@ const playerAppCore = {
     }
     this.setupHoverDarkenTouchInteractions();
     this.setupIdleUnblurTouchInteractions();
-    this.gateEffectsOnBackground();
+    this.runLoadIn(this.gateEffectsOnBackground(), reel?.id);
     this.setupWaveformWidthTracking();
 
     this.setupWaveSurfer();
