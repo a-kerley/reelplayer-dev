@@ -873,6 +873,8 @@ export default {
 
       const entries = await listEntries(env, "page_", (p) => ({
         id: p.id, slug: p.slug, title: p.title, published: p.published, analyticsEnabled: p.analyticsEnabled === true,
+        // Player blocks' reel references - lets the builder's Published Reels list show where each reel is used.
+        reelIds: [...new Set((p.blocks || []).map((b) => b?.reelId).filter(Boolean))],
       }));
       return jsonResponse(entries);
     }

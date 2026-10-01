@@ -1011,6 +1011,12 @@ body {
   margin-top: 0.45rem;
 }
 
+.manage-used-in {
+  margin-top: 0.4rem;
+  font-size: 0.8rem;
+  color: #999;
+}
+
 .manage-badge {
   display: inline-block;
   background: #1e1e1e;

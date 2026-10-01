@@ -13,6 +13,30 @@ async function fetchReelList() {
   return response.json();
 }
 
+// Pages and Cards are the only places we can see a reel being used (a
+// third-party site's iframe is invisible to us). Both reference a reel as
+// `live-<sourceReelId>` (follows republishes) or a specific version's id (pinned).
+async function fetchUsages() {
+  const load = async (path) => {
+    try {
+      const r = await apiFetch(path);
+      return r.ok ? r.json() : [];
+    } catch {
+      return [];
+    }
+  };
+  const [pages, cards] = await Promise.all([load("/pages"), load("/cards")]);
+  return [
+    ...pages.map((p) => ({ kind: "Page", name: p.title || p.slug, refs: p.reelIds || [] })),
+    // Cards are versioned like reels - only the newest version of each counts.
+    ...Object.values(cards.reduce((acc, c) => {
+      const key = c.sourceCardId || c.id;
+      if (!acc[key] || (c.created || "") > (acc[key].created || "")) acc[key] = c;
+      return acc;
+    }, {})).map((c) => ({ kind: "Card", name: c.title, refs: c.reelId ? [c.reelId] : [] }))
+  ];
+}
+
 async function deleteReel(id) {
   const response = await apiFetch(`/reels/${id}`, { method: "DELETE" });
   if (!response.ok) {
@@ -43,7 +67,7 @@ export function groupByReel(entries) {
 
 // currentReelId - the draft id of the reel open in the builder, matched
 // against each group's sourceReelId so the highlight survives republishes.
-function renderListHTML(groups, currentReelId) {
+function renderListHTML(groups, currentReelId, usages = []) {
   // KV writes aren't instantly consistent across every edge location, so a
   // reel published moments ago can briefly be missing from this list even
   // though the publish itself succeeded - this note is shown unconditionally
@@ -64,14 +88,24 @@ function renderListHTML(groups, currentReelId) {
       : '<span class="manage-badge">Analytics off</span>';
     const versionCount = `<span class="manage-badge">${group.versions.length} version${group.versions.length === 1 ? "" : "s"}</span>`;
 
-    const versions = group.versions.map((v, i) => `
+    const usedBy = (match) => usages.filter((u) => u.refs.some(match));
+    const liveUsers = usedBy((r) => group.sourceReelId && r === `live-${group.sourceReelId}`);
+    const usedHTML = liveUsers.length
+      ? `<div class="manage-used-in" title="Pages/Cards that always show this reel's latest version. Embeds on other websites can't be detected.">Used in: ${liveUsers.map((u) => `${u.kind} "${escapeHtml(u.name)}"`).join(", ")}</div>`
+      : '<div class="manage-used-in" title="Embeds on other websites can\'t be detected.">Not used in any Page or Card</div>';
+
+    const versions = group.versions.map((v, i) => {
+      const pinned = usedBy((r) => r === v.id);
+      return `
       <div class="manage-version">
         <span class="manage-version-date">${formatDate(v.created)}</span>
         ${i === 0 ? '<span class="manage-badge manage-badge--on">Latest</span>' : ""}
+        ${pinned.length ? `<span class="manage-badge" title="Pinned to this exact version">Pinned: ${pinned.map((u) => escapeHtml(u.name)).join(", ")}</span>` : ""}
         <code class="manage-id" title="Embed id">${escapeHtml(v.id)}</code>
         <button type="button" class="manage-btn manage-btn--danger embed-manager-delete-btn" data-id="${escapeHtml(v.id)}" data-title="${title}" data-created="${escapeHtml(formatDate(v.created))}"
           title="Permanently delete this published version">Delete</button>
-      </div>`).join("");
+      </div>`;
+    }).join("");
 
     return `
       <div class="manage-card${isCurrent ? " is-current" : ""}">
@@ -81,6 +115,7 @@ function renderListHTML(groups, currentReelId) {
             title="View opens/plays/listen-time analytics for this reel (all its published versions combined)">Stats</button>
         </div>
         <div class="manage-badges">${analyticsBadge}${versionCount}</div>
+        ${usedHTML}
         <div class="manage-versions">${versions}</div>
       </div>`;
   }).join("");
@@ -98,11 +133,12 @@ async function openEmbedManager(getCurrentReel) {
   }
 
   const groups = groupByReel(entries);
+  const usages = await fetchUsages();
 
   dialog.createDialog({
     type: "custom",
     message: `Published Reels (${groups.length})`,
-    content: renderListHTML(groups, getCurrentReel?.()?.id),
+    content: renderListHTML(groups, getCurrentReel?.()?.id, usages),
     maxWidth: "640px",
     buttons: [
       { text: "Close", type: "secondary", onClick: () => dialog.closeDialog() }
