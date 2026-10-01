@@ -323,6 +323,9 @@ function renderPlayer(block, page) {
   if (closedOverride) iframeParams.set("closedHeightOverride", String(closedOverride));
   if (openOverride) iframeParams.set("openHeightOverride", String(openOverride));
   if (playerOverride) iframeParams.set("playerHeightOverride", String(playerOverride));
+  // WHY: a page with several reels shouldn't fetch every player's media up front -
+  // off-screen embeds load when scrolled near, so the one being used gets bandwidth.
+  iframe.loading = "lazy";
   iframe.src = `player?${iframeParams}`;
   iframe.width = "100%";
   iframe.height = String(height);
